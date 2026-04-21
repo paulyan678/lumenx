@@ -8,7 +8,13 @@ import {
     GLOBAL_T2I_MODELS,
     R2V_ROUTE_MODEL_ID,
     R2V_SELECTION_MODEL_ID,
+    getCanonicalDefaults,
+    getCanonicalModeEntry,
+    getCanonicalModeId,
+    getLegacyModelId,
     getMaxReferenceImages,
+    getModelLineEntry,
+    getModeGateway,
     resolveModelSettings,
 } from '@/lib/modelCatalog';
 
@@ -167,5 +173,66 @@ describe('model catalog runtime helpers', () => {
     it('reads per-model reference image limits from catalog metadata', () => {
         expect(getMaxReferenceImages('wan2.6-image')).toBe(4);
         expect(getMaxReferenceImages('wan2.5-i2i-preview')).toBe(3);
+    });
+});
+
+describe('model catalog phase 2 canonical helpers', () => {
+    it('resolves legacy flat id to canonical mode id', () => {
+        expect(getCanonicalModeId('wan2.6-i2v')).toBe('wan/wan2.6-video#i2v');
+        expect(getCanonicalModeId('wan2.6-r2v')).toBe('wan/wan2.6-video#r2v');
+        expect(getCanonicalModeId('nonexistent')).toBeUndefined();
+    });
+
+    it('resolves canonical mode id back to legacy flat id', () => {
+        expect(getLegacyModelId('wan/wan2.6-video#i2v')).toBe('wan2.6-i2v');
+        expect(getLegacyModelId('wan/wan2.6-video#r2v')).toBe('wan2.6-r2v');
+        expect(getLegacyModelId('nonexistent')).toBeUndefined();
+    });
+
+    it('reads canonical mode entry with full metadata', () => {
+        const entry = getCanonicalModeEntry('wan/wan2.6-video#i2v');
+        expect(entry).not.toBeNull();
+        expect(entry?.model_line_id).toBe('wan/wan2.6-video');
+        expect(entry?.legacy_model_id).toBe('wan2.6-i2v');
+        expect(entry?.mode).toBe('i2v');
+        expect(entry?.family).toBe('wan');
+
+        expect(getCanonicalModeEntry('nonexistent')).toBeNull();
+    });
+
+    it('reads model line entry', () => {
+        const line = getModelLineEntry('wan/wan2.6-video');
+        expect(line).not.toBeNull();
+        expect(line?.family).toBe('wan');
+        expect(line?.modes).toContain('wan/wan2.6-video#i2v');
+        expect(line?.modes).toContain('wan/wan2.6-video#r2v');
+        expect(line?.legacy_model_ids).toContain('wan2.6-i2v');
+
+        expect(getModelLineEntry('nonexistent')).toBeNull();
+    });
+
+    it('reads gateway metadata from canonical mode runtime', () => {
+        expect(getModeGateway('wan/wan2.6-video#r2v')).toBe('dashscope');
+        expect(getModeGateway('wan/wan2.6-video#r2v', 'vendor')).toBeUndefined();
+        expect(getModeGateway('nonexistent')).toBeUndefined();
+    });
+
+    it('reads canonical default model settings', () => {
+        const defaults = getCanonicalDefaults();
+        expect(defaults.t2i_model).toContain('#');
+        expect(defaults.i2i_model).toContain('#');
+        expect(defaults.i2v_model).toContain('#');
+    });
+
+    it('does not leak canonical ids into visible flat model selectors', () => {
+        for (const model of GLOBAL_I2V_MODELS) {
+            expect(model.id).not.toContain('#');
+        }
+        for (const model of GLOBAL_T2I_MODELS) {
+            expect(model.id).not.toContain('#');
+        }
+        for (const model of GLOBAL_I2I_MODELS) {
+            expect(model.id).not.toContain('#');
+        }
     });
 });

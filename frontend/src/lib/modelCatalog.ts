@@ -89,23 +89,53 @@ interface ModelCatalog {
             i2i_model: string;
             i2v_model: string;
         };
+        canonical_model_settings?: {
+            t2i_model?: string;
+            i2i_model?: string;
+            i2v_model?: string;
+        };
     };
     models: Record<string, CatalogModel>;
-    model_lines?: Record<string, unknown>;
-    modes?: Record<string, unknown>;
-    canonical_defaults?: {
-        t2i_mode_id?: string;
-        i2i_mode_id?: string;
-        i2v_mode_id?: string;
-    };
-    compat?: {
-        legacy_model_ids?: Record<string, string>;
+    model_lines: Record<
+        string,
+        {
+            id: string;
+            family: string;
+            modes: string[];
+            legacy_model_ids: string[];
+            runtime?: Record<string, Record<string, unknown>>;
+            [key: string]: unknown;
+        }
+    >;
+    modes: Record<
+        string,
+        {
+            id: string;
+            model_line_id: string;
+            legacy_model_id: string;
+            mode: string;
+            family: string;
+            status: ModelStatus;
+            capabilities: string[];
+            runtime: Record<string, Record<string, unknown>>;
+            ui: {
+                selection_group: SelectionGroup;
+                visible_in: VisibilitySurface[];
+                recommended?: boolean;
+                order?: number;
+                badges?: string[];
+            };
+            [key: string]: unknown;
+        }
+    >;
+    compat: {
+        legacy_model_ids: Record<string, string>;
     };
 }
 
 const MODEL_CATALOG = rawCatalog as ModelCatalog;
 const CATALOG_MODELS = Object.values(MODEL_CATALOG.models);
-const LEGACY_MODEL_ID_ALIASES = MODEL_CATALOG.compat?.legacy_model_ids ?? {};
+const LEGACY_MODEL_ID_ALIASES = MODEL_CATALOG.compat.legacy_model_ids;
 const CANONICAL_MODEL_ID_ALIASES = Object.freeze(
     Object.fromEntries(
         Object.entries(LEGACY_MODEL_ID_ALIASES).map(([legacyModelId, canonicalModeId]) => [
@@ -114,6 +144,47 @@ const CANONICAL_MODEL_ID_ALIASES = Object.freeze(
         ])
     ) as Record<string, string>
 );
+
+// ---------------------------------------------------------------------------
+// Phase 2: Canonical mode internal helpers
+// ---------------------------------------------------------------------------
+
+/** Resolve a legacy flat ID to its canonical mode ID, or undefined. */
+export function getCanonicalModeId(legacyId: string): string | undefined {
+    return LEGACY_MODEL_ID_ALIASES[legacyId];
+}
+
+/** Resolve a canonical mode ID back to its legacy flat ID, or undefined. */
+export function getLegacyModelId(canonicalModeId: string): string | undefined {
+    return CANONICAL_MODEL_ID_ALIASES[canonicalModeId];
+}
+
+/** Get the canonical mode entry for a mode ID. */
+export function getCanonicalModeEntry(canonicalModeId: string) {
+    return MODEL_CATALOG.modes[canonicalModeId] ?? null;
+}
+
+/** Get the model line entry for a model line ID. */
+export function getModelLineEntry(modelLineId: string) {
+    return MODEL_CATALOG.model_lines[modelLineId] ?? null;
+}
+
+/** Get the gateway value for a canonical mode on a backend. */
+export function getModeGateway(
+    canonicalModeId: string,
+    backend: string = 'dashscope'
+): string | undefined {
+    const mode = MODEL_CATALOG.modes[canonicalModeId];
+    if (!mode) return undefined;
+    const backendMeta = mode.runtime?.[backend];
+    if (!backendMeta) return undefined;
+    return backendMeta.gateway as string | undefined;
+}
+
+/** Get canonical default model settings. */
+export function getCanonicalDefaults(): Record<string, string> {
+    return { ...(MODEL_CATALOG.defaults.canonical_model_settings ?? {}) };
+}
 
 const DEFAULT_ASPECT_RATIOS = Object.freeze({
     character_aspect_ratio: '9:16',

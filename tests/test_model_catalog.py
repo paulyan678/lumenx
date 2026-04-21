@@ -10,6 +10,7 @@ from src.utils.model_catalog import (
     build_catalog_dict,
     build_catalog_validation_report,
     build_provider_family_configs,
+    get_catalog_accessor,
     get_default_model_settings,
     write_frontend_generated_catalog,
     write_generated_catalog,
@@ -271,3 +272,203 @@ class TestModelCatalogValidation:
 
         with pytest.raises(ValueError, match="Unsupported backend"):
             build_catalog_dict(tmp_path)
+
+
+class TestPhase2CatalogContract:
+    """Phase 2: Treat additive metadata as official generated contract."""
+
+    def test_model_lines_emitted_for_all_families(self):
+        catalog = build_catalog_dict(MODEL_CATALOG_ROOT)
+
+        model_lines = catalog["model_lines"]
+        families_with_lines = {ml["family"] for ml in model_lines.values()}
+
+        for family_name in catalog["families"]:
+            assert family_name in families_with_lines, (
+                f"Family '{family_name}' has no model_lines entries"
+            )
+
+    def test_every_legacy_model_has_canonical_mapping(self):
+        catalog = build_catalog_dict(MODEL_CATALOG_ROOT)
+
+        for model_id in catalog["models"]:
+            assert model_id in catalog["compat"]["legacy_model_ids"], (
+                f"Legacy model '{model_id}' missing from compat.legacy_model_ids"
+            )
+            canonical_id = catalog["compat"]["legacy_model_ids"][model_id]
+            assert canonical_id in catalog["modes"], (
+                f"Canonical mode '{canonical_id}' for '{model_id}' missing from modes"
+            )
+
+    def test_canonical_defaults_resolve_to_valid_modes(self):
+        catalog = build_catalog_dict(MODEL_CATALOG_ROOT)
+
+        canonical_defaults = catalog["defaults"]["canonical_model_settings"]
+        assert canonical_defaults, "canonical_model_settings must be present"
+
+        for key, canonical_id in canonical_defaults.items():
+            assert canonical_id in catalog["modes"], (
+                f"Canonical default '{key}' -> '{canonical_id}' not in modes"
+            )
+            mode_entry = catalog["modes"][canonical_id]
+            assert mode_entry["legacy_model_id"] in catalog["models"], (
+                f"Mode '{canonical_id}' legacy_model_id not in models"
+            )
+
+    def test_mode_entries_have_required_metadata(self):
+        catalog = build_catalog_dict(MODEL_CATALOG_ROOT)
+
+        for mode_id, mode in catalog["modes"].items():
+            assert "model_line_id" in mode, f"{mode_id} missing model_line_id"
+            assert "legacy_model_id" in mode, f"{mode_id} missing legacy_model_id"
+            assert "mode" in mode, f"{mode_id} missing mode name"
+            assert "runtime" in mode, f"{mode_id} missing runtime"
+            assert "family" in mode, f"{mode_id} missing family"
+            assert "ui" in mode, f"{mode_id} missing ui"
+            assert mode["model_line_id"] in catalog["model_lines"], (
+                f"{mode_id} references nonexistent model_line '{mode['model_line_id']}'"
+            )
+
+    def test_runtime_gateway_present_where_defined(self):
+        catalog = build_catalog_dict(MODEL_CATALOG_ROOT)
+
+        wan_video_modes = [
+            mid for mid in catalog["modes"]
+            if mid.startswith("wan/wan2.6-video#")
+        ]
+        assert wan_video_modes, "Expected wan2.6-video modes to exist"
+
+        for mode_id in wan_video_modes:
+            mode = catalog["modes"][mode_id]
+            dashscope_runtime = mode["runtime"].get("dashscope", {})
+            assert "gateway" in dashscope_runtime, (
+                f"{mode_id} missing runtime.dashscope.gateway"
+            )
+
+
+class TestCatalogAccessor:
+    """Phase 2: Test the CatalogAccessor helper API."""
+
+    def test_resolve_legacy_to_canonical(self):
+        accessor = get_catalog_accessor(build_catalog_dict(MODEL_CATALOG_ROOT))
+
+        assert accessor.resolve_legacy_to_canonical("wan2.6-i2v") == "wan/wan2.6-video#i2v"
+        assert accessor.resolve_legacy_to_canonical("wan2.6-r2v") == "wan/wan2.6-video#r2v"
+        assert accessor.resolve_legacy_to_canonical("nonexistent") is None
+
+    def test_resolve_canonical_to_legacy(self):
+        accessor = get_catalog_accessor(build_catalog_dict(MODEL_CATALOG_ROOT))
+
+        assert accessor.resolve_canonical_to_legacy("wan/wan2.6-video#i2v") == "wan2.6-i2v"
+        assert accessor.resolve_canonical_to_legacy("wan/wan2.6-video#r2v") == "wan2.6-r2v"
+        assert accessor.resolve_canonical_to_legacy("nonexistent") is None
+
+    def test_resolve_to_flat_accepts_both_id_forms(self):
+        accessor = get_catalog_accessor(build_catalog_dict(MODEL_CATALOG_ROOT))
+
+        assert accessor.resolve_to_flat("wan2.6-i2v") == "wan2.6-i2v"
+        assert accessor.resolve_to_flat("wan/wan2.6-video#i2v") == "wan2.6-i2v"
+        assert accessor.resolve_to_flat("unknown-id") == "unknown-id"
+
+    def test_get_mode_entry_returns_full_metadata(self):
+        accessor = get_catalog_accessor(build_catalog_dict(MODEL_CATALOG_ROOT))
+
+        entry = accessor.get_mode_entry("wan/wan2.6-video#i2v")
+        assert entry is not None
+        assert entry["model_line_id"] == "wan/wan2.6-video"
+        assert entry["legacy_model_id"] == "wan2.6-i2v"
+        assert entry["mode"] == "i2v"
+        assert entry["family"] == "wan"
+
+    def test_get_mode_runtime(self):
+        accessor = get_catalog_accessor(build_catalog_dict(MODEL_CATALOG_ROOT))
+
+        runtime = accessor.get_mode_runtime("wan/wan2.6-video#r2v")
+        assert runtime is not None
+        assert "dashscope" in runtime
+
+        assert accessor.get_mode_runtime("nonexistent") is None
+
+    def test_get_mode_product(self):
+        accessor = get_catalog_accessor(build_catalog_dict(MODEL_CATALOG_ROOT))
+
+        ui = accessor.get_mode_product("wan/wan2.6-video#i2v")
+        assert ui is not None
+        assert ui["selection_group"] == "i2v"
+
+        assert accessor.get_mode_product("nonexistent") is None
+
+    def test_get_gateway(self):
+        accessor = get_catalog_accessor(build_catalog_dict(MODEL_CATALOG_ROOT))
+
+        assert accessor.get_gateway("wan/wan2.6-video#r2v") == "dashscope"
+        assert accessor.get_gateway("wan/wan2.6-video#r2v", "vendor") is None
+        assert accessor.get_gateway("nonexistent") is None
+
+    def test_enumeration_helpers(self):
+        accessor = get_catalog_accessor(build_catalog_dict(MODEL_CATALOG_ROOT))
+
+        canonical_ids = accessor.all_canonical_mode_ids()
+        legacy_ids = accessor.all_legacy_model_ids()
+        line_ids = accessor.all_model_line_ids()
+
+        assert len(canonical_ids) == len(legacy_ids)
+        assert len(canonical_ids) > 0
+        assert len(line_ids) > 0
+        assert all("#" in cid for cid in canonical_ids)
+
+    def test_canonical_defaults(self):
+        accessor = get_catalog_accessor(build_catalog_dict(MODEL_CATALOG_ROOT))
+
+        defaults = accessor.canonical_defaults()
+        assert "t2i_model" in defaults
+        assert "i2i_model" in defaults
+        assert "i2v_model" in defaults
+        assert all("#" in v for v in defaults.values())
+
+
+class TestGetGatewayForModel:
+    """Phase 2 Task 6: Tests for provider_registry.get_gateway_for_model()."""
+
+    def test_gateway_lookup_with_flat_id(self):
+        from src.utils.provider_registry import get_gateway_for_model
+
+        result = get_gateway_for_model("wan2.6-i2v")
+        assert result == "dashscope"
+
+    def test_gateway_lookup_with_canonical_id(self):
+        from src.utils.provider_registry import get_gateway_for_model
+
+        result = get_gateway_for_model("wan/wan2.6-video#i2v")
+        assert result == "dashscope"
+
+    def test_gateway_lookup_vendor_backend(self):
+        from src.utils.provider_registry import get_gateway_for_model
+
+        result = get_gateway_for_model("kling-v3", backend="vendor")
+        assert result == "kling"
+
+    def test_gateway_lookup_dashscope_backend_for_dual_provider(self):
+        from src.utils.provider_registry import get_gateway_for_model
+
+        result = get_gateway_for_model("kling-v3", backend="dashscope")
+        assert result == "dashscope"
+
+    def test_gateway_lookup_vidu_vendor(self):
+        from src.utils.provider_registry import get_gateway_for_model
+
+        result = get_gateway_for_model("viduq3-pro", backend="vendor")
+        assert result == "vidu"
+
+    def test_gateway_lookup_returns_none_for_unknown_model(self):
+        from src.utils.provider_registry import get_gateway_for_model
+
+        result = get_gateway_for_model("nonexistent-model")
+        assert result is None
+
+    def test_gateway_defaults_to_dashscope_when_backend_omitted(self):
+        from src.utils.provider_registry import get_gateway_for_model
+
+        result_explicit = get_gateway_for_model("wan2.6-r2v", backend="dashscope")
+        result_default = get_gateway_for_model("wan2.6-r2v")
+        assert result_explicit == result_default == "dashscope"

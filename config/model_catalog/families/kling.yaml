@@ -36,6 +36,11 @@ models:
     status: active
     release_stage: stable
     capabilities: [t2v, i2v]
+    runtime:
+      dashscope:
+        gateway: dashscope
+      vendor:
+        gateway: kling
     docs:
       context_hub_doc_ids:
         - aliyun/bailian-kling-proxy

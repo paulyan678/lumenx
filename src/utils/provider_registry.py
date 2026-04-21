@@ -159,3 +159,27 @@ def get_default_provider_registry() -> ProviderRegistry:
 
 def resolve_provider_backend(model_name: str, env: Optional[Mapping[str, str]] = None) -> str:
     return get_default_provider_registry().resolve_backend(model_name=model_name, env=env)
+
+
+# ---------------------------------------------------------------------------
+# Phase 2: Gateway metadata inspection (read-only, no routing changes)
+# ---------------------------------------------------------------------------
+
+def get_gateway_for_model(
+    model_id: str,
+    backend: Optional[str] = None,
+) -> Optional[str]:
+    """Inspect the gateway metadata for a model (flat or canonical ID).
+
+    This is a read-only diagnostic helper.  It does NOT change routing
+    behavior — current routing remains family-prefix based.
+    """
+    from .model_catalog import get_catalog_accessor
+
+    accessor = get_catalog_accessor()
+    canonical_id = accessor.resolve_legacy_to_canonical(model_id)
+    if canonical_id is None:
+        canonical_id = model_id  # already canonical or unknown
+
+    resolved_backend = backend or "dashscope"
+    return accessor.get_gateway(canonical_id, resolved_backend)

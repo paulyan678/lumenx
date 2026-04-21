@@ -47,6 +47,14 @@ def main() -> int:
     if planned_models:
         print(f"- planned models: {', '.join(planned_models)}")
 
+    # Phase 2: canonical metadata summary
+    print(f"- model lines: {report.stats.get('model_lines', 0)}")
+    print(f"- canonical modes: {report.stats.get('canonical_modes', 0)}")
+    print(f"- legacy aliases: {report.stats.get('legacy_aliases', 0)}")
+    canonical_defaults = report.stats.get("canonical_defaults", {})
+    if canonical_defaults:
+        print(f"- canonical defaults: {canonical_defaults}")
+
     if report.warnings:
         print("Warnings:")
         for warning in report.warnings:

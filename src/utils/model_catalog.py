@@ -939,6 +939,112 @@ def load_frontend_generated_model_catalog(
         return json.load(f)
 
 
+# ---------------------------------------------------------------------------
+# Phase 2: Canonical mode helper API
+# ---------------------------------------------------------------------------
+
+class CatalogAccessor:
+    """Stable helper API for canonical mode lookups on a loaded catalog."""
+
+    def __init__(self, catalog: Mapping[str, Any]) -> None:
+        self._catalog = catalog
+        self._models: Mapping[str, Any] = catalog.get("models", {})
+        self._model_lines: Mapping[str, Any] = catalog.get("model_lines", {})
+        self._modes: Mapping[str, Any] = catalog.get("modes", {})
+        self._legacy_to_canonical: Mapping[str, str] = (
+            catalog.get("compat", {}).get("legacy_model_ids", {})
+        )
+        self._canonical_to_legacy: Dict[str, str] = {
+            canonical: legacy
+            for legacy, canonical in self._legacy_to_canonical.items()
+        }
+
+    # --- ID resolution helpers ---
+
+    def resolve_legacy_to_canonical(self, flat_id: str) -> Optional[str]:
+        """Resolve a legacy flat model ID to its canonical mode ID."""
+        return self._legacy_to_canonical.get(flat_id)
+
+    def resolve_canonical_to_legacy(self, canonical_mode_id: str) -> Optional[str]:
+        """Resolve a canonical mode ID back to the legacy flat ID."""
+        return self._canonical_to_legacy.get(canonical_mode_id)
+
+    def resolve_to_flat(self, model_id: str) -> str:
+        """Accept either a flat ID or canonical mode ID, always return a flat ID."""
+        legacy = self.resolve_canonical_to_legacy(model_id)
+        if legacy is not None:
+            return legacy
+        if model_id in self._models:
+            return model_id
+        return model_id
+
+    # --- Metadata access helpers ---
+
+    def get_mode_entry(self, canonical_mode_id: str) -> Optional[Dict[str, Any]]:
+        """Return the full canonical mode entry."""
+        entry = self._modes.get(canonical_mode_id)
+        return dict(entry) if entry else None
+
+    def get_mode_runtime(self, canonical_mode_id: str) -> Optional[Dict[str, Any]]:
+        """Return the runtime backend metadata for a canonical mode."""
+        entry = self._modes.get(canonical_mode_id)
+        if entry is None:
+            return None
+        return dict(entry.get("runtime", {}))
+
+    def get_mode_product(self, canonical_mode_id: str) -> Optional[Dict[str, Any]]:
+        """Return the product/UI metadata for a canonical mode."""
+        entry = self._modes.get(canonical_mode_id)
+        if entry is None:
+            return None
+        return dict(entry.get("ui", {}))
+
+    def get_model_line(self, model_line_id: str) -> Optional[Dict[str, Any]]:
+        """Return the model line entry."""
+        entry = self._model_lines.get(model_line_id)
+        return dict(entry) if entry else None
+
+    def get_gateway(
+        self, canonical_mode_id: str, backend: str = "dashscope"
+    ) -> Optional[str]:
+        """Return the gateway value for a canonical mode on a specific backend."""
+        runtime = self.get_mode_runtime(canonical_mode_id)
+        if runtime is None:
+            return None
+        backend_meta = runtime.get(backend)
+        if backend_meta is None:
+            return None
+        return backend_meta.get("gateway")
+
+    # --- Enumeration helpers ---
+
+    def all_canonical_mode_ids(self) -> List[str]:
+        """Return all canonical mode IDs in sorted order."""
+        return sorted(self._modes.keys())
+
+    def all_legacy_model_ids(self) -> List[str]:
+        """Return all legacy flat model IDs in sorted order."""
+        return sorted(self._models.keys())
+
+    def all_model_line_ids(self) -> List[str]:
+        """Return all model line IDs in sorted order."""
+        return sorted(self._model_lines.keys())
+
+    def canonical_defaults(self) -> Dict[str, str]:
+        """Return the canonical default model settings."""
+        return dict(
+            self._catalog.get("defaults", {}).get("canonical_model_settings", {})
+        )
+
+
+def get_catalog_accessor(
+    catalog: Optional[Mapping[str, Any]] = None,
+) -> CatalogAccessor:
+    """Build a CatalogAccessor from a loaded or generated catalog."""
+    active_catalog = catalog or load_generated_model_catalog()
+    return CatalogAccessor(active_catalog)
+
+
 def get_default_model_settings(catalog_root: Optional[Path] = None) -> DefaultModelSettings:
     catalog = build_catalog_dict(catalog_root or MODEL_CATALOG_ROOT)
     defaults = catalog["defaults"]["model_settings"]

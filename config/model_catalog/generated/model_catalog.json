@@ -268,7 +268,14 @@
       "routing_prefixes": [
         "kling-"
       ],
-      "runtime": {},
+      "runtime": {
+        "dashscope": {
+          "gateway": "dashscope"
+        },
+        "vendor": {
+          "gateway": "kling"
+        }
+      },
       "status": "active",
       "supported_backends": [
         "dashscope",
@@ -387,7 +394,14 @@
       "routing_prefixes": [
         "vidu"
       ],
-      "runtime": {},
+      "runtime": {
+        "dashscope": {
+          "gateway": "dashscope"
+        },
+        "vendor": {
+          "gateway": "vidu"
+        }
+      },
       "status": "active",
       "supported_backends": [
         "dashscope",
@@ -447,7 +461,14 @@
       "routing_prefixes": [
         "vidu"
       ],
-      "runtime": {},
+      "runtime": {
+        "dashscope": {
+          "gateway": "dashscope"
+        },
+        "vendor": {
+          "gateway": "vidu"
+        }
+      },
       "status": "active",
       "supported_backends": [
         "dashscope",
@@ -2327,7 +2348,14 @@
       "routing_prefixes": [
         "kling-"
       ],
-      "runtime": {},
+      "runtime": {
+        "dashscope": {
+          "gateway": "dashscope"
+        },
+        "vendor": {
+          "gateway": "kling"
+        }
+      },
       "status": "active",
       "supported_backends": [
         "dashscope",
@@ -2492,7 +2520,14 @@
       "routing_prefixes": [
         "vidu"
       ],
-      "runtime": {},
+      "runtime": {
+        "dashscope": {
+          "gateway": "dashscope"
+        },
+        "vendor": {
+          "gateway": "vidu"
+        }
+      },
       "status": "active",
       "supported_backends": [
         "dashscope",
@@ -2592,7 +2627,14 @@
       "routing_prefixes": [
         "vidu"
       ],
-      "runtime": {},
+      "runtime": {
+        "dashscope": {
+          "gateway": "dashscope"
+        },
+        "vendor": {
+          "gateway": "vidu"
+        }
+      },
       "status": "active",
       "supported_backends": [
         "dashscope",
