@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Save, Loader2, Key, ChevronDown, ChevronRight, Settings, MessageSquareCode } from "lucide-react";
+import { Save, Loader2, Key, ChevronDown, ChevronRight, Settings, MessageSquareCode, Palette, Globe } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { api, type EnvConfigPayload, type ProviderMode } from "@/lib/api";
 import { ASPECT_RATIOS } from "@/store/projectStore";
 import {
@@ -11,6 +12,7 @@ import {
   GLOBAL_T2I_MODELS,
   normalizeModelSettings,
 } from "@/lib/modelCatalog";
+import { useSettingsStore, type Locale, type Theme } from "@/store/settingsStore";
 import { Image, Video, Layout, Check, User, Building, Box } from "lucide-react";
 
 type EnvConfig = EnvConfigPayload & {
@@ -113,6 +115,9 @@ function loadFromLS<T>(key: string, fallback: T): T {
 }
 
 export default function SettingsPage() {
+  const t = useTranslations("settings");
+  const { locale, theme, setLocale, setTheme } = useSettingsStore();
+
   // ── API Config ──
   const [config, setConfig] = useState<EnvConfig>(DEFAULT_CONFIG);
   const [loading, setLoading] = useState(false);
@@ -199,7 +204,67 @@ export default function SettingsPage() {
 
   return (
     <div className="container mx-auto px-6 py-8 max-w-4xl space-y-8">
-      <h1 className="text-2xl font-display font-bold text-white">设置</h1>
+      <h1 className="text-2xl font-display font-bold text-foreground">{t("title")}</h1>
+
+      {/* ── Section 0: Appearance ── */}
+      <section className="glass-panel rounded-xl p-6 space-y-6">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 rounded-lg">
+            <Palette size={20} className="text-violet-400" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-foreground">{t("appearance")}</h2>
+          </div>
+        </div>
+
+        {/* Language */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Globe size={14} className="text-text-secondary" />
+            <label className="text-sm font-medium text-foreground">{t("language")}</label>
+          </div>
+          <p className="text-xs text-text-secondary">{t("languageDesc")}</p>
+          <div className="flex gap-2 mt-2">
+            {([["zh", t("chinese")], ["en", t("english")]] as [Locale, string][]).map(([loc, label]) => (
+              <button
+                key={loc}
+                onClick={() => setLocale(loc)}
+                className={`px-4 py-2 text-sm rounded-lg border transition-colors ${
+                  locale === loc
+                    ? "border-primary/60 bg-primary/15 text-foreground"
+                    : "border-glass-border bg-hover-bg text-text-secondary hover:text-foreground"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Theme */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Palette size={14} className="text-text-secondary" />
+            <label className="text-sm font-medium text-foreground">{t("theme")}</label>
+          </div>
+          <p className="text-xs text-text-secondary">{t("themeDesc")}</p>
+          <div className="flex gap-2 mt-2">
+            {([["dark", t("themeDark")], ["light", t("themeLight")]] as [Theme, string][]).map(([th, label]) => (
+              <button
+                key={th}
+                onClick={() => setTheme(th)}
+                className={`px-4 py-2 text-sm rounded-lg border transition-colors ${
+                  theme === th
+                    ? "border-primary/60 bg-primary/15 text-foreground"
+                    : "border-glass-border bg-hover-bg text-text-secondary hover:text-foreground"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* ── Section 1: API Configuration ── */}
       <section className="glass-panel rounded-xl p-6 space-y-6">
@@ -208,8 +273,8 @@ export default function SettingsPage() {
             <Key size={20} className="text-amber-400" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-white">API 配置</h2>
-            <p className="text-xs text-gray-500">DashScope-first setup with optional OSS mirror and provider-direct routing</p>
+            <h2 className="text-lg font-bold text-foreground">{t("apiConfig")}</h2>
+            <p className="text-xs text-text-secondary">DashScope-first setup with optional OSS mirror and provider-direct routing</p>
           </div>
         </div>
 
@@ -361,8 +426,8 @@ export default function SettingsPage() {
             <Settings size={20} className="text-blue-400" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-white">默认模型设置</h2>
-            <p className="text-xs text-gray-500">Default models and aspect ratios for new projects</p>
+            <h2 className="text-lg font-bold text-foreground">{t("defaultModels")}</h2>
+            <p className="text-xs text-text-secondary">Default models and aspect ratios for new projects</p>
           </div>
         </div>
 
@@ -464,8 +529,8 @@ export default function SettingsPage() {
             <MessageSquareCode size={20} className="text-purple-400" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-white">默认提示词配置</h2>
-            <p className="text-xs text-gray-500">Default system prompts for new projects (leave empty for built-in defaults)</p>
+            <h2 className="text-lg font-bold text-foreground">{t("defaultPrompts")}</h2>
+            <p className="text-xs text-text-secondary">Default system prompts for new projects (leave empty for built-in defaults)</p>
           </div>
         </div>
 
