@@ -45,8 +45,8 @@ models:
         ui:
           selection_group: i2v
           visible_in: [project_settings, series_settings, video_sidebar, global_settings]
-          order: 85
-          badges: [new]
+          order: 120
+          badges: [recommended]
         duration:
           type: slider
           min: 3

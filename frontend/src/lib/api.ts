@@ -325,12 +325,14 @@ export const api = {
         characterAspectRatio?: string,
         sceneAspectRatio?: string,
         propAspectRatio?: string,
-        storyboardAspectRatio?: string
+        storyboardAspectRatio?: string,
+        imageModel?: string
     ) => {
         const res = await axios.post(`${API_URL}/projects/${scriptId}/model_settings`, {
             t2i_model: t2iModel,
             i2i_model: i2iModel,
             i2v_model: i2vModel,
+            image_model: imageModel,
             character_aspect_ratio: characterAspectRatio,
             scene_aspect_ratio: sceneAspectRatio,
             prop_aspect_ratio: propAspectRatio,
@@ -650,6 +652,7 @@ export const api = {
     updateSeriesModelSettings: async (seriesId: string, settings: {
         t2i_model?: string;
         i2i_model?: string;
+        image_model?: string;
         i2v_model?: string;
         character_aspect_ratio?: string;
         scene_aspect_ratio?: string;

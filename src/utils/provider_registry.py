@@ -64,6 +64,23 @@ class ProviderRegistry:
 
 DEFAULT_PROVIDER_FAMILIES: Tuple[ProviderFamilyConfig, ...] = (
     ProviderFamilyConfig(
+        model_family="wan2.7-",
+        backend_default="dashscope",
+        credential_sources={
+            "dashscope": ("DASHSCOPE_API_KEY",),
+        },
+        supported_modalities=("t2i", "i2i", "image", "i2v", "r2v"),
+        image_input_mode={
+            "dashscope": "dashscope_multimodal_message",
+        },
+        audio_input_mode={
+            "dashscope": "dashscope_temp_file_url",
+        },
+        reference_video_input_mode={
+            "dashscope": "dashscope_temp_file_url",
+        },
+    ),
+    ProviderFamilyConfig(
         model_family="wan2.6-",
         backend_default="dashscope",
         credential_sources={
@@ -81,14 +98,31 @@ DEFAULT_PROVIDER_FAMILIES: Tuple[ProviderFamilyConfig, ...] = (
         },
     ),
     ProviderFamilyConfig(
-        model_family="kling-",
+        model_family="qwen-image-",
+        backend_default="dashscope",
+        credential_sources={
+            "dashscope": ("DASHSCOPE_API_KEY",),
+        },
+        supported_modalities=("t2i", "i2i", "image"),
+        image_input_mode={
+            "dashscope": "dashscope_multimodal_message",
+        },
+        audio_input_mode={
+            "dashscope": "dashscope_temp_file_url",
+        },
+        reference_video_input_mode={
+            "dashscope": "dashscope_temp_file_url",
+        },
+    ),
+    ProviderFamilyConfig(
+        model_family="kling/kling-",
         backend_default="dashscope",
         backend_env_key="KLING_PROVIDER_MODE",
         credential_sources={
             "dashscope": ("DASHSCOPE_API_KEY",),
             "vendor": ("KLING_ACCESS_KEY", "KLING_SECRET_KEY"),
         },
-        supported_modalities=("t2v", "i2v"),
+        supported_modalities=("t2v", "i2v", "r2v"),
         image_input_mode={
             "dashscope": "dashscope_image_to_video",
             "vendor": "kling_vendor_base64_image",
@@ -103,14 +137,36 @@ DEFAULT_PROVIDER_FAMILIES: Tuple[ProviderFamilyConfig, ...] = (
         },
     ),
     ProviderFamilyConfig(
-        model_family="vidu",
+        model_family="kling-",
+        backend_default="dashscope",
+        backend_env_key="KLING_PROVIDER_MODE",
+        credential_sources={
+            "dashscope": ("DASHSCOPE_API_KEY",),
+            "vendor": ("KLING_ACCESS_KEY", "KLING_SECRET_KEY"),
+        },
+        supported_modalities=("t2v", "i2v", "r2v"),
+        image_input_mode={
+            "dashscope": "dashscope_image_to_video",
+            "vendor": "kling_vendor_base64_image",
+        },
+        audio_input_mode={
+            "dashscope": "dashscope_temp_file_url",
+            "vendor": "kling_vendor_audio_url",
+        },
+        reference_video_input_mode={
+            "dashscope": "dashscope_temp_file_url",
+            "vendor": "kling_vendor_video_url",
+        },
+    ),
+    ProviderFamilyConfig(
+        model_family="vidu/vidu",
         backend_default="dashscope",
         backend_env_key="VIDU_PROVIDER_MODE",
         credential_sources={
             "dashscope": ("DASHSCOPE_API_KEY",),
             "vendor": ("VIDU_API_KEY",),
         },
-        supported_modalities=("t2v", "i2v"),
+        supported_modalities=("t2v", "i2v", "r2v"),
         image_input_mode={
             "dashscope": "dashscope_image_to_video",
             "vendor": "vidu_vendor_image_url",
@@ -125,25 +181,59 @@ DEFAULT_PROVIDER_FAMILIES: Tuple[ProviderFamilyConfig, ...] = (
         },
     ),
     ProviderFamilyConfig(
-        model_family="pixverse-",
+        model_family="vidu",
         backend_default="dashscope",
-        backend_env_key="PIXVERSE_PROVIDER_MODE",
+        backend_env_key="VIDU_PROVIDER_MODE",
         credential_sources={
             "dashscope": ("DASHSCOPE_API_KEY",),
-            "vendor": ("PIXVERSE_API_KEY",),
+            "vendor": ("VIDU_API_KEY",),
         },
-        supported_modalities=("t2v", "i2v"),
+        supported_modalities=("t2v", "i2v", "r2v"),
         image_input_mode={
             "dashscope": "dashscope_image_to_video",
-            "vendor": "pixverse_vendor_image_url",
+            "vendor": "vidu_vendor_image_url",
         },
         audio_input_mode={
             "dashscope": "dashscope_temp_file_url",
-            "vendor": "pixverse_vendor_audio_url",
+            "vendor": "vidu_vendor_audio_url",
         },
         reference_video_input_mode={
             "dashscope": "dashscope_temp_file_url",
-            "vendor": "pixverse_vendor_video_url",
+            "vendor": "vidu_vendor_video_url",
+        },
+    ),
+    ProviderFamilyConfig(
+        model_family="pixverse/pixverse-",
+        backend_default="dashscope",
+        credential_sources={
+            "dashscope": ("DASHSCOPE_API_KEY",),
+        },
+        supported_modalities=("t2v", "i2v", "r2v"),
+        image_input_mode={
+            "dashscope": "dashscope_image_to_video",
+        },
+        audio_input_mode={
+            "dashscope": "dashscope_temp_file_url",
+        },
+        reference_video_input_mode={
+            "dashscope": "dashscope_temp_file_url",
+        },
+    ),
+    ProviderFamilyConfig(
+        model_family="pixverse-",
+        backend_default="dashscope",
+        credential_sources={
+            "dashscope": ("DASHSCOPE_API_KEY",),
+        },
+        supported_modalities=("t2v", "i2v", "r2v"),
+        image_input_mode={
+            "dashscope": "dashscope_image_to_video",
+        },
+        audio_input_mode={
+            "dashscope": "dashscope_temp_file_url",
+        },
+        reference_video_input_mode={
+            "dashscope": "dashscope_temp_file_url",
         },
     ),
 )

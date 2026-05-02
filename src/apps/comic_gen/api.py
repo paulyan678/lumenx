@@ -434,6 +434,7 @@ async def update_series_prompt_config(series_id: str, config: PromptConfig):
 class UpdateModelSettingsRequest(BaseModel):
     t2i_model: Optional[str] = None
     i2i_model: Optional[str] = None
+    image_model: Optional[str] = None
     i2v_model: Optional[str] = None
     character_aspect_ratio: Optional[str] = None
     scene_aspect_ratio: Optional[str] = None
@@ -1448,7 +1449,8 @@ async def update_model_settings(script_id: str, request: UpdateModelSettingsRequ
             request.character_aspect_ratio,
             request.scene_aspect_ratio,
             request.prop_aspect_ratio,
-            request.storyboard_aspect_ratio
+            request.storyboard_aspect_ratio,
+            request.image_model
         )
         return signed_response(updated_script)
     except ValueError as e:

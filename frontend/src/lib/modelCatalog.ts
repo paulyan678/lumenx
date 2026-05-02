@@ -7,16 +7,18 @@ export type DurationConfig =
 
 export interface ModelParamSupport {
     resolution?: { options: string[]; default: string };
+    ratio?: { options: string[]; default: string };
     seed?: boolean;
     negativePrompt?: boolean;
     promptExtend?: boolean;
-    shotType?: boolean;
+    shotType?: boolean | { options: string[]; default: string };
     audio?: boolean;
     mode?: { options: string[]; default: string };
     sound?: boolean;
     cfgScale?: { min: number; max: number; step: number; default: number };
     viduAudio?: boolean;
     movementAmplitude?: { options: string[]; default: string };
+    watermark?: boolean;
 }
 
 export interface I2VModelConfig {
@@ -46,6 +48,7 @@ export type ModelOption = SelectableModelOption;
 export interface FrontendModelSettings {
     t2i_model: string;
     i2i_model: string;
+    image_model: string;
     i2v_model: string;
     character_aspect_ratio: string;
     scene_aspect_ratio: string;
@@ -53,7 +56,7 @@ export interface FrontendModelSettings {
     storyboard_aspect_ratio: string;
 }
 
-type SelectionGroup = 't2i' | 'i2i' | 'i2v';
+type SelectionGroup = 't2i' | 'i2i' | 'image' | 'i2v';
 type ModelStatus = 'active' | 'planned' | 'deprecated' | 'hidden';
 type SettingsSurface = 'project_settings' | 'series_settings' | 'global_settings';
 type VisibilitySurface = SettingsSurface | 'video_sidebar';
@@ -87,11 +90,13 @@ interface ModelCatalog {
         model_settings: {
             t2i_model: string;
             i2i_model: string;
+            image_model: string;
             i2v_model: string;
         };
         canonical_model_settings?: {
             t2i_model?: string;
             i2i_model?: string;
+            image_model?: string;
             i2v_model?: string;
         };
     };
@@ -253,6 +258,9 @@ function getConfiguredDefaultId(group: SelectionGroup): string {
     if (group === 'i2i') {
         return MODEL_CATALOG.defaults.model_settings.i2i_model;
     }
+    if (group === 'image') {
+        return MODEL_CATALOG.defaults.model_settings.image_model;
+    }
     return MODEL_CATALOG.defaults.model_settings.i2v_model;
 }
 
@@ -314,6 +322,7 @@ export function resolveModelSettings(
         ...settings,
         t2i_model: resolveModelId('t2i', settings?.t2i_model, surface),
         i2i_model: resolveModelId('i2i', settings?.i2i_model, surface),
+        image_model: resolveModelId('image', settings?.image_model, surface),
         i2v_model: resolveModelId('i2v', settings?.i2v_model, surface),
         character_aspect_ratio:
             settings?.character_aspect_ratio || DEFAULT_MODEL_SETTINGS.character_aspect_ratio,
@@ -345,6 +354,10 @@ export const PROJECT_I2I_MODELS = getVisibleModels('i2i', 'project_settings').ma
 export const SERIES_I2I_MODELS = getVisibleModels('i2i', 'series_settings').map(toSelectableModel);
 export const GLOBAL_I2I_MODELS = getVisibleModels('i2i', 'global_settings').map(toSelectableModel);
 
+export const PROJECT_IMAGE_MODELS = getVisibleModels('image', 'project_settings').map(toSelectableModel);
+export const SERIES_IMAGE_MODELS = getVisibleModels('image', 'series_settings').map(toSelectableModel);
+export const GLOBAL_IMAGE_MODELS = getVisibleModels('image', 'global_settings').map(toSelectableModel);
+
 export const PROJECT_I2V_MODELS = getVisibleModels('i2v', 'project_settings').map(toI2VModel);
 export const SERIES_I2V_MODELS = getVisibleModels('i2v', 'series_settings').map(toI2VModel);
 export const GLOBAL_I2V_MODELS = getVisibleModels('i2v', 'global_settings').map(toI2VModel);
@@ -352,6 +365,7 @@ export const VIDEO_I2V_MODELS = getVisibleModels('i2v', 'video_sidebar').map(toI
 
 export const T2I_MODELS = PROJECT_T2I_MODELS;
 export const I2I_MODELS = PROJECT_I2I_MODELS;
+export const IMAGE_MODELS = PROJECT_IMAGE_MODELS;
 export const I2V_MODELS = PROJECT_I2V_MODELS;
 export const VIDEO_SIDEBAR_I2V_MODELS = VIDEO_I2V_MODELS;
 
@@ -396,10 +410,14 @@ export function getR2vRouteModelId(selectedI2vModelId: string): string {
 }
 
 /**
- * Returns true if the given R2V model uses image references (HappyHorse)
- * instead of video references (Wan).
+ * Returns true if the given R2V model uses image references
+ * instead of video references (Wan 2.5/2.6 legacy).
  */
 export function isR2vImageBased(modelId: string): boolean {
     const model = MODEL_CATALOG.models[modelId];
-    return model?.family === 'happyhorse';
+    const family = model?.family;
+    // All current R2V models use image references except wan2.6-r2v (legacy video refs)
+    if (family === 'wan' && modelId === 'wan2.6-r2v') return false;
+    return family === 'happyhorse' || family === 'wan' || family === 'kling'
+        || family === 'pixverse' || family === 'vidu';
 }

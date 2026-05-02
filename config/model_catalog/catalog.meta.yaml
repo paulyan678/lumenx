@@ -1,6 +1,7 @@
 version: 1
 defaults:
   model_settings:
-    t2i_model: wan2.6-t2i
-    i2i_model: wan2.6-image
-    i2v_model: wan2.6-i2v
+    t2i_model: wan2.7-image-pro
+    i2i_model: wan2.7-image
+    i2v_model: wan2.7-i2v
+    image_model: wan2.7-image-pro
