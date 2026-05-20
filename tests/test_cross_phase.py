@@ -284,8 +284,9 @@ class TestModelSettingsIntegration:
         now = _ts()
         s = Series(id="s1", title="S", created_at=now, updated_at=now)
         assert isinstance(s.model_settings, ModelSettings)
-        assert s.model_settings.t2i_model == "wan2.6-t2i"
-        assert s.model_settings.i2v_model == "wan2.6-i2v"
+        # Defaults follow the catalog (wan2.7 family is current).
+        assert s.model_settings.t2i_model == "wan2.7-image-pro"
+        assert s.model_settings.i2v_model == "wan2.7-i2v"
 
     def test_update_series_model_settings_via_pipeline(self, pipeline):
         """Pipeline update_series should accept model_settings changes."""
@@ -294,8 +295,8 @@ class TestModelSettingsIntegration:
         updated = pipeline.update_series(s.id, {"model_settings": new_ms})
         assert updated.model_settings.t2i_model == "custom-t2i"
         assert updated.model_settings.i2v_model == "kling-1.6"
-        # Other fields keep defaults
-        assert updated.model_settings.i2i_model == "wan2.6-image"
+        # Other fields keep catalog defaults.
+        assert updated.model_settings.i2i_model == "wan2.7-image"
 
     def test_update_series_model_settings_partial_via_copy(self, pipeline):
         """Partial update via model_copy should preserve other fields."""
@@ -304,7 +305,7 @@ class TestModelSettingsIntegration:
         updated_ms = current_ms.model_copy(update={"t2i_model": "new-model"})
         updated = pipeline.update_series(s.id, {"model_settings": updated_ms})
         assert updated.model_settings.t2i_model == "new-model"
-        assert updated.model_settings.i2i_model == "wan2.6-image"  # preserved
+        assert updated.model_settings.i2i_model == "wan2.7-image"  # preserved
         assert updated.model_settings.storyboard_aspect_ratio == "16:9"  # preserved
 
     def test_model_settings_not_overwritten_by_id_or_created_at(self, pipeline):
