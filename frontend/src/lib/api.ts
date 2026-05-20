@@ -190,6 +190,24 @@ export const api = {
         return res.data;
     },
 
+    /** Return last N lines of the backend log + any ERROR-flavored
+     *  lines, for the Diagnose UI on stuck tasks. Backend caps at
+     *  1000 lines so a runaway client can't drag the server. */
+    diagnoseLogTail: async (lines: number = 200): Promise<{
+        path: string;
+        total_lines?: number;
+        returned_lines?: number;
+        lines: string[];
+        errors: string[];
+        missing: boolean;
+    }> => {
+        const res = await axios.get(`${API_URL}/diagnose/log_tail`, {
+            params: { lines },
+            timeout: 8000,
+        });
+        return res.data;
+    },
+
     /** Mark a video task as failed-by-cancel. Provider-side render
      *  keeps going; this just unblocks the local UI. Already-completed
      *  tasks are a 404 no-op. */
@@ -350,12 +368,14 @@ export const api = {
         sceneAspectRatio?: string,
         propAspectRatio?: string,
         storyboardAspectRatio?: string,
-        imageModel?: string
+        imageModel?: string,
+        r2vModel?: string,
     ) => {
         const res = await axios.post(`${API_URL}/projects/${scriptId}/model_settings`, {
             t2i_model: t2iModel,
             i2i_model: i2iModel,
             i2v_model: i2vModel,
+            r2v_model: r2vModel,
             image_model: imageModel,
             character_aspect_ratio: characterAspectRatio,
             scene_aspect_ratio: sceneAspectRatio,

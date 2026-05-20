@@ -200,6 +200,29 @@ def test_create_video_task_rejects_wan26_r2v_without_video_refs(pipeline):
         )
 
 
+def test_model_settings_persists_r2v_model(pipeline):
+    """B-plan: project-level model_settings.r2v_model is the default
+    Storyboard's R2V tab seeds from. Verify it round-trips: writing
+    via update_model_settings persists, get_script() sees it back."""
+    from src.apps.comic_gen.models import Script
+    script = Script(
+        id="p1", title="P", original_text="t",
+        created_at=time.time(), updated_at=time.time(),
+    )
+    pipeline.scripts = {"p1": script}
+
+    # Default value is wan2.7-r2v per ModelSettings field default.
+    assert script.model_settings.r2v_model == "wan2.7-r2v"
+
+    # Update through the pipeline path the API endpoint uses.
+    with patch.object(pipeline, "_save_data"):
+        updated = pipeline.update_model_settings("p1", r2v_model="kling-v3-r2v")
+    assert updated.model_settings.r2v_model == "kling-v3-r2v"
+
+    # Other fields untouched.
+    assert updated.model_settings.i2v_model == script.model_settings.i2v_model
+
+
 def test_create_video_task_accepts_r2v_with_refs(pipeline):
     pipeline.scripts = {"p1": _script_with_tasks()}
     # Avoid touching disk for snapshot copy.

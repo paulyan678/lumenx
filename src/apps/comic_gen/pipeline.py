@@ -2632,7 +2632,7 @@ class ComicGenPipeline:
         self._save_data()
         return script
 
-    def update_model_settings(self, script_id: str, t2i_model: str = None, i2i_model: str = None, i2v_model: str = None, character_aspect_ratio: str = None, scene_aspect_ratio: str = None, prop_aspect_ratio: str = None, storyboard_aspect_ratio: str = None, image_model: str = None) -> Script:
+    def update_model_settings(self, script_id: str, t2i_model: str = None, i2i_model: str = None, i2v_model: str = None, r2v_model: str = None, character_aspect_ratio: str = None, scene_aspect_ratio: str = None, prop_aspect_ratio: str = None, storyboard_aspect_ratio: str = None, image_model: str = None) -> Script:
         """Updates the model settings for a script."""
         script = self.scripts.get(script_id)
         if not script:
@@ -2644,6 +2644,8 @@ class ComicGenPipeline:
             script.model_settings.i2i_model = i2i_model
         if i2v_model:
             script.model_settings.i2v_model = i2v_model
+        if r2v_model:
+            script.model_settings.r2v_model = r2v_model
         if image_model:
             script.model_settings.image_model = image_model
         if character_aspect_ratio:
@@ -2654,7 +2656,7 @@ class ComicGenPipeline:
             script.model_settings.prop_aspect_ratio = prop_aspect_ratio
         if storyboard_aspect_ratio:
             script.model_settings.storyboard_aspect_ratio = storyboard_aspect_ratio
-        
+
         self._save_data()
         return script
 

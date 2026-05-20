@@ -175,6 +175,41 @@ async def health_check():
     }
 
 
+@app.get("/diagnose/log_tail")
+async def diagnose_log_tail(lines: int = 200):
+    """Return the last N lines of the app log + an ERROR/Exception
+    summary so the Diagnose UI on stuck tasks can show actual log
+    content instead of just a path. Read-only, capped to 1000 lines so
+    a runaway client can't hose the process."""
+    from ...utils import get_log_dir
+    capped = max(1, min(int(lines or 200), 1000))
+    log_path = os.path.join(get_log_dir(), "app.log")
+    if not os.path.exists(log_path):
+        return {"path": log_path, "lines": [], "errors": [], "missing": True}
+    try:
+        with open(log_path, "r", encoding="utf-8", errors="replace") as f:
+            # Read all, then tail. App.log is bounded by the rotating
+            # handler (≤ 5 MB active) so this is safe.
+            all_lines = f.readlines()
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"Could not read log: {exc}")
+    tail = all_lines[-capped:] if len(all_lines) > capped else all_lines
+    error_keywords = ("ERROR", "Exception", "Failed", "Unauthorized", "Traceback")
+    errors = [
+        ln.rstrip("\n")
+        for ln in tail
+        if any(k in ln for k in error_keywords)
+    ][-30:]
+    return {
+        "path": log_path,
+        "total_lines": len(all_lines),
+        "returned_lines": len(tail),
+        "lines": [ln.rstrip("\n") for ln in tail],
+        "errors": errors,
+        "missing": False,
+    }
+
+
 @app.get("/system/check")
 async def check_system():
     """Check system dependencies (ffmpeg, etc.) and configuration."""
@@ -457,6 +492,7 @@ class UpdateModelSettingsRequest(BaseModel):
     i2i_model: Optional[str] = None
     image_model: Optional[str] = None
     i2v_model: Optional[str] = None
+    r2v_model: Optional[str] = None
     character_aspect_ratio: Optional[str] = None
     scene_aspect_ratio: Optional[str] = None
     prop_aspect_ratio: Optional[str] = None
@@ -1506,11 +1542,12 @@ async def update_model_settings(script_id: str, request: UpdateModelSettingsRequ
             request.t2i_model,
             request.i2i_model,
             request.i2v_model,
-            request.character_aspect_ratio,
-            request.scene_aspect_ratio,
-            request.prop_aspect_ratio,
-            request.storyboard_aspect_ratio,
-            request.image_model
+            r2v_model=request.r2v_model,
+            character_aspect_ratio=request.character_aspect_ratio,
+            scene_aspect_ratio=request.scene_aspect_ratio,
+            prop_aspect_ratio=request.prop_aspect_ratio,
+            storyboard_aspect_ratio=request.storyboard_aspect_ratio,
+            image_model=request.image_model,
         )
         return signed_response(updated_script)
     except ValueError as e:

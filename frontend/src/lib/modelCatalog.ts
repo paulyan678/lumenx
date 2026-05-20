@@ -50,6 +50,10 @@ export interface FrontendModelSettings {
     i2i_model: string;
     image_model: string;
     i2v_model: string;
+    /** Project-level R2V default. Storyboard's R2V tab uses it as
+     *  initial value; per-storyboard localStorage override still wins.
+     *  Optional on the wire so older project files still parse. */
+    r2v_model?: string;
     character_aspect_ratio: string;
     scene_aspect_ratio: string;
     prop_aspect_ratio: string;

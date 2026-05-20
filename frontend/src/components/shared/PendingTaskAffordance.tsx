@@ -16,7 +16,8 @@
 // Used by: Studio ShotCard pending branch. Container is provided by the
 // parent; we render content + a modal portal.
 import { useEffect, useState } from "react";
-import { Loader2, X, AlertTriangle, FileText, Copy, Check } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Loader2, X, AlertTriangle, FileText, Copy, Check, RefreshCw, Terminal } from "lucide-react";
 import { api } from "@/lib/api";
 
 interface Props {
@@ -154,9 +155,26 @@ export function DiagnoseModal({ taskId, elapsedLabel, onClose }: DiagnoseModalPr
         | { kind: "loading" }
         | { kind: "ok"; data: Awaited<ReturnType<typeof api.healthCheck>> }
         | { kind: "error"; message: string };
+    type LogState =
+        | { kind: "idle" }
+        | { kind: "loading" }
+        | { kind: "ok"; data: Awaited<ReturnType<typeof api.diagnoseLogTail>> }
+        | { kind: "error"; message: string };
     const [health, setHealth] = useState<HealthState>({ kind: "loading" });
-    const [copied, setCopied] = useState<"task" | "log" | null>(null);
+    const [log, setLog] = useState<LogState>({ kind: "idle" });
+    const [copied, setCopied] = useState<"task" | "log_path" | "log_text" | null>(null);
 
+    const loadLog = () => {
+        setLog({ kind: "loading" });
+        api.diagnoseLogTail(200)
+            .then((data) => setLog({ kind: "ok", data }))
+            .catch((err) =>
+                setLog({ kind: "error", message: err instanceof Error ? err.message : String(err) }),
+            );
+    };
+
+    // Auto-fetch health on mount; auto-fetch log too so the user
+    // doesn't need to click anything to see what's wrong.
     useEffect(() => {
         let cancelled = false;
         api.healthCheck()
@@ -166,12 +184,14 @@ export function DiagnoseModal({ taskId, elapsedLabel, onClose }: DiagnoseModalPr
             .catch((err) => {
                 if (!cancelled) setHealth({ kind: "error", message: err instanceof Error ? err.message : String(err) });
             });
+        loadLog();
         return () => {
             cancelled = true;
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const copy = async (text: string, kind: "task" | "log") => {
+    const copy = async (text: string, kind: "task" | "log_path" | "log_text") => {
         try {
             await navigator.clipboard.writeText(text);
             setCopied(kind);
@@ -181,20 +201,29 @@ export function DiagnoseModal({ taskId, elapsedLabel, onClose }: DiagnoseModalPr
         }
     };
 
-    return (
+    // Esc to close — convenient when the modal is portaled out of focus.
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => {
+            if (e.key === "Escape") onClose();
+        };
+        window.addEventListener("keydown", handler);
+        return () => window.removeEventListener("keydown", handler);
+    }, [onClose]);
+
+    const modal = (
         <>
             <div
                 aria-hidden="true"
-                className="fixed inset-0 z-[60] bg-black/40"
+                className="fixed inset-0 z-[60] bg-black/55 backdrop-blur-sm"
                 onClick={onClose}
             />
             <div
                 role="dialog"
                 aria-label="Diagnose stuck task"
-                className="fixed left-1/2 top-1/2 z-[61] w-[min(540px,92vw)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[12px] border border-white/8 bg-[#141416]/96 shadow-[0_24px_48px_-22px_rgba(0,0,0,0.85),inset_0_1px_0_0_rgba(255,255,255,0.06)] backdrop-blur-xl"
+                className="fixed left-1/2 top-1/2 z-[61] flex w-[min(720px,94vw)] max-h-[85vh] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[12px] border border-white/8 bg-[#141416] shadow-[0_24px_48px_-22px_rgba(0,0,0,0.85),inset_0_1px_0_0_rgba(255,255,255,0.06)]"
             >
-                <div aria-hidden="true" className="h-[2px] bg-gradient-to-r from-amber-300/85 via-amber-300/35 to-transparent" />
-                <header className="flex items-center justify-between gap-3 border-b border-white/6 px-4 py-3">
+                <div aria-hidden="true" className="h-[2px] shrink-0 bg-gradient-to-r from-amber-300/85 via-amber-300/35 to-transparent" />
+                <header className="flex shrink-0 items-center justify-between gap-3 border-b border-white/6 px-4 py-3">
                     <div className="flex items-center gap-2">
                         <AlertTriangle size={14} className="text-amber-300" aria-hidden="true" />
                         <div className="font-display text-[14px] font-medium tracking-[-0.005em] text-foreground">
@@ -210,7 +239,7 @@ export function DiagnoseModal({ taskId, elapsedLabel, onClose }: DiagnoseModalPr
                         <X size={14} aria-hidden="true" />
                     </button>
                 </header>
-                <div className="space-y-4 px-4 py-4 text-[12.5px] leading-[1.55] text-text-secondary/95">
+                <div className="space-y-3 overflow-y-auto px-4 py-4 text-[12.5px] leading-[1.55] text-text-secondary/95">
                     <Row label="Elapsed">
                         <span className="font-mono">{elapsedLabel}</span>
                     </Row>
@@ -239,16 +268,82 @@ export function DiagnoseModal({ taskId, elapsedLabel, onClose }: DiagnoseModalPr
                         <Row label="Log file">
                             <button
                                 type="button"
-                                onClick={() => copy(health.data.log_file, "log")}
+                                onClick={() => copy(health.data.log_file, "log_path")}
                                 className="inline-flex items-center gap-1.5 rounded border border-white/8 bg-black/35 px-2 py-[3px] font-mono text-[10.5px] tracking-tight text-foreground/95 transition-colors hover:border-primary/45"
                                 title="Copy log path"
                             >
                                 <FileText size={11} aria-hidden="true" />
-                                <span className="truncate max-w-[300px]">{health.data.log_file}</span>
-                                {copied === "log" ? <Check size={11} /> : <Copy size={11} />}
+                                <span className="truncate max-w-[420px]">{health.data.log_file}</span>
+                                {copied === "log_path" ? <Check size={11} /> : <Copy size={11} />}
                             </button>
                         </Row>
                     ) : null}
+
+                    {/* Inline log tail — auto-fetched. The user doesn't need
+                        to leave the app to investigate the typical "stuck"
+                        case (provider auth, network out, model misuse). */}
+                    <div className="rounded-md border border-white/8 bg-black/30">
+                        <div className="flex items-center justify-between gap-2 border-b border-white/6 px-3 py-1.5 font-mono text-[9px] font-medium uppercase tracking-[0.24em] text-text-muted/85">
+                            <span className="inline-flex items-center gap-1.5">
+                                <Terminal size={11} aria-hidden="true" />
+                                Backend log · last 200 lines
+                                {log.kind === "ok" && log.data.errors.length > 0 ? (
+                                    <span className="rounded-full bg-red-400/15 px-1.5 text-red-200">
+                                        {log.data.errors.length} error rows
+                                    </span>
+                                ) : null}
+                            </span>
+                            <div className="flex items-center gap-1">
+                                <button
+                                    type="button"
+                                    onClick={loadLog}
+                                    aria-label="Reload log"
+                                    title="Reload"
+                                    className="grid h-6 w-6 place-items-center rounded text-text-muted hover:bg-white/[0.06] hover:text-foreground"
+                                >
+                                    <RefreshCw size={11} aria-hidden="true" />
+                                </button>
+                                {log.kind === "ok" && log.data.lines.length > 0 ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => copy(log.data.lines.join("\n"), "log_text")}
+                                        aria-label="Copy log text"
+                                        title="Copy"
+                                        className="grid h-6 w-6 place-items-center rounded text-text-muted hover:bg-white/[0.06] hover:text-foreground"
+                                    >
+                                        {copied === "log_text" ? <Check size={11} /> : <Copy size={11} />}
+                                    </button>
+                                ) : null}
+                            </div>
+                        </div>
+                        {/* Errors pinned on top so the user lands on the
+                            interesting part instead of scrolling 200 lines. */}
+                        {log.kind === "ok" && log.data.errors.length > 0 ? (
+                            <div className="max-h-[120px] overflow-y-auto border-b border-white/6 bg-red-500/[0.06] px-3 py-1.5 font-mono text-[10px] leading-[1.6] text-red-200/95">
+                                {log.data.errors.map((line, i) => (
+                                    <div key={i} className="whitespace-pre-wrap break-words">{line}</div>
+                                ))}
+                            </div>
+                        ) : null}
+                        <div className="max-h-[280px] overflow-y-auto px-3 py-2 font-mono text-[10px] leading-[1.55] text-text-secondary/95">
+                            {log.kind === "loading" ? (
+                                <div className="text-text-muted/85">loading…</div>
+                            ) : log.kind === "error" ? (
+                                <div className="text-red-300">Could not read log: {log.message}</div>
+                            ) : log.kind === "ok" && log.data.missing ? (
+                                <div className="text-text-muted/85">Log file does not exist yet at {log.data.path}.</div>
+                            ) : log.kind === "ok" ? (
+                                log.data.lines.length === 0 ? (
+                                    <div className="text-text-muted/85">Log is empty.</div>
+                                ) : (
+                                    log.data.lines.map((line, i) => (
+                                        <div key={i} className="whitespace-pre-wrap break-words">{line}</div>
+                                    ))
+                                )
+                            ) : null}
+                        </div>
+                    </div>
+
                     <div className="rounded-md border border-dashed border-white/10 bg-black/20 px-3 py-2.5 text-[11.5px] leading-[1.55] text-text-secondary/85">
                         <div className="mb-1 font-mono text-[9px] font-medium uppercase tracking-[0.28em] text-text-muted/85">
                             Quick checks
@@ -256,7 +351,7 @@ export function DiagnoseModal({ taskId, elapsedLabel, onClose }: DiagnoseModalPr
                         <ol className="list-decimal space-y-1 pl-4">
                             <li>Press F5 to refresh — polling may have stalled.</li>
                             <li>If backend is unreachable, the desktop app or <code className="rounded bg-white/[0.06] px-1 font-mono text-[10.5px]">./start_backend.sh</code> may have stopped. Restart it.</li>
-                            <li>Open the log file (path above) and look for <code className="rounded bg-white/[0.06] px-1 font-mono text-[10.5px]">ERROR</code> / <code className="rounded bg-white/[0.06] px-1 font-mono text-[10.5px]">Failed</code> / <code className="rounded bg-white/[0.06] px-1 font-mono text-[10.5px]">Unauthorized</code>.</li>
+                            <li>Look at the red rows above for the immediate cause (provider auth, network, model misuse).</li>
                             <li>Backend restart wipes in-memory tasks; a stuck task is automatically marked failed at startup, so retry usually works.</li>
                         </ol>
                     </div>
@@ -264,6 +359,12 @@ export function DiagnoseModal({ taskId, elapsedLabel, onClose }: DiagnoseModalPr
             </div>
         </>
     );
+
+    // Portal escapes any transformed/overflow-clipped ancestor (the
+    // ShotCard's animated motion.div was the original culprit). Render
+    // straight to <body> so a fixed-position modal really is fixed.
+    if (typeof window === "undefined") return null;
+    return createPortal(modal, document.body);
 }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {

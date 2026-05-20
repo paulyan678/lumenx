@@ -56,13 +56,17 @@ export default function StoryboardR2V() {
             );
         }
 
-        // R2V — same validation against VIDEO_R2V_MODELS. When no
-        // explicit choice exists yet we derive an initial value from
-        // the chosen I2V family so the two stay coherent on first
-        // mount (user picks Wan I2V → R2V dropdown defaults to the Wan
-        // R2V entry, etc.).
+        // R2V preference order:
+        //   1. localStorage (user's last explicit pick — survives reloads)
+        //   2. project.model_settings.r2v_model (project-level default,
+        //      set in 生成设置 — Plan B "specialize" hierarchy)
+        //   3. derived from i2v family (initial coherence on first mount)
+        //   4. catalog DEFAULT_R2V_MODEL_ID
+        // Each candidate is validated against VIDEO_R2V_MODELS so a
+        // hidden id from any layer falls through cleanly.
+        const projectR2v = currentProject?.model_settings?.r2v_model;
         const r2vDerived = getR2vRouteModelId(i2vModelId);
-        const r2vCandidate = savedR2v || r2vDerived || DEFAULT_R2V_MODEL_ID;
+        const r2vCandidate = savedR2v || projectR2v || r2vDerived || DEFAULT_R2V_MODEL_ID;
         const r2vOk = VIDEO_R2V_MODELS.find(m => m.id === r2vCandidate);
         const r2vModelId = r2vOk ? r2vCandidate : (VIDEO_R2V_MODELS[0]?.id ?? DEFAULT_R2V_MODEL_ID);
         if (!r2vOk && ls && savedR2v) {
