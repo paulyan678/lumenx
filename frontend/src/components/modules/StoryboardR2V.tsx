@@ -6,7 +6,7 @@ import { Plus, Settings2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useProjectStore } from "@/store/projectStore";
 import { api } from "@/lib/api";
-import { getR2vRouteModelId, isR2vImageBased, VIDEO_I2V_MODELS, DEFAULT_I2V_MODEL_ID } from "@/lib/modelCatalog";
+import { getR2vRouteModelId, isR2vImageBased, VIDEO_I2V_MODELS, VIDEO_R2V_MODELS, DEFAULT_I2V_MODEL_ID, DEFAULT_R2V_MODEL_ID } from "@/lib/modelCatalog";
 import ShotCard, { type ShotNode } from "./storyboard-r2v/ShotCard";
 import AssetDrawer from "./storyboard-r2v/AssetDrawer";
 import VideoConfigModal, { type VideoConfig, DEFAULT_VIDEO_CONFIG } from "./storyboard-r2v/VideoConfigModal";
@@ -33,39 +33,57 @@ export default function StoryboardR2V() {
 
     // Global video config (with localStorage persistence for model selection)
     const [videoConfig, setVideoConfig] = useState<VideoConfig>(() => {
-        const savedModel = typeof window !== 'undefined' ? localStorage.getItem('storyboard-r2v-model') : null;
-        const projectModel = currentProject?.model_settings?.i2v_model || DEFAULT_I2V_MODEL_ID;
-        const candidate = savedModel || projectModel;
-        // Defensive: a cached localStorage model id may have been hidden
-        // or removed from the I2V list since it was last selected (e.g.
-        // the user once picked `wan2.7-r2v` while it was visible, the
-        // catalog later marked it hidden, and now the ID lingers in
-        // their browser). Falling back to the default avoids silently
-        // shipping the wrong model into the I2V flow on every submit,
-        // which surfaces as "ref_image_urls is required" hundreds of
-        // lines deep in the backend log. (See pipeline.create_video_task
-        // for the matching guard.)
-        const modelConfig = VIDEO_I2V_MODELS.find(m => m.id === candidate);
-        const modelId = modelConfig ? candidate : DEFAULT_I2V_MODEL_ID;
-        if (!modelConfig && typeof window !== 'undefined' && savedModel) {
-            // Wipe the stale cache so we don't keep falling back every
-            // mount. Project-level i2v_model can still drive the choice.
-            localStorage.removeItem('storyboard-r2v-model');
+        const ls = typeof window !== 'undefined' ? window.localStorage : null;
+        const savedI2v = ls?.getItem('storyboard-r2v-model') ?? null;
+        const savedR2v = ls?.getItem('storyboard-r2v-r2v-model') ?? null;
+        const projectI2v = currentProject?.model_settings?.i2v_model || DEFAULT_I2V_MODEL_ID;
+
+        // I2V — defensive: a cached localStorage model id may have been
+        // hidden or removed from the I2V list since it was last
+        // selected (e.g. the user once picked `wan2.7-r2v` while it was
+        // visible, the catalog later marked it hidden, and now the ID
+        // lingers in their browser). Falling back to the default avoids
+        // silently shipping the wrong model into the I2V flow.
+        const i2vCandidate = savedI2v || projectI2v;
+        const i2vOk = VIDEO_I2V_MODELS.find(m => m.id === i2vCandidate);
+        const i2vModelId = i2vOk ? i2vCandidate : DEFAULT_I2V_MODEL_ID;
+        if (!i2vOk && ls && savedI2v) {
+            ls.removeItem('storyboard-r2v-model');
             // eslint-disable-next-line no-console
             console.warn(
-                `[Studio] Cached I2V model "${candidate}" is no longer in the visible I2V list; ` +
+                `[Studio] Cached I2V model "${i2vCandidate}" is no longer in the visible I2V list; ` +
                 `falling back to "${DEFAULT_I2V_MODEL_ID}".`,
             );
         }
-        const finalConfig = VIDEO_I2V_MODELS.find(m => m.id === modelId);
+
+        // R2V — same validation against VIDEO_R2V_MODELS. When no
+        // explicit choice exists yet we derive an initial value from
+        // the chosen I2V family so the two stay coherent on first
+        // mount (user picks Wan I2V → R2V dropdown defaults to the Wan
+        // R2V entry, etc.).
+        const r2vDerived = getR2vRouteModelId(i2vModelId);
+        const r2vCandidate = savedR2v || r2vDerived || DEFAULT_R2V_MODEL_ID;
+        const r2vOk = VIDEO_R2V_MODELS.find(m => m.id === r2vCandidate);
+        const r2vModelId = r2vOk ? r2vCandidate : (VIDEO_R2V_MODELS[0]?.id ?? DEFAULT_R2V_MODEL_ID);
+        if (!r2vOk && ls && savedR2v) {
+            ls.removeItem('storyboard-r2v-r2v-model');
+        }
+
+        const finalConfig = VIDEO_I2V_MODELS.find(m => m.id === i2vModelId);
         const dc = finalConfig?.duration;
         const defaultDuration = dc ? (dc.type === 'fixed' ? dc.value : dc.default) : 5;
-        return { ...DEFAULT_VIDEO_CONFIG, model: modelId, duration: defaultDuration };
+        return {
+            ...DEFAULT_VIDEO_CONFIG,
+            model: i2vModelId,
+            r2vModel: r2vModelId,
+            duration: defaultDuration,
+        };
     });
 
     const handleConfigChange = useCallback((config: VideoConfig) => {
         if (typeof window !== 'undefined') {
             localStorage.setItem('storyboard-r2v-model', config.model);
+            localStorage.setItem('storyboard-r2v-r2v-model', config.r2vModel);
         }
         setVideoConfig(config);
     }, []);
@@ -233,9 +251,18 @@ export default function StoryboardR2V() {
 
         try {
             if (shot.tabMode === "direct_r2v") {
-                // R2V mode: use reference assets
+                // R2V mode: use reference assets. We prefer the user's
+                // explicit R2V model choice (videoConfig.r2vModel) over
+                // the derived route from the I2V model. The derivation
+                // is kept as a fallback when the explicit r2vModel is
+                // missing or invalid (which can only happen if the
+                // catalog flipped under our feet).
                 const referenceUrls = parseAssetTags(shot.prompt);
-                const routeModelId = getR2vRouteModelId(videoConfig.model);
+                const explicitR2v = videoConfig.r2vModel;
+                const explicitOk = VIDEO_R2V_MODELS.some(m => m.id === explicitR2v);
+                const routeModelId = explicitOk
+                    ? explicitR2v
+                    : getR2vRouteModelId(videoConfig.model);
                 const imageBased = isR2vImageBased(routeModelId);
 
                 const task = await api.createVideoTask(
@@ -407,8 +434,15 @@ export default function StoryboardR2V() {
         }
     }, [drawerState.targetShotIndex, shots, updatePrompt]);
 
-    // Get model display name for toolbar
-    const currentModelName = VIDEO_I2V_MODELS.find(m => m.id === videoConfig.model)?.name ?? videoConfig.model;
+    // Toolbar model display: surface the model the project's workflow
+    // mode actually uses, not the I2V parent. R2V projects were
+    // showing "wan2.7-i2v" while their generation actually went
+    // through wan2.6-r2v / wan2.7-r2v — confusing and the source of
+    // the "but I selected R2V" support thread.
+    const isR2VWorkflow = (currentProject?.workflow_mode ?? "r2v") === "r2v";
+    const currentModelName = isR2VWorkflow
+        ? (VIDEO_R2V_MODELS.find(m => m.id === videoConfig.r2vModel)?.name ?? videoConfig.r2vModel)
+        : (VIDEO_I2V_MODELS.find(m => m.id === videoConfig.model)?.name ?? videoConfig.model);
 
     return (
         <div className="h-full flex flex-col overflow-hidden relative">
@@ -531,6 +565,7 @@ export default function StoryboardR2V() {
                 onClose={() => setConfigModalOpen(false)}
                 config={videoConfig}
                 onConfigChange={handleConfigChange}
+                variant={isR2VWorkflow ? "r2v" : "i2v"}
             />
         </div>
     );

@@ -399,6 +399,34 @@ for (const model of SORTED_MODEL_ENTRIES) {
     }
 }
 
+// User-facing R2V model picker. The catalog hides individual R2V
+// models in the `video_sidebar` surface and exposes I2V models instead
+// (one per family); R2V is auto-routed from the chosen I2V model. That
+// works for users who think "pick a family, the rest is wired up", but
+// breaks the user who explicitly creates an R2V project and reasonably
+// expects an R2V model dropdown. We surface R2V choices by deriving
+// one selectable entry per family from R2V_ROUTE_MAP, mirroring the
+// VIDEO_I2V_MODELS shape so the UI can render either list with the
+// same component.
+export const VIDEO_R2V_MODELS: I2VModelConfig[] = (() => {
+    const seen = new Set<string>();
+    const out: I2VModelConfig[] = [];
+    // Walk the I2V list in canonical order so the R2V list ends up
+    // family-aligned with what the user already sees on the I2V tab.
+    for (const i2v of VIDEO_I2V_MODELS) {
+        const family = i2v.family;
+        if (!family) continue;
+        const r2vId = R2V_ROUTE_MAP[family];
+        if (!r2vId || seen.has(r2vId)) continue;
+        const r2vModel = MODEL_CATALOG.models[r2vId];
+        if (!r2vModel) continue;
+        seen.add(r2vId);
+        out.push(toI2VModel(r2vModel));
+    }
+    return out;
+})();
+export const DEFAULT_R2V_MODEL_ID = VIDEO_R2V_MODELS[0]?.id ?? R2V_ROUTE_MODEL_ID;
+
 /**
  * Given the currently selected I2V model, resolve the correct R2V route model.
  * Each family has its own hidden R2V model (e.g. wan -> wan2.6-r2v, happyhorse -> happyhorse-1.0-r2v).
