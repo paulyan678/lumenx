@@ -235,7 +235,7 @@ export default function CompareModal({ tasks, onClose, resolveUrl }: CompareModa
                                         className="h-full w-full object-contain"
                                     />
                                 ) : (
-                                    <div className="grid h-full w-full place-items-center font-mono text-[10px] uppercase tracking-[0.22em] text-text-muted/65">
+                                    <div className="grid h-full w-full place-items-center font-mono text-chrome-sm font-medium uppercase text-text-muted">
                                         no video url
                                     </div>
                                 )}
