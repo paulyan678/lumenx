@@ -19,6 +19,7 @@ from .models import (
     ProviderRoutingConfig,
     Script,
     Series,
+    StoryboardFrame,
     VideoTask,
 )
 from .llm import ScriptProcessor, DEFAULT_STORYBOARD_POLISH_PROMPT, DEFAULT_VIDEO_POLISH_PROMPT, DEFAULT_R2V_POLISH_PROMPT
@@ -1192,6 +1193,10 @@ class CreateVideoTaskRequest(BaseModel):
     # HappyHorse params
     reference_image_urls: List[str] = []  # Reference image URLs for HH R2V (max 9)
     ratio: Optional[str] = None  # Aspect ratio for HH T2V/R2V
+    # Source tab in the Storyboard R2V workbench. Distinct from
+    # generation_mode (backend dispatcher hint) — used by the candidates
+    # panel to group takes per UI tab on refresh.
+    workbench_tab: Optional[str] = None  # 't2i_i2v' | 'direct_r2v'
 
 
 async def process_video_task(script_id: str, task_id: str):
@@ -1243,6 +1248,39 @@ async def annotate_video_task(script_id: str, task_id: str, request: AnnotateVid
     if task is None:
         raise HTTPException(status_code=404, detail="Video task not found")
     return signed_response(task)
+
+
+class UpdateFrameWorkbenchRequest(BaseModel):
+    """Storyboard R2V workbench state writeback. Every field optional;
+    only what the caller passes gets updated. The server clamps lists
+    and indices to safe ranges; rejects unknown enum values."""
+    workbench_tab_mode: Optional[str] = None  # 't2i_i2v' | 'direct_r2v'
+    t2i_image_urls: Optional[List[str]] = None  # full ordered history, server caps at 10 FIFO
+    t2i_selected_index: Optional[int] = None  # active首帧 index, clamped to range
+    workbench_generate_count: Optional[int] = None  # batch size, clamped to [1, 6]
+
+
+@app.patch("/projects/{script_id}/frames/{frame_id}/workbench", response_model=StoryboardFrame)
+async def update_frame_workbench(
+    script_id: str, frame_id: str, request: UpdateFrameWorkbenchRequest
+):
+    """Persist Storyboard R2V workbench state onto a frame so it
+    survives refresh and cross-device opens. Previously this state
+    lived only in React component state and got lost on reload."""
+    try:
+        frame = pipeline.update_frame_workbench(
+            script_id,
+            frame_id,
+            workbench_tab_mode=request.workbench_tab_mode,
+            t2i_image_urls=request.t2i_image_urls,
+            t2i_selected_index=request.t2i_selected_index,
+            workbench_generate_count=request.workbench_generate_count,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if frame is None:
+        raise HTTPException(status_code=404, detail="Script or frame not found")
+    return signed_response(frame)
 
 
 @app.post("/projects/{script_id}/video_tasks/{task_id}/cancel", response_model=VideoTask)
@@ -1297,6 +1335,7 @@ async def create_video_task(script_id: str, request: CreateVideoTaskRequest, bac
                 cfg_scale=request.cfg_scale,
                 vidu_audio=request.vidu_audio,
                 movement_amplitude=request.movement_amplitude,
+                workbench_tab=request.workbench_tab,
             )
 
             # Find the created task object

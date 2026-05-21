@@ -123,6 +123,15 @@ class VideoTask(BaseModel):
     # in Assembly stage, not here.
     is_starred: bool = Field(False, description="User-starred shortlist flag (multi-select per shot)")
     label: Optional[str] = Field(None, description="User-attached short free-text note (≤20 chars)")
+    # Source tab in the Storyboard R2V workbench. Distinct from
+    # generation_mode (which the backend dispatcher uses to pick the
+    # provider); workbench_tab reflects the UI tab the user clicked
+    # Generate from, so candidates can be grouped per tab on refresh.
+    # Optional: pre-Phase-2-persistence tasks parse with None.
+    workbench_tab: Optional[str] = Field(
+        None,
+        description="Storyboard R2V workbench tab the user generated from: 't2i_i2v' | 'direct_r2v'",
+    )
     created_at: float = Field(default_factory=time.time)
 
 class Character(BaseModel):
@@ -265,6 +274,32 @@ class StoryboardFrame(BaseModel):
     locked: bool = Field(False, description="Whether this frame is locked from regeneration")
     status: GenerationStatus = GenerationStatus.PENDING
     updated_at: float = Field(default_factory=time.time, description="Timestamp of last update")
+
+    # === Storyboard R2V Workbench Persistence ===
+    # These fields back the per-shot workbench panel state so it
+    # survives refreshes and cross-device opens. Previously this state
+    # lived only in React component state and was lost on reload.
+    # All Optional with sane defaults to keep older frame records
+    # round-tripping unchanged.
+    workbench_tab_mode: Optional[str] = Field(
+        None,
+        description="Last-active R2V workbench tab: 't2i_i2v' | 'direct_r2v'",
+    )
+    t2i_image_urls: List[str] = Field(
+        default_factory=list,
+        description=(
+            "Ordered history of T2I first-frame URLs for this shot "
+            "(bounded FIFO, max 10). Active one indexed by t2i_selected_index."
+        ),
+    )
+    t2i_selected_index: int = Field(
+        0,
+        description="Index into t2i_image_urls; the active首帧 fed into I2V.",
+    )
+    workbench_generate_count: int = Field(
+        1,
+        description="Last-chosen Generate ×N batch size for this shot (1-6).",
+    )
 
 class ModelSettings(BaseModel):
     """Model selection settings for different generation stages"""

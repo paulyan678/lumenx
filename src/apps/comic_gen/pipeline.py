@@ -174,6 +174,78 @@ class ComicGenPipeline:
                 logger.warning("annotate_video_task: save failed")
             return task
 
+    _T2I_HISTORY_LIMIT = 10
+    _MAX_GENERATE_COUNT = 6
+    _WORKBENCH_TAB_VALUES = ("t2i_i2v", "direct_r2v")
+
+    def update_frame_workbench(
+        self,
+        script_id: str,
+        frame_id: str,
+        workbench_tab_mode: Optional[str] = None,
+        t2i_image_urls: Optional[List[str]] = None,
+        t2i_selected_index: Optional[int] = None,
+        workbench_generate_count: Optional[int] = None,
+    ) -> Optional["StoryboardFrame"]:
+        """Persist Storyboard R2V workbench state onto a frame.
+
+        Each field is optional; only the ones the caller passes get
+        written. The four fields cover everything the per-shot panel
+        carries that needs to survive refresh/cross-device:
+          - workbench_tab_mode: 't2i_i2v' | 'direct_r2v'
+          - t2i_image_urls: full ordered history (caller is the source
+            of truth, server clamps to _T2I_HISTORY_LIMIT FIFO)
+          - t2i_selected_index: active首帧 index, clamped to range
+          - workbench_generate_count: per-shot batch size, clamped to
+            [1, _MAX_GENERATE_COUNT]
+
+        Returns the updated StoryboardFrame, or None if the
+        script/frame can't be found (caller maps to 404).
+        Unknown enum values for workbench_tab_mode are rejected with
+        ValueError so a typo doesn't silently persist garbage."""
+        with self._save_lock:
+            script = self.scripts.get(script_id)
+            if not script:
+                return None
+            frames = getattr(script, "frames", None) or []
+            frame = next((f for f in frames if getattr(f, "id", None) == frame_id), None)
+            if not frame:
+                return None
+            if workbench_tab_mode is not None:
+                if workbench_tab_mode not in self._WORKBENCH_TAB_VALUES:
+                    raise ValueError(
+                        f"workbench_tab_mode must be one of {self._WORKBENCH_TAB_VALUES}, "
+                        f"got {workbench_tab_mode!r}",
+                    )
+                frame.workbench_tab_mode = workbench_tab_mode
+            if t2i_image_urls is not None:
+                # Filter empties + cap FIFO so the client can't grow the
+                # list unbounded by repeated calls. The client also caps
+                # at the same limit, but defense in depth.
+                cleaned = [u for u in t2i_image_urls if isinstance(u, str) and u.strip()]
+                if len(cleaned) > self._T2I_HISTORY_LIMIT:
+                    cleaned = cleaned[-self._T2I_HISTORY_LIMIT:]
+                frame.t2i_image_urls = cleaned
+            if t2i_selected_index is not None:
+                # Clamp against the resulting URL list, not whatever was
+                # there before — t2i_image_urls may have been written
+                # this same call.
+                urls = frame.t2i_image_urls or []
+                if not urls:
+                    frame.t2i_selected_index = 0
+                else:
+                    frame.t2i_selected_index = max(0, min(int(t2i_selected_index), len(urls) - 1))
+            if workbench_generate_count is not None:
+                frame.workbench_generate_count = max(
+                    1, min(int(workbench_generate_count), self._MAX_GENERATE_COUNT)
+                )
+            frame.updated_at = time.time()
+            try:
+                self._save_data()
+            except Exception:
+                logger.warning("update_frame_workbench: save failed")
+            return frame
+
     def mark_video_task_failed(
         self, script_id: str, task_id: str, error_message: str
     ) -> bool:
@@ -1528,7 +1600,7 @@ class ComicGenPipeline:
         self._save_data()
         return script
 
-    def create_video_task(self, script_id: str, image_url: str, prompt: str, duration: int = 5, seed: int = None, resolution: str = "720p", generate_audio: bool = False, audio_url: str = None, prompt_extend: bool = True, negative_prompt: str = None, model: str = "wan2.7-i2v", frame_id: str = None, shot_type: str = "single", generation_mode: str = "i2v", reference_video_urls: list = None, reference_image_urls: list = None, ratio: str = None, mode: str = None, sound: str = None, cfg_scale: float = None, vidu_audio: bool = None, movement_amplitude: str = None) -> Tuple[Script, str]:
+    def create_video_task(self, script_id: str, image_url: str, prompt: str, duration: int = 5, seed: int = None, resolution: str = "720p", generate_audio: bool = False, audio_url: str = None, prompt_extend: bool = True, negative_prompt: str = None, model: str = "wan2.7-i2v", frame_id: str = None, shot_type: str = "single", generation_mode: str = "i2v", reference_video_urls: list = None, reference_image_urls: list = None, ratio: str = None, mode: str = None, sound: str = None, cfg_scale: float = None, vidu_audio: bool = None, movement_amplitude: str = None, workbench_tab: Optional[str] = None) -> Tuple[Script, str]:
         """Creates a new video generation task."""
         script = self.get_script(script_id)
         if not script:
@@ -1621,13 +1693,14 @@ class ComicGenPipeline:
             cfg_scale=cfg_scale,
             vidu_audio=vidu_audio,
             movement_amplitude=movement_amplitude,
+            workbench_tab=workbench_tab,
             created_at=time.time()
         )
-        
+
         if not script.video_tasks:
             script.video_tasks = []
         script.video_tasks.append(task)
-        
+
         self._save_data()
         return script, task_id
 

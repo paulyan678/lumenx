@@ -29,7 +29,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.apps.comic_gen.models import Script, VideoTask
+from src.apps.comic_gen.models import Script, StoryboardFrame, VideoTask
 from src.apps.comic_gen.pipeline import ComicGenPipeline
 
 
@@ -293,3 +293,189 @@ def test_create_video_task_accepts_r2v_with_refs(pipeline):
 
     assert task_id
     assert any(t.id == task_id for t in script.video_tasks)
+
+
+# ---------------------------------------------------------------------------
+# Storyboard R2V workbench persistence (P.1 + P.2 + P.3)
+# ---------------------------------------------------------------------------
+
+
+def _script_with_frame(frame: StoryboardFrame, *tasks: VideoTask) -> Script:
+    return Script(
+        id="p1",
+        title="P",
+        original_text="t",
+        created_at=time.time(),
+        updated_at=time.time(),
+        frames=[frame],
+        video_tasks=list(tasks),
+    )
+
+
+def test_storyboard_frame_workbench_fields_default_empty():
+    """Old frames without workbench_* fields parse cleanly with defaults."""
+    legacy_payload = {"id": "f1", "scene_id": "s1"}
+    frame = StoryboardFrame.model_validate(legacy_payload)
+    assert frame.workbench_tab_mode is None
+    assert frame.t2i_image_urls == []
+    assert frame.t2i_selected_index == 0
+    assert frame.workbench_generate_count == 1
+
+
+def test_storyboard_frame_workbench_fields_round_trip():
+    """New workbench state survives Pydantic round-trip."""
+    frame = StoryboardFrame(
+        id="f1",
+        scene_id="s1",
+        workbench_tab_mode="t2i_i2v",
+        t2i_image_urls=["http://a", "http://b", "http://c"],
+        t2i_selected_index=2,
+        workbench_generate_count=4,
+    )
+    revived = StoryboardFrame.model_validate(frame.model_dump())
+    assert revived.workbench_tab_mode == "t2i_i2v"
+    assert revived.t2i_image_urls == ["http://a", "http://b", "http://c"]
+    assert revived.t2i_selected_index == 2
+    assert revived.workbench_generate_count == 4
+
+
+def test_video_task_workbench_tab_default_none():
+    """Existing VideoTask records without workbench_tab parse fine."""
+    legacy_payload = {"id": "v1", "project_id": "p1", "image_url": "x", "prompt": "p"}
+    task = VideoTask.model_validate(legacy_payload)
+    assert task.workbench_tab is None
+
+
+def test_update_frame_workbench_partial_writes(pipeline):
+    frame = StoryboardFrame(id="f1", scene_id="s1")
+    pipeline.scripts = {"p1": _script_with_frame(frame)}
+    with patch.object(pipeline, "_save_data"):
+        updated = pipeline.update_frame_workbench(
+            "p1", "f1", workbench_tab_mode="direct_r2v",
+        )
+    assert updated is not None
+    assert updated.workbench_tab_mode == "direct_r2v"
+    # Other fields untouched.
+    assert updated.t2i_image_urls == []
+    assert updated.t2i_selected_index == 0
+    assert updated.workbench_generate_count == 1
+
+
+def test_update_frame_workbench_rejects_unknown_tab_mode(pipeline):
+    frame = StoryboardFrame(id="f1", scene_id="s1")
+    pipeline.scripts = {"p1": _script_with_frame(frame)}
+    with pytest.raises(ValueError, match="workbench_tab_mode"):
+        pipeline.update_frame_workbench("p1", "f1", workbench_tab_mode="bogus_tab")
+
+
+def test_update_frame_workbench_caps_t2i_history_at_10(pipeline):
+    """Server-side defense in depth — the client also caps but the
+    server must not accept unbounded list growth."""
+    frame = StoryboardFrame(id="f1", scene_id="s1")
+    pipeline.scripts = {"p1": _script_with_frame(frame)}
+    long_list = [f"http://img-{i}" for i in range(15)]
+    with patch.object(pipeline, "_save_data"):
+        updated = pipeline.update_frame_workbench(
+            "p1", "f1", t2i_image_urls=long_list,
+        )
+    assert updated is not None
+    # FIFO: oldest dropped, newest retained.
+    assert updated.t2i_image_urls == [f"http://img-{i}" for i in range(5, 15)]
+    assert len(updated.t2i_image_urls) == 10
+
+
+def test_update_frame_workbench_clamps_selected_index_against_new_list(pipeline):
+    frame = StoryboardFrame(id="f1", scene_id="s1")
+    pipeline.scripts = {"p1": _script_with_frame(frame)}
+    with patch.object(pipeline, "_save_data"):
+        updated = pipeline.update_frame_workbench(
+            "p1", "f1",
+            t2i_image_urls=["http://a", "http://b"],
+            t2i_selected_index=99,  # out of range
+        )
+    assert updated is not None
+    assert updated.t2i_selected_index == 1  # clamped to len-1
+
+
+def test_update_frame_workbench_clamps_selected_index_to_zero_when_empty(pipeline):
+    frame = StoryboardFrame(
+        id="f1", scene_id="s1",
+        t2i_image_urls=["http://a"],
+        t2i_selected_index=0,
+    )
+    pipeline.scripts = {"p1": _script_with_frame(frame)}
+    with patch.object(pipeline, "_save_data"):
+        updated = pipeline.update_frame_workbench(
+            "p1", "f1", t2i_image_urls=[], t2i_selected_index=5,
+        )
+    assert updated is not None
+    assert updated.t2i_image_urls == []
+    assert updated.t2i_selected_index == 0
+
+
+def test_update_frame_workbench_clamps_generate_count_to_range(pipeline):
+    # Both bounds tested against the same frame; the helper mutates in
+    # place, so the second call overwrites the first — we capture each
+    # clamped value at the moment of the call instead of relying on the
+    # returned reference.
+    frame = StoryboardFrame(id="f1", scene_id="s1")
+    pipeline.scripts = {"p1": _script_with_frame(frame)}
+    with patch.object(pipeline, "_save_data"):
+        too_high = pipeline.update_frame_workbench(
+            "p1", "f1", workbench_generate_count=99,
+        )
+        assert too_high is not None
+        assert too_high.workbench_generate_count == 6  # clamped to upper bound
+        too_low = pipeline.update_frame_workbench(
+            "p1", "f1", workbench_generate_count=0,
+        )
+        assert too_low is not None
+        assert too_low.workbench_generate_count == 1  # clamped to lower bound
+
+
+def test_update_frame_workbench_filters_blank_t2i_urls(pipeline):
+    frame = StoryboardFrame(id="f1", scene_id="s1")
+    pipeline.scripts = {"p1": _script_with_frame(frame)}
+    with patch.object(pipeline, "_save_data"):
+        updated = pipeline.update_frame_workbench(
+            "p1", "f1",
+            t2i_image_urls=["http://a", "", "  ", "http://b", None],  # type: ignore[list-item]
+        )
+    assert updated is not None
+    assert updated.t2i_image_urls == ["http://a", "http://b"]
+
+
+def test_update_frame_workbench_returns_none_for_unknown(pipeline):
+    pipeline.scripts = {"p1": _script_with_frame(StoryboardFrame(id="f1", scene_id="s1"))}
+    assert pipeline.update_frame_workbench("p1", "ghost", workbench_tab_mode="t2i_i2v") is None
+    assert pipeline.update_frame_workbench("ghost", "f1", workbench_tab_mode="t2i_i2v") is None
+
+
+def test_create_video_task_persists_workbench_tab(pipeline):
+    pipeline.scripts = {"p1": _script_with_tasks()}
+    with patch.object(pipeline, "_save_data"):
+        script, task_id = pipeline.create_video_task(
+            script_id="p1",
+            image_url="http://example.com/img.png",
+            prompt="A scene",
+            model="wan2.7-i2v",
+            generation_mode="i2v",
+            workbench_tab="t2i_i2v",
+        )
+    task = next(t for t in script.video_tasks if t.id == task_id)
+    assert task.workbench_tab == "t2i_i2v"
+
+
+def test_create_video_task_workbench_tab_defaults_to_none(pipeline):
+    """Pre-Phase-2 callers don't supply workbench_tab — must not break."""
+    pipeline.scripts = {"p1": _script_with_tasks()}
+    with patch.object(pipeline, "_save_data"):
+        script, task_id = pipeline.create_video_task(
+            script_id="p1",
+            image_url="http://example.com/img.png",
+            prompt="A scene",
+            model="wan2.7-i2v",
+            generation_mode="i2v",
+        )
+    task = next(t for t in script.video_tasks if t.id == task_id)
+    assert task.workbench_tab is None
