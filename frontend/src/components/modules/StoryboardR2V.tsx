@@ -17,8 +17,6 @@ import {
     appendT2IImage,
     setActiveT2IIndex,
     removeT2IImage,
-    appendVideoTaskId,
-    videoTaskIdsForTab,
     getActiveT2IImageUrl,
 } from "./storyboard-r2v/shotNodeHelpers";
 import ShotPanel from "./storyboard-r2v/shot-panel/ShotPanel";
@@ -34,18 +32,26 @@ export default function StoryboardR2V() {
     const updateProject = useProjectStore((state) => state.updateProject);
     const t = useTranslations("storyboardR2V");
 
-    // Derive shots from project frames or initialize empty. Each shot
-    // gets pushed through migrateShotNode so the new t2iImageUrls /
-    // videoTaskIdsByTab fields are present even for legacy drafts.
+    // Derive shots from project frames. Workbench state (T2I 抽卡
+    // history, last-active tab, batch count) now comes from backend-
+    // persisted frame fields (added in commit 9149b06) instead of
+    // React-only state, so cross-refresh / cross-device users see the
+    // same panel state. migrateShotNode still runs as a defensive
+    // belt-and-suspenders for very old localStorage drafts.
     const [shots, setShots] = useState<ShotNode[]>(() => {
         if (currentProject?.frames && currentProject.frames.length > 0) {
             return currentProject.frames.map((frame: any) => migrateShotNode({
                 id: frame.id,
                 prompt: frame.action_description || "",
-                tabMode: "direct_r2v" as const,
+                tabMode: (frame.workbench_tab_mode as "t2i_i2v" | "direct_r2v" | undefined)
+                    ?? "direct_r2v",
                 videoUrl: frame.video_url || undefined,
                 videoStatus: frame.video_url ? ("completed" as const) : undefined,
                 imageUrl: frame.rendered_image_url || frame.image_url || undefined,
+                t2iImageUrls: Array.isArray(frame.t2i_image_urls) ? frame.t2i_image_urls : [],
+                t2iSelectedIndex: typeof frame.t2i_selected_index === "number"
+                    ? frame.t2i_selected_index
+                    : 0,
             }));
         }
         return [migrateShotNode({ id: `shot_${Date.now()}`, prompt: "", tabMode: "direct_r2v" })];
@@ -136,8 +142,64 @@ export default function StoryboardR2V() {
     // Per-shot batch count (the "抽卡 ×N" knob). Decoupled from
     // videoConfig because users typically pick the model + duration
     // once and vary count per shot. Keyed by shot.id so insert/move
-    // don't shuffle counts onto the wrong shot.
-    const [shotCounts, setShotCounts] = useState<Record<string, number>>({});
+    // don't shuffle counts onto the wrong shot. Seeded from backend
+    // workbench_generate_count so user choices survive refresh.
+    const [shotCounts, setShotCounts] = useState<Record<string, number>>(() => {
+        const out: Record<string, number> = {};
+        const frames: any[] = currentProject?.frames ?? [];
+        for (const f of frames) {
+            if (typeof f.workbench_generate_count === "number") {
+                out[f.id] = f.workbench_generate_count;
+            }
+        }
+        return out;
+    });
+
+    // Debounced backend writer for workbench state. Coalesces rapid
+    // changes (e.g. user clicking through T2I thumbs) into one PATCH
+    // per shot per second. Per-shot map ensures one shot's pending
+    // write doesn't get overwritten by another's.
+    const workbenchPendingRef = useRef<Map<string, {
+        timer: number;
+        patch: Parameters<typeof api.updateFrameWorkbench>[2];
+    }>>(new Map());
+    const persistWorkbench = useCallback((
+        shotId: string,
+        patch: Parameters<typeof api.updateFrameWorkbench>[2],
+    ) => {
+        if (!currentProject?.id) return;
+        const projectId = currentProject.id;
+        const map = workbenchPendingRef.current;
+        const existing = map.get(shotId);
+        const merged = { ...(existing?.patch ?? {}), ...patch };
+        if (existing) {
+            window.clearTimeout(existing.timer);
+        }
+        const timer = window.setTimeout(() => {
+            map.delete(shotId);
+            api.updateFrameWorkbench(projectId, shotId, merged).catch((err) => {
+                console.warn("[Studio] Failed to persist workbench state:", err);
+            });
+        }, 1000);
+        map.set(shotId, { timer, patch: merged });
+    }, [currentProject?.id]);
+
+    // Flush all pending writes on unmount so leaving the page doesn't
+    // strand the user's last change in the debounce window.
+    useEffect(() => {
+        const map = workbenchPendingRef.current;
+        return () => {
+            const projectId = currentProject?.id;
+            if (!projectId) return;
+            for (const [shotId, entry] of Array.from(map.entries())) {
+                window.clearTimeout(entry.timer);
+                api.updateFrameWorkbench(projectId, shotId, entry.patch).catch(() => {
+                    /* best-effort on teardown */
+                });
+            }
+            map.clear();
+        };
+    }, [currentProject?.id]);
 
     const characters = currentProject?.characters || [];
     const scenes = currentProject?.scenes || [];
@@ -198,10 +260,15 @@ export default function StoryboardR2V() {
         setShots(prev => prev.map((s, i) => i === index ? { ...s, prompt } : s));
     }, []);
 
-    // Set shot tab mode
+    // Set shot tab mode + persist so the user's last-active tab
+    // survives refresh.
     const setTabMode = useCallback((index: number, mode: "t2i_i2v" | "direct_r2v") => {
-        setShots(prev => prev.map((s, i) => i === index ? { ...s, tabMode: mode } : s));
-    }, []);
+        setShots(prev => prev.map((s, i) => {
+            if (i !== index) return s;
+            persistWorkbench(s.id, { workbench_tab_mode: mode });
+            return { ...s, tabMode: mode };
+        }));
+    }, [persistWorkbench]);
 
     // Parse asset tags from prompt and resolve to URLs
     const parseAssetTags = useCallback((prompt: string): string[] => {
@@ -269,9 +336,15 @@ export default function StoryboardR2V() {
                 // history + auto-select so the new image becomes the
                 // active首帧 used by downstream I2V generation.
                 const imageUrl = result.image_url || result.rendered_image_url;
-                setShots(prev => prev.map((s, i) =>
-                    i === index ? appendT2IImage({ ...s, t2iStatus: "completed" }, imageUrl) : s
-                ));
+                setShots(prev => prev.map((s, i) => {
+                    if (i !== index) return s;
+                    const updated = appendT2IImage({ ...s, t2iStatus: "completed" }, imageUrl);
+                    persistWorkbench(s.id, {
+                        t2i_image_urls: updated.t2iImageUrls ?? [],
+                        t2i_selected_index: updated.t2iSelectedIndex ?? 0,
+                    });
+                    return updated;
+                }));
             }
         } catch (error) {
             console.error("Failed to generate T2I for shot:", error);
@@ -279,7 +352,7 @@ export default function StoryboardR2V() {
                 i === index ? { ...s, t2iStatus: "failed" } : s
             ));
         }
-    }, [shots, currentProject]);
+    }, [shots, currentProject, persistWorkbench]);
 
     // Generate video for a shot
     const generateVideo = useCallback(async (index: number) => {
@@ -459,6 +532,7 @@ export default function StoryboardR2V() {
                         undefined, undefined,
                         imageBased ? referenceUrls : undefined,
                         params?.ratio ?? videoConfig.resolution,
+                        tabMode,
                     );
                     return task?.id ?? null;
                 }
@@ -493,6 +567,8 @@ export default function StoryboardR2V() {
                     params?.viduAudio ?? videoConfig.viduAudio,
                     params?.movementAmplitude ?? videoConfig.movementAmplitude,
                     undefined,
+                    undefined,
+                    tabMode,
                 );
                 return task?.id ?? null;
             };
@@ -504,15 +580,17 @@ export default function StoryboardR2V() {
             if (taskIds.length > 0) {
                 setShots(prev => prev.map((s, i) => {
                     if (i !== index) return s;
-                    // Stamp each new task into the per-tab bucket; the
-                    // legacy single videoTaskId mirrors the latest one
-                    // so any code still reading the single field gets
-                    // the most-recent batch's last task.
-                    let next = s;
-                    for (const tid of taskIds) {
-                        next = appendVideoTaskId(next, tabMode, tid);
-                    }
-                    return { ...next, videoStatus: "processing" as const };
+                    // Mirror the latest task id on the legacy single
+                    // field so the ShotCard preview spinner / cancel
+                    // CTA keep working. The candidates panel reads
+                    // from project.video_tasks (filtered by
+                    // frame_id + workbench_tab), so the per-tab id
+                    // bucket on the shot is no longer needed.
+                    return {
+                        ...s,
+                        videoTaskId: taskIds[taskIds.length - 1],
+                        videoStatus: "processing" as const,
+                    };
                 }));
             } else {
                 setShots(prev => prev.map((s, i) =>
@@ -541,18 +619,15 @@ export default function StoryboardR2V() {
         const anyInFlight = allTasks.some(
             (t) => t.status === "pending" || t.status === "processing",
         );
-        // Also poll if any local shot has an unresolved task id — that
-        // covers the just-created-task window before the project state
-        // has caught up.
+        // Also poll if any shot's locally-tracked videoTaskId is not
+        // yet reflected in the project record (closes the just-created
+        // window). With the Phase-2 derive-from-tasks model, we only
+        // care about the legacy single-id mirror on the shot.
         const localInFlight = shots.some((s) => {
-            const ids = [
-                ...(videoTaskIdsForTab(s, "t2i_i2v") || []),
-                ...(videoTaskIdsForTab(s, "direct_r2v") || []),
-            ];
-            return ids.some((id) => {
-                const t = allTasks.find((tt) => tt.id === id);
-                return !t || t.status === "pending" || t.status === "processing";
-            });
+            const id = s.videoTaskId;
+            if (!id) return false;
+            const t = allTasks.find((tt) => tt.id === id);
+            return !t || t.status === "pending" || t.status === "processing";
         });
         if (!anyInFlight && !localInFlight) return;
         const projectId = currentProject.id;
@@ -601,11 +676,15 @@ export default function StoryboardR2V() {
                         if (status.status === "completed") {
                             const imageUrl = status.image_url || status.video_url || status.result_url;
                             if (imageUrl) {
-                                setShots(prev => prev.map(s =>
-                                    s.id === shot.id
-                                        ? appendT2IImage({ ...s, t2iStatus: "completed" }, imageUrl)
-                                        : s
-                                ));
+                                setShots(prev => prev.map(s => {
+                                    if (s.id !== shot.id) return s;
+                                    const updated = appendT2IImage({ ...s, t2iStatus: "completed" }, imageUrl);
+                                    persistWorkbench(s.id, {
+                                        t2i_image_urls: updated.t2iImageUrls ?? [],
+                                        t2i_selected_index: updated.t2iSelectedIndex ?? 0,
+                                    });
+                                    return updated;
+                                }));
                             }
                         } else if (status.status === "failed") {
                             setShots(prev => prev.map(s =>
@@ -620,7 +699,7 @@ export default function StoryboardR2V() {
         }, 5000);
 
         return () => clearInterval(interval);
-    }, [shots]);
+    }, [shots, persistWorkbench]);
 
     // Insert asset tag from drawer into target shot
     const insertAssetFromDrawer = useCallback((type: string, name: string) => {
@@ -693,19 +772,23 @@ export default function StoryboardR2V() {
         return out;
     }, [compareSelectedIds, tasksById]);
 
-    // Per-shot candidate tasks: walk the shot's per-tab id bucket and
-    // resolve each id to a project-level VideoTask. Tasks not yet
-    // round-tripped to the project record are skipped (the next 5s
-    // refresh tick picks them up).
+    // Per-shot candidate tasks — derived directly from the project-
+    // level video_tasks. After Phase 2 persistence, each VideoTask
+    // carries `frame_id` + `workbench_tab` so we can bucket without a
+    // shot-side index. Pre-Phase-2 tasks lack `workbench_tab`; they
+    // fall back to `generation_mode` so legacy records still group
+    // correctly into the right tab.
     const tasksForShot = useCallback((shot: ShotNode): VideoTask[] => {
-        const ids = videoTaskIdsForTab(shot, shot.tabMode);
-        const out: VideoTask[] = [];
-        for (const id of ids) {
-            const t = tasksById.get(id);
-            if (t) out.push(t);
-        }
-        return out;
-    }, [tasksById]);
+        return allVideoTasks.filter((t) => {
+            if (t.frame_id !== shot.id) return false;
+            if (t.workbench_tab != null) {
+                return t.workbench_tab === shot.tabMode;
+            }
+            // Legacy fallback: i2v tasks belong in t2i_i2v, r2v in direct_r2v.
+            if (shot.tabMode === "direct_r2v") return t.generation_mode === "r2v";
+            return t.generation_mode !== "r2v"; // i2v + undefined → i2v tab
+        });
+    }, [allVideoTasks]);
 
     // Build a ParamsState from videoConfig + per-shot count override.
     // Single source of truth: videoConfig drives shared knobs; shotCounts
@@ -730,9 +813,16 @@ export default function StoryboardR2V() {
     }, [videoConfig, shotCounts]);
 
     // ParamsSection.onChange handler: count goes into the per-shot
-    // map; everything else writes back to the shared videoConfig (so
-    // the user's most-recent picks become the new default for siblings).
+    // map (and persisted to the frame); everything else writes back to
+    // the shared videoConfig (so the user's most-recent picks become
+    // the new default for siblings). videoConfig is mirrored to
+    // localStorage as a recovery cache only — the authoritative model
+    // selection lives in project.model_settings, written via the
+    // 生成设置 modal.
     const handleShotParamsChange = useCallback((shot: ShotNode, next: ParamsState) => {
+        if ((shotCounts[shot.id] ?? 1) !== next.count) {
+            persistWorkbench(shot.id, { workbench_generate_count: next.count });
+        }
         setShotCounts(prev => ({ ...prev, [shot.id]: next.count }));
         const isR2v = shot.tabMode === "direct_r2v";
         const ls = typeof window !== "undefined" ? window.localStorage : null;
@@ -758,7 +848,7 @@ export default function StoryboardR2V() {
             }
             return updated;
         });
-    }, []);
+    }, [persistWorkbench, shotCounts]);
 
     // Annotate handlers wire CandidateThumb's star/label CTAs to the
     // backend PATCH endpoint. We refresh the project after each call
@@ -807,13 +897,13 @@ export default function StoryboardR2V() {
     }, [currentProject?.id, refreshProject]);
 
     // Retry = fire a fresh batch of 1 for the shot owning this task,
-    // reusing the task's params as best-effort. Falls back to current
-    // ParamsSection state if we can't find the owner.
+    // reusing the task's params as best-effort. After Phase 2 the
+    // task→shot mapping is direct via task.frame_id; falls back to
+    // current ParamsSection state if we can't find the owner.
     const handleRetryTask = useCallback(async (task: VideoTask) => {
-        const ownerIdx = shots.findIndex((s) => {
-            const ids = videoTaskIdsForTab(s, s.tabMode);
-            return ids.includes(task.id);
-        });
+        const ownerIdx = task.frame_id
+            ? shots.findIndex((s) => s.id === task.frame_id)
+            : -1;
         if (ownerIdx < 0) return;
         await generateVideoBatch(ownerIdx, 1);
     }, [shots, generateVideoBatch]);
@@ -985,12 +1075,23 @@ export default function StoryboardR2V() {
                                         generating={shot.t2iStatus === "pending" || shot.t2iStatus === "processing"}
                                         inFlightTaskId={shot.t2iTaskId}
                                         inFlightStatus={shot.t2iStatus}
-                                        onSelect={(i) => setShots(prev => prev.map((s, j) =>
-                                            j === index ? setActiveT2IIndex(s, i) : s,
-                                        ))}
-                                        onRemove={(i) => setShots(prev => prev.map((s, j) =>
-                                            j === index ? removeT2IImage(s, i) : s,
-                                        ))}
+                                        onSelect={(i) => setShots(prev => prev.map((s, j) => {
+                                            if (j !== index) return s;
+                                            const next = setActiveT2IIndex(s, i);
+                                            persistWorkbench(s.id, {
+                                                t2i_selected_index: next.t2iSelectedIndex ?? 0,
+                                            });
+                                            return next;
+                                        }))}
+                                        onRemove={(i) => setShots(prev => prev.map((s, j) => {
+                                            if (j !== index) return s;
+                                            const next = removeT2IImage(s, i);
+                                            persistWorkbench(s.id, {
+                                                t2i_image_urls: next.t2iImageUrls ?? [],
+                                                t2i_selected_index: next.t2iSelectedIndex ?? 0,
+                                            });
+                                            return next;
+                                        }))}
                                         onGenerate={() => generateT2I(index)}
                                         resolveUrl={resolveAssetUrl}
                                     />

@@ -74,6 +74,10 @@ export interface VideoTask {
     is_starred?: boolean;
     /** User-attached short free-text note (≤20 chars, server-truncated). */
     label?: string | null;
+    /** Source tab in the Storyboard R2V workbench. Pre-Phase-2 records
+     *  parse with null/undefined; CandidatesSection falls back to
+     *  generation_mode to bucket them in that case. */
+    workbench_tab?: "t2i_i2v" | "direct_r2v" | null;
 }
 
 export const api = {
@@ -140,7 +144,11 @@ export const api = {
         movementAmplitude?: string,
         // HappyHorse params
         referenceImageUrls: string[] = [],  // Reference images for HappyHorse R2V (1-9)
-        ratio?: string  // Aspect ratio: 16:9, 9:16, 1:1, 4:3, 3:4
+        ratio?: string,  // Aspect ratio: 16:9, 9:16, 1:1, 4:3, 3:4
+        // Storyboard R2V workbench tab the user clicked Generate from.
+        // Distinct from generationMode (backend dispatcher); workbench_tab
+        // lets the candidates panel group takes per UI tab on refresh.
+        workbenchTab?: "t2i_i2v" | "direct_r2v"
     ) => {
         const res = await axios.post(`${API_URL}/projects/${id}/video_tasks`, {
             image_url,
@@ -167,8 +175,33 @@ export const api = {
             movement_amplitude: movementAmplitude,
             // HappyHorse
             reference_image_urls: referenceImageUrls,
-            ratio
+            ratio,
+            workbench_tab: workbenchTab,
         });
+        return res.data;
+    },
+
+    /** Persist Storyboard R2V workbench state onto a frame.
+     *  Used by StoryboardR2V to write tab/T2I history/active index/
+     *  batch-count whenever the user changes them. Server clamps:
+     *    t2i_image_urls ≤ 10 FIFO,
+     *    t2i_selected_index ∈ [0, len-1],
+     *    workbench_generate_count ∈ [1, 6].
+     *  Unknown tab_mode returns 400. */
+    updateFrameWorkbench: async (
+        scriptId: string,
+        frameId: string,
+        patch: {
+            workbench_tab_mode?: "t2i_i2v" | "direct_r2v";
+            t2i_image_urls?: string[];
+            t2i_selected_index?: number;
+            workbench_generate_count?: number;
+        },
+    ) => {
+        const res = await axios.patch(
+            `${API_URL}/projects/${scriptId}/frames/${frameId}/workbench`,
+            patch,
+        );
         return res.data;
     },
 
