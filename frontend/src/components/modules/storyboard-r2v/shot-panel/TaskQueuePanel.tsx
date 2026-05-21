@@ -64,11 +64,37 @@ export default function TaskQueuePanel({
     if (!open) return null;
 
     return (
-        <aside
-            role="region"
-            aria-label="Task queue"
-            className="flex h-full w-[360px] shrink-0 flex-col border-l border-glass-border bg-surface motion-safe:animate-[queuePanelIn_280ms_cubic-bezier(0.22,1,0.36,1)_both]"
-        >
+        <>
+            {/* Backdrop — only renders below xl, where the panel is an
+                overlay rather than a layout-pushing column. Click to
+                dismiss matches the modal idiom for narrower screens. */}
+            <div
+                aria-hidden="true"
+                onClick={onClose}
+                className="absolute inset-0 z-20 bg-black/55 backdrop-blur-[1px] motion-safe:animate-[fadeInBackdrop_180ms_ease-out-quart_both] xl:hidden"
+            />
+            <aside
+                role="region"
+                aria-label="Task queue"
+                className={[
+                    // Always: flex layout, glass surface, slide-in entry.
+                    "flex h-full shrink-0 flex-col border-l border-glass-border bg-surface",
+                    "motion-safe:animate-[queuePanelIn_280ms_cubic-bezier(0.22,1,0.36,1)_both]",
+                    // ≥xl (1280): push column — old behavior. Static
+                    // flex sibling, 360px wide, compresses main area.
+                    "xl:static xl:w-[360px] xl:shadow-none xl:z-auto",
+                    // md–lg (768–1279): overlay panel. Floats over main
+                    // content rather than pushing it, since narrow
+                    // viewports can't spare 360px of horizontal real
+                    // estate without the shot list becoming unusable.
+                    "absolute inset-y-0 right-0 z-30 w-[340px] max-w-[min(340px,calc(100vw-48px))]",
+                    "shadow-[-12px_0_32px_-12px_rgba(0,0,0,0.55)]",
+                    // <md (768): full-width drawer. Smaller phones get
+                    // the queue as a modal full-screen takeover; the
+                    // close button + backdrop both dismiss.
+                    "max-md:w-screen max-md:max-w-none",
+                ].join(" ")}
+            >
             <header className="flex shrink-0 items-center justify-between gap-2 border-b border-glass-border px-3.5 py-3">
                 <div className="flex items-baseline gap-2">
                     {/* Display tier — primary panel title (P0-2). */}
@@ -141,6 +167,7 @@ export default function TaskQueuePanel({
                 )}
             </div>
         </aside>
+        </>
     );
 }
 

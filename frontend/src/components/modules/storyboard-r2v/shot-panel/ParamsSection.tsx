@@ -381,15 +381,18 @@ export default function ParamsSection({
 // ---------- Sub-components ----------
 
 function ParamRow({ label, children }: { label: string; children: React.ReactNode }) {
+    // Below sm the label stacks above the control so cramped widths
+    // (≤480 phones) don't squeeze the input. At ≥sm the original
+    // two-column label / control layout returns.
     return (
-        <div className="flex items-start gap-3">
+        <div className="flex flex-col items-start gap-1 sm:flex-row sm:gap-3">
             {/* Row label — chrome tier, NOT uppercase (Sweep E P2-1:
                 uppercase tracking is reserved for section titles, not
                 every chrome line). */}
-            <span className="w-24 shrink-0 pt-2 font-mono text-chrome-sm font-medium tracking-tight text-text-muted">
+            <span className="font-mono text-chrome-sm font-medium tracking-tight text-text-muted sm:w-24 sm:shrink-0 sm:pt-2">
                 {label}
             </span>
-            <div className="min-w-0 flex-1">{children}</div>
+            <div className="min-w-0 w-full flex-1 sm:w-auto">{children}</div>
         </div>
     );
 }

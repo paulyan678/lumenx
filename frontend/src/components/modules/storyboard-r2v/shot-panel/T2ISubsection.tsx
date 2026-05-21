@@ -67,7 +67,10 @@ export default function T2ISubsection({
 
     return (
         <div className="space-y-2">
-            <div className="flex items-start gap-3">
+            {/* Below sm the active preview stacks ABOVE the thumb strip
+                so neither truncates. At ≥sm they sit side-by-side as
+                in the original design. */}
+            <div className="flex flex-col items-start gap-3 sm:flex-row">
                 {/* Active首帧 large preview — display tier label
                     "Now editing" promotes the focal frame to display
                     level so the workbench has a visual anchor (P0-2). */}
@@ -102,8 +105,10 @@ export default function T2ISubsection({
                     </div>
                 </div>
 
-                {/* Thumbnail strip */}
-                <div className="flex flex-1 flex-wrap items-start gap-1.5 pt-[22px]">
+                {/* Thumbnail strip. pt-[22px] aligns with the
+                    "Active frame" display-tier title at ≥sm; at <sm
+                    the title is above so no top padding needed. */}
+                <div className="flex flex-1 flex-wrap items-start gap-1.5 sm:pt-[22px]">
                     {imageUrls.map((url, idx) => {
                         const active = idx === safeIndex;
                         return (

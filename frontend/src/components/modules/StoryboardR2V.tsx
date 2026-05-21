@@ -965,8 +965,10 @@ export default function StoryboardR2V() {
             so the queue doesn't overlay content. The flex parent splits
             available width between this main column and the side queue. */}
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-            {/* Top Toolbar */}
-            <div className="flex items-center justify-between px-6 py-3 border-b border-white/[0.06] bg-white/[0.02] backdrop-blur-xl shrink-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+            {/* Top Toolbar — wraps to two rows on narrow viewports
+                so the model-name + queue button drop below the shot
+                counter instead of overflowing horizontally. */}
+            <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-white/[0.06] bg-white/[0.02] backdrop-blur-xl shrink-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] sm:px-6">
                 <div className="flex items-center gap-3">
                     <span className="text-sm font-medium text-foreground">
                         {shots.length} {shots.length === 1 ? "Shot" : "Shots"}
@@ -982,7 +984,13 @@ export default function StoryboardR2V() {
                     </motion.button>
                 </div>
                 <div className="flex items-center gap-3">
-                    <span className="text-[11px] text-text-secondary tracking-wide">{t("currentModel")}: <span className="text-foreground font-medium">{currentModelName}</span></span>
+                    {/* Hide the verbose current-model label on narrow
+                        viewports — the model is also visible inside
+                        each shot's ParamsSection, so the toolbar can
+                        keep just the queue button. */}
+                    <span className="hidden text-[11px] text-text-secondary tracking-wide md:inline">
+                        {t("currentModel")}: <span className="text-foreground font-medium">{currentModelName}</span>
+                    </span>
                     <TaskQueueButton
                         inFlightCount={inFlightTaskCount}
                         open={queueOpen}
@@ -991,8 +999,10 @@ export default function StoryboardR2V() {
                 </div>
             </div>
 
-            {/* Shot List (Timeline) */}
-            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+            {/* Shot List (Timeline) — px tightens on narrow so the
+                shot cards + their attached workbench panels keep
+                breathing room without overflowing. */}
+            <div className="flex-1 overflow-y-auto px-3 py-4 space-y-3 sm:px-6">
                 {shots.map((shot, index) => {
                     const shotTasks = tasksForShot(shot);
                     const shotInFlight = shotTasks.filter(

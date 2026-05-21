@@ -31,15 +31,20 @@ export default function ShotPanel({ children }: ShotPanelProps) {
     // commits to "this belongs to that shot." Panel itself gains a
     // subtle inset highlight + soft outer shadow for depth without
     // boxiness (anti-pattern: nested cards).
+    //
+    // Responsive: at ≥md (768) keep the deep ml-5 indent that visually
+    // marks "child of shot." Below md the candidate grid + params
+    // sections need every horizontal pixel, so the indent shrinks to
+    // ml-2 and the connector L-shape repositions to match.
     return (
-        <div className="relative ml-5 mr-1 mt-1.5">
+        <div className="relative ml-2 mr-1 mt-1.5 md:ml-5">
             <span
                 aria-hidden="true"
-                className="absolute -top-2.5 left-3 h-3 border-l border-primary/35"
+                className="absolute -top-2.5 left-1.5 h-3 border-l border-primary/35 md:left-3"
             />
             <span
                 aria-hidden="true"
-                className="absolute top-[2px] left-3 h-px w-2.5 border-t border-primary/35"
+                className="absolute top-[2px] left-1.5 h-px w-2 border-t border-primary/35 md:left-3 md:w-2.5"
             />
             <div className="rounded-lg border border-glass-border bg-black/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_2px_12px_-6px_rgba(0,0,0,0.5)] backdrop-blur-[2px] motion-safe:animate-[shotPanelIn_220ms_cubic-bezier(0.22,1,0.36,1)_both]">
                 {children}

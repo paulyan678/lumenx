@@ -213,9 +213,11 @@ export default function CandidatesSection({
                 <div className="space-y-2">
                     {/* Compare callout — promoted to display tier when
                         ≥2 selected (P0-2). This is a "you can do
-                        something now" moment, deserves visual weight. */}
+                        something now" moment, deserves visual weight.
+                        Wraps to a vertical stack on narrow viewports
+                        so the CTA never overflows. */}
                     {compareCount >= 2 ? (
-                        <div className="flex items-center justify-between gap-3 rounded-md border border-status-starred-border bg-status-starred-bg px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-status-starred-border bg-status-starred-bg px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] sm:gap-3">
                             <span className="font-display text-display-sm font-semibold tracking-tight text-status-starred-fg">
                                 {compareCount} selected for compare
                             </span>

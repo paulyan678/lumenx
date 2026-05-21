@@ -193,6 +193,14 @@ body {
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* TaskQueuePanel backdrop fade — only renders below xl when the panel
+   becomes an overlay. The backdrop dimming gives the panel its modal
+   register without needing a portal. */
+@keyframes fadeInBackdrop {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
 /* Respect reduced-motion preference: kill all custom animations.
    The above transitions still apply (CSS transitions on hover etc
    are kept), but the orchestrated entrance keyframes go away for
