@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { useProjectStore } from "@/store/projectStore";
 import { api, type VideoTask } from "@/lib/api";
 import { getAssetUrl } from "@/lib/utils";
+import { debugLog } from "@/lib/debugLog";
 import type { BatchSummary } from "./storyboard-r2v/shot-panel/CandidatesSection";
 import { getR2vRouteModelId, isR2vImageBased, VIDEO_I2V_MODELS, VIDEO_R2V_MODELS, DEFAULT_I2V_MODEL_ID, DEFAULT_R2V_MODEL_ID } from "@/lib/modelCatalog";
 import ShotCard, { type ShotNode } from "./storyboard-r2v/ShotCard";
@@ -75,9 +76,9 @@ export default function StoryboardR2V() {
         const i2vModelId = i2vOk ? i2vCandidate : DEFAULT_I2V_MODEL_ID;
         if (!i2vOk && ls && savedI2v) {
             ls.removeItem('storyboard-r2v-model');
-            // eslint-disable-next-line no-console
-            console.warn(
-                `[Studio] Cached I2V model "${i2vCandidate}" is no longer in the visible I2V list; ` +
+            debugLog.warn(
+                "Studio",
+                `Cached I2V model "${i2vCandidate}" is no longer in the visible I2V list; ` +
                 `falling back to "${DEFAULT_I2V_MODEL_ID}".`,
             );
         }
@@ -178,7 +179,7 @@ export default function StoryboardR2V() {
         const timer = window.setTimeout(() => {
             map.delete(shotId);
             api.updateFrameWorkbench(projectId, shotId, merged).catch((err) => {
-                console.warn("[Studio] Failed to persist workbench state:", err);
+                debugLog.warn("Studio", "Failed to persist workbench state:", err);
             });
         }, 1000);
         map.set(shotId, { timer, patch: merged });
@@ -347,7 +348,7 @@ export default function StoryboardR2V() {
                 }));
             }
         } catch (error) {
-            console.error("Failed to generate T2I for shot:", error);
+            debugLog.error("Studio", "Failed to generate T2I for shot:", error);
             setShots(prev => prev.map((s, i) =>
                 i === index ? { ...s, t2iStatus: "failed" } : s
             ));
@@ -417,9 +418,9 @@ export default function StoryboardR2V() {
                 // only model into the I2V flow.
                 const i2vModelOk = VIDEO_I2V_MODELS.some(m => m.id === videoConfig.model);
                 if (!i2vModelOk) {
-                    // eslint-disable-next-line no-console
-                    console.warn(
-                        `[Studio] Refusing to submit I2V task with model "${videoConfig.model}" ` +
+                    debugLog.warn(
+                        "Studio",
+                        `Refusing to submit I2V task with model "${videoConfig.model}" ` +
                         `which is not in the visible I2V list. Falling back to "${DEFAULT_I2V_MODEL_ID}".`,
                     );
                     setVideoConfig(c => ({ ...c, model: DEFAULT_I2V_MODEL_ID }));
@@ -468,7 +469,7 @@ export default function StoryboardR2V() {
                 }
             }
         } catch (error) {
-            console.error("Failed to generate video for shot:", error);
+            debugLog.error("Studio", "Failed to generate video for shot:", error);
             setShots(prev => prev.map((s, i) =>
                 i === index ? { ...s, videoStatus: "failed" } : s
             ));
@@ -540,7 +541,7 @@ export default function StoryboardR2V() {
                 const i2vModelId = params?.model ?? videoConfig.model;
                 const i2vModelOk = VIDEO_I2V_MODELS.some(m => m.id === i2vModelId);
                 if (!i2vModelOk) {
-                    console.warn(`[Studio] Refusing I2V submission with non-I2V model "${i2vModelId}".`);
+                    debugLog.warn("Studio", `Refusing I2V submission with non-I2V model "${i2vModelId}".`);
                     return null;
                 }
                 const imageUrl = getActiveT2IImageUrl(shot) || shot.imageUrl || "";
@@ -598,7 +599,7 @@ export default function StoryboardR2V() {
                 ));
             }
         } catch (error) {
-            console.error("Batch generate failed for shot:", error);
+            debugLog.error("Studio", "Batch generate failed for shot:", error);
             setShots(prev => prev.map((s, i) =>
                 i === index ? { ...s, videoStatus: "failed" as const } : s
             ));
@@ -666,7 +667,7 @@ export default function StoryboardR2V() {
                             ));
                         }
                     } catch (error) {
-                        console.error("Video poll failed for shot:", shot.id, error);
+                        debugLog.error("Studio", "Video poll failed for shot:", shot.id, error);
                     }
                 }
                 // Poll T2I task
@@ -692,7 +693,7 @@ export default function StoryboardR2V() {
                             ));
                         }
                     } catch (error) {
-                        console.error("T2I poll failed for shot:", shot.id, error);
+                        debugLog.error("Studio", "T2I poll failed for shot:", shot.id, error);
                     }
                 }
             }
@@ -868,7 +869,7 @@ export default function StoryboardR2V() {
             await api.annotateVideoTask(currentProject.id, task.id, { is_starred: next });
             await refreshProject();
         } catch (err) {
-            console.error("Failed to toggle star:", err);
+            debugLog.error("Studio", "Failed to toggle star:", err);
         }
     }, [currentProject?.id, refreshProject]);
 
@@ -882,7 +883,7 @@ export default function StoryboardR2V() {
             }
             await refreshProject();
         } catch (err) {
-            console.error("Failed to set label:", err);
+            debugLog.error("Studio", "Failed to set label:", err);
         }
     }, [currentProject?.id, refreshProject]);
 
@@ -892,7 +893,7 @@ export default function StoryboardR2V() {
             await api.cancelVideoTask(currentProject.id, task.id);
             await refreshProject();
         } catch (err) {
-            console.error("Failed to cancel task:", err);
+            debugLog.error("Studio", "Failed to cancel task:", err);
         }
     }, [currentProject?.id, refreshProject]);
 

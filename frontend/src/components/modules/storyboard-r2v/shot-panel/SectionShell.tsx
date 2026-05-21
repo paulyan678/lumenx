@@ -38,14 +38,18 @@ export default function SectionShell({
     headerOverride,
 }: SectionShellProps) {
     return (
-        <div className="border-b border-white/[0.04] last:border-b-0">
+        <div className="border-b border-glass-border last:border-b-0">
             {headerOverride ?? (
                 <div className="flex items-center gap-2 px-3 py-2">
+                    {/* 28x28 visual chevron + 40x40 hit area via -m-1
+                        p-2 expansion (WCAG 2.5.5 AA). Visual outline
+                        unchanged. */}
                     <button
                         type="button"
                         onClick={onToggle}
                         aria-expanded={open}
-                        className="grid h-5 w-5 place-items-center rounded text-text-muted transition-colors hover:bg-white/[0.05] hover:text-foreground"
+                        aria-label={open ? "Collapse section" : "Expand section"}
+                        className="-m-1 grid h-7 w-7 place-items-center rounded text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                     >
                         {open ? (
                             <ChevronDown size={13} aria-hidden="true" />
@@ -56,13 +60,16 @@ export default function SectionShell({
                     <button
                         type="button"
                         onClick={onToggle}
-                        className="flex min-w-0 flex-1 items-baseline gap-2 text-left"
+                        className="flex min-w-0 flex-1 items-baseline gap-2 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                     >
-                        <span className="font-mono text-[10px] font-medium uppercase tracking-[0.22em] text-text-secondary/95">
+                        {/* Section title — chrome tier (per type scale),
+                            uppercase tracking is RESERVED for section
+                            titles (not metadata) per Sweep E (P2-1). */}
+                        <span className="font-mono text-chrome-sm font-medium uppercase text-text-secondary">
                             {title}
                         </span>
                         {subtitle ? (
-                            <span className="truncate font-mono text-[9px] tracking-tight text-text-muted/80">
+                            <span className="truncate font-mono text-chrome-sm tracking-tight text-text-muted">
                                 {subtitle}
                             </span>
                         ) : null}

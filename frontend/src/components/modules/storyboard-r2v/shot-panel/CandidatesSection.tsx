@@ -179,7 +179,8 @@ export default function CandidatesSection({
                         type="button"
                         onClick={() => setSort((s) => (s === "time" ? "model" : "time"))}
                         title={`Sort by ${sort === "time" ? "time" : "model"} (click to switch)`}
-                        className="btn-tip grid h-6 w-6 place-items-center rounded text-text-muted hover:bg-white/[0.06] hover:text-foreground"
+                        aria-label={`Sort by ${sort === "time" ? "time" : "model"}; click to switch`}
+                        className="btn-tip -m-1 grid h-7 w-7 place-items-center rounded text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                     >
                         {sort === "time" ? (
                             <Clock size={11} aria-hidden="true" />
@@ -191,26 +192,38 @@ export default function CandidatesSection({
             }
         >
             {totalCount === 0 ? (
-                <div className="px-2 py-4 text-center font-mono text-[10px] uppercase tracking-[0.22em] text-text-muted/85">
-                    No candidates yet · click Generate ×N above
+                // Empty state scaffolds the workflow instead of just
+                // saying "nothing here" (P2-9). Three numbered steps
+                // teach the panel without taking over.
+                <div className="flex flex-col items-center gap-2 px-3 py-5">
+                    <div className="font-display text-display-sm font-semibold tracking-tight text-foreground/85">
+                        No candidates yet
+                    </div>
+                    <ol className="flex flex-col gap-1 text-center font-mono text-chrome-sm tracking-tight text-text-muted">
+                        <li>① Pick a model above</li>
+                        <li>② Choose how many to generate (×N)</li>
+                        <li>③ Click Generate — takes appear here</li>
+                    </ol>
                 </div>
             ) : batches.length === 0 ? (
-                <div className="px-2 py-4 text-center font-mono text-[10px] uppercase tracking-[0.22em] text-text-muted/85">
+                <div className="px-2 py-4 text-center font-mono text-chrome-sm font-medium uppercase text-text-muted">
                     No matches under current filter
                 </div>
             ) : (
                 <div className="space-y-2">
-                    {/* Compare button — floats at top when ≥2 selected. */}
+                    {/* Compare callout — promoted to display tier when
+                        ≥2 selected (P0-2). This is a "you can do
+                        something now" moment, deserves visual weight. */}
                     {compareCount >= 2 ? (
-                        <div className="flex items-center justify-between rounded-md border border-amber-300/35 bg-amber-400/[0.08] px-2.5 py-1.5">
-                            <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-amber-200/95">
+                        <div className="flex items-center justify-between gap-3 rounded-md border border-status-starred-border bg-status-starred-bg px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                            <span className="font-display text-display-sm font-semibold tracking-tight text-status-starred-fg">
                                 {compareCount} selected for compare
                             </span>
                             <button
                                 type="button"
                                 onClick={() => onOpenCompare?.()}
                                 disabled={!onOpenCompare}
-                                className="inline-flex items-center gap-1 rounded-md bg-amber-300 px-2 py-[3px] font-mono text-[10px] font-medium uppercase tracking-[0.18em] text-[#141416] transition-colors hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="inline-flex items-center gap-1.5 rounded-md bg-status-starred-solid px-3 py-1.5 font-display text-display-sm font-semibold text-on-warm shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] transition-all duration-fast ease-out-quart hover:brightness-110 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-starred-border disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 Compare ×{compareCount} →
                             </button>
@@ -254,10 +267,11 @@ function FilterChip({
             type="button"
             onClick={onClick}
             title={title}
-            className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-[2px] font-mono text-[9px] font-medium uppercase tracking-[0.18em] transition-colors ${
+            aria-pressed={active}
+            className={`inline-flex min-h-[24px] items-center gap-1 rounded-full border px-2 py-[2px] font-mono text-chrome-sm font-medium uppercase transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 ${
                 active
                     ? "border-primary/55 bg-primary/15 text-primary"
-                    : "border-white/10 bg-black/20 text-text-muted hover:border-white/20 hover:text-foreground"
+                    : "border-glass-border bg-black/20 text-text-muted hover:border-white/20 hover:text-foreground"
             }`}
         >
             {children}
@@ -292,36 +306,54 @@ function BatchBlock({
     const failedCount = batch.tasks.filter((t) => t.status === "failed").length;
     const runningCount = batch.tasks.filter((t) => t.status === "pending" || t.status === "processing").length;
     const completedCount = batch.tasks.filter((t) => t.status === "completed").length;
+
+    // Restructured batch header (P2-2): left = model + take count
+    // (body tier, the things that disambiguate this batch). Right =
+    // status pips (only when nonzero). Params (negative, resolution,
+    // ratio) demoted to title attribute so the row breathes — they
+    // matter on the rare 复用 click, not on every scan.
     return (
-        <div className="rounded-md border border-white/6 bg-black/15">
-            <div className="flex items-center gap-2 px-2 py-1.5">
+        <div className="rounded-md border border-glass-border bg-black/15">
+            <div className="flex items-center gap-2 px-2 py-2">
                 <button
                     type="button"
                     onClick={() => setOpen(!open)}
-                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                    aria-expanded={open}
+                    title={batch.summary}
+                    className="-m-1 flex min-w-0 flex-1 items-center gap-2 rounded p-1 text-left transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                 >
-                    <span className="font-mono text-[9px] tracking-tight text-text-muted/85">
+                    <span className="text-text-muted">
                         {open ? (
-                            <ArrowDown size={10} aria-hidden="true" />
+                            <ArrowDown size={11} aria-hidden="true" />
                         ) : (
-                            <ArrowUp size={10} aria-hidden="true" className="rotate-180" />
+                            <ArrowUp size={11} aria-hidden="true" className="rotate-180" />
                         )}
                     </span>
-                    <span className="truncate font-mono text-[9.5px] font-medium uppercase tracking-[0.22em] text-text-secondary">
-                        {batch.tasks.length} take{batch.tasks.length === 1 ? "" : "s"} · {batch.model}
+                    <span className="truncate font-sans text-body-sm font-medium text-foreground">
+                        ×{batch.tasks.length}
+                        <span className="ml-1 font-mono text-chrome-sm text-text-muted">{batch.model}</span>
                     </span>
-                    <span className="truncate font-mono text-[9px] tracking-tight text-text-muted/85">
-                        · {formatBatchAge(batch.createdAt)} · {batch.summary}
+                    <span className="truncate font-mono text-chrome-sm tracking-tight text-text-muted">
+                        · {formatBatchAge(batch.createdAt)}
                     </span>
-                    <span className="ml-auto flex shrink-0 items-center gap-1">
+                    <span className="ml-auto flex shrink-0 items-center gap-1.5">
                         {runningCount > 0 ? (
-                            <span className="font-mono text-[9px] text-blue-200/95">●{runningCount}</span>
+                            <span className="inline-flex items-center gap-0.5 font-mono text-chrome-sm font-medium text-status-processing-fg">
+                                <span aria-hidden="true">●</span>
+                                <span aria-label={`${runningCount} running`}>{runningCount}</span>
+                            </span>
                         ) : null}
                         {completedCount > 0 ? (
-                            <span className="font-mono text-[9px] text-emerald-300/95">✓{completedCount}</span>
+                            <span className="inline-flex items-center gap-0.5 font-mono text-chrome-sm font-medium text-status-completed-fg">
+                                <span aria-hidden="true">✓</span>
+                                <span aria-label={`${completedCount} completed`}>{completedCount}</span>
+                            </span>
                         ) : null}
                         {failedCount > 0 ? (
-                            <span className="font-mono text-[9px] text-red-300/95">✗{failedCount}</span>
+                            <span className="inline-flex items-center gap-0.5 font-mono text-chrome-sm font-medium text-status-failed-fg">
+                                <span aria-hidden="true">✗</span>
+                                <span aria-label={`${failedCount} failed`}>{failedCount}</span>
+                            </span>
                         ) : null}
                     </span>
                 </button>
@@ -332,15 +364,16 @@ function BatchBlock({
                             e.stopPropagation();
                             onReuseBatchParams(batch);
                         }}
-                        title="Copy this batch's params to the panel above"
-                        className="btn-tip grid h-5 w-5 place-items-center rounded text-text-muted hover:bg-white/[0.06] hover:text-foreground"
+                        title="Reuse params"
+                        aria-label="Reuse batch parameters"
+                        className="-m-1 grid h-7 w-7 place-items-center rounded text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                     >
-                        <RotateCw size={10} aria-hidden="true" />
+                        <RotateCw size={11} aria-hidden="true" />
                     </button>
                 ) : null}
             </div>
             {open ? (
-                <div className="flex flex-wrap gap-2 border-t border-white/6 px-2 py-2">
+                <div className="flex flex-wrap gap-2 border-t border-glass-border px-2 py-2">
                     {batch.tasks.map((task) => (
                         <CandidateThumb
                             key={task.id}

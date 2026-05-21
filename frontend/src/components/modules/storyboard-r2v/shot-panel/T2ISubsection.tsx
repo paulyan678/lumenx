@@ -68,35 +68,42 @@ export default function T2ISubsection({
     return (
         <div className="space-y-2">
             <div className="flex items-start gap-3">
-                {/* Active首帧 large preview */}
-                <div className="relative h-[90px] w-[120px] shrink-0 overflow-hidden rounded-md border border-white/10 bg-black/40">
-                    {activeUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                            src={display(activeUrl)}
-                            alt="Active T2I首帧"
-                            className="h-full w-full object-cover"
-                        />
-                    ) : (
-                        <div className="grid h-full w-full place-items-center font-mono text-[9px] uppercase tracking-[0.22em] text-text-muted/65">
-                            no T2I yet
-                        </div>
-                    )}
-                    {/* If inflight + no current active, overlay diagnose
-                        affordance on the placeholder */}
-                    {generating && !activeUrl ? (
-                        <div className="absolute inset-0 grid place-items-center bg-black/65 backdrop-blur-[1px]">
-                            <PendingTaskAffordance
-                                statusLabel={inFlightStatus === "pending" ? "Queued" : "Generating"}
-                                taskId={inFlightTaskId}
-                                compact
+                {/* Active首帧 large preview — display tier label
+                    "Now editing" promotes the focal frame to display
+                    level so the workbench has a visual anchor (P0-2). */}
+                <div className="flex shrink-0 flex-col gap-1">
+                    <div className="font-display text-display-sm font-semibold tracking-tight text-foreground/95">
+                        Active frame
+                    </div>
+                    <div className="relative h-[90px] w-[120px] overflow-hidden rounded-md border border-glass-border bg-black/40">
+                        {activeUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                                src={display(activeUrl)}
+                                alt="Active T2I首帧"
+                                className="h-full w-full object-cover"
                             />
-                        </div>
-                    ) : null}
+                        ) : (
+                            <div className="grid h-full w-full place-items-center font-mono text-chrome-sm font-medium uppercase text-text-muted">
+                                no T2I yet
+                            </div>
+                        )}
+                        {/* If inflight + no current active, overlay diagnose
+                            affordance on the placeholder */}
+                        {generating && !activeUrl ? (
+                            <div className="absolute inset-0 grid place-items-center bg-black/65 backdrop-blur-[1px]">
+                                <PendingTaskAffordance
+                                    statusLabel={inFlightStatus === "pending" ? "Queued" : "Generating"}
+                                    taskId={inFlightTaskId}
+                                    compact
+                                />
+                            </div>
+                        ) : null}
+                    </div>
                 </div>
 
                 {/* Thumbnail strip */}
-                <div className="flex flex-1 flex-wrap items-start gap-1.5">
+                <div className="flex flex-1 flex-wrap items-start gap-1.5 pt-[22px]">
                     {imageUrls.map((url, idx) => {
                         const active = idx === safeIndex;
                         return (
@@ -106,41 +113,55 @@ export default function T2ISubsection({
                                 onMouseEnter={() => setHoveredIdx(idx)}
                                 onMouseLeave={() => setHoveredIdx((cur) => (cur === idx ? null : cur))}
                                 onClick={() => onSelect(idx)}
-                                className={`group relative h-[60px] w-[60px] shrink-0 overflow-hidden rounded border transition-all ${
+                                aria-pressed={active}
+                                aria-label={`T2I candidate ${idx + 1}${active ? " (active)" : ""}`}
+                                className={`group relative h-[60px] w-[60px] shrink-0 overflow-hidden rounded-md border transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-1 focus-visible:ring-offset-black ${
                                     active
-                                        ? "border-primary/65 ring-1 ring-primary/35"
-                                        : "border-white/10 hover:border-white/25"
+                                        ? "border-primary/70 ring-1 ring-primary/40"
+                                        : "border-glass-border hover:border-white/30"
                                 }`}
                                 title={active ? "Active首帧" : "Click to make active"}
                             >
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img
                                     src={display(url)}
-                                    alt={`T2I候选 ${idx + 1}`}
-                                    className={`h-full w-full object-cover transition-opacity ${
-                                        active ? "" : "opacity-65 group-hover:opacity-100"
+                                    alt=""
+                                    className={`h-full w-full object-cover transition-opacity duration-fast ease-out-quart ${
+                                        active ? "" : "opacity-70 group-hover:opacity-100"
                                     }`}
                                 />
-                                {active ? (
-                                    <span
-                                        aria-hidden="true"
-                                        className="absolute bottom-0 left-0 right-0 h-[2px] bg-primary"
-                                    />
-                                ) : null}
-                                {/* Hover × in corner — clicks delete this candidate. */}
+                                {/* Active stripe — width transitions from 0 → 100%
+                                    on selection change for affirming feedback. */}
+                                <span
+                                    aria-hidden="true"
+                                    className={`absolute bottom-0 left-0 h-[2px] bg-primary transition-[width] duration-base ease-out-quart ${
+                                        active ? "w-full" : "w-0"
+                                    }`}
+                                />
+                                {/* Hover × in corner — clicks delete this candidate.
+                                    24×24 hit area on a 16×16 visual via padding. */}
                                 {hoveredIdx === idx ? (
                                     <span
                                         role="button"
                                         tabIndex={0}
-                                        aria-label="Delete T2I候选"
+                                        aria-label="Delete T2I candidate"
                                         title="Delete"
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             onRemove(idx);
                                         }}
-                                        className="absolute right-0.5 top-0.5 grid h-4 w-4 cursor-pointer place-items-center rounded-full bg-black/75 text-white/95 transition-colors hover:bg-red-500/85"
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Enter" || e.key === " ") {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                onRemove(idx);
+                                            }
+                                        }}
+                                        className="absolute right-0 top-0 grid h-6 w-6 cursor-pointer place-items-center rounded-full text-white/95 transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-failed-border"
                                     >
-                                        <X size={9} aria-hidden="true" />
+                                        <span className="grid h-4 w-4 place-items-center rounded-full bg-black/75 transition-colors duration-fast ease-out-quart hover:bg-status-failed-fg">
+                                            <X size={9} aria-hidden="true" />
+                                        </span>
                                     </span>
                                 ) : null}
                             </button>
@@ -152,8 +173,9 @@ export default function T2ISubsection({
                         type="button"
                         onClick={onGenerate}
                         disabled={generating}
-                        className="grid h-[60px] w-[60px] shrink-0 place-items-center rounded border border-dashed border-white/15 bg-black/20 text-text-muted transition-colors hover:border-primary/45 hover:text-primary disabled:cursor-wait disabled:opacity-60"
-                        title="Generate new T2I候选"
+                        aria-label="Generate new T2I candidate"
+                        className="grid h-[60px] w-[60px] shrink-0 place-items-center rounded-md border border-dashed border-white/15 bg-black/20 text-text-muted transition-colors duration-fast ease-out-quart hover:border-primary/55 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 disabled:cursor-wait disabled:opacity-60"
+                        title="Generate new T2I candidate"
                     >
                         {generating ? (
                             <Loader2 size={14} className="animate-spin" aria-hidden="true" />
@@ -164,12 +186,12 @@ export default function T2ISubsection({
                 </div>
             </div>
 
-            {/* Metadata line */}
+            {/* Metadata line — chrome tier, contrast-safe */}
             {activeUrl ? (
-                <div className="px-1 font-mono text-[9px] tracking-tight text-text-muted/80">
+                <div className="px-1 font-mono text-chrome-sm tracking-tight text-text-muted">
                     Active: thumb-{safeIndex + 1} of {imageUrls.length}
                     {imageUrls.length >= 10 ? (
-                        <span className="ml-2 text-amber-200/80">· history at cap (10), oldest dropped on next gen</span>
+                        <span className="ml-2 text-status-starred-fg">· history at cap (10), oldest dropped on next gen</span>
                     ) : null}
                 </div>
             ) : null}

@@ -26,20 +26,22 @@ interface ShotPanelProps {
 }
 
 export default function ShotPanel({ children }: ShotPanelProps) {
+    // P2-4 revision: the previous "dashed" connector was too subtle
+    // to register. Promoted to a 1px solid primary-tinted L-shape that
+    // commits to "this belongs to that shot." Panel itself gains a
+    // subtle inset highlight + soft outer shadow for depth without
+    // boxiness (anti-pattern: nested cards).
     return (
-        <div className="ml-5 mt-1 mr-1 relative">
-            {/* Dashed connector from shot card bottom to panel top — sits in
-                the indent gutter. ~20px tall stub, dashed for the "supplementary,
-                not core" visual register. */}
+        <div className="relative ml-5 mr-1 mt-1.5">
             <span
                 aria-hidden="true"
-                className="absolute -top-2 left-3 h-3 border-l border-dashed border-white/15"
+                className="absolute -top-2.5 left-3 h-3 border-l border-primary/35"
             />
             <span
                 aria-hidden="true"
-                className="absolute top-1 left-3 h-px w-2 border-t border-dashed border-white/15"
+                className="absolute top-[2px] left-3 h-px w-2.5 border-t border-primary/35"
             />
-            <div className="rounded-lg border border-white/[0.04] bg-black/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
+            <div className="rounded-lg border border-glass-border bg-black/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_2px_12px_-6px_rgba(0,0,0,0.5)] backdrop-blur-[2px] motion-safe:animate-[shotPanelIn_220ms_cubic-bezier(0.22,1,0.36,1)_both]">
                 {children}
             </div>
         </div>

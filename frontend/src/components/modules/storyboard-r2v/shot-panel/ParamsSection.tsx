@@ -155,10 +155,11 @@ export default function ParamsSection({
                                     type="button"
                                     onClick={() => handleModelChange(m.id)}
                                     title={m.description}
-                                    className={`rounded-full border px-2.5 py-[3px] font-mono text-[10px] font-medium tracking-wide transition-colors ${
+                                    aria-pressed={active}
+                                    className={`min-h-[28px] rounded-full border px-2.5 py-1 font-mono text-chrome-sm font-medium transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 ${
                                         active
-                                            ? "border-primary/45 bg-primary/15 text-primary"
-                                            : "border-white/10 bg-black/20 text-text-secondary hover:border-white/20 hover:text-foreground"
+                                            ? "border-primary/55 bg-primary/15 text-primary"
+                                            : "border-glass-border bg-black/20 text-text-secondary hover:border-white/20 hover:text-foreground"
                                     }`}
                                 >
                                     {m.name}
@@ -187,10 +188,12 @@ export default function ParamsSection({
                                     key={n}
                                     type="button"
                                     onClick={() => set("count", n)}
-                                    className={`grid h-7 w-9 place-items-center rounded-md border font-mono text-[11px] font-medium transition-colors ${
+                                    aria-pressed={active}
+                                    aria-label={`Generate ${n} at a time`}
+                                    className={`grid h-8 w-10 place-items-center rounded-md border font-mono text-body-sm font-medium transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 ${
                                         active
-                                            ? "border-primary/45 bg-primary/15 text-primary"
-                                            : "border-white/10 bg-black/20 text-text-secondary hover:border-white/20 hover:text-foreground"
+                                            ? "border-primary/55 bg-primary/15 text-primary"
+                                            : "border-glass-border bg-black/20 text-text-secondary hover:border-white/20 hover:text-foreground"
                                     }`}
                                 >
                                     ×{n}
@@ -224,21 +227,22 @@ export default function ParamsSection({
 
                 {/* Advanced fold */}
                 {hasAdvanced ? (
-                    <div className="rounded-md border border-dashed border-white/8">
+                    <div className="rounded-md border border-dashed border-glass-border">
                         <button
                             type="button"
                             onClick={() => setAdvOpen(!advOpen)}
-                            className="flex w-full items-center justify-between gap-2 px-2.5 py-1.5 text-text-secondary hover:text-foreground"
+                            aria-expanded={advOpen}
+                            className="flex w-full min-h-[32px] items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-text-secondary transition-colors duration-fast ease-out-quart hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                         >
-                            <span className="font-mono text-[9.5px] font-medium uppercase tracking-[0.22em]">
-                                {advOpen ? "▼" : "▶"} Advanced
+                            <span className="font-mono text-chrome-sm font-medium uppercase">
+                                <span aria-hidden="true">{advOpen ? "▼" : "▶"}</span> Advanced
                             </span>
-                            <span className="font-mono text-[9px] tracking-tight text-text-muted/85">
+                            <span className="font-mono text-chrome-sm tracking-tight text-text-muted">
                                 {countAdvancedParams(modelParams)} params
                             </span>
                         </button>
                         {advOpen ? (
-                            <div className="space-y-3 border-t border-white/6 px-3 py-3">
+                            <div className="space-y-3 border-t border-glass-border px-3 py-3">
                                 {modelParams.negativePrompt ? (
                                     <ParamRow label="Negative">
                                         <input
@@ -246,7 +250,7 @@ export default function ParamsSection({
                                             value={params.negativePrompt ?? ""}
                                             onChange={(e) => set("negativePrompt", e.target.value)}
                                             placeholder="things to avoid…"
-                                            className="w-full rounded-md border border-white/10 bg-black/30 px-2.5 py-1.5 font-mono text-[11px] text-foreground placeholder:text-text-muted/65 outline-none focus:border-primary/45"
+                                            className="w-full rounded-md border border-glass-border bg-black/30 px-2.5 py-1.5 font-sans text-body-sm text-foreground placeholder:text-text-muted outline-none transition-colors duration-fast ease-out-quart focus:border-primary/55 focus-visible:ring-2 focus-visible:ring-primary/45"
                                         />
                                     </ParamRow>
                                 ) : null}
@@ -261,12 +265,13 @@ export default function ParamsSection({
                                                     set("seed", v === "" ? undefined : parseInt(v, 10));
                                                 }}
                                                 placeholder="random"
-                                                className="w-32 rounded-md border border-white/10 bg-black/30 px-2 py-1 font-mono text-[11px] text-foreground placeholder:text-text-muted/65 outline-none focus:border-primary/45"
+                                                className="w-32 rounded-md border border-glass-border bg-black/30 px-2 py-1.5 font-mono text-body-sm text-foreground placeholder:text-text-muted outline-none transition-colors duration-fast ease-out-quart focus:border-primary/55 focus-visible:ring-2 focus-visible:ring-primary/45"
                                             />
                                             <button
                                                 type="button"
                                                 onClick={() => set("seed", Math.floor(Math.random() * 1_000_000_000))}
-                                                className="grid h-7 w-7 place-items-center rounded text-text-muted hover:bg-white/[0.06] hover:text-foreground"
+                                                aria-label="Generate random seed"
+                                                className="grid h-8 w-8 place-items-center rounded text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                                                 title="New random seed"
                                             >
                                                 🎲
@@ -343,23 +348,26 @@ export default function ParamsSection({
                     </div>
                 ) : null}
 
-                {/* Generate */}
+                {/* Generate CTA — display tier per P0-2 (the focal
+                    action on this surface). min-w-[160px] prevents the
+                    "Generate ×N → Generating N…" label flip from
+                    causing layout shift (P2-6). */}
                 <div className="flex items-center justify-end pt-1">
                     <button
                         type="button"
                         onClick={() => onGenerate(params)}
                         disabled={generateDisabled || generating}
                         title={generateDisabledReason}
-                        className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.18),0_4px_12px_-4px_rgba(100,108,255,0.5)] transition-all hover:bg-primary/92 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
+                        className="inline-flex min-w-[160px] items-center justify-center gap-1.5 rounded-md bg-primary px-4 py-2 font-display text-display-sm font-semibold tracking-tight text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.22),0_6px_16px_-6px_rgba(100,108,255,0.55)] transition-all duration-fast ease-out-quart hover:bg-primary/92 hover:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.28),0_8px_22px_-6px_rgba(100,108,255,0.65)] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/65 focus-visible:ring-offset-2 focus-visible:ring-offset-black disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         {generating ? (
                             <>
-                                <Loader2 size={12} className="animate-spin" aria-hidden="true" />
+                                <Loader2 size={14} className="animate-spin" aria-hidden="true" />
                                 Generating {inFlightCount}…
                             </>
                         ) : (
                             <>
-                                <Sparkles size={12} aria-hidden="true" />
+                                <Sparkles size={14} aria-hidden="true" />
                                 Generate ×{params.count}
                             </>
                         )}
@@ -375,7 +383,10 @@ export default function ParamsSection({
 function ParamRow({ label, children }: { label: string; children: React.ReactNode }) {
     return (
         <div className="flex items-start gap-3">
-            <span className="w-24 shrink-0 pt-1 font-mono text-[9.5px] font-medium uppercase tracking-[0.22em] text-text-muted/85">
+            {/* Row label — chrome tier, NOT uppercase (Sweep E P2-1:
+                uppercase tracking is reserved for section titles, not
+                every chrome line). */}
+            <span className="w-24 shrink-0 pt-2 font-mono text-chrome-sm font-medium tracking-tight text-text-muted">
                 {label}
             </span>
             <div className="min-w-0 flex-1">{children}</div>
@@ -401,10 +412,11 @@ function PillCluster({
                         key={String(opt)}
                         type="button"
                         onClick={() => onChange(String(opt))}
-                        className={`rounded-md border px-2 py-[3px] font-mono text-[10px] font-medium transition-colors ${
+                        aria-pressed={active}
+                        className={`min-h-[28px] rounded-md border px-2.5 py-1 font-mono text-chrome-sm font-medium transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 ${
                             active
-                                ? "border-primary/45 bg-primary/15 text-primary"
-                                : "border-white/10 bg-black/20 text-text-secondary hover:border-white/20 hover:text-foreground"
+                                ? "border-primary/55 bg-primary/15 text-primary"
+                                : "border-glass-border bg-black/20 text-text-secondary hover:border-white/20 hover:text-foreground"
                         }`}
                     >
                         {opt}
@@ -426,8 +438,8 @@ function DurationControl({
 }) {
     if (cfg.type === "fixed") {
         return (
-            <span className="font-mono text-[11px] text-text-secondary">
-                {cfg.value}s <span className="text-text-muted/65">(fixed)</span>
+            <span className="font-mono text-body-sm tabular-nums text-text-secondary">
+                {cfg.value}s <span className="text-text-muted">(fixed)</span>
             </span>
         );
     }
@@ -450,9 +462,10 @@ function DurationControl({
                 step={cfg.step}
                 value={value}
                 onChange={(e) => onChange(parseInt(e.target.value, 10))}
-                className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-white/10 accent-primary"
+                aria-label="Duration in seconds"
+                className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-white/10 accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
             />
-            <span className="w-10 shrink-0 text-right font-mono text-[11px] tabular-nums text-foreground">
+            <span className="w-10 shrink-0 text-right font-mono text-body-sm tabular-nums text-foreground">
                 {value}s
             </span>
         </div>
@@ -481,9 +494,9 @@ function SliderControl({
                 step={step}
                 value={value}
                 onChange={(e) => onChange(parseFloat(e.target.value))}
-                className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-white/10 accent-primary"
+                className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-white/10 accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
             />
-            <span className="w-10 shrink-0 text-right font-mono text-[11px] tabular-nums text-foreground">
+            <span className="w-10 shrink-0 text-right font-mono text-body-sm tabular-nums text-foreground">
                 {value}
             </span>
         </div>
@@ -497,20 +510,26 @@ function ToggleControl({
     value: boolean;
     onChange: (v: boolean) => void;
 }) {
+    // 28x28 hit area via -m-1 p-1, 36x20 visual track preserved.
     return (
         <button
             type="button"
             onClick={() => onChange(!value)}
             aria-pressed={value}
-            className={`relative h-5 w-9 rounded-full transition-colors ${
-                value ? "bg-primary" : "bg-white/10"
-            }`}
+            className="-m-1 inline-flex h-7 items-center rounded-full p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
         >
             <span
-                className={`absolute top-[2px] h-4 w-4 rounded-full bg-white shadow transition-all ${
-                    value ? "left-[18px]" : "left-[2px]"
+                aria-hidden="true"
+                className={`relative h-5 w-9 rounded-full transition-colors duration-fast ease-out-quart ${
+                    value ? "bg-primary" : "bg-white/10"
                 }`}
-            />
+            >
+                <span
+                    className={`absolute top-[2px] h-4 w-4 rounded-full bg-white shadow transition-all duration-base ease-out-quart ${
+                        value ? "left-[18px]" : "left-[2px]"
+                    }`}
+                />
+            </span>
         </button>
     );
 }

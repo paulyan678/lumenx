@@ -67,12 +67,13 @@ export default function TaskQueuePanel({
         <aside
             role="region"
             aria-label="Task queue"
-            className="flex h-full w-[360px] shrink-0 flex-col border-l border-glass-border bg-surface"
+            className="flex h-full w-[360px] shrink-0 flex-col border-l border-glass-border bg-surface motion-safe:animate-[queuePanelIn_280ms_cubic-bezier(0.22,1,0.36,1)_both]"
         >
             <header className="flex shrink-0 items-center justify-between gap-2 border-b border-glass-border px-3.5 py-3">
                 <div className="flex items-baseline gap-2">
-                    <span className="font-display text-[13px] font-semibold text-foreground">Task queue</span>
-                    <span className="font-mono text-[9.5px] uppercase tracking-[0.22em] text-text-muted/85">
+                    {/* Display tier — primary panel title (P0-2). */}
+                    <span className="font-display text-display-sm font-semibold tracking-tight text-foreground">Task queue</span>
+                    <span className="font-mono text-chrome-sm font-medium uppercase text-text-muted">
                         {tasks.length} total
                     </span>
                 </div>
@@ -80,7 +81,7 @@ export default function TaskQueuePanel({
                     type="button"
                     aria-label="Close queue"
                     onClick={onClose}
-                    className="grid h-6 w-6 place-items-center rounded text-text-muted hover:bg-hover-bg hover:text-foreground"
+                    className="-m-1 grid h-7 w-7 place-items-center rounded text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                 >
                     <X size={13} aria-hidden="true" />
                 </button>
@@ -89,9 +90,9 @@ export default function TaskQueuePanel({
             <div role="tablist" className="flex shrink-0 border-b border-glass-border px-3 py-1.5">
                 {(
                     [
-                        ["active", "Active", buckets.active.length, "text-amber-300"],
-                        ["done", "Done", buckets.done.length, "text-emerald-300"],
-                        ["failed", "Failed", buckets.failed.length, "text-red-300"],
+                        ["active", "Active", buckets.active.length, "text-status-processing-fg"],
+                        ["done", "Done", buckets.done.length, "text-status-completed-fg"],
+                        ["failed", "Failed", buckets.failed.length, "text-status-failed-fg"],
                     ] as Array<[TabKey, string, number, string]>
                 ).map(([key, label, count, colorClass]) => (
                     <button
@@ -100,7 +101,7 @@ export default function TaskQueuePanel({
                         role="tab"
                         aria-selected={tab === key}
                         onClick={() => setTab(key)}
-                        className={`flex-1 rounded-md py-1.5 font-mono text-[10px] font-medium uppercase tracking-[0.2em] transition-colors ${
+                        className={`min-h-[32px] flex-1 rounded-md py-1.5 font-mono text-chrome-sm font-medium uppercase transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 ${
                             tab === key
                                 ? "bg-glass text-foreground"
                                 : "text-text-muted hover:text-foreground"
@@ -116,7 +117,7 @@ export default function TaskQueuePanel({
 
             <div className="flex-1 overflow-y-auto px-2.5 py-2.5">
                 {visibleTasks.length === 0 ? (
-                    <div className="grid h-full place-items-center px-3 text-center font-mono text-[10px] uppercase tracking-[0.22em] text-text-muted/85">
+                    <div className="grid h-full place-items-center px-3 text-center font-mono text-chrome-sm font-medium uppercase text-text-muted">
                         {tab === "active"
                             ? "No tasks running."
                             : tab === "done"
@@ -158,15 +159,17 @@ function TaskRow({
 }) {
     const isInFlight = task.status === "pending" || task.status === "processing";
     const isFailed = task.status === "failed";
+    // Status dot uses the semantic token palette (Sweep A); a single
+    // pulse on processing keeps the eye on what's moving without
+    // jittering the whole row.
     const dotClass =
         task.status === "completed"
-            ? "bg-emerald-400"
+            ? "bg-status-completed-fg"
             : task.status === "failed"
-                ? "bg-red-400"
+                ? "bg-status-failed-fg"
                 : task.status === "processing"
-                    ? "bg-amber-400 animate-pulse"
-                    : "bg-blue-400";
-    const idShort = task.id.slice(0, 6);
+                    ? "bg-status-processing-fg animate-pulse"
+                    : "bg-status-pending-fg";
     const elapsedS = Math.max(0, Math.floor(Date.now() / 1000 - task.created_at));
     const elapsedLabel = elapsedS < 60
         ? `${elapsedS}s`
@@ -174,18 +177,21 @@ function TaskRow({
             ? `${Math.floor(elapsedS / 60)}m`
             : `${Math.floor(elapsedS / 3600)}h`;
 
+    // Row title includes the full task id only via tooltip (P2-3); the
+    // visible #idShort was redundant noise next to shotLabel which is
+    // already disambiguating.
     return (
-        <div className="rounded-md border border-glass-border bg-glass px-2.5 py-1.5">
+        <div
+            className="group/row rounded-md border border-glass-border bg-glass px-2.5 py-2 transition-colors duration-fast ease-out-quart hover:border-white/15"
+            title={`Task id: ${task.id}`}
+        >
             <div className="flex items-center gap-2">
                 <span className={`h-2 w-2 shrink-0 rounded-full ${dotClass}`} aria-hidden="true" />
-                <span className="truncate font-mono text-[10px] font-medium text-foreground/95">
+                <span className="truncate font-sans text-body-sm font-medium text-foreground">
                     {shotLabel}
                 </span>
-                <span className="font-mono text-[9px] tracking-tight text-text-muted/65">
-                    #{idShort}
-                </span>
                 {isInFlight ? (
-                    <Loader2 size={10} className="animate-spin text-amber-300" aria-hidden="true" />
+                    <Loader2 size={10} className="animate-spin text-status-processing-fg" aria-hidden="true" />
                 ) : null}
                 <span className="ml-auto flex shrink-0 items-center gap-1">
                     {task.frame_id ? (
@@ -194,7 +200,7 @@ function TaskRow({
                             aria-label="Jump to shot"
                             title="Jump to shot"
                             onClick={() => onJumpToShot(task.frame_id!)}
-                            className="grid h-5 w-5 place-items-center rounded text-text-muted hover:bg-hover-bg hover:text-foreground"
+                            className="-m-1 grid h-7 w-7 place-items-center rounded text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                         >
                             <ArrowRight size={11} aria-hidden="true" />
                         </button>
@@ -205,7 +211,7 @@ function TaskRow({
                             aria-label="Cancel task"
                             title="Cancel"
                             onClick={() => { void onCancel(task); }}
-                            className="grid h-5 w-5 place-items-center rounded text-text-muted hover:bg-red-400/15 hover:text-red-200"
+                            className="-m-1 grid h-7 w-7 place-items-center rounded text-text-muted transition-colors duration-fast ease-out-quart hover:bg-status-failed-bg hover:text-status-failed-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-failed-border"
                         >
                             <X size={11} aria-hidden="true" />
                         </button>
@@ -216,17 +222,17 @@ function TaskRow({
                             aria-label="Retry task"
                             title="Retry"
                             onClick={() => { void onRetry(task); }}
-                            className="rounded border border-red-300/35 bg-red-400/10 px-1.5 py-[1px] font-mono text-[9px] uppercase tracking-[0.18em] text-red-100 hover:bg-red-400/20"
+                            className="min-h-[24px] rounded border border-status-failed-border bg-status-failed-bg px-1.5 py-[2px] font-mono text-chrome-sm font-medium uppercase text-status-failed-fg transition-colors duration-fast ease-out-quart hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-failed-border"
                         >
                             retry
                         </button>
                     ) : null}
                 </span>
             </div>
-            <div className="mt-0.5 truncate font-mono text-[9px] tracking-tight text-text-muted/80">
+            <div className="mt-1 truncate font-mono text-chrome-sm tracking-tight text-text-muted">
                 {task.model || "—"} · {elapsedLabel} ago
                 {isFailed && task.error ? (
-                    <span className="ml-1 text-red-300/85"> · {task.error.slice(0, 60)}</span>
+                    <span className="ml-1 text-status-failed-fg"> · {task.error.slice(0, 60)}</span>
                 ) : null}
             </div>
         </div>
