@@ -666,6 +666,19 @@
     "currentModel": "当前模型",
     "generateBatch": "生成 ×{count}",
     "generatingBatch": "生成中 {count}…",
-    "missingRefs": "{model} 需要参考图片才能生成。在 prompt 里用 @ 引用角色 / 场景 / 道具，至少一张。"
+    "missingRefs": "{model} 需要参考图片才能生成。在 prompt 里用 @ 引用角色 / 场景 / 道具，至少一张。",
+    "promptExpand": "放大编辑",
+    "promptExpandTitle": "编辑 {shot} 的描述",
+    "promptExpandChars": "字符",
+    "promptExpandSave": "保存",
+    "promptExpandSaveHint": "保存并关闭 (Cmd/Ctrl + Enter)",
+    "promptExpandHotkeys": "Esc 关闭 · Cmd/Ctrl+Enter 保存",
+    "promptExpandShortcut": "Cmd/Ctrl + E 也能保存"
+  },
+  "assetCard": {
+    "seriesSharedBadge": "系列",
+    "seriesSharedTooltip": "此资产属于整个系列共享。修改会同步影响所有引用此资产的剧集。",
+    "episodeLocalBadge": "本集",
+    "episodeLocalTooltip": "此资产仅在本集中可见，不会影响其他剧集。"
   }
 }

@@ -800,26 +800,72 @@ class ComicGenPipeline:
         self._save_data()
         return script
     
+    def _find_asset_with_source(
+        self, script: "Script", asset_id: str, asset_type: str
+    ) -> Tuple[Optional[object], Optional[str]]:
+        """Locate an asset by (id, type) in either the episode's local
+        list OR the parent series' shared pool. Returns
+        (asset, source) where source ∈ {"script", "series"} so the
+        caller can mutate the right object and save the right side.
+
+        Episode-local always wins (the user explicitly forked this
+        asset to override the series version). Falls back to series
+        only when the id isn't local. Returns (None, None) when the
+        asset doesn't exist in either container — caller should 404.
+        """
+        if asset_type == "character":
+            ep_list = script.characters
+        elif asset_type == "scene":
+            ep_list = script.scenes
+        elif asset_type == "prop":
+            ep_list = script.props
+        else:
+            return None, None
+        local = next((a for a in ep_list if a.id == asset_id), None)
+        if local is not None:
+            return local, "script"
+        # Fall back to series shared pool if this episode belongs to
+        # a series.
+        if not script.series_id:
+            return None, None
+        series = self.series_store.get(script.series_id)
+        if not series:
+            return None, None
+        if asset_type == "character":
+            sh_list = series.characters
+        elif asset_type == "scene":
+            sh_list = series.scenes
+        else:  # prop
+            sh_list = series.props
+        shared = next((a for a in sh_list if a.id == asset_id), None)
+        if shared is not None:
+            return shared, "series"
+        return None, None
+
+    def _save_after_asset_mutation(self, source: str) -> None:
+        """Persist after mutating an asset; pick the right save path
+        based on which container the asset lives in (episode vs series)."""
+        if source == "series":
+            self._save_series_data()
+        else:
+            self._save_data()
+
     def toggle_asset_lock(self, script_id: str, asset_id: str, asset_type: str) -> Script:
-        """Toggle the locked status of an asset."""
+        """Toggle the locked status of an asset. Works on both
+        episode-local and series-shared assets (A2 decision: default
+        write to series, since locking a shared character should
+        affect all episodes that use it)."""
         script = self.scripts.get(script_id)
         if not script:
             raise ValueError("Script not found")
-            
-        target_asset = None
-        if asset_type == "character":
-            target_asset = next((c for c in script.characters if c.id == asset_id), None)
-        elif asset_type == "scene":
-            target_asset = next((s for s in script.scenes if s.id == asset_id), None)
-        elif asset_type == "prop":
-            target_asset = next((p for p in script.props if p.id == asset_id), None)
-            
+
+        target_asset, source = self._find_asset_with_source(script, asset_id, asset_type)
         if not target_asset:
             raise ValueError(f"Asset {asset_id} of type {asset_type} not found")
-            
+
         # Toggle the locked status
         target_asset.locked = not target_asset.locked
-        self._save_data()
+        self._save_after_asset_mutation(source)
         return script
 
     def toggle_frame_lock(self, script_id: str, frame_id: str) -> Script:
@@ -838,30 +884,25 @@ class ComicGenPipeline:
         return script
 
     def update_asset_image(self, script_id: str, asset_id: str, asset_type: str, image_url: str) -> Script:
-        """Updates the image URL of an asset manually."""
+        """Updates the image URL of an asset manually. Per A2 decision,
+        series-shared assets are updated in place (shared semantics);
+        episode-local assets are updated locally."""
         script = self.scripts.get(script_id)
         if not script:
             raise ValueError("Script not found")
-            
-        target_asset = None
-        if asset_type == "character":
-            target_asset = next((c for c in script.characters if c.id == asset_id), None)
-        elif asset_type == "scene":
-            target_asset = next((s for s in script.scenes if s.id == asset_id), None)
-        elif asset_type == "prop":
-            target_asset = next((p for p in script.props if p.id == asset_id), None)
-            
+
+        target_asset, source = self._find_asset_with_source(script, asset_id, asset_type)
         if not target_asset:
             raise ValueError(f"Asset {asset_id} of type {asset_type} not found")
-            
+
         target_asset.image_url = image_url
         # For characters, also update avatar if it's not set or if we want to sync them
-        # For now, let's assume the uploaded image is the main reference. 
+        # For now, let's assume the uploaded image is the main reference.
         # If it's a character, we might want to set avatar_url to the same image for simplicity
         if asset_type == "character":
             target_asset.avatar_url = image_url
-            
-        self._save_data()
+
+        self._save_after_asset_mutation(source)
         return script
 
     def update_asset_description(self, script_id: str, asset_id: str, asset_type: str, description: str) -> Script:
@@ -869,30 +910,25 @@ class ComicGenPipeline:
         return self.update_asset_attributes(script_id, asset_id, asset_type, {"description": description})
 
     def update_asset_attributes(self, script_id: str, asset_id: str, asset_type: str, attributes: Dict[str, Any]) -> Script:
-        """Updates arbitrary attributes of an asset."""
+        """Updates arbitrary attributes of an asset. Routes the write
+        to either the episode-local or the parent series' shared copy
+        depending on which container owns the asset (A2 decision)."""
         script = self.scripts.get(script_id)
         if not script:
             raise ValueError("Script not found")
-            
-        target_asset = None
-        if asset_type == "character":
-            target_asset = next((c for c in script.characters if c.id == asset_id), None)
-        elif asset_type == "scene":
-            target_asset = next((s for s in script.scenes if s.id == asset_id), None)
-        elif asset_type == "prop":
-            target_asset = next((p for p in script.props if p.id == asset_id), None)
-            
+
+        target_asset, source = self._find_asset_with_source(script, asset_id, asset_type)
         if not target_asset:
             raise ValueError(f"Asset {asset_id} of type {asset_type} not found")
-            
+
         # Update attributes
         for key, value in attributes.items():
             if hasattr(target_asset, key):
                 setattr(target_asset, key, value)
             else:
                 logger.warning(f"Attribute {key} not found in {asset_type} model")
-        
-        self._save_data()
+
+        self._save_after_asset_mutation(source)
         return script
 
     def add_uploaded_asset_variant(

@@ -76,6 +76,15 @@ export interface Character {
     full_body_updated_at?: number;
     three_view_updated_at?: number;
     headshot_updated_at?: number;
+    /** Backend-derived: where this asset actually lives.
+     *  "episode" — in the script's own characters[] (episode-local
+     *  override or standalone-project local)
+     *  "series" — in the parent Series.characters[] (shared across
+     *  all episodes in the series)
+     *  Drives UI badges + the "high-cost action" confirm modal
+     *  (A2 design decision). Not persisted; set fresh on every
+     *  GET /projects/{id} response. */
+    source?: "episode" | "series";
 }
 
 export interface Scene {
@@ -90,6 +99,7 @@ export interface Scene {
     locked?: boolean;
     time_of_day?: string;
     lighting_mood?: string;
+    source?: "episode" | "series";
 }
 
 export interface Prop {
@@ -102,6 +112,7 @@ export interface Prop {
     video_prompt?: string;
     status?: string;
     locked?: boolean;
+    source?: "episode" | "series";
 }
 
 export interface StoryboardFrame {

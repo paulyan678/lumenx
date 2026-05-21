@@ -666,6 +666,19 @@
     "currentModel": "Model",
     "generateBatch": "Generate ×{count}",
     "generatingBatch": "Generating {count}…",
-    "missingRefs": "{model} needs reference images. Use @ in the prompt to attach a character / scene / prop — at least one required."
+    "missingRefs": "{model} needs reference images. Use @ in the prompt to attach a character / scene / prop — at least one required.",
+    "promptExpand": "Expand editor",
+    "promptExpandTitle": "Editing {shot} description",
+    "promptExpandChars": "chars",
+    "promptExpandSave": "Save",
+    "promptExpandSaveHint": "Save and close (Cmd/Ctrl + Enter)",
+    "promptExpandHotkeys": "Esc to cancel · Cmd/Ctrl+Enter to save",
+    "promptExpandShortcut": "Cmd/Ctrl + E also saves"
+  },
+  "assetCard": {
+    "seriesSharedBadge": "Series",
+    "seriesSharedTooltip": "Shared across the entire series. Edits propagate to all episodes that reference this asset.",
+    "episodeLocalBadge": "Episode",
+    "episodeLocalTooltip": "Local to this episode only. Edits don't affect other episodes."
   }
 }
