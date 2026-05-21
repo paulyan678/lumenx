@@ -171,22 +171,26 @@ describe('model catalog fallbacks', () => {
         expect(compatI2vModels.map((model) => model.id)).toContain('wan2.6-i2v');
         expect(compatI2vModels.some((model) => model.id === 'wan/wan2.6-video#i2v')).toBe(false);
         // R2V selection/route ids are derived globally from catalog
-        // ordering, not from the mocked compat slice. happyhorse-1.0
-        // is the highest-ordered visible r2v-capable family in the
-        // current catalog.
+        // ordering, not from the mocked compat slice.
+        // - Selection (visible I2V picker target): happyhorse-1.0-i2v
+        //   wins because its order=120 > everyone else's.
+        // - Route (hidden R2V dispatch target): wan2.7-r2v wins
+        //   because its order=20 > all other hidden R2V models
+        //   (after the 2026-05-21 bump to prefer wan2.7 over wan2.6).
         expect(compatR2vSelectionModelId).toBe('happyhorse-1.0-i2v');
-        expect(compatR2vRouteModelId).toBe('happyhorse-1.0-r2v');
+        expect(compatR2vRouteModelId).toBe('wan2.7-r2v');
     });
 });
 
 describe('model catalog runtime helpers', () => {
     it('derives the current R2V selection and route ids from catalog data', () => {
-        // After Phase 2, the first visible R2V-capable model (sorted by
-        // catalog order) is happyhorse-1.0-i2v, with the hidden
-        // happyhorse-1.0-r2v as its dynamic route target. The picker
-        // surfaces the I2V parent and routing flips it at submit time.
+        // Selection target = highest-ordered visible R2V-capable
+        // I2V model (happyhorse-1.0-i2v at order 120).
+        // Route target = highest-ordered hidden R2V model, which is
+        // wan2.7-r2v at order 20 (deliberately bumped above
+        // wan2.6-r2v's 10 so Wan 2.7 wins the default routing).
         expect(R2V_SELECTION_MODEL_ID).toBe('happyhorse-1.0-i2v');
-        expect(R2V_ROUTE_MODEL_ID).toBe('happyhorse-1.0-r2v');
+        expect(R2V_ROUTE_MODEL_ID).toBe('wan2.7-r2v');
     });
 
     it('reads per-model reference image limits from catalog metadata', () => {

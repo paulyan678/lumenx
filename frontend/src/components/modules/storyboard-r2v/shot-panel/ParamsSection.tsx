@@ -19,6 +19,7 @@
  */
 import { useCallback, useMemo } from "react";
 import { Loader2, Sparkles } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type { I2VModelConfig, DurationConfig, ModelParamSupport } from "@/lib/modelCatalog";
 import { usePanelSectionState } from "./usePanelSectionState";
 import SectionShell from "./SectionShell";
@@ -61,6 +62,10 @@ interface ParamsSectionProps {
     /** Active in-flight count for this shot — flips the button text
      *  to "Generating…" while a batch is running. */
     inFlightCount?: number;
+    /** Inline error to show under the Generate button (e.g.
+     *  "happyhorse-1.0-r2v needs reference images"). Host owns the
+     *  validation; this component just renders the message. */
+    errorMessage?: string | null;
 }
 
 const COUNT_OPTIONS = [1, 2, 4, 6] as const;
@@ -75,7 +80,9 @@ export default function ParamsSection({
     generateDisabled = false,
     generateDisabledReason,
     inFlightCount = 0,
+    errorMessage,
 }: ParamsSectionProps) {
+    const t = useTranslations("storyboardR2V");
     const [open, setOpen] = usePanelSectionState(shotId, "params", true);
     const [advOpen, setAdvOpen] = usePanelSectionState(shotId, "params-advanced", false);
 
@@ -348,6 +355,20 @@ export default function ParamsSection({
                     </div>
                 ) : null}
 
+                {/* Inline validation error (e.g. R2V model with no
+                    references attached). Pops above the Generate CTA
+                    so the user sees why their click would fail BEFORE
+                    they click, and stays visible until they fix the
+                    issue or successfully generate. */}
+                {errorMessage ? (
+                    <div
+                        role="alert"
+                        className="rounded-md border border-status-failed-border bg-status-failed-bg px-3 py-2 font-sans text-body-sm text-status-failed-fg"
+                    >
+                        {errorMessage}
+                    </div>
+                ) : null}
+
                 {/* Generate CTA — display tier per P0-2 (the focal
                     action on this surface). min-w-[160px] prevents the
                     "Generate ×N → Generating N…" label flip from
@@ -363,12 +384,12 @@ export default function ParamsSection({
                         {generating ? (
                             <>
                                 <Loader2 size={14} className="animate-spin" aria-hidden="true" />
-                                Generating {inFlightCount}…
+                                {t("generatingBatch", { count: inFlightCount })}
                             </>
                         ) : (
                             <>
                                 <Sparkles size={14} aria-hidden="true" />
-                                Generate ×{params.count}
+                                {t("generateBatch", { count: params.count })}
                             </>
                         )}
                     </button>

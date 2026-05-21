@@ -4,14 +4,11 @@ import { useRef, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
     Play,
-    Loader2,
     Trash2,
     ChevronUp,
     ChevronDown,
     Copy,
-    Sparkles,
     Video,
-    Image,
     ImageIcon,
     AtSign,
 } from "lucide-react";
@@ -269,66 +266,16 @@ export default function ShotCard({
         );
     };
 
-    const renderGenerateButton = () => {
-        const isProcessing =
-            shot.t2iStatus === "processing" ||
-            shot.t2iStatus === "pending" ||
-            shot.videoStatus === "processing" ||
-            shot.videoStatus === "pending";
-
-        const baseButtonClasses =
-            "relative flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg overflow-hidden transition-all duration-200 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100";
-
-        if (shot.tabMode === "t2i_i2v") {
-            if (shot.t2iImageUrl && !shot.videoUrl && !shot.videoTaskId) {
-                return (
-                    <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={onGenerateVideo}
-                        disabled={isProcessing}
-                        className={`${baseButtonClasses} bg-primary/90 hover:bg-primary text-white shadow-[0_0_20px_rgba(100,108,255,0.15)] hover:shadow-[0_0_28px_rgba(100,108,255,0.25)]`}
-                    >
-                        <Sparkles size={13} strokeWidth={2} />
-                        {t("generateVideo")}
-                    </motion.button>
-                );
-            }
-            return (
-                <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={onGenerateT2I}
-                    disabled={!shot.prompt.trim() || isProcessing}
-                    className={`${baseButtonClasses} bg-primary/90 hover:bg-primary text-white shadow-[0_0_20px_rgba(100,108,255,0.15)] hover:shadow-[0_0_28px_rgba(100,108,255,0.25)]`}
-                >
-                    {shot.t2iStatus === "processing" || shot.t2iStatus === "pending" ? (
-                        <Loader2 size={13} className="animate-spin" strokeWidth={2} />
-                    ) : (
-                        <ImageIcon size={13} strokeWidth={2} />
-                    )}
-                    {t("generateImage")}
-                </motion.button>
-            );
-        }
-
-        return (
-            <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={onGenerateVideo}
-                disabled={!shot.prompt.trim() || isProcessing}
-                className={`${baseButtonClasses} bg-primary/90 hover:bg-primary text-white shadow-[0_0_20px_rgba(100,108,255,0.15)] hover:shadow-[0_0_28px_rgba(100,108,255,0.25)]`}
-            >
-                {shot.videoStatus === "processing" ? (
-                    <Loader2 size={13} className="animate-spin" strokeWidth={2} />
-                ) : (
-                    <Sparkles size={13} strokeWidth={2} />
-                )}
-                {t("generateVideo")}
-            </motion.button>
-        );
-    };
+    // Legacy renderGenerateButton was removed in the workbench
+    // redesign (Sweep G, 2026-05-21): generation moved to the
+    // ParamsSection's "Generate ×N" CTA inside the attached
+    // ShotPanel, and T2I首帧 generation lives in T2ISubsection's
+    // "+gen" tile. Keeping it on the ShotCard duplicated the action
+    // with a different label (i18n vs English) and a different
+    // batch-size semantics (×1 vs ×N) — confusing and the source of
+    // the "two Generate buttons" bug report.
+    // onGenerateVideo / onGenerateT2I are still wired for the inline
+    // retry buttons inside renderPreview when a take fails.
 
     const handleInsertAssetFromChip = (type: string, name: string) => {
         const tag = `[${type}:${name}]`;
@@ -489,7 +436,6 @@ export default function ShotCard({
                                     <Trash2 size={13} strokeWidth={1.5} />
                                 </motion.button>
                             </div>
-                            {renderGenerateButton()}
                         </div>
                     </div>
                 </div>

@@ -281,17 +281,16 @@ export function DiagnoseModal({ taskId, elapsedLabel, onClose }: DiagnoseModalPr
 
                     {/* Inline log tail — auto-fetched. The user doesn't need
                         to leave the app to investigate the typical "stuck"
-                        case (provider auth, network out, model misuse). */}
+                        case (provider auth, network out, model misuse).
+                        Two clearly-labeled sub-panels: errors digest
+                        on top (just the ERROR rows from the tail —
+                        usually the root cause) and the full chronological
+                        tail below for context. */}
                     <div className="rounded-md border border-white/8 bg-black/30">
                         <div className="flex items-center justify-between gap-2 border-b border-white/6 px-3 py-1.5 font-mono text-[9px] font-medium uppercase tracking-[0.24em] text-text-muted/85">
                             <span className="inline-flex items-center gap-1.5">
                                 <Terminal size={11} aria-hidden="true" />
-                                Backend log · last 200 lines
-                                {log.kind === "ok" && log.data.errors.length > 0 ? (
-                                    <span className="rounded-full bg-red-400/15 px-1.5 text-red-200">
-                                        {log.data.errors.length} error rows
-                                    </span>
-                                ) : null}
+                                Backend log
                             </span>
                             <div className="flex items-center gap-1">
                                 <button
@@ -307,8 +306,8 @@ export function DiagnoseModal({ taskId, elapsedLabel, onClose }: DiagnoseModalPr
                                     <button
                                         type="button"
                                         onClick={() => copy(log.data.lines.join("\n"), "log_text")}
-                                        aria-label="Copy log text"
-                                        title="Copy"
+                                        aria-label="Copy full log text"
+                                        title="Copy full tail"
                                         className="grid h-6 w-6 place-items-center rounded text-text-muted hover:bg-white/[0.06] hover:text-foreground"
                                     >
                                         {copied === "log_text" ? <Check size={11} /> : <Copy size={11} />}
@@ -316,15 +315,29 @@ export function DiagnoseModal({ taskId, elapsedLabel, onClose }: DiagnoseModalPr
                                 ) : null}
                             </div>
                         </div>
-                        {/* Errors pinned on top so the user lands on the
-                            interesting part instead of scrolling 200 lines. */}
+                        {/* Errors-only digest — pinned to top so the
+                            user lands on the actionable signal first.
+                            Labeled "Errors only" so it's not confused
+                            with the full tail right below. */}
                         {log.kind === "ok" && log.data.errors.length > 0 ? (
-                            <div className="max-h-[120px] overflow-y-auto border-b border-white/6 bg-red-500/[0.06] px-3 py-1.5 font-mono text-[10px] leading-[1.6] text-red-200/95">
-                                {log.data.errors.map((line, i) => (
-                                    <div key={i} className="whitespace-pre-wrap break-words">{line}</div>
-                                ))}
-                            </div>
+                            <>
+                                <div className="flex items-center justify-between gap-2 border-b border-red-400/15 bg-red-500/[0.08] px-3 py-1 font-mono text-[9px] font-medium uppercase tracking-[0.22em] text-red-200/95">
+                                    <span>① Errors only · {log.data.errors.length} rows</span>
+                                    <span className="text-red-200/70 normal-case tracking-tight">root cause is usually here</span>
+                                </div>
+                                <div className="max-h-[120px] overflow-y-auto border-b border-white/8 bg-red-500/[0.05] px-3 py-1.5 font-mono text-[10px] leading-[1.6] text-red-200/95">
+                                    {log.data.errors.map((line, i) => (
+                                        <div key={i} className="whitespace-pre-wrap break-words">{line}</div>
+                                    ))}
+                                </div>
+                            </>
                         ) : null}
+                        {/* Full chronological tail — gives context
+                            around the errors above (what was running,
+                            what the request looked like, etc.). */}
+                        <div className="border-b border-white/6 bg-black/20 px-3 py-1 font-mono text-[9px] font-medium uppercase tracking-[0.22em] text-text-muted/85">
+                            ② Full tail · last {log.kind === "ok" ? log.data.returned_lines ?? log.data.lines.length : "200"} lines
+                        </div>
                         <div className="max-h-[280px] overflow-y-auto px-3 py-2 font-mono text-[10px] leading-[1.55] text-text-secondary/95">
                             {log.kind === "loading" ? (
                                 <div className="text-text-muted/85">loading…</div>

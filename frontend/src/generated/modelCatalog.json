@@ -4263,7 +4263,7 @@
       },
       "ui": {
         "badges": [],
-        "order": 10,
+        "order": 20,
         "recommended": false,
         "selection_group": "i2v",
         "visible_in": []
@@ -6971,7 +6971,7 @@
       },
       "ui": {
         "badges": [],
-        "order": 10,
+        "order": 20,
         "recommended": false,
         "selection_group": "i2v",
         "visible_in": []

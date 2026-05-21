@@ -1623,21 +1623,34 @@ class ComicGenPipeline:
             else:
                 model = "wan2.7-r2v"
 
-        # Defensive guard against model⇄mode⇄refs mismatch (real bug seen
-        # in production: a stale localStorage carried `wan2.7-r2v` into
-        # an I2V flow that never supplies refs, so wanx.py raised mid-
-        # generation, the BG task crashed, and the user saw nothing but a
-        # spinner). Catch the inconsistency at task-creation time so the
-        # frontend gets a clean 400 instead of a permanently-failed task.
-        if model in ("wan2.7-r2v", "wan2.6-r2v"):
-            needs_image_refs = model == "wan2.7-r2v"
-            refs = (reference_image_urls or []) if needs_image_refs else (reference_video_urls or [])
+        # Defensive guard against model⇄mode⇄refs mismatch. Every R2V
+        # model needs reference inputs; without them the underlying
+        # provider call raises mid-generation, the BG task crashes,
+        # and the user sees nothing but a spinner. Catch the
+        # inconsistency at task-creation time so the frontend gets a
+        # clean 400 instead of a permanently-failed task.
+        #
+        # Originally we only checked wan2.7-r2v / wan2.6-r2v (the
+        # first reported case). Production added happyhorse-1.0-r2v,
+        # kling-v3-r2v, pixverse-c1-r2v, pixverse-v5.6-r2v,
+        # viduq3-pro-r2v, viduq3-turbo-r2v — all need refs too. We
+        # now match on the "-r2v" suffix so new R2V families inherit
+        # the check automatically. Only wan2.6-r2v (legacy) takes
+        # video refs; everything else takes image refs.
+        is_r2v_model = isinstance(model, str) and model.endswith("-r2v")
+        if is_r2v_model:
+            needs_video_refs = model == "wan2.6-r2v"
+            refs = (
+                (reference_video_urls or []) if needs_video_refs
+                else (reference_image_urls or [])
+            )
             if not refs:
-                kind = "image" if needs_image_refs else "video"
+                kind = "video" if needs_video_refs else "image"
                 raise ValueError(
                     f"Model '{model}' is reference-to-video and requires {kind} references, "
-                    "but none were provided. Switch to an I2V model (e.g. wan2.7-i2v) or "
-                    "supply reference inputs."
+                    f"but none were provided. Attach reference {kind}s (use @ in the prompt "
+                    "to reference characters / scenes / props) or switch to an I2V model "
+                    "(e.g. wan2.7-i2v)."
                 )
 
         # Snapshot the input image to ensure consistency

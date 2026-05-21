@@ -1348,8 +1348,14 @@ async def create_video_task(script_id: str, request: CreateVideoTaskRequest, bac
 
         return signed_response(tasks)
 
+    except ValueError as e:
+        # Validation failures from pipeline.create_video_task (model⇄
+        # mode⇄refs mismatch, missing references for R2V, etc.) are
+        # the user's responsibility to fix — surface as 400 so the
+        # frontend can show an inline error instead of treating it
+        # as a server error.
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        import traceback
         logger.exception("An error occurred")
         raise HTTPException(status_code=500, detail=str(e))
 

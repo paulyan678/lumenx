@@ -140,6 +140,18 @@ export default function StoryboardR2V() {
     // jump-scroll the canvas to a specific frame.
     const shotWrapperRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
 
+    // Inline per-shot validation error messages (shown by ParamsSection
+    // below the Generate CTA). Used for pre-flight failures like
+    // "R2V needs reference images" that we catch before hitting the
+    // backend, so the user gets immediate feedback instead of a
+    // task that queues, fails, and shows up only in the diagnose log.
+    const [shotErrors, setShotErrors] = useState<Record<string, string>>({});
+    const missingRefsMessage = useCallback(
+        (modelLabel: string) =>
+            t("missingRefs", { model: modelLabel }),
+        [t],
+    );
+
     // Per-shot batch count (the "抽卡 ×N" knob). Decoupled from
     // videoConfig because users typically pick the model + duration
     // once and vary count per shot. Keyed by shot.id so insert/move
@@ -494,6 +506,33 @@ export default function StoryboardR2V() {
         const tabMode = shot.tabMode;
         const effectiveCount = Math.max(1, Math.min(6, count || 1));
 
+        // Pre-flight: R2V tab needs reference inputs. Without them
+        // the backend rejects with 400 anyway, but historically the
+        // task would queue, fail mid-generation, and the user'd see
+        // "排队中..." until the failure surfaced. Cheaper to validate
+        // here and show inline error in the ParamsSection.
+        if (tabMode === "direct_r2v") {
+            const refs = parseAssetTags(shot.prompt);
+            if (refs.length === 0) {
+                const r2vModelId = params?.model ?? videoConfig.r2vModel;
+                const r2vModel = VIDEO_R2V_MODELS.find(m => m.id === r2vModelId);
+                const modelLabel = r2vModel?.name ?? r2vModelId;
+                setShotErrors(prev => ({
+                    ...prev,
+                    [shot.id]: missingRefsMessage(modelLabel),
+                }));
+                return;
+            }
+        }
+        // Clear any prior error once this attempt is valid; success
+        // path or backend-side rejection will overwrite if needed.
+        setShotErrors(prev => {
+            if (!prev[shot.id]) return prev;
+            const next = { ...prev };
+            delete next[shot.id];
+            return next;
+        });
+
         setShots(prev => prev.map((s, i) =>
             i === index ? { ...s, videoStatus: "pending" } : s
         ));
@@ -598,13 +637,21 @@ export default function StoryboardR2V() {
                     i === index ? { ...s, videoStatus: "failed" as const } : s
                 ));
             }
-        } catch (error) {
+        } catch (error: any) {
             debugLog.error("Studio", "Batch generate failed for shot:", error);
+            // Surface backend validation failures (HTTP 400) inline
+            // on the shot's panel so the user sees what to fix
+            // instead of just a generic "failed" pill on the card.
+            const status = error?.response?.status;
+            const detail = error?.response?.data?.detail;
+            if (status === 400 && typeof detail === "string") {
+                setShotErrors(prev => ({ ...prev, [shot.id]: detail }));
+            }
             setShots(prev => prev.map((s, i) =>
                 i === index ? { ...s, videoStatus: "failed" as const } : s
             ));
         }
-    }, [shots, currentProject, videoConfig, parseAssetTags]);
+    }, [shots, currentProject, videoConfig, parseAssetTags, missingRefsMessage]);
 
     // Project-level task refresh: when any task on any shot is in
     // flight, refetch the whole project every 5s. The candidates
@@ -1077,6 +1124,7 @@ export default function StoryboardR2V() {
                                 onChange={(next) => handleShotParamsChange(shot, next)}
                                 onGenerate={(p) => generateVideoBatch(index, p.count, p)}
                                 inFlightCount={shotInFlight}
+                                errorMessage={shotErrors[shot.id] ?? null}
                             />
                             {isI2vTab ? (
                                 <div className="border-t border-white/[0.04] px-3 py-2.5">

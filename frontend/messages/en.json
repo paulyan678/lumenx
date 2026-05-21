@@ -663,6 +663,9 @@
     "advancedParams": "Advanced",
     "t2iGenerating": "Generating image...",
     "t2iCompleted": "Image generated",
-    "currentModel": "Model"
+    "currentModel": "Model",
+    "generateBatch": "Generate ×{count}",
+    "generatingBatch": "Generating {count}…",
+    "missingRefs": "{model} needs reference images. Use @ in the prompt to attach a character / scene / prop — at least one required."
   }
 }

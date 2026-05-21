@@ -417,6 +417,16 @@ export const VIDEO_R2V_MODELS: I2VModelConfig[] = (() => {
     const out: I2VModelConfig[] = [];
     // Walk the I2V list in canonical order so the R2V list ends up
     // family-aligned with what the user already sees on the I2V tab.
+    //
+    // R2V models in the catalog deliberately omit `duration` and
+    // `params` (those live on the I2V mode of the same family because
+    // R2V is treated as a routing variant of I2V at generation time —
+    // the user picks a take's reference inputs but the model's
+    // duration / resolution behavior is shared). Without inheritance
+    // the workbench falls back to `{ type: "fixed", value: 5 }` and
+    // shows "5s (fixed)" even for families that support 3–15s. We
+    // fix that by patching the I2V sibling's duration + params onto
+    // the R2V entry here.
     for (const i2v of VIDEO_I2V_MODELS) {
         const family = i2v.family;
         if (!family) continue;
@@ -425,7 +435,17 @@ export const VIDEO_R2V_MODELS: I2VModelConfig[] = (() => {
         const r2vModel = MODEL_CATALOG.models[r2vId];
         if (!r2vModel) continue;
         seen.add(r2vId);
-        out.push(toI2VModel(r2vModel));
+        const base = toI2VModel(r2vModel);
+        // Inherit duration / params from the I2V sibling when the R2V
+        // entry leaves them empty (the typical case). If the R2V
+        // entry explicitly defines its own, those win.
+        const r2vHasDuration = r2vModel.duration && (r2vModel.duration as { type?: string }).type;
+        const r2vHasParams = r2vModel.params && Object.keys(r2vModel.params).length > 0;
+        out.push({
+            ...base,
+            duration: r2vHasDuration ? base.duration : i2v.duration,
+            params: r2vHasParams ? base.params : i2v.params,
+        });
     }
     return out;
 })();

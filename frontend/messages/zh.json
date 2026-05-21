@@ -663,6 +663,9 @@
     "advancedParams": "高级参数",
     "t2iGenerating": "图片生成中...",
     "t2iCompleted": "图片已生成",
-    "currentModel": "当前模型"
+    "currentModel": "当前模型",
+    "generateBatch": "生成 ×{count}",
+    "generatingBatch": "生成中 {count}…",
+    "missingRefs": "{model} 需要参考图片才能生成。在 prompt 里用 @ 引用角色 / 场景 / 道具，至少一张。"
   }
 }
