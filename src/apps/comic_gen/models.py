@@ -347,6 +347,30 @@ class StoryboardFrame(BaseModel):
         description="Task ID of the chosen final take for this frame (singular). Set in Assembly stage; read by Storyboard.",
     )
 
+class CustomVoice(BaseModel):
+    """PR-3h/i — User-created custom voice (clone or design).
+
+    Lives on Series.custom_voices[] (Q16.1 推荐: per-series 共享池).
+    The picker modal's 我的复刻/我的设计 tabs read from this list.
+
+    For clones: source_audio_url retains the original upload reference for
+    later re-clone or audit; voice_prompt is None.
+    For designs (PR-3i): voice_prompt retains the description for iteration;
+    source_audio_url is None.
+    """
+    id: str = Field(..., description="voice_id returned by dashscope customization API")
+    label: str = Field(..., description="User-given display name (e.g. '林墨真人声')")
+    origin: str = Field(..., description="'clone' (PR-3h) | 'design' (PR-3i)")
+    target_model: str = Field(
+        "cosyvoice-v3.5-plus",
+        description="Speech-synth model the voice was bound to at creation time. Required for /voice/preview model override because custom voice_id is NOT in static VOICES registry.",
+    )
+    family: str = Field("cosyvoice", description="'cosyvoice' | 'qwen3' — for picker UI filtering")
+    created_at: float = Field(default_factory=time.time)
+    source_audio_url: Optional[str] = Field(None, description="Clone only: original upload URL")
+    voice_prompt: Optional[str] = Field(None, description="Design only: prompt used to generate (≤500 chars)")
+
+
 class ModelSettings(BaseModel):
     """Model selection settings for different generation stages"""
     t2i_model: str = Field(_DEFAULT_MODEL_SETTINGS.t2i_model, description="Text-to-Image model for Assets")
@@ -479,6 +503,11 @@ class Series(BaseModel):
     # the shot card tab toggle. See Project.default_generation_mode for
     # full semantics.
     default_generation_mode: str = Field("r2v", description="Default per-shot generation_mode for new episodes: 'r2v' (节奏优先) or 'i2v' (画面优先)")
+
+    # PR-3h/i (r2v-workflow-v3) — Custom voice pool (clones + designs).
+    # Per Q16.1: series-level scope. Any character in this series can pick
+    # from this pool via VoicePickerModal's 我的复刻 / 我的设计 tabs.
+    custom_voices: List["CustomVoice"] = Field(default_factory=list, description="User-created custom voices (clones + designs)")
 
     # R2V v2 Phase 6 — content source mode. Orthogonal to workflow_mode.
     # 'scripted'  = traditional flow (Script step parses entities first)

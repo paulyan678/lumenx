@@ -3054,6 +3054,121 @@ class ComicGenPipeline:
             self._save_series_data_unlocked()
             return series
 
+    # ─────────────────────────────────────────────────────────────
+    # PR-3h/i · Custom voice (clone + design) management
+    # Per Q16.1: series-level pool. Episodes / characters in the series
+    # share access via VoicePickerModal's 我的复刻 / 我的设计 tabs.
+    # ─────────────────────────────────────────────────────────────
+
+    def create_voice_clone(
+        self,
+        series_id: str,
+        audio_url: str,
+        label: str,
+        target_model: str = "cosyvoice-v3.5-plus",
+    ) -> 'CustomVoice':
+        """Clone a voice from a reference audio URL via dashscope customization.
+
+        Calls /services/audio/tts/customization with model='voice-enrollment'
+        action='create_voice'. Persists the returned voice_id under
+        series.custom_voices[]. Returns the CustomVoice entry.
+
+        Per doc: audio must be ≤10MB, MP3/WAV/M4A, ≥16kHz, 10-20s recommended.
+        Frontend should pre-validate before calling.
+        """
+        import requests
+        from .models import CustomVoice  # local import to avoid circular
+
+        with self._save_lock:
+            series = self.series_store.get(series_id)
+            if not series:
+                raise ValueError(f"Series not found: {series_id}")
+
+            api_key = os.getenv("DASHSCOPE_API_KEY")
+            if not api_key:
+                raise RuntimeError("DASHSCOPE_API_KEY not configured")
+
+            # Dashscope customization endpoint (Beijing region; intl uses
+            # dashscope-intl URL — TODO when LumenX supports intl deployment)
+            url = "https://dashscope.aliyuncs.com/api/v1/services/audio/tts/customization"
+            payload = {
+                "model": "voice-enrollment",
+                "input": {
+                    "action": "create_voice",
+                    "target_model": target_model,
+                    "prefix": label[:20],  # API has prefix length limit
+                    "url": audio_url,
+                },
+            }
+            headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+
+            logger.info(f"[voice/clone] creating voice for series={series_id} label='{label}' target={target_model}")
+            resp = requests.post(url, json=payload, headers=headers, timeout=60)
+            if resp.status_code != 200:
+                logger.error(f"[voice/clone] dashscope error {resp.status_code}: {resp.text[:500]}")
+                raise RuntimeError(f"Voice clone failed: HTTP {resp.status_code} — {resp.text[:200]}")
+
+            data = resp.json()
+            # Per doc shape: output.voice (CosyVoice) or output.voice_id (Qwen-TTS)
+            voice_id = (
+                data.get("output", {}).get("voice")
+                or data.get("output", {}).get("voice_id")
+                or data.get("voice")
+            )
+            if not voice_id:
+                logger.error(f"[voice/clone] no voice_id in response: {data}")
+                raise RuntimeError(f"Voice clone succeeded but voice_id missing in response: {data}")
+
+            custom = CustomVoice(
+                id=str(voice_id),
+                label=label,
+                origin="clone",
+                target_model=target_model,
+                family="cosyvoice",  # PR-3h hardcodes CosyVoice clone target
+                source_audio_url=audio_url,
+            )
+            if series.custom_voices is None:
+                series.custom_voices = []
+            series.custom_voices.append(custom)
+            series.updated_at = time.time()
+            self._save_series_data_unlocked()
+            logger.info(f"[voice/clone] success voice_id={voice_id} stored on series={series_id}")
+            return custom
+
+    def list_custom_voices(self, series_id: str) -> List['CustomVoice']:
+        """Return all custom voices in a series (clones + designs).
+        Empty list if series has none or doesn't exist."""
+        series = self.series_store.get(series_id)
+        if not series:
+            return []
+        return list(series.custom_voices or [])
+
+    def delete_custom_voice(self, series_id: str, voice_id: str) -> bool:
+        """Remove a custom voice entry. Returns True if removed, False if
+        not found. Note: does NOT call dashscope to delete the underlying
+        voice (the platform allows re-use for 24h; cleanup is best-effort)."""
+        with self._save_lock:
+            series = self.series_store.get(series_id)
+            if not series or not series.custom_voices:
+                return False
+            before = len(series.custom_voices)
+            series.custom_voices = [v for v in series.custom_voices if v.id != voice_id]
+            removed = before != len(series.custom_voices)
+            if removed:
+                series.updated_at = time.time()
+                self._save_series_data_unlocked()
+            return removed
+
+    def find_custom_voice(self, voice_id: str) -> Optional['CustomVoice']:
+        """Search all series for a custom voice by voice_id. Used by
+        /voice/preview to resolve target_model for cloned/designed voices
+        (which aren't in the static TTS_VOICE_REGISTRY)."""
+        for series in self.series_store.values():
+            for cv in (series.custom_voices or []):
+                if cv.id == voice_id:
+                    return cv
+        return None
+
     def get_series_episodes(self, series_id: str) -> List[Script]:
         """Get all Episodes belonging to a Series, in order."""
         series = self.series_store.get(series_id)
