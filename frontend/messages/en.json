@@ -876,6 +876,7 @@
     "t2iHeroTitle": "Start with a first frame",
     "t2iHeroBody": "I2V needs a starting image. Let AI generate one from your prompt, or upload your own.",
     "t2iHeroGenerateLabel": "Generate from prompt",
+    "t2iHeroGenerateEnabledTooltip": "Use the prompt above to generate the first frame (shared with the video generation prompt)",
     "t2iHeroUploadLabel": "Upload image",
     "t2iHeroDropHint": "or drop an image here",
     "t2iHeroGenerateDisabledTooltip": "Write a prompt above first",

@@ -238,7 +238,7 @@ function Hero({
                             type="button"
                             onClick={onGenerate}
                             disabled={generateDisabled}
-                            title={promptIsEmpty ? t("t2iHeroGenerateDisabledTooltip") : t("t2iHeroGenerateLabel")}
+                            title={promptIsEmpty ? t("t2iHeroGenerateDisabledTooltip") : t("t2iHeroGenerateEnabledTooltip")}
                             className="btn-tip inline-flex min-h-[36px] items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 font-display text-display-sm font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_4px_12px_-4px_rgba(100,108,255,0.55)] transition-all duration-fast ease-out-quart hover:bg-primary/92 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             {generating ? (
