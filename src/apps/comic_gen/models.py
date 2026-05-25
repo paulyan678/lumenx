@@ -220,6 +220,11 @@ class Character(BaseModel):
     voice_speed: float = Field(1.0, description="Default speech rate (0.5-2.0)")
     voice_pitch: float = Field(1.0, description="Default pitch rate (0.5-2.0)")
     voice_volume: int = Field(50, description="Default volume (0-100)")
+    # PR-3g (r2v-workflow-v3) — Voice source tracking. 'system' = built-in
+    # voice from TTS_VOICE_REGISTRY; 'clone' = user-uploaded reference
+    # audio (PR-3h); 'design' = voice generated from text prompt (PR-3i).
+    # Picker modal Tabs filter by this field (Q15.5 B).
+    voice_origin: str = Field("system", description="Voice source: 'system' | 'clone' | 'design'")
     locked: bool = Field(False, description="Whether this asset is locked from regeneration")
     status: GenerationStatus = GenerationStatus.PENDING
 

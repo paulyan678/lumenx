@@ -144,9 +144,11 @@ class TTSProcessor:
         speech_rate: float = 1.0,
         pitch_rate: float = 1.0,
         volume: int = 50,
+        instructions: Optional[str] = None,
     ) -> Tuple[str, float, str]:
         """
-        Synthesize speech from text.
+        Synthesize speech from text. Dispatches to CosyVoice or Qwen3-TTS
+        based on the voice's family (registry metadata).
 
         Args:
             text: Text to synthesize (max 20,000 characters)
@@ -155,62 +157,196 @@ class TTSProcessor:
             speech_rate: Speech speed multiplier (0.5-2.0, default 1.0)
             pitch_rate: Pitch multiplier (0.5-2.0, default 1.0)
             volume: Volume level (0-100, default 50)
+            instructions: Natural-language instruction for voice control
+                (CosyVoice ≤100 chars / Qwen3 ≤1600 tokens). Only honored by
+                models with `supports_instruction=True`; ignored silently
+                otherwise. PR-3g #2.
 
         Returns:
             Tuple[str, float, str]: (output_path, first_package_delay_ms, request_id)
         """
+        voice = voice or self.voice
+        family = self._resolve_family_for_voice(voice)
+
+        if family == 'qwen3':
+            return self._synthesize_qwen3(
+                text, output_path, voice,
+                speech_rate=speech_rate, instructions=instructions,
+            )
+        # CosyVoice (default for legacy entries without family metadata)
+        return self._synthesize_cosyvoice(
+            text, output_path, voice,
+            speech_rate=speech_rate, pitch_rate=pitch_rate, volume=volume,
+            instructions=instructions,
+        )
+
+    def _synthesize_cosyvoice(
+        self, text: str, output_path: str, voice: str,
+        speech_rate: float = 1.0, pitch_rate: float = 1.0, volume: int = 50,
+        instructions: Optional[str] = None,
+    ) -> Tuple[str, float, str]:
+        """Synthesize using CosyVoice SpeechSynthesizer (dashscope.audio.tts_v2)."""
         import time
         from dashscope.audio.tts_v2 import SpeechSynthesizer
 
         start_time = time.time()
-        voice = voice or self.voice
-
-        # Resolve the correct model for the voice if it's a known voice
         model = self._resolve_model_for_voice(voice)
 
-        logger.info(f"Synthesizing with model={model}, voice='{voice}' (rate={speech_rate}, pitch={pitch_rate}, vol={volume})...")
-        logger.info(f"Text: {text[:100]}{'...' if len(text) > 100 else ''}")
-
-        # Clamp parameters to valid ranges per DashScope docs
+        # Clamp parameters
         speech_rate = max(0.5, min(2.0, speech_rate))
         pitch_rate = max(0.5, min(2.0, pitch_rate))
         volume = max(0, min(100, volume))
 
-        synthesizer = SpeechSynthesizer(
-            model=model,
-            voice=voice,
-            speech_rate=speech_rate,
-            pitch_rate=pitch_rate,
-            volume=volume,
-        )
+        synth_kwargs = {
+            'model': model,
+            'voice': voice,
+            'speech_rate': speech_rate,
+            'pitch_rate': pitch_rate,
+            'volume': volume,
+        }
+        # Pass instructions only if voice supports it (v3-flash / v3.5-*).
+        # SDK will reject unknown kwargs, so gate explicitly.
+        if instructions and self._voice_supports_instruction(voice):
+            synth_kwargs['instructions'] = instructions
 
-        # Synthesize audio (blocking call, returns bytes)
+        logger.info(
+            f"CosyVoice synth: model={model}, voice='{voice}' "
+            f"(rate={speech_rate}, pitch={pitch_rate}, vol={volume}, "
+            f"instr={'yes' if instructions else 'no'})"
+        )
+        logger.info(f"Text: {text[:100]}{'...' if len(text) > 100 else ''}")
+
+        synthesizer = SpeechSynthesizer(**synth_kwargs)
         audio_data = synthesizer.call(text)
 
-        # Get metrics
         request_id = synthesizer.get_last_request_id()
         first_package_delay = synthesizer.get_first_package_delay()
 
-        # Ensure output directory exists and save
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         with open(output_path, 'wb') as f:
             f.write(audio_data)
 
         duration = time.time() - start_time
-        logger.info(f"Audio synthesized: request_id={request_id}, delay={first_package_delay}ms, total={duration:.2f}s -> {output_path}")
-
+        logger.info(
+            f"CosyVoice audio synthesized: request_id={request_id}, "
+            f"delay={first_package_delay}ms, total={duration:.2f}s -> {output_path}"
+        )
         return output_path, first_package_delay, request_id
+
+    def _synthesize_qwen3(
+        self, text: str, output_path: str, voice: str,
+        speech_rate: float = 1.0, instructions: Optional[str] = None,
+    ) -> Tuple[str, float, str]:
+        """Synthesize using Qwen3-TTS via dashscope.MultiModalConversation.
+
+        Qwen3 has a different API surface than CosyVoice:
+          - Endpoint: /services/aigc/multimodal-generation/generation
+          - SDK call: MultiModalConversation.call(model=..., text=..., voice=...,
+                       language_type=..., instructions=..., stream=False)
+          - Returns audio URL (not bytes); we download to output_path.
+        """
+        import time
+        import requests
+        import dashscope
+
+        start_time = time.time()
+        # Qwen3 doesn't expose per-call rate; speech control happens via
+        # `instructions` string (e.g. "语速偏快"). Param kept for signature
+        # parity with CosyVoice path.
+        _ = speech_rate
+
+        # Switch to instruct variant when instructions supplied, per doc
+        model = self._resolve_model_for_voice(voice)
+        if instructions and self._voice_supports_instruction(voice):
+            # qwen3-tts-flash → qwen3-tts-instruct-flash for instruction control
+            if 'instruct' not in model:
+                model = 'qwen3-tts-instruct-flash'
+
+        # Detect target language hint from voice metadata if present
+        lang_primary = self._voice_meta(voice).get('lang_primary') or ''
+        LANG_MAP: dict = {
+            'es': 'Spanish', 'ru': 'Russian', 'it': 'Italian',
+            'ko': 'Korean', 'ja': 'Japanese', 'de': 'German', 'fr': 'French',
+            'pt': 'Portuguese',
+        }
+        language_type = LANG_MAP.get(lang_primary, 'Chinese')
+
+        params = {
+            'api_key': self.api_key,
+            'model': model,
+            'text': text,
+            'voice': voice,
+            'language_type': language_type,
+            'stream': False,
+        }
+        if instructions and 'instruct' in model:
+            params['instructions'] = instructions
+            params['optimize_instructions'] = True
+
+        logger.info(
+            f"Qwen3 synth: model={model}, voice='{voice}', "
+            f"lang={language_type}, instr={'yes' if instructions else 'no'}"
+        )
+        logger.info(f"Text: {text[:100]}{'...' if len(text) > 100 else ''}")
+
+        response = dashscope.MultiModalConversation.call(**params)
+        if not response or not getattr(response, 'output', None):
+            raise RuntimeError(f"Qwen3 TTS empty response: {response}")
+        audio = response.output.audio
+        if audio is None or not getattr(audio, 'url', None):
+            raise RuntimeError(f"Qwen3 TTS no audio URL: {response}")
+
+        # Download the audio file (URL valid 24h)
+        audio_resp = requests.get(audio.url, timeout=30)
+        audio_resp.raise_for_status()
+
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        with open(output_path, 'wb') as f:
+            f.write(audio_resp.content)
+
+        duration = time.time() - start_time
+        request_id = getattr(response, 'request_id', '') or ''
+        logger.info(
+            f"Qwen3 audio synthesized: request_id={request_id}, "
+            f"total={duration:.2f}s -> {output_path}"
+        )
+        # Qwen3 non-streaming has no first_package_delay; report 0.
+        return output_path, 0.0, request_id
+
+    def _voice_meta(self, voice_id: str) -> dict:
+        """Return registry metadata for a voice_id (matched via model_id field)."""
+        for meta in VOICES.values():
+            if meta['model_id'] == voice_id:
+                return meta
+        return {}
 
     def _resolve_model_for_voice(self, voice_id: str) -> str:
         """Resolve the correct model for a given voice ID.
 
-        v2 voices require cosyvoice-v2, v3 voices require cosyvoice-v3-flash/plus.
-        Falls back to self.model if voice is not in the registry (e.g. cloned voices).
+        Falls back to self.model if voice is not in the registry (e.g.
+        cloned/designed voices, which have voice_id but no static entry).
         """
-        for meta in VOICES.values():
-            if meta['model_id'] == voice_id:
-                return meta.get('model', self.model)
-        return self.model
+        meta = self._voice_meta(voice_id)
+        return meta.get('model', self.model) if meta else self.model
+
+    def _resolve_family_for_voice(self, voice_id: str) -> str:
+        """Resolve voice family: 'cosyvoice' (default) or 'qwen3'.
+
+        Registry metadata `family` field is the source of truth. CosyVoice
+        entries pre-PR-3g don't have the field and implicitly belong to
+        family='cosyvoice'.
+        """
+        meta = self._voice_meta(voice_id)
+        return meta.get('family', 'cosyvoice')
+
+    def _voice_supports_instruction(self, voice_id: str) -> bool:
+        """Whether this voice's model accepts the `instructions` parameter."""
+        meta = self._voice_meta(voice_id)
+        if 'supports_instruction' in meta:
+            return bool(meta['supports_instruction'])
+        # Heuristic for legacy CosyVoice entries: v3-flash / v3.5-* support it.
+        model = meta.get('model', self.model)
+        return any(tag in model for tag in ('v3.5-', 'v3-flash'))
 
     @staticmethod
     def list_voices():
