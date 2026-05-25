@@ -1965,7 +1965,8 @@
             "1080p"
           ]
         },
-        "seed": true
+        "seed": true,
+        "watermark": true
       },
       "provider": "aliyun",
       "release_stage": "stable",
@@ -4499,7 +4500,8 @@
             "1080p"
           ]
         },
-        "seed": true
+        "seed": true,
+        "watermark": true
       },
       "provider": "aliyun",
       "release_stage": "stable",
