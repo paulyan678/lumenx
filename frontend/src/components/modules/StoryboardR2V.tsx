@@ -1482,24 +1482,18 @@ export default function StoryboardR2V() {
                             expanded={expandedShots.has(shot.id)}
                             onToggleExpanded={() => toggleShotExpanded(shot.id)}
                         />
-                        {/* Attached workbench: params + (optional) T2I首帧
-                            strip + candidates panel rendered as sibling
-                            sections. Each owns its own collapse via
-                            SectionShell — no extra drawer wrapper. */}
+                        {/* Attached workbench: t2i_i2v 模式下渲染顺序为
+                            Step 1 (T2ISubsection) → Step 2 (ParamsSection)
+                            → CandidatesSection；direct_r2v 模式无 T2I 区，
+                            ParamsSection → CandidatesSection。
+                            Spec: docs/design/r2v-workflow-v3-unified.md §4.3.2
+                            (PR-3a · Option A 最小修复)
+                            v1 不加 explicit section header / first-frame
+                            thumbnail in Step 2 — 看用户反馈再升级 v2. */}
                         {expandedShots.has(shot.id) ? (
                         <div className="ml-2 mr-1 mt-1.5 rounded-lg border border-glass-border bg-black/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_2px_12px_-6px_rgba(0,0,0,0.5)] backdrop-blur-[2px] motion-safe:animate-[shotPanelIn_220ms_cubic-bezier(0.22,1,0.36,1)_both] md:ml-5">
-                            <ParamsSection
-                                shotId={shot.id}
-                                modelList={modelList}
-                                title={isI2vTab ? "I2V Params" : "R2V Params"}
-                                params={paramsState}
-                                onChange={(next) => handleShotParamsChange(shot, next)}
-                                onGenerate={(p) => generateVideoBatch(index, p.count, p)}
-                                inFlightCount={shotInFlight}
-                                errorMessage={shotErrors[shot.id] ?? null}
-                            />
                             {isI2vTab ? (
-                                <div className="border-t border-glass-border">
+                                <div>
                                     <T2ISubsection
                                         imageUrls={shot.t2iImageUrls ?? []}
                                         selectedIndex={shot.t2iSelectedIndex ?? 0}
@@ -1612,6 +1606,22 @@ export default function StoryboardR2V() {
                                     />
                                 </div>
                             ) : null}
+                            {/* Step 2 · 生成视频 (ParamsSection) — always shown
+                                when shot expanded; renders below Step 1 in
+                                t2i_i2v mode, and is the only section above
+                                candidates in direct_r2v mode. */}
+                            <div className={isI2vTab ? "border-t border-glass-border" : ""}>
+                                <ParamsSection
+                                    shotId={shot.id}
+                                    modelList={modelList}
+                                    title={isI2vTab ? "I2V Params" : "R2V Params"}
+                                    params={paramsState}
+                                    onChange={(next) => handleShotParamsChange(shot, next)}
+                                    onGenerate={(p) => generateVideoBatch(index, p.count, p)}
+                                    inFlightCount={shotInFlight}
+                                    errorMessage={shotErrors[shot.id] ?? null}
+                                />
+                            </div>
                             <div className="border-t border-glass-border">
                                 <CandidatesSection
                                     shotId={shot.id}
