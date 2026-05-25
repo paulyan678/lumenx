@@ -2487,6 +2487,78 @@ def delete_series_custom_voice(series_id: str, voice_id: str):
     return signed_response({"removed": True})
 
 
+# ─────────────────────────────────────────────────────────────
+# PR-3i · Voice design endpoints
+# Iterative pattern: preview → (tweak prompt) → preview → accept.
+# Each preview mints a NEW voice on dashscope; only accept persists.
+# ─────────────────────────────────────────────────────────────
+
+class VoiceDesignPreviewRequest(BaseModel):
+    voice_prompt: str
+    preview_text: str = "你好，这是一段音色测试。请仔细听一听是否符合预期。"
+    target_model: str = "cosyvoice-v3.5-plus"
+
+
+@app.post("/voice/design/preview")
+def voice_design_preview(request: VoiceDesignPreviewRequest):
+    """Mint a fresh design voice and return a preview audio URL.
+
+    The user re-calls this with a tweaked voice_prompt to iterate.
+    Returns: {voice_id, preview_url, target_model}.
+    """
+    try:
+        result = pipeline.voice_design_preview(
+            voice_prompt=request.voice_prompt,
+            preview_text=request.preview_text,
+            target_model=request.target_model,
+        )
+        return signed_response(result)
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class VoiceDesignSaveRequest(BaseModel):
+    series_id: str
+    voice_id: str
+    voice_prompt: str
+    label: str
+    target_model: str = "cosyvoice-v3.5-plus"
+
+
+@app.post("/voice/design/accept")
+def voice_design_accept(request: VoiceDesignSaveRequest):
+    """Persist a previewed design voice into series.custom_voices[]."""
+    try:
+        custom = pipeline.voice_design_save(
+            series_id=request.series_id,
+            voice_id=request.voice_id,
+            voice_prompt=request.voice_prompt,
+            label=request.label,
+            target_model=request.target_model,
+        )
+        return signed_response(custom)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class VoiceDesignTranslateRequest(BaseModel):
+    description: str
+
+
+@app.post("/voice/design/translate")
+def voice_design_translate(request: VoiceDesignTranslateRequest):
+    """LLM helper: character.description → CosyVoice voice_prompt."""
+    if not request.description.strip():
+        raise HTTPException(status_code=400, detail="description is empty")
+    try:
+        voice_prompt = pipeline.translate_character_to_voice_prompt(request.description)
+        return {"voice_prompt": voice_prompt}
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 class GenerateLineAudioRequest(BaseModel):
     speed: float = 1.0
     pitch: float = 1.0
