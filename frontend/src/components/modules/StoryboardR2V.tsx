@@ -13,6 +13,7 @@ import { debugLog } from "@/lib/debugLog";
 import type { BatchSummary } from "./storyboard-r2v/shot-panel/CandidatesSection";
 import { getR2vRouteModelId, isR2vImageBased, VIDEO_I2V_MODELS, VIDEO_R2V_MODELS, DEFAULT_I2V_MODEL_ID, DEFAULT_R2V_MODEL_ID } from "@/lib/modelCatalog";
 import ShotCard, { type ShotNode } from "./storyboard-r2v/ShotCard";
+import DialogueAudioRow from "./storyboard-r2v/DialogueAudioRow";
 import AssetDrawer from "./storyboard-r2v/AssetDrawer";
 import { type VideoConfig, DEFAULT_VIDEO_CONFIG } from "./storyboard-r2v/VideoConfigModal";
 import {
@@ -1390,6 +1391,20 @@ export default function StoryboardR2V() {
                     <Plus size={13} strokeWidth={2} />
                     {t("addShot")}
                 </motion.button>
+                {/* PR-3j · Batch generate dialogue audio for every frame with
+                    dialogue. Skips frames whose hash still matches. */}
+                <BatchDialogueAudioButton
+                    scriptId={currentProject?.id ?? null}
+                    onDone={async () => {
+                        if (!currentProject) return;
+                        try {
+                            const updated = await api.getProject(currentProject.id);
+                            if (updated?.frames) updateProject(currentProject.id, { frames: updated.frames });
+                        } catch (e) {
+                            debugLog.warn("Studio", "refresh after batch audio failed", e);
+                        }
+                    }}
+                />
                 {shots.length > 1 ? (
                     <div className="ml-auto flex items-center gap-1">
                         <button
@@ -1499,6 +1514,43 @@ export default function StoryboardR2V() {
                             onGenerateBatch={(n) => generateVideoBatch(index, n, paramsState)}
                             inFlightCount={shotInFlight}
                         />
+                        {/* PR-3j · Frame-level dialogue audio row. Only renders
+                            when the frame has dialogue text; resolves the
+                            bound character's voice_id and tracks stale state. */}
+                        {(() => {
+                            const frame = currentProject?.frames?.find((f: any) => f.id === shot.id);
+                            if (!frame || !frame.dialogue?.trim()) return null;
+                            const charId = Array.isArray(frame.character_ids) ? frame.character_ids[0] : null;
+                            const speaker = charId ? characters.find((c: any) => c.id === charId) : null;
+                            return (
+                                <div className="ml-2 mr-1 mt-1.5 md:ml-5">
+                                    <DialogueAudioRow
+                                        scriptId={currentProject!.id}
+                                        frameId={frame.id}
+                                        dialogue={frame.dialogue}
+                                        voiceId={speaker?.voice_id}
+                                        audioUrl={frame.audio_url}
+                                        audioError={frame.audio_error}
+                                        snapshotDialogue={frame.dialogue}
+                                        snapshotVoiceId={frame.dialogue_voice_id}
+                                        snapshotInstructions={frame.dialogue_instructions}
+                                        onAudioUpdated={async () => {
+                                            // Refresh project so frame.audio_url + dialogue_text_hash
+                                            // round-trip back into UI
+                                            if (!currentProject) return;
+                                            try {
+                                                const updated = await api.getProject(currentProject.id);
+                                                if (updated?.frames) {
+                                                    updateProject(currentProject.id, { frames: updated.frames });
+                                                }
+                                            } catch (e) {
+                                                debugLog.warn("Studio", "refresh after audio gen failed", e);
+                                            }
+                                        }}
+                                    />
+                                </div>
+                            );
+                        })()}
                         {/* Attached workbench: t2i_i2v 模式下渲染顺序为
                             Step 1 (T2ISubsection) → Step 2 (ParamsSection)
                             → CandidatesSection；direct_r2v 模式无 T2I 区，
@@ -1708,5 +1760,40 @@ export default function StoryboardR2V() {
             />
         ) : null}
         </div>
+    );
+}
+
+// PR-3j · Top toolbar batch generator. Lazy state to keep the parent
+// re-render cost zero while idle.
+function BatchDialogueAudioButton({
+    scriptId,
+    onDone,
+}: {
+    scriptId: string | null;
+    onDone: () => void | Promise<void>;
+}) {
+    const t = useTranslations("dialogueAudio");
+    const [busy, setBusy] = useState(false);
+    if (!scriptId) return null;
+    const handleClick = async () => {
+        setBusy(true);
+        try {
+            await api.generateDialogueAudioBatch(scriptId);
+            await onDone();
+        } catch (e) {
+            debugLog.error("Studio", "batch dialogue audio failed", e);
+        } finally {
+            setBusy(false);
+        }
+    };
+    return (
+        <button
+            type="button"
+            onClick={handleClick}
+            disabled={busy}
+            className="inline-flex h-7 items-center gap-1.5 rounded px-2.5 font-mono text-[10.5px] uppercase tracking-[0.14em] font-medium text-primary border border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors disabled:opacity-40"
+        >
+            {busy ? "…" : t("batchGenerate")}
+        </button>
     );
 }

@@ -83,6 +83,35 @@
     "apply": "Apply",
     "playFailed": "Preview failed — please retry"
   },
+  "dialogueAudio": {
+    "title": "Dialogue Audio",
+    "generate": "Generate",
+    "regenerate": "Regenerate",
+    "noVoiceBound": "Bind a voice to the character in Cast first",
+    "generateFailed": "Generation failed — please retry",
+    "playFailed": "Preview failed — please retry",
+    "freeTextPlaceholder": "Or custom tone hint (≤ 80 chars)",
+    "batchGenerate": "🎙️ Generate all dialogue",
+    "batchProgress": "Synthesizing {count} frames…",
+    "batchDone": "Completed {count} frames",
+    "state": {
+      "empty": "Empty",
+      "generating": "Generating",
+      "ready": "Ready",
+      "stale": "Stale",
+      "error": "Error"
+    },
+    "emotion": {
+      "neutral": "Neutral",
+      "happy": "Happy",
+      "sad": "Sad",
+      "angry": "Angry",
+      "surprised": "Surprised",
+      "calm": "Calm",
+      "gentle": "Gentle",
+      "serious": "Serious"
+    }
+  },
   "voiceDesign": {
     "title": "Design a new voice",
     "close": "Close",

@@ -83,6 +83,35 @@
     "apply": "应用",
     "playFailed": "试听失败，请重试"
   },
+  "dialogueAudio": {
+    "title": "对白音频",
+    "generate": "生成对白",
+    "regenerate": "重新生成",
+    "noVoiceBound": "请先在 Cast 中给角色绑定音色",
+    "generateFailed": "生成失败，请重试",
+    "playFailed": "试听失败，请重试",
+    "freeTextPlaceholder": "或自定义语气提示（≤ 80 字）",
+    "batchGenerate": "🎙️ 生成全部对白",
+    "batchProgress": "正在为 {count} 帧合成对白...",
+    "batchDone": "已完成 {count} 帧",
+    "state": {
+      "empty": "未生成",
+      "generating": "合成中",
+      "ready": "就绪",
+      "stale": "需重生成",
+      "error": "失败"
+    },
+    "emotion": {
+      "neutral": "中性",
+      "happy": "开心",
+      "sad": "悲伤",
+      "angry": "愤怒",
+      "surprised": "惊讶",
+      "calm": "冷静",
+      "gentle": "温柔",
+      "serious": "严肃"
+    }
+  },
   "voiceDesign": {
     "title": "设计新音色",
     "close": "关闭",
