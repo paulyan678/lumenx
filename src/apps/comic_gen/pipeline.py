@@ -3169,6 +3169,152 @@ class ComicGenPipeline:
                     return cv
         return None
 
+    # ─────────────────────────────────────────────────────────────
+    # PR-3i · Voice design (iterate: prompt → preview → accept)
+    # Unlike clone (audio-driven, 1 shot), design is text-driven and
+    # users naturally iterate. Each preview mints a new voice on
+    # dashscope; we only persist the voice the user explicitly accepts.
+    # ─────────────────────────────────────────────────────────────
+
+    def voice_design_preview(
+        self,
+        voice_prompt: str,
+        preview_text: str,
+        target_model: str = "cosyvoice-v3.5-plus",
+    ) -> Dict[str, Any]:
+        """Mint a new design voice via dashscope, synth a preview, return both.
+
+        Does NOT persist. User iterates by re-calling with a tweaked
+        voice_prompt. When they're happy, frontend calls voice_design_save
+        with the returned voice_id to commit to series.custom_voices[].
+        """
+        import requests
+        import hashlib
+
+        api_key = os.getenv("DASHSCOPE_API_KEY")
+        if not api_key:
+            raise RuntimeError("DASHSCOPE_API_KEY not configured")
+
+        url = "https://dashscope.aliyuncs.com/api/v1/services/audio/tts/customization"
+        payload = {
+            "model": "voice-enrollment",
+            "input": {
+                "action": "create_voice",
+                "target_model": target_model,
+                "prefix": "design",
+                "voice_prompt": voice_prompt[:500],
+            },
+        }
+        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+
+        logger.info(f"[voice/design] preview voice_prompt='{voice_prompt[:60]}…' target={target_model}")
+        resp = requests.post(url, json=payload, headers=headers, timeout=60)
+        if resp.status_code != 200:
+            logger.error(f"[voice/design] dashscope error {resp.status_code}: {resp.text[:500]}")
+            raise RuntimeError(f"Voice design failed: HTTP {resp.status_code} — {resp.text[:200]}")
+
+        data = resp.json()
+        voice_id = (
+            data.get("output", {}).get("voice")
+            or data.get("output", {}).get("voice_id")
+            or data.get("voice")
+        )
+        if not voice_id:
+            logger.error(f"[voice/design] no voice_id in response: {data}")
+            raise RuntimeError(f"Voice design API returned no voice_id: {data}")
+
+        voice_id_str = str(voice_id)
+
+        if not self.audio_generator.tts:
+            raise RuntimeError("TTS unavailable; cannot synthesize preview")
+
+        cache_dir = "output/cache/voice_design_preview"
+        os.makedirs(cache_dir, exist_ok=True)
+        cache_key = hashlib.md5(f"{voice_id_str}|{preview_text}".encode("utf-8")).hexdigest()
+        cache_path = os.path.join(cache_dir, f"{cache_key}.mp3")
+
+        self.audio_generator.tts.synthesize(
+            text=preview_text,
+            output_path=cache_path,
+            voice=voice_id_str,
+            model_override=target_model,
+            family_override="cosyvoice",
+        )
+
+        preview_url = f"cache/voice_design_preview/{cache_key}.mp3"
+        return {"voice_id": voice_id_str, "preview_url": preview_url, "target_model": target_model}
+
+    def voice_design_save(
+        self,
+        series_id: str,
+        voice_id: str,
+        voice_prompt: str,
+        label: str,
+        target_model: str = "cosyvoice-v3.5-plus",
+    ) -> 'CustomVoice':
+        """Persist a previewed design voice into series.custom_voices[]."""
+        from .models import CustomVoice
+
+        with self._save_lock:
+            series = self.series_store.get(series_id)
+            if not series:
+                raise ValueError(f"Series not found: {series_id}")
+
+            existing = next(
+                (cv for cv in (series.custom_voices or []) if cv.id == voice_id),
+                None,
+            )
+            if existing:
+                logger.info(f"[voice/design] save: voice_id={voice_id} already exists; returning existing")
+                return existing
+
+            custom = CustomVoice(
+                id=voice_id,
+                label=label,
+                origin="design",
+                target_model=target_model,
+                family="cosyvoice",
+                voice_prompt=voice_prompt[:500],
+            )
+            if series.custom_voices is None:
+                series.custom_voices = []
+            series.custom_voices.append(custom)
+            series.updated_at = time.time()
+            self._save_series_data_unlocked()
+            logger.info(f"[voice/design] saved voice_id={voice_id} to series={series_id}")
+            return custom
+
+    def translate_character_to_voice_prompt(self, description: str) -> str:
+        """LLM helper: convert a character description into a CosyVoice
+        voice_prompt suitable for /services/audio/tts/customization.
+
+        The prompt should describe vocal qualities (timbre, pace, age, mood)
+        in concise Chinese. CosyVoice voice_prompt cap is 500 chars; we
+        target ~120-200 to leave headroom for tone hints.
+        """
+        from .llm_adapter import LLMAdapter
+
+        adapter = LLMAdapter()
+        if not adapter.is_configured():
+            raise RuntimeError("LLM adapter not configured (missing DASHSCOPE_API_KEY)")
+
+        system_prompt = (
+            "你是一个语音设计师，擅长将角色设定转化为简洁的中文音色描述。"
+            "输出要求："
+            "1. 只描述音色、语速、年龄、情绪，不要描写外貌或剧情。"
+            "2. 用 100-200 字中文，单段无标题，不带引号或多余说明。"
+            "3. 重点：性别·年龄·音色质感·语速·气质氛围。"
+        )
+        user_prompt = f"角色设定：\n{description.strip()[:1000]}\n\n请输出音色描述。"
+
+        text = adapter.chat(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        )
+        return (text or "").strip()[:500]
+
     def get_series_episodes(self, series_id: str) -> List[Script]:
         """Get all Episodes belonging to a Series, in order."""
         series = self.series_store.get(series_id)
