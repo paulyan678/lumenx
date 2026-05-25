@@ -886,13 +886,30 @@ export const api = {
         return response.json();
     },
 
-    generateLineAudio: async (scriptId: string, frameId: string, speed: number, pitch: number, volume: number = 50) => {
+    generateLineAudio: async (
+        scriptId: string,
+        frameId: string,
+        speed: number,
+        pitch: number,
+        volume: number = 50,
+        instructions?: string,
+    ) => {
         const response = await fetch(`${API_URL}/projects/${scriptId}/frames/${frameId}/audio`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ speed, pitch, volume }),
+            body: JSON.stringify({ speed, pitch, volume, instructions: instructions || null }),
         });
         if (!response.ok) throw new Error("Failed to generate line audio");
+        return response.json();
+    },
+
+    /** PR-3j · Generate dialogue audio for every frame with dialogue.
+     *  Skips frames whose snapshot hash still matches. */
+    generateDialogueAudioBatch: async (scriptId: string) => {
+        const response = await fetch(`${API_URL}/projects/${scriptId}/dialogue_audio/batch`, {
+            method: "POST",
+        });
+        if (!response.ok) throw new Error("Failed to generate dialogue audio batch");
         return response.json();
     },
 
