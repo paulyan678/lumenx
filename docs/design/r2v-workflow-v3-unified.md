@@ -115,6 +115,25 @@ i2v vs r2v 是 **model input shape 差异**（first frame vs ref images），不
 - 展开态：`▴ 参数 / Takes (收起)` + 下面展开完整 params 区
 - 视觉权重提升 5-10 倍，解决 "找不到" 痛点
 
+### Q15 · TTS 能力范围（2026-05-25 grill,基于完整 doc audit）
+**5 个 sub-decision 全部按推荐**：
+
+**Q15.1 · Voice model family v1 范围**: **CosyVoice + Qwen3-TTS** (Qwen3 方言 voices 对中国短剧创作核心场景极有价值；MiniMax 暂缓)
+
+**Q15.2 · 声音复刻 (Voice Cloning) v1**: **做 — character 详情侧 drawer 加"复刻" tab** (创作者高频需求"用朋友录音作角色")。API: `POST /services/audio/tts/customization` model=`voice-enrollment`/`qwen-voice-enrollment` action=`create_voice`/`create`
+
+**Q15.3 · 声音设计 (Voice Design) v1**: **做 + character.description 一键转 voice_prompt** (复用 description 同时驱动 image + voice，LumenX 核心 leverage). API: 同上 endpoint 不同 model (`voice-enrollment`/`qwen-voice-design`)
+
+**Q15.4 · 指令控制 UX**: **chip + 自由文本双轨** (90% 用户用 6-8 个 preset chip 够；10% advanced 写自由文本)。后端统一翻译为 `instructions` 参数 (CosyVoice ≤ 100 字符, Qwen3 ≤ 1600 token)
+
+**Q15.5 · Voice picker modal 形态**: **Tabs `[系统音色 | 我的复刻 | 我的设计]`** (按"来源"分组，跨 family 在每个 tab 内分组)。系统音色 tab 内再二级分 CosyVoice / Qwen3 / 方言
+
+### Q15 影响（之前 spec 假设修正）
+- ❌ `cosyvoice-v3-flash` 是 v3 主推 → ✅ `cosyvoice-v3.5-plus` / `v3.5-flash` 是当前主推 (v3.5 系列不支持系统音色，只支持复刻/设计)
+- ❌ Emotion = 固定 7 enum + 固定中文格式 → ✅ 自然语言 instructions 参数 (≤100 字符)
+- ❌ 复刻/设计 = v2 backlog → ✅ first-class API，PR-3 v1 范围
+- ❌ tts.py 30 voices 够 → ✅ 162 CosyVoice voices + 35+ Qwen3 voices 待补充
+
 ---
 
 ## 3. New Architecture
@@ -505,23 +524,45 @@ ffmpeg \
 
 ## 6. Implementation Plan
 
-### 6.1 PR Roadmap (PR-3a → PR-3k)
+### 6.1 PR Roadmap (rewritten 2026-05-25 post Q15)
+
+**已完成 (PR-3a → 3f + Q14 + Action Bar merge)** ✅
+| PR | Subject | Commit |
+|---|---|---|
+| PR-3a | StoryboardR2V t2i_i2v 重组两 Step section | 55d6dbe |
+| PR-3b | ShotCard "参数/Takes" disclosure bar | 3ee33bf |
+| PR-3c (+ follow-up) | 闭环生成行 + count selector + 去 ParamsSection Generate | 98056f2 + 678560e |
+| PR-3d | Shared prompt tooltip | 325f27f |
+| PR-3 grill Q14 | T2ISubsection candidates 默认展开 + 显式 Reroll | 1c2ba8a |
+| Action Bar merge | 底部一体化 actions + generation cluster | 4e666ea |
+| PR-3e | `default_generation_mode` 字段 + CreateSeriesDialog 视觉控制偏好 picker | e39358f |
+| PR-3f | "r2v" → "Unified Workflow" 命名 normalize | f55b48f |
+
+**Voice 子序列 (path B 拆 4 个 PR, post Q15)**：
 
 | PR | Subject | 依赖 | Est. |
 |---|---|---|---|
-| **PR-3a** | StoryboardR2V t2i_i2v 重组两 Step section (task #80) | 无 | 1-2d |
-| **PR-3b** | ShotCard "参数/Takes" 按钮重定位为 disclosure bar (task #79) | 无 | 0.5d |
-| **PR-3c** | 项目创建时新增 "workflow + 视觉控制偏好" 开关；Project model 增 `workflow_mode + default_generation_mode` 字段 | 无 | 1d |
-| **PR-3d** | ProjectClient 路由扩展：`workflow_mode="unified"` 走 StoryboardR2V；legacy 走原路径 | 3c | 0.5d |
-| **PR-3e** | Cast 卡片 voice binding hover dropdown + Voice picker modal (含 L1.5 推荐 + 试听) | task #77 (CosyVoice 文档) | 2-3d |
-| **PR-3f** | Voice picker modal "✨ 让 AI 帮我挑" 按钮 + L4 AI 推荐 backend | 3e | 1d |
-| **PR-3g** | Storyboard frame-level dialogue audio row + top "Generate All Audio" batch button + stale 检测 | 3e | 2-3d |
-| **PR-3h** | Assembly IA 重组 (Phase-based + BGM section + Mixer 4-slider + Export 子面板) | 3g | 2-3d |
-| **PR-3i** | merge_videos 扩展含 audio track mux (ffmpeg pipeline 真实化) | 3h | 2-3d |
-| **PR-3j** | Voice modal emotion prompt UI (依赖 task #77 spike: CosyVoice v3 prompt-based emotion 支持情况) | task #77 spike done | 1-2d |
-| **PR-3k** | Step 7/8/9 deprecation cleanup (unified 项目跳过这些 step，legacy 项目仍可见；旧 Voice/Mix/Export step components 标 @deprecated) | 3g + 3h + 3i | 0.5d |
+| **PR-3g** | Voice picker modal (3 tabs: 系统音色/我的复刻/我的设计) + Cast 卡片 hover dropdown + 试听 + tts.py 扩展 (Qwen3-TTS catalog + cosyvoice-v3.5-flash/plus + 162 CosyVoice voices subset) + backend `/voice/preview` endpoint (memcache) | 无 | 2-3d |
+| **PR-3h** | 声音复刻 (Voice Cloning) — character 详情 drawer 加 "复刻" tab + 上传 reference audio + 后端 `/voice/clone` 调 `/customization` action=create_voice → 返回 voice_id 写入 character.voice_id (with origin marker) | 3g | 1-2d |
+| **PR-3i** | 声音设计 (Voice Design) — character 详情 drawer 加 "设计" tab + voice_prompt 输入 + "用 character.description 一键转" 智能按钮 (LLM rewrite description → voice_prompt) + 后端调 `/customization` action=create_voice (cosyvoice-v3.5-plus voice_prompt) | 3g | 2d |
+| **PR-3j** | Storyboard frame-level dialogue audio row + top batch button + stale 检测 + **chip emotion (8 preset chip + 自由文本 advanced) → instructions 参数** | 3g | 2-3d |
 
-**总估时**：14-19 days（serial），含 task #77 解锁后才能启动 3e/3j
+**Assembly + 收尾**：
+| PR | Subject | 依赖 | Est. |
+|---|---|---|---|
+| **PR-3k** | Assembly IA 重组 (Phase-based + BGM section + Mixer 4-slider + Export 子面板) | 3j | 2-3d |
+| **PR-3l** | merge_videos 扩展含 audio track mux (ffmpeg multi-track: video + dialogue + BGM) | 3k | 2-3d |
+| **PR-3m** | Step 7/8/9 deprecation cleanup (unified 项目跳过；legacy 仍可见；@deprecated 标记) | 3j + 3k + 3l | 0.5d |
+
+**总估时**: ~12-16 days (Voice 子序列 7-10d, Assembly 收尾 4.5-6.5d)
+
+**Dependency 关键路径**: PR-3g → 3h/3i (parallel) → 3j → 3k → 3l → 3m
+
+### 6.2 关键 milestone (post Q15)
+1. **PR-3g** = voice 基础设施（picker UI + tts.py catalog + preview endpoint）— 解锁所有后续 voice 工作
+2. **PR-3h + 3i** = 自定义音色生产（复刻 + 设计）— 用户能创建专属角色 voice
+3. **PR-3j** = audio 实际生成 + emotion 控制 — frame.dialogue → mp3 with emotion
+4. **PR-3k + 3l** = 整片合成 + 多轨混音 — 最终视频含 dialogue + BGM
 
 ### 6.2 关键 milestone
 
