@@ -2378,6 +2378,10 @@ def voice_preview(request: VoicePreviewRequest):
     output/cache/voice_preview/{key}.mp3. Subsequent identical calls
     return the cached URL instantly.
 
+    PR-3h #2: handles CUSTOM voices (clones/designs) by looking up
+    series.custom_voices[] for target_model + family overrides — required
+    because cloned voice_ids aren't in static TTS_VOICE_REGISTRY.
+
     Spec: r2v-workflow-v3-unified.md §4.2.3 (cache strategy) + Q5 b/c.
     """
     import hashlib
@@ -2386,6 +2390,11 @@ def voice_preview(request: VoicePreviewRequest):
             status_code=503,
             detail="TTS service unavailable. Check DASHSCOPE_API_KEY configuration.",
         )
+
+    # PR-3h #2: resolve custom voice → target_model/family override
+    custom = pipeline.find_custom_voice(request.voice_id)
+    model_override = custom.target_model if custom else None
+    family_override = custom.family if custom else None
 
     cache_dir = "output/cache/voice_preview"
     os.makedirs(cache_dir, exist_ok=True)
@@ -2405,6 +2414,8 @@ def voice_preview(request: VoicePreviewRequest):
                 pitch_rate=request.pitch,
                 volume=request.volume,
                 instructions=request.instructions,
+                model_override=model_override,
+                family_override=family_override,
             )
         except Exception as e:
             logger.error(f"[/voice/preview] TTS error voice={request.voice_id}: {e}")
@@ -2415,6 +2426,65 @@ def voice_preview(request: VoicePreviewRequest):
     # signing when configured, no-op otherwise.
     url = f"cache/voice_preview/{cache_key}.mp3"
     return signed_response({"url": url, "cached": cached})
+
+
+# ─────────────────────────────────────────────────────────────
+# PR-3h · Voice clone endpoints
+# Per Q16: series-level scope for custom voices. Frontend uploads audio
+# via existing /upload (gets URL), then calls /voice/clone with that URL.
+# ─────────────────────────────────────────────────────────────
+
+class VoiceCloneRequest(BaseModel):
+    """PR-3h request: clone a voice from a reference audio URL.
+
+    Frontend pre-validates: ≤10MB, MP3/WAV/M4A, ≥16kHz, 10-20s recommended.
+    """
+    series_id: str
+    audio_url: str
+    label: str
+    target_model: str = "cosyvoice-v3.5-plus"
+
+
+@app.post("/voice/clone")
+def voice_clone(request: VoiceCloneRequest):
+    """Create a custom voice by cloning a reference audio sample.
+
+    Per Q15.2: stored at series level so any character in the series can
+    pick from the clone via the VoicePickerModal '我的复刻' tab.
+    """
+    try:
+        custom = pipeline.create_voice_clone(
+            series_id=request.series_id,
+            audio_url=request.audio_url,
+            label=request.label,
+            target_model=request.target_model,
+        )
+        return signed_response(custom)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/series/{series_id}/custom_voices")
+def list_series_custom_voices(series_id: str):
+    """Return all custom voices (clones + designs) in a series."""
+    voices = pipeline.list_custom_voices(series_id)
+    return signed_response(voices)
+
+
+@app.delete("/series/{series_id}/custom_voices/{voice_id}")
+def delete_series_custom_voice(series_id: str, voice_id: str):
+    """Remove a custom voice from a series.
+
+    Note: does NOT delete on dashscope side (24h retention is best-effort).
+    If a character has this voice_id bound, the binding becomes orphaned
+    (frontend should warn before delete in v2).
+    """
+    removed = pipeline.delete_custom_voice(series_id, voice_id)
+    if not removed:
+        raise HTTPException(status_code=404, detail="Custom voice not found")
+    return signed_response({"removed": True})
 
 
 class GenerateLineAudioRequest(BaseModel):

@@ -145,6 +145,8 @@ class TTSProcessor:
         pitch_rate: float = 1.0,
         volume: int = 50,
         instructions: Optional[str] = None,
+        model_override: Optional[str] = None,
+        family_override: Optional[str] = None,
     ) -> Tuple[str, float, str]:
         """
         Synthesize speech from text. Dispatches to CosyVoice or Qwen3-TTS
@@ -161,36 +163,46 @@ class TTSProcessor:
                 (CosyVoice ≤100 chars / Qwen3 ≤1600 tokens). Only honored by
                 models with `supports_instruction=True`; ignored silently
                 otherwise. PR-3g #2.
+            model_override: Force a specific TTS model (e.g. cosyvoice-v3.5-plus
+                for custom cloned voices not in TTS_VOICE_REGISTRY). PR-3h #2.
+            family_override: Force dispatch family ('cosyvoice' | 'qwen3') for
+                voices not in the registry. PR-3h #2.
 
         Returns:
             Tuple[str, float, str]: (output_path, first_package_delay_ms, request_id)
         """
         voice = voice or self.voice
-        family = self._resolve_family_for_voice(voice)
+        family = family_override or self._resolve_family_for_voice(voice)
 
         if family == 'qwen3':
             return self._synthesize_qwen3(
                 text, output_path, voice,
                 speech_rate=speech_rate, instructions=instructions,
+                model_override=model_override,
             )
         # CosyVoice (default for legacy entries without family metadata)
         return self._synthesize_cosyvoice(
             text, output_path, voice,
             speech_rate=speech_rate, pitch_rate=pitch_rate, volume=volume,
-            instructions=instructions,
+            instructions=instructions, model_override=model_override,
         )
 
     def _synthesize_cosyvoice(
         self, text: str, output_path: str, voice: str,
         speech_rate: float = 1.0, pitch_rate: float = 1.0, volume: int = 50,
         instructions: Optional[str] = None,
+        model_override: Optional[str] = None,
     ) -> Tuple[str, float, str]:
         """Synthesize using CosyVoice SpeechSynthesizer (dashscope.audio.tts_v2)."""
         import time
         from dashscope.audio.tts_v2 import SpeechSynthesizer
 
         start_time = time.time()
-        model = self._resolve_model_for_voice(voice)
+        # PR-3h #2: model_override lets caller (e.g. /voice/preview for a
+        # custom cloned voice) bypass registry lookup which would fall back
+        # to self.model and produce wrong output. Cloned voices need their
+        # target_model (typically cosyvoice-v3.5-plus).
+        model = model_override or self._resolve_model_for_voice(voice)
 
         # Clamp parameters
         speech_rate = max(0.5, min(2.0, speech_rate))
@@ -236,6 +248,7 @@ class TTSProcessor:
     def _synthesize_qwen3(
         self, text: str, output_path: str, voice: str,
         speech_rate: float = 1.0, instructions: Optional[str] = None,
+        model_override: Optional[str] = None,
     ) -> Tuple[str, float, str]:
         """Synthesize using Qwen3-TTS via dashscope.MultiModalConversation.
 
@@ -255,10 +268,11 @@ class TTSProcessor:
         # parity with CosyVoice path.
         _ = speech_rate
 
-        # Switch to instruct variant when instructions supplied, per doc
-        model = self._resolve_model_for_voice(voice)
+        # PR-3h #2: explicit override wins (for custom voices not in registry).
+        # Otherwise resolve from registry, then switch to instruct variant
+        # when instructions supplied (per doc).
+        model = model_override or self._resolve_model_for_voice(voice)
         if instructions and self._voice_supports_instruction(voice):
-            # qwen3-tts-flash → qwen3-tts-instruct-flash for instruction control
             if 'instruct' not in model:
                 model = 'qwen3-tts-instruct-flash'
 
