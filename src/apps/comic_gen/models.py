@@ -401,6 +401,14 @@ class Script(BaseModel):
     # Workflow mode
     workflow_mode: str = Field("i2v_legacy", description="Workflow mode: 'r2v' (reference-to-video) or 'i2v_legacy' (first-frame I2V, default for old projects)")
 
+    # PR-3e (r2v-workflow-v3) — Visual control preference. Determines the
+    # default tabMode for newly added shots in the R2V workbench:
+    #   'r2v' (default, 节奏优先) → new shots default to direct_r2v
+    #   'i2v' (画面优先)         → new shots default to t2i_i2v (生首帧 → 生视频)
+    # Per-shot tabMode still overridable. Series-level field; episodes
+    # inherit from parent series.
+    default_generation_mode: str = Field("r2v", description="Default per-shot generation_mode: 'r2v' (节奏优先) or 'i2v' (画面优先)")
+
     # Merged video URL
     merged_video_url: Optional[str] = Field(None, description="URL of the merged final video")
 
@@ -460,6 +468,12 @@ class Series(BaseModel):
 
     # Workflow mode for all episodes in this series
     workflow_mode: str = Field("i2v_legacy", description="Workflow mode: 'r2v' or 'i2v_legacy'")
+
+    # PR-3e (r2v-workflow-v3) — Visual control preference at series level.
+    # Episodes inherit this when created; user can override per-shot via
+    # the shot card tab toggle. See Project.default_generation_mode for
+    # full semantics.
+    default_generation_mode: str = Field("r2v", description="Default per-shot generation_mode for new episodes: 'r2v' (节奏优先) or 'i2v' (画面优先)")
 
     # R2V v2 Phase 6 — content source mode. Orthogonal to workflow_mode.
     # 'scripted'  = traditional flow (Script step parses entities first)

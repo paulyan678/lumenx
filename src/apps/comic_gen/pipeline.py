@@ -2961,7 +2961,7 @@ class ComicGenPipeline:
         with self._save_lock:
             self._save_series_data_unlocked()
 
-    def create_series(self, title: str, description: str = "", workflow_mode: str = "i2v_legacy", content_mode: str = "scripted") -> Series:
+    def create_series(self, title: str, description: str = "", workflow_mode: str = "i2v_legacy", content_mode: str = "scripted", default_generation_mode: str = "r2v") -> Series:
         """Create a new Series."""
         with self._save_lock:
             series = Series(
@@ -2970,6 +2970,7 @@ class ComicGenPipeline:
                 description=description,
                 workflow_mode=workflow_mode,
                 content_mode=content_mode,
+                default_generation_mode=default_generation_mode,
                 created_at=time.time(),
                 updated_at=time.time(),
             )

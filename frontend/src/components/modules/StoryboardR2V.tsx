@@ -351,10 +351,13 @@ export default function StoryboardR2V() {
     // Add a new shot after the given index
     const addShot = useCallback(async (afterIndex: number) => {
         const synthId = `shot_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        // PR-3e · pick default tabMode from project preference (inherited from
+        // series). "i2v" (画面优先) → t2i_i2v; "r2v" (节奏优先, default) → direct_r2v.
+        const defaultMode = currentProject?.default_generation_mode === "i2v" ? "t2i_i2v" : "direct_r2v";
         const newShot: ShotNode = {
             id: synthId,
             prompt: "",
-            tabMode: "direct_r2v",
+            tabMode: defaultMode,
         };
         setShots(prev => {
             const updated = [...prev];

@@ -210,6 +210,9 @@ export interface Series {
     prompt_config?: PromptConfig;
     model_settings?: ModelSettings;
     workflow_mode?: "r2v" | "i2v_legacy";
+    /** PR-3e — Visual control preference. 'r2v' = 节奏优先 (new shots default
+     *  direct_r2v); 'i2v' = 画面优先 (new shots default t2i_i2v). */
+    default_generation_mode?: "r2v" | "i2v";
     episode_ids: string[];
     created_at: number;
     updated_at: number;
@@ -233,6 +236,9 @@ export interface Project {
     model_settings?: ModelSettings;
     prompt_config?: PromptConfig;
     workflow_mode?: "i2v_legacy" | "r2v";
+    /** PR-3e — Inherited from series; used by StoryboardR2V addShot to
+     *  pick default tabMode for new shots. */
+    default_generation_mode?: "r2v" | "i2v";
     merged_video_url?: string;
     series_id?: string;
     episode_number?: number;

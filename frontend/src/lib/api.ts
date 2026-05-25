@@ -779,13 +779,14 @@ export const api = {
     // Series CRUD
     createSeriesV2: async (
         title: string,
-        opts: { description?: string; workflow_mode?: string; content_mode?: "scripted" | "freeform" } = {},
+        opts: { description?: string; workflow_mode?: string; content_mode?: "scripted" | "freeform"; default_generation_mode?: "r2v" | "i2v" } = {},
     ) => {
         const response = await axios.post(`${API_URL}/series`, {
             title,
             description: opts.description ?? "",
             workflow_mode: opts.workflow_mode ?? "r2v",
             content_mode: opts.content_mode ?? "scripted",
+            default_generation_mode: opts.default_generation_mode ?? "r2v",
         });
         return response.data;
     },

@@ -384,6 +384,9 @@ class CreateSeriesRequest(BaseModel):
     # R2V v2 Phase 6 — content mode (scripted | freeform), defaults
     # scripted (traditional script-first flow).
     content_mode: str = "scripted"
+    # PR-3e (r2v-workflow-v3) — Visual control preference.
+    # 'r2v' (节奏优先, default) | 'i2v' (画面优先).
+    default_generation_mode: str = "r2v"
 
 
 class UpdateSeriesRequest(BaseModel):
@@ -391,6 +394,7 @@ class UpdateSeriesRequest(BaseModel):
     description: Optional[str] = None
     workflow_mode: Optional[str] = None
     content_mode: Optional[str] = None
+    default_generation_mode: Optional[str] = None
     # R2V v2: series-level art_direction baseline (Phase 2). Inherits +
     # override flows at the episode level read this as the source of truth.
     art_direction: Optional[ArtDirection] = None
@@ -404,6 +408,7 @@ def create_series(request: CreateSeriesRequest):
         request.description,
         request.workflow_mode,
         request.content_mode,
+        request.default_generation_mode,
     )
     return signed_response(series)
 
