@@ -5,11 +5,13 @@ import { Play, Pause, Volume2, Music, Mic, Video, Sliders } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useProjectStore } from "@/store/projectStore";
 import { getAssetUrl } from "@/lib/utils";
+import StepHeader from "@/components/shared/StepHeader";
 
 export default function FinalMixStudio() {
     const currentProject = useProjectStore((state) => state.currentProject);
     const ta = useTranslations("artDirection");
     const tp = useTranslations("pipeline");
+    const tStep = useTranslations("stepHeader");
 
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
@@ -56,6 +58,19 @@ export default function FinalMixStudio() {
 
     return (
         <div className="flex flex-col h-full text-foreground">
+            <StepHeader
+                stepNumber={8}
+                totalSteps={6}
+                icon={<Sliders />}
+                englishName="Final Mix"
+                title={tStep("mixTitle")}
+                subtitle={tStep("mixSubtitle")}
+                trailing={(
+                    <span className="font-mono text-[10px] uppercase tracking-[0.18em] px-2.5 py-1 rounded-full bg-glass border border-glass-border text-text-muted">
+                        {tStep("comingSoon")}
+                    </span>
+                )}
+            />
             {/* Top Bar: Preview & Mixer */}
             <div className="flex-1 flex border-b border-glass-border min-h-0">
                 {/* Preview Window */}

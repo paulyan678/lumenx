@@ -7,9 +7,11 @@ import { useTranslations } from "next-intl";
 import { useProjectStore } from "@/store/projectStore";
 import { api } from "@/lib/api";
 import { getAssetUrl } from "@/lib/utils";
+import StepHeader from "@/components/shared/StepHeader";
 
 export default function ExportStudio() {
     const tv = useTranslations("video");
+    const tStep = useTranslations("stepHeader");
     const currentProject = useProjectStore((state) => state.currentProject);
 
     const [isExporting, setIsExporting] = useState(false);
@@ -42,7 +44,21 @@ export default function ExportStudio() {
     };
 
     return (
-        <div className="flex h-full text-foreground">
+        <div className="flex flex-col h-full text-foreground">
+            <StepHeader
+                stepNumber={9}
+                totalSteps={6}
+                icon={<Film />}
+                englishName="Export"
+                title={tStep("exportTitle")}
+                subtitle={tStep("exportSubtitle")}
+                trailing={(
+                    <span className="font-mono text-[10px] uppercase tracking-[0.18em] px-2.5 py-1 rounded-full bg-glass border border-glass-border text-text-muted">
+                        {tStep("comingSoon")}
+                    </span>
+                )}
+            />
+            <div className="flex flex-1 overflow-hidden">
             {/* Left: Configuration */}
             <div className="w-96 border-r border-glass-border bg-surface p-8 flex flex-col">
                 <h2 className="text-2xl font-display font-bold mb-8 flex items-center gap-3">
@@ -182,6 +198,7 @@ export default function ExportStudio() {
                         </div>
                     )}
                 </div>
+            </div>
             </div>
         </div>
     );

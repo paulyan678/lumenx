@@ -7,9 +7,11 @@ import clsx from "clsx";
 import { useProjectStore } from "@/store/projectStore";
 import { api } from "@/lib/api";
 import { getAssetUrl } from "@/lib/utils";
+import StepHeader from "@/components/shared/StepHeader";
 
 export default function VoiceActingStudio() {
     const tv = useTranslations("voice");
+    const tStep = useTranslations("stepHeader");
     const currentProject = useProjectStore((state) => state.currentProject);
     const updateProject = useProjectStore((state) => state.updateProject);
 
@@ -113,7 +115,21 @@ export default function VoiceActingStudio() {
     };
 
     return (
-        <div className="flex h-full text-foreground">
+        <div className="flex flex-col h-full text-foreground">
+            <StepHeader
+                stepNumber={7}
+                totalSteps={6}
+                icon={<Mic />}
+                englishName="Voice Acting"
+                title={tStep("voiceTitle")}
+                subtitle={tStep("voiceSubtitle")}
+                trailing={(
+                    <span className="font-mono text-[10px] uppercase tracking-[0.18em] px-2.5 py-1 rounded-full bg-glass border border-glass-border text-text-muted">
+                        {tStep("comingSoon")}
+                    </span>
+                )}
+            />
+            <div className="flex flex-1 overflow-hidden">
             <audio ref={audioRef} onEnded={() => setPlayingAudio(null)} className="hidden" />
 
             {/* Left Sidebar: Casting Room */}
@@ -381,6 +397,7 @@ export default function VoiceActingStudio() {
                         </div>
                     )}
                 </div>
+            </div>
             </div>
         </div>
     );
