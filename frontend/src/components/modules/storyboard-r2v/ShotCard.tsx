@@ -651,8 +651,7 @@ export default function ShotCard({
                                     whileHover={{ scale: 1.08 }}
                                     whileTap={{ scale: 0.92 }}
                                     onClick={onDelete}
-                                    disabled={totalShots <= 1}
-                                    className="p-1.5 rounded-lg hover:bg-white/[0.06] text-text-secondary hover:text-rose-400 transition-colors disabled:opacity-20 disabled:hover:bg-transparent"
+                                    className="p-1.5 rounded-lg hover:bg-white/[0.06] text-text-secondary hover:text-rose-400 transition-colors"
                                     title={t("deleteShot")}
                                 >
                                     <Trash2 size={13} strokeWidth={1.5} />

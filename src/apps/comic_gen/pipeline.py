@@ -404,6 +404,20 @@ class ComicGenPipeline:
         new_script.style_prompt = existing_script.style_prompt
         new_script.merged_video_url = existing_script.merged_video_url
         new_script.workflow_mode = existing_script.workflow_mode
+        # Preserve series binding — the freshly parsed Script defaults
+        # series_id/episode_number to None, which would orphan an episode
+        # mid-reparse and break the Reconcile suggestions endpoint
+        # (it returns [] for any project without a series_id). Same
+        # applies to prompt_config, default_generation_mode, custom_voices,
+        # bgm_url, mix_settings — all project-level fields that have
+        # nothing to do with the entity extraction we just re-ran.
+        new_script.series_id = existing_script.series_id
+        new_script.episode_number = existing_script.episode_number
+        new_script.prompt_config = existing_script.prompt_config
+        new_script.default_generation_mode = existing_script.default_generation_mode
+        new_script.custom_voices = existing_script.custom_voices if hasattr(existing_script, 'custom_voices') else new_script.custom_voices
+        new_script.bgm_url = existing_script.bgm_url
+        new_script.mix_settings = existing_script.mix_settings
         
         # Replace the script in memory
         self.scripts[script_id] = new_script

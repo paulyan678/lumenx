@@ -3,12 +3,16 @@
 import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Palette, Wand2, Plus, Check, Loader2, ChevronRight } from "lucide-react";
+import { Sparkles, Palette, Wand2, Plus, Check, Loader2, ChevronRight, Lock, RotateCcw, ArrowUp } from "lucide-react";
 import { useProjectStore, type StyleConfig, type StylePreset } from "@/store/projectStore"; // Combined imports
 import { api } from "@/lib/api";
+import StepHeader from "@/components/shared/StepHeader";
+import WorkflowActionButton from "@/components/shared/WorkflowActionButton";
+import SidePanelHeader from "@/components/shared/SidePanelHeader";
 
 export default function ArtDirection() {
     const ta = useTranslations("artDirection");
+    const tStep = useTranslations("stepHeader");
     const {
         currentProject,
         updateProject,
@@ -27,33 +31,116 @@ export default function ArtDirection() {
     const [editingNegative, setEditingNegative] = useState("");
     const [isSaving, setIsSaving] = useState(false);
 
+    // R2V v2 Phase 2: series-level inherit/override state.
+    // Fetch series baseline on mount/whenever project changes; track local
+    // unlock for the "解锁编辑" affordance.
+    const [seriesBaseline, setSeriesBaseline] = useState<StyleConfig | null>(null);
+    const [seriesBaselineLoading, setSeriesBaselineLoading] = useState(false);
+    const [isUnlocked, setIsUnlocked] = useState(false);
+    const [bannerBusy, setBannerBusy] = useState(false);
+
+    useEffect(() => {
+        // Reset unlock state when switching projects
+        setIsUnlocked(false);
+        const seriesId = currentProject?.series_id;
+        if (!seriesId) {
+            setSeriesBaseline(null);
+            return;
+        }
+        setSeriesBaselineLoading(true);
+        api.getSeries(seriesId)
+            .then((s: any) => {
+                setSeriesBaseline(s?.art_direction?.style_config ?? null);
+            })
+            .catch(() => setSeriesBaseline(null))
+            .finally(() => setSeriesBaselineLoading(false));
+    }, [currentProject?.series_id, currentProject?.id]);
+
+    // Inherit-state derivation (project relative to series baseline)
+    const projectStyle = currentProject?.art_direction?.style_config ?? null;
+    const inSeries = !!currentProject?.series_id;
+    const isInherit = inSeries && !!seriesBaseline && !projectStyle;
+    const isOverridden = inSeries && !!seriesBaseline && !!projectStyle;
+    const canPromote = inSeries && !seriesBaseline && !!projectStyle;
+    const editorLocked = isInherit && !isUnlocked;
+
+    const handleUnlock = () => setIsUnlocked(true);
+
+    // R2V v2 Phase P0-b — clear project art_direction (return to series inherit).
+    const handleResetToSeries = async () => {
+        if (!currentProject?.id) return;
+        setBannerBusy(true);
+        try {
+            const fresh = await api.clearProjectArtDirection(currentProject.id);
+            // Refresh project in store
+            updateProject(currentProject.id, fresh);
+            setSelectedStyle(null);
+            setEditingName("");
+            setEditingPositive("");
+            setEditingNegative("");
+            setIsUnlocked(false);
+        } catch (err) {
+            console.error("Reset to series baseline failed", err);
+        } finally {
+            setBannerBusy(false);
+        }
+    };
+
+    const handlePromoteToSeries = async () => {
+        if (!currentProject?.series_id || !currentProject?.art_direction) return;
+        setBannerBusy(true);
+        try {
+            await api.updateSeries(currentProject.series_id, {
+                art_direction: currentProject.art_direction as any,
+            });
+            // Reload series baseline locally
+            const s = await api.getSeries(currentProject.series_id);
+            setSeriesBaseline(s?.art_direction?.style_config ?? null);
+        } catch (err) {
+            console.error("Promote to series baseline failed", err);
+        } finally {
+            setBannerBusy(false);
+        }
+    };
+
     // Load presets only once on mount (separate from project-dependent state)
     useEffect(() => {
         loadPresets();
     }, []);  // Empty dependency - only run on mount
 
-    // Load art direction from project when it changes
+    // Load art direction from project when it changes. If the project
+    // itself has none but the parent series does (isInherit), display the
+    // series baseline as the visible style — otherwise the banner says
+    // "继承自 Pixar 3D" while the editor below stays blank, which the user
+    // (rightly) read as "系列风格在 episode 看不到".
     useEffect(() => {
-        // Load existing art direction if available
-        if (currentProject?.art_direction) {
-            console.log("Loading Art Direction:", currentProject.art_direction);
-            if (currentProject.art_direction.style_config) {
-                setSelectedStyle(currentProject.art_direction.style_config);
-                setEditingName(currentProject.art_direction.style_config.name || "");
-                setEditingPositive(currentProject.art_direction.style_config.positive_prompt || "");
-                setEditingNegative(currentProject.art_direction.style_config.negative_prompt || "");
+        const projectAD = currentProject?.art_direction;
+        const projectStyleConfig = projectAD?.style_config ?? null;
+        if (projectStyleConfig) {
+            console.log("Loading Art Direction (project override):", projectAD);
+            setSelectedStyle(projectStyleConfig);
+            setEditingName(projectStyleConfig.name || "");
+            setEditingPositive(projectStyleConfig.positive_prompt || "");
+            setEditingNegative(projectStyleConfig.negative_prompt || "");
+            setCustomStyles(projectAD?.custom_styles || []);
+            if (projectAD?.ai_recommendations && projectAD.ai_recommendations.length > 0) {
+                setAiRecommendations(projectAD.ai_recommendations);
             }
-
-            setCustomStyles(currentProject.art_direction.custom_styles || []);
-
-            // Load recommendations from project if available
-            if (currentProject.art_direction.ai_recommendations && currentProject.art_direction.ai_recommendations.length > 0) {
-                setAiRecommendations(currentProject.art_direction.ai_recommendations);
-            }
+        } else if (seriesBaseline) {
+            // Inherit display: project has no override → mirror series baseline
+            // into editor fields so user can SEE what they're inheriting.
+            // Editor stays locked (editorLocked = isInherit && !isUnlocked)
+            // until user explicitly clicks 解锁编辑.
+            console.log("Loading Art Direction (series baseline inherit):", seriesBaseline);
+            setSelectedStyle(seriesBaseline);
+            setEditingName(seriesBaseline.name || "");
+            setEditingPositive(seriesBaseline.positive_prompt || "");
+            setEditingNegative(seriesBaseline.negative_prompt || "");
+            setCustomStyles(projectAD?.custom_styles || []);
         } else {
-            console.log("No Art Direction found in currentProject");
+            console.log("No Art Direction found in currentProject or series");
         }
-    }, [currentProject?.id, currentProject?.art_direction]);  // More specific dependencies
+    }, [currentProject?.id, currentProject?.art_direction, seriesBaseline]);
 
     // Sync local aiRecommendations with store when it updates (e.g. after analysis finishes)
     useEffect(() => {
@@ -180,41 +267,88 @@ export default function ArtDirection() {
     };
 
     return (
-        <div className="flex flex-col h-full overflow-hidden">
-            {/* Header */}
-            <div className="h-20 border-b border-glass-border bg-surface flex items-center px-8 justify-between">
-                <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center shadow-lg shadow-purple-500/20">
-                        <Palette className="text-foreground" size={20} />
-                    </div>
-                    <div>
-                        <h2 className="text-xl font-display font-bold text-foreground">Art Direction</h2>
-                        <p className="text-xs text-text-secondary">{ta("subtitle")}</p>
-                    </div>
-                </div>
+        // Layout v4: outermost horizontal split. Right Style editor is its
+        // own floor-to-ceiling column; main left column owns StepHeader + AI/
+        // presets + bottom action bar.
+        <div className="flex h-full w-full overflow-hidden">
+            {/* Left: main column */}
+            <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+                <StepHeader
+                    stepNumber={2}
+                    icon={<Palette />}
+                    englishName="Style"
+                    title={tStep("styleTitle")}
+                    subtitle={tStep("styleSubtitle")}
+                    /* trailing intentionally empty — 应用并继续 moved to
+                       bottom sticky bar (semantically a "末步 footer"). */
+                />
 
-                <button
-                    onClick={handleApply}
-                    disabled={!selectedStyle || isSaving}
-                    className="px-6 py-2 bg-primary hover:bg-primary/90 text-foreground rounded-lg font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                    {isSaving ? (
+                {/* Scrollable AI + Presets */}
+                <div className="flex-1 min-h-0 flex flex-col p-8 overflow-y-auto gap-8 bg-surface">
+                    {/* R2V v2 Phase 2: inherit / override / promote banner */}
+                    {inSeries && !seriesBaselineLoading && (
                         <>
-                            <Loader2 size={16} className="animate-spin" />
-                            {ta("saving")}
-                        </>
-                    ) : (
-                        <>
-                            {ta("applyAndContinue")}
-                            <ChevronRight size={16} />
+                            {isInherit && (
+                                <div className="flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/10 px-4 py-3">
+                                    <Lock size={16} className="text-primary shrink-0" />
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm text-foreground">
+                                            <span className="text-text-secondary">{ta("inheritsBaseline")}</span>{" "}
+                                            <span className="font-medium">{seriesBaseline?.name}</span>
+                                        </p>
+                                        <p className="text-[11px] text-text-muted mt-0.5">{ta("inheritHint")}</p>
+                                    </div>
+                                    {editorLocked && (
+                                        <WorkflowActionButton variant="secondary" size="sm" onClick={handleUnlock}>
+                                            {ta("unlockEdit")}
+                                        </WorkflowActionButton>
+                                    )}
+                                </div>
+                            )}
+                            {isOverridden && (
+                                <div className="flex items-center gap-3 rounded-lg border border-amber-400/30 bg-amber-400/10 px-4 py-3">
+                                    <RotateCcw size={16} className="text-amber-300 shrink-0" />
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm text-foreground">
+                                            <span className="text-amber-200">{ta("overridingBaseline")}</span>{" "}
+                                            <span className="text-text-secondary text-[12px]">
+                                                ({ta("baselineLabel")}: {seriesBaseline?.name})
+                                            </span>
+                                        </p>
+                                        <p className="text-[11px] text-text-muted mt-0.5">{ta("overrideHint")}</p>
+                                    </div>
+                                    <WorkflowActionButton
+                                        variant="secondary"
+                                        size="sm"
+                                        loading={bannerBusy}
+                                        leftIcon={<RotateCcw />}
+                                        onClick={handleResetToSeries}
+                                    >
+                                        {ta("resetToSeries")}
+                                    </WorkflowActionButton>
+                                </div>
+                            )}
+                            {canPromote && (
+                                <div className="flex items-center gap-3 rounded-lg border border-purple-400/30 bg-purple-400/10 px-4 py-3">
+                                    <ArrowUp size={16} className="text-purple-300 shrink-0" />
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm text-foreground">{ta("promotePromptTitle")}</p>
+                                        <p className="text-[11px] text-text-muted mt-0.5">{ta("promotePromptHint")}</p>
+                                    </div>
+                                    <WorkflowActionButton
+                                        variant="secondary"
+                                        size="sm"
+                                        loading={bannerBusy}
+                                        leftIcon={<ArrowUp />}
+                                        onClick={handlePromoteToSeries}
+                                    >
+                                        {ta("promoteBtn")}
+                                    </WorkflowActionButton>
+                                </div>
+                            )}
                         </>
                     )}
-                </button>
-            </div>
 
-            <div className="flex-1 flex overflow-hidden">
-                {/* Left Panel: AI + Presets */}
-                <div className="w-2/3 flex flex-col p-8 overflow-y-auto gap-8 border-r border-glass-border bg-surface">
                     {/* AI Recommendations */}
                     <div>
                         <div className="flex items-center justify-between mb-4">
@@ -222,23 +356,15 @@ export default function ArtDirection() {
                                 <Sparkles size={20} className="text-yellow-400" />
                                 {ta("aiRecommendations")}
                             </h3>
-                            <button
+                            <WorkflowActionButton
+                                variant="secondary"
+                                loading={isAnalyzingArtStyle}
+                                leftIcon={<Wand2 />}
                                 onClick={handleAnalyze}
                                 disabled={isAnalyzingArtStyle}
-                                className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-foreground text-sm rounded-lg font-medium transition-all disabled:opacity-50 flex items-center gap-2"
                             >
-                                {isAnalyzingArtStyle ? (
-                                    <>
-                                        <Loader2 size={14} className="animate-spin" />
-                                        {ta("analyzing")}
-                                    </>
-                                ) : (
-                                    <>
-                                        <Wand2 size={14} />
-                                        {ta("analyzeScript")}
-                                    </>
-                                )}
-                            </button>
+                                {isAnalyzingArtStyle ? ta("analyzing") : ta("analyzeScript")}
+                            </WorkflowActionButton>
                         </div>
 
                         <div className="grid grid-cols-1 gap-4">
@@ -294,8 +420,41 @@ export default function ArtDirection() {
                     )}
                 </div>
 
-                {/* Right Panel: Editor */}
-                <div className="w-1/3 flex flex-col p-8 overflow-y-auto bg-surface">
+                {/* Bottom sticky bar — "末步 footer" 语义：在 main 完成所有
+                    style 选择后，主行动按钮 sticky 在底部承接"进入下一步"意图。
+                    比挂在 page header 右侧更符合用户的操作流。 */}
+                <div className="shrink-0 border-t border-glass-border bg-surface/95 backdrop-blur-md px-8 py-3 flex items-center justify-end gap-3">
+                    {selectedStyle ? (
+                        <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">
+                            <span className="text-foreground">{selectedStyle.name}</span>
+                            <span className="mx-1.5">·</span>
+                            <span>selected</span>
+                        </span>
+                    ) : (
+                        <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">
+                            select a style →
+                        </span>
+                    )}
+                    <WorkflowActionButton
+                        variant="primary"
+                        loading={isSaving}
+                        rightIcon={<ChevronRight />}
+                        onClick={handleApply}
+                        disabled={!selectedStyle}
+                    >
+                        {isSaving ? ta("saving") : ta("applyAndContinue")}
+                    </WorkflowActionButton>
+                </div>
+            </div>
+
+            {/* Right: independent Style Editor panel — floor-to-ceiling */}
+            <div className="w-[360px] shrink-0 flex flex-col bg-surface border-l border-glass-border overflow-hidden">
+                <SidePanelHeader
+                    icon={<Palette />}
+                    title={ta("styleEditor")}
+                    subtitle={selectedStyle?.name ?? ta("selectStyleHint")}
+                />
+                <div className="flex-1 overflow-y-auto p-6">
                     <StyleEditor
                         name={editingName}
                         positivePrompt={editingPositive}
@@ -352,7 +511,7 @@ function StyleRecommendationCard({ style, isSelected, onSelect }: any) {
     );
 }
 
-function StylePresetCard({ style, isSelected, onSelect }: any) {
+export function StylePresetCard({ style, isSelected, onSelect }: any) {
     return (
         <motion.div
             layout
@@ -382,14 +541,13 @@ function StyleEditor({ name, positivePrompt, negativePrompt, onNameChange, onPos
     const ta = useTranslations("artDirection");
     return (
         <div className="space-y-6">
-            <div>
-                <h3 className="text-lg font-bold text-foreground mb-4">{ta("styleEditor")}</h3>
-                {!selectedStyle && (
-                    <div className="text-sm text-text-muted italic mb-4">
-                        {ta("selectStyleHint")}
-                    </div>
-                )}
-            </div>
+            {/* 标题已经在外层 SidePanelHeader 渲染，此处不再重复。
+                empty-state 提示移到表单上方，省去一层 div 包装。 */}
+            {!selectedStyle && (
+                <div className="text-sm text-text-muted italic">
+                    {ta("selectStyleHint")}
+                </div>
+            )}
 
             <div>
                 <label className="block text-sm font-medium text-text-secondary mb-2">
