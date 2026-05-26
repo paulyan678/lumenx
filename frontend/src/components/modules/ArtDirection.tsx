@@ -3,12 +3,13 @@
 import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Palette, Wand2, Plus, Check, Loader2, ChevronRight, Lock, RotateCcw, ArrowUp } from "lucide-react";
+import { Sparkles, Palette, Wand2, Plus, Check, Loader2, ChevronRight, Lock, RotateCcw, ArrowUp, AlertTriangle, X } from "lucide-react";
 import { useProjectStore, type StyleConfig, type StylePreset } from "@/store/projectStore"; // Combined imports
 import { api } from "@/lib/api";
 import StepHeader from "@/components/shared/StepHeader";
 import WorkflowActionButton from "@/components/shared/WorkflowActionButton";
 import SidePanelHeader from "@/components/shared/SidePanelHeader";
+import { toast } from "@/store/toastStore";
 
 export default function ArtDirection() {
     const ta = useTranslations("artDirection");
@@ -31,17 +32,23 @@ export default function ArtDirection() {
     const [editingNegative, setEditingNegative] = useState("");
     const [isSaving, setIsSaving] = useState(false);
 
-    // R2V v2 Phase 2: series-level inherit/override state.
-    // Fetch series baseline on mount/whenever project changes; track local
-    // unlock for the "解锁编辑" affordance.
+    // Series baseline (inherit source). Fetched on mount/project change.
     const [seriesBaseline, setSeriesBaseline] = useState<StyleConfig | null>(null);
     const [seriesBaselineLoading, setSeriesBaselineLoading] = useState(false);
-    const [isUnlocked, setIsUnlocked] = useState(false);
     const [bannerBusy, setBannerBusy] = useState(false);
+    // Confirm-override dialog (gates the first preset click while inheriting,
+    // per design grill: never silently 'unlock' — always explicit when
+    // diverging from the series baseline).
+    const [pendingOverrideStyle, setPendingOverrideStyle] = useState<StyleConfig | null>(null);
+    // True after the user explicitly accepted the override prompt for this
+    // editing session but before they hit Apply. Drives the amber 'preview'
+    // banner + editor ring so the user knows their changes aren't yet saved.
+    const [overrideAccepted, setOverrideAccepted] = useState(false);
 
     useEffect(() => {
-        // Reset unlock state when switching projects
-        setIsUnlocked(false);
+        // Reset session-only state when switching projects
+        setOverrideAccepted(false);
+        setPendingOverrideStyle(null);
         const seriesId = currentProject?.series_id;
         if (!seriesId) {
             setSeriesBaseline(null);
@@ -56,15 +63,19 @@ export default function ArtDirection() {
             .finally(() => setSeriesBaselineLoading(false));
     }, [currentProject?.series_id, currentProject?.id]);
 
-    // Inherit-state derivation (project relative to series baseline)
+    // Inherit-state derivation (project relative to series baseline).
     const projectStyle = currentProject?.art_direction?.style_config ?? null;
     const inSeries = !!currentProject?.series_id;
     const isInherit = inSeries && !!seriesBaseline && !projectStyle;
     const isOverridden = inSeries && !!seriesBaseline && !!projectStyle;
     const canPromote = inSeries && !seriesBaseline && !!projectStyle;
-    const editorLocked = isInherit && !isUnlocked;
-
-    const handleUnlock = () => setIsUnlocked(true);
+    // 'Preview' = user clicked override-confirm in inherit mode and is
+    // editing/selecting a new style that hasn't been Applied yet.
+    const isPreview = isInherit && overrideAccepted;
+    // Editor textareas: read-only ONLY when truly inheriting without an
+    // active override decision. The old isUnlocked toggle is gone —
+    // accepting the override dialog flips the editor to editable directly.
+    const editorReadOnly = isInherit && !overrideAccepted;
 
     // R2V v2 Phase P0-b — clear project art_direction (return to series inherit).
     const handleResetToSeries = async () => {
@@ -78,9 +89,17 @@ export default function ArtDirection() {
             setEditingName("");
             setEditingPositive("");
             setEditingNegative("");
-            setIsUnlocked(false);
+            setOverrideAccepted(false);
+            toast.success(ta("toastResetDone"), {
+                projectId: currentProject.id,
+                projectTitle: currentProject.title,
+            });
         } catch (err) {
             console.error("Reset to series baseline failed", err);
+            toast.error(ta("toastResetFailed"), {
+                projectId: currentProject?.id,
+                projectTitle: currentProject?.title,
+            });
         } finally {
             setBannerBusy(false);
         }
@@ -170,7 +189,10 @@ export default function ArtDirection() {
             );
         } catch (error) {
             console.error("Failed to analyze script:", error);
-            alert(ta("analysisFailed"));
+            toast.error(ta("analysisFailed"), {
+                projectId: currentProject?.id,
+                projectTitle: currentProject?.title,
+            });
         }
     };
 
@@ -188,7 +210,7 @@ export default function ArtDirection() {
         };
     };
 
-    const handleSelectStyle = (style: StyleConfig | StylePreset) => {
+    const applyStyleToEditor = (style: StyleConfig | StylePreset) => {
         const normalizedStyle = toStyleConfig(style);
         setSelectedStyle(normalizedStyle);
         setEditingName(normalizedStyle.name);
@@ -196,9 +218,40 @@ export default function ArtDirection() {
         setEditingNegative(normalizedStyle.negative_prompt);
     };
 
+    const handleSelectStyle = (style: StyleConfig | StylePreset) => {
+        const normalizedStyle = toStyleConfig(style);
+        // Picking the same style that's already the series baseline is a
+        // no-op — let it through without an override prompt.
+        const isSeriesBaseline = isInherit && seriesBaseline && normalizedStyle.id === seriesBaseline.id;
+        // Inherit mode + user picks something other than the series baseline
+        // → open the explicit override confirm dialog (per design grill).
+        if (isInherit && !overrideAccepted && !isSeriesBaseline) {
+            setPendingOverrideStyle(normalizedStyle);
+            return;
+        }
+        applyStyleToEditor(normalizedStyle);
+    };
+
+    const confirmOverridePreview = () => {
+        if (!pendingOverrideStyle) return;
+        setOverrideAccepted(true);
+        applyStyleToEditor(pendingOverrideStyle);
+        toast.info(ta("toastOverridePreviewing", { name: pendingOverrideStyle.name }), {
+            projectId: currentProject?.id,
+            projectTitle: currentProject?.title,
+            body: ta("toastOverridePreviewingBody"),
+        });
+        setPendingOverrideStyle(null);
+    };
+
+    const cancelOverrideConfirm = () => setPendingOverrideStyle(null);
+
     const handleSaveCustom = async () => {
         if (!editingName || !editingPositive) {
-            alert(ta("fillNameAndPrompt"));
+            toast.warning(ta("fillNameAndPrompt"), {
+                projectId: currentProject?.id,
+                projectTitle: currentProject?.title,
+            });
             return;
         }
 
@@ -226,17 +279,26 @@ export default function ArtDirection() {
                     aiRecommendations
                 );
                 updateProject(currentProject.id, updated);
-                alert(ta("customStyleSaved"));
+                toast.success(ta("customStyleSaved"), {
+                    projectId: currentProject.id,
+                    projectTitle: currentProject.title,
+                });
             } catch (error) {
                 console.error("Failed to save custom style:", error);
-                alert(ta("saveFailed"));
+                toast.error(ta("saveFailed"), {
+                    projectId: currentProject?.id,
+                    projectTitle: currentProject?.title,
+                });
             }
         }
     };
 
     const handleApply = async () => {
         if (!currentProject || !selectedStyle) {
-            alert(ta("selectStyleFirst"));
+            toast.warning(ta("selectStyleFirst"), {
+                projectId: currentProject?.id,
+                projectTitle: currentProject?.title,
+            });
             return;
         }
 
@@ -257,10 +319,18 @@ export default function ArtDirection() {
                 aiRecommendations
             );
             updateProject(currentProject.id, updated);
-            alert(ta("styleApplied"));
+            setOverrideAccepted(false); // override is now persisted, leave preview state
+            toast.success(ta("styleApplied"), {
+                projectId: currentProject.id,
+                projectTitle: currentProject.title,
+                body: ta("styleAppliedBody", { name: finalConfig.name }),
+            });
         } catch (error) {
             console.error("Failed to save art direction:", error);
-            alert(ta("saveFailedShort"));
+            toast.error(ta("saveFailedShort"), {
+                projectId: currentProject?.id,
+                projectTitle: currentProject?.title,
+            });
         } finally {
             setIsSaving(false);
         }
@@ -285,10 +355,14 @@ export default function ArtDirection() {
 
                 {/* Scrollable AI + Presets */}
                 <div className="flex-1 min-h-0 flex flex-col p-8 overflow-y-auto gap-8 bg-surface">
-                    {/* R2V v2 Phase 2: inherit / override / promote banner */}
+                    {/* R2V v2 Phase 2: inherit / preview / override / promote banner */}
                     {inSeries && !seriesBaselineLoading && (
                         <>
-                            {isInherit && (
+                            {/* INHERIT — pure: project tracks series baseline,
+                                no override decision pending. Action hint:
+                                'pick any preset below to override'. No
+                                unlock button (legacy concept removed). */}
+                            {isInherit && !overrideAccepted && (
                                 <div className="flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/10 px-4 py-3">
                                     <Lock size={16} className="text-primary shrink-0" />
                                     <div className="flex-1 min-w-0">
@@ -298,11 +372,36 @@ export default function ArtDirection() {
                                         </p>
                                         <p className="text-[11px] text-text-muted mt-0.5">{ta("inheritHint")}</p>
                                     </div>
-                                    {editorLocked && (
-                                        <WorkflowActionButton variant="secondary" size="sm" onClick={handleUnlock}>
-                                            {ta("unlockEdit")}
-                                        </WorkflowActionButton>
-                                    )}
+                                </div>
+                            )}
+                            {/* PREVIEW — user accepted override but hasn't
+                                Applied yet. Amber banner makes it obvious
+                                the change isn't saved + drives them toward
+                                the Apply CTA in the sticky footer. */}
+                            {isPreview && (
+                                <div className="flex items-center gap-3 rounded-lg border border-amber-400/40 bg-amber-400/10 px-4 py-3">
+                                    <AlertTriangle size={16} className="text-amber-300 shrink-0" />
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm text-foreground">
+                                            <span className="text-amber-200">{ta("previewBannerTitle")}</span>{" "}
+                                            <span className="font-medium">{selectedStyle?.name ?? "—"}</span>
+                                            <span className="text-text-secondary text-[12px]">
+                                                {" "}({ta("baselineLabel")}: {seriesBaseline?.name})
+                                            </span>
+                                        </p>
+                                        <p className="text-[11px] text-text-muted mt-0.5">{ta("previewBannerHint")}</p>
+                                    </div>
+                                    <WorkflowActionButton
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                            setOverrideAccepted(false);
+                                            // Reset editor back to series baseline display
+                                            if (seriesBaseline) applyStyleToEditor(seriesBaseline);
+                                        }}
+                                    >
+                                        {ta("cancelOverride")}
+                                    </WorkflowActionButton>
                                 </div>
                             )}
                             {isOverridden && (
@@ -447,13 +546,37 @@ export default function ArtDirection() {
                 </div>
             </div>
 
-            {/* Right: independent Style Editor panel — floor-to-ceiling */}
-            <div className="w-[360px] shrink-0 flex flex-col bg-surface border-l border-glass-border overflow-hidden">
+            {/* Right: independent Style Editor panel — floor-to-ceiling.
+                Border + status pill switch color to reflect override state
+                so the user can SEE that the panel is editable / will save. */}
+            <div
+                className={`w-[360px] shrink-0 flex flex-col bg-surface border-l overflow-hidden transition-colors ${
+                    isPreview
+                        ? "border-amber-400/60"
+                        : isOverridden
+                            ? "border-amber-400/40"
+                            : "border-glass-border"
+                }`}
+            >
                 <SidePanelHeader
                     icon={<Palette />}
                     title={ta("styleEditor")}
                     subtitle={selectedStyle?.name ?? ta("selectStyleHint")}
                 />
+                {(isPreview || isOverridden) && (
+                    <div className={`px-4 py-2 border-b ${isPreview ? "border-amber-400/40 bg-amber-400/10" : "border-amber-400/30 bg-amber-400/5"}`}>
+                        <p className="font-mono text-[9.5px] uppercase tracking-[0.18em] text-amber-200">
+                            {isPreview ? ta("editorStatePreview") : ta("editorStateOverride")}
+                        </p>
+                    </div>
+                )}
+                {editorReadOnly && (
+                    <div className="px-4 py-2 border-b border-primary/30 bg-primary/5">
+                        <p className="font-mono text-[9.5px] uppercase tracking-[0.18em] text-primary">
+                            {ta("editorStateInherit")}
+                        </p>
+                    </div>
+                )}
                 <div className="flex-1 overflow-y-auto p-6">
                     <StyleEditor
                         name={editingName}
@@ -464,9 +587,60 @@ export default function ArtDirection() {
                         onNegativeChange={setEditingNegative}
                         onSaveCustom={handleSaveCustom}
                         selectedStyle={selectedStyle}
+                        readOnly={editorReadOnly}
                     />
                 </div>
             </div>
+
+            {/* Override confirmation dialog (per design grill: explicit
+                step before forking from the series baseline). */}
+            {pendingOverrideStyle && (
+                <div
+                    className="fixed inset-0 z-[110] bg-overlay backdrop-blur-sm grid place-items-center p-4"
+                    onClick={cancelOverrideConfirm}
+                >
+                    <div
+                        className="w-full max-w-md rounded-2xl border border-glass-border bg-elevated shadow-[0_24px_64px_-12px_rgba(0,0,0,0.7)]"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <header className="flex items-center justify-between gap-3 px-5 py-3 border-b border-glass-border">
+                            <div className="flex items-center gap-2">
+                                <AlertTriangle size={15} className="text-amber-300" />
+                                <h2 className="text-display font-medium text-foreground">{ta("overrideConfirmTitle")}</h2>
+                            </div>
+                            <button
+                                onClick={cancelOverrideConfirm}
+                                aria-label={ta("close") || "Close"}
+                                className="p-1.5 rounded-lg hover:bg-hover-bg text-text-muted hover:text-foreground transition-colors"
+                            >
+                                <X size={15} />
+                            </button>
+                        </header>
+                        <div className="px-5 py-4 space-y-3">
+                            <p className="text-body-sm text-text-secondary leading-relaxed">
+                                {ta("overrideConfirmIntro")}
+                            </p>
+                            <div className="rounded-lg border border-glass-border bg-glass px-3 py-2 space-y-1">
+                                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">{ta("overrideFromTo")}</p>
+                                <p className="text-[13px] text-foreground">
+                                    <span className="text-text-secondary">{seriesBaseline?.name ?? "—"}</span>
+                                    <span className="mx-2 text-text-muted">→</span>
+                                    <span className="font-medium text-amber-200">{pendingOverrideStyle.name}</span>
+                                </p>
+                            </div>
+                            <p className="text-[11.5px] text-text-muted">{ta("overrideConfirmFooter")}</p>
+                        </div>
+                        <footer className="flex items-center justify-end gap-2 px-5 py-3 border-t border-glass-border">
+                            <WorkflowActionButton variant="ghost" size="sm" onClick={cancelOverrideConfirm}>
+                                {ta("overrideCancelBtn")}
+                            </WorkflowActionButton>
+                            <WorkflowActionButton variant="primary" size="sm" onClick={confirmOverridePreview} leftIcon={<Check />}>
+                                {ta("overrideConfirmBtn")}
+                            </WorkflowActionButton>
+                        </footer>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -537,12 +711,16 @@ export function StylePresetCard({ style, isSelected, onSelect }: any) {
     );
 }
 
-function StyleEditor({ name, positivePrompt, negativePrompt, onNameChange, onPositiveChange, onNegativeChange, onSaveCustom, selectedStyle }: any) {
+function StyleEditor({ name, positivePrompt, negativePrompt, onNameChange, onPositiveChange, onNegativeChange, onSaveCustom, selectedStyle, readOnly = false }: any) {
     const ta = useTranslations("artDirection");
+    const inputClass = readOnly
+        ? "w-full bg-glass border border-glass-border rounded-lg p-3 text-sm text-text-secondary placeholder-text-muted cursor-default opacity-80"
+        : "w-full bg-glass border border-glass-border rounded-lg p-3 text-sm text-foreground placeholder-text-muted focus:border-primary focus:outline-none";
+    const textareaClass = readOnly
+        ? "w-full bg-input-bg border border-glass-border rounded-lg p-3 text-sm text-text-secondary placeholder-text-muted resize-none cursor-default opacity-80"
+        : "w-full bg-input-bg border border-glass-border rounded-lg p-3 text-sm text-foreground placeholder-text-muted focus:border-primary focus:outline-none resize-none";
     return (
         <div className="space-y-6">
-            {/* 标题已经在外层 SidePanelHeader 渲染，此处不再重复。
-                empty-state 提示移到表单上方，省去一层 div 包装。 */}
             {!selectedStyle && (
                 <div className="text-sm text-text-muted italic">
                     {ta("selectStyleHint")}
@@ -556,9 +734,10 @@ function StyleEditor({ name, positivePrompt, negativePrompt, onNameChange, onPos
                 <input
                     type="text"
                     value={name}
+                    readOnly={readOnly}
                     onChange={(e) => onNameChange(e.target.value)}
                     placeholder={ta("styleNamePlaceholder")}
-                    className="w-full bg-glass border border-glass-border rounded-lg p-3 text-sm text-foreground placeholder-text-muted focus:border-primary focus:outline-none"
+                    className={inputClass}
                 />
             </div>
 
@@ -568,10 +747,11 @@ function StyleEditor({ name, positivePrompt, negativePrompt, onNameChange, onPos
                 </label>
                 <textarea
                     value={positivePrompt}
+                    readOnly={readOnly}
                     onChange={(e) => onPositiveChange(e.target.value)}
                     placeholder={ta("positivePromptPlaceholder")}
                     rows={6}
-                    className="w-full bg-input-bg border border-glass-border rounded-lg p-3 text-sm text-foreground placeholder-text-muted focus:border-primary focus:outline-none resize-none"
+                    className={textareaClass}
                 />
                 <p className="text-xs text-text-muted mt-1">
                     {ta("positivePromptHint")}
@@ -584,10 +764,11 @@ function StyleEditor({ name, positivePrompt, negativePrompt, onNameChange, onPos
                 </label>
                 <textarea
                     value={negativePrompt}
+                    readOnly={readOnly}
                     onChange={(e) => onNegativeChange(e.target.value)}
                     placeholder={ta("negativePromptPlaceholder")}
                     rows={4}
-                    className="w-full bg-input-bg border border-glass-border rounded-lg p-3 text-sm text-foreground placeholder-text-muted focus:border-primary focus:outline-none resize-none"
+                    className={textareaClass}
                 />
                 <p className="text-xs text-text-muted mt-1">
                     {ta("negativePromptHint")}
@@ -597,7 +778,7 @@ function StyleEditor({ name, positivePrompt, negativePrompt, onNameChange, onPos
             <div className="pt-4 border-t border-glass-border">
                 <button
                     onClick={onSaveCustom}
-                    disabled={!name || !positivePrompt}
+                    disabled={readOnly || !name || !positivePrompt}
                     className="w-full px-4 py-2 bg-hover-bg hover:bg-hover-bg text-foreground text-sm rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                     <Plus size={14} />
