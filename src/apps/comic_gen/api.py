@@ -348,6 +348,27 @@ class ReparseProjectRequest(BaseModel):
     text: str
 
 
+class UpdateScriptTextRequest(BaseModel):
+    text: str
+
+
+@app.put("/projects/{script_id}/text", response_model=Script)
+def update_script_text(script_id: str, request: UpdateScriptTextRequest):
+    """Persist `original_text` without re-parsing entities.
+
+    Used by ScriptProcessor's onBlur so typing survives reload/navigation
+    without triggering an LLM round-trip. Heavy reparse stays bound to the
+    explicit "提取实体" CTA.
+    """
+    script = pipeline.get_script(script_id)
+    if not script:
+        raise HTTPException(status_code=404, detail="Script not found")
+    script.original_text = request.text or ""
+    script.updated_at = time.time()
+    pipeline._save_data()
+    return signed_response(script)
+
+
 @app.put("/projects/{script_id}/reparse", response_model=Script)
 async def reparse_project(script_id: str, request: ReparseProjectRequest):
     """Re-parses the text for an existing project, replacing all entities."""

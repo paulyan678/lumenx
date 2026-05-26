@@ -634,6 +634,7 @@
     "scriptEditor": "剧本编辑器",
     "analyzingScript": "智能分析中...",
     "extractEntities": "提取实体",
+    "scriptEmpty": "剧本为空，请先在左侧文本区粘贴或输入剧本内容，再点击「提取实体」。",
     "scriptPlaceholder": "在此粘贴小说或剧本内容...",
     "entityPanel": "实体识别面板",
     "entitiesCount": "已识别 {count} 个关键要素",

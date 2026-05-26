@@ -634,6 +634,7 @@
     "scriptEditor": "Script Editor",
     "analyzingScript": "Analyzing...",
     "extractEntities": "Extract Entities",
+    "scriptEmpty": "Script is empty — paste or type your script on the left, then click Extract Entities.",
     "scriptPlaceholder": "Paste novel or script content here...",
     "entityPanel": "Entity Recognition Panel",
     "entitiesCount": "{count} key elements identified",

@@ -175,6 +175,13 @@ export const api = {
         return { ...res.data, originalText: res.data.original_text };
     },
 
+    /** Persist `original_text` without LLM reparse. Used for textarea
+     *  blur-saves so navigation/reload doesn't drop in-progress drafts. */
+    updateScriptText: async (scriptId: string, text: string) => {
+        const res = await axios.put(`${API_URL}/projects/${scriptId}/text`, { text });
+        return { ...res.data, originalText: res.data.original_text };
+    },
+
     syncDescriptions: async (scriptId: string) => {
         const res = await axios.post(`${API_URL}/projects/${scriptId}/sync_descriptions`);
         return res.data;
