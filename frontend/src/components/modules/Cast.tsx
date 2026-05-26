@@ -81,9 +81,15 @@ export default function Cast() {
     const [addModalOpen, setAddModalOpen] = useState<null | "character" | "scene" | "prop">(null);
 
     /**
-     * Aggregate frame references into per-asset appearance counts.
-     * Single pass over frames so the cost is O(frames × refs) per render —
-     * for the 5-100 frame range typical of an episode that's a no-op.
+     * Aggregate per-asset appearance counts from frame references, then
+     * union with the project's entity pool so freshly-extracted assets
+     * (which have NO frame references yet — frames are created in a
+     * separate '生成分镜' step) still show up in Cast.
+     *
+     * Earlier this only listed entities discovered through frame iteration,
+     * which silently dropped every extracted character/scene/prop until
+     * the user generated frames. The toast said 'extraction done' but
+     * Cast looked empty.
      */
     const { characters, scenes, props } = useMemo(() => {
         const characterCounts = new Map<string, number>();
@@ -103,45 +109,42 @@ export default function Cast() {
         const scenePool: any[] = currentProject?.scenes ?? [];
         const propPool: any[] = currentProject?.props ?? [];
 
-        const characters: CastItem[] = Array.from(characterCounts.entries()).map(([id, n]) => {
-            const c = characterPool.find(x => x.id === id);
-            const imageUrl = c ? resolveCharacterImage(c) : undefined;
+        const characters: CastItem[] = characterPool.map((c: any) => {
+            const imageUrl = resolveCharacterImage(c);
             return {
-                id,
-                name: c?.name ?? id,
+                id: c.id,
+                name: c.name ?? c.id,
                 kind: "character" as const,
-                appearances: n,
+                appearances: characterCounts.get(c.id) ?? 0,
                 referenceImageUrl: imageUrl,
                 status: (imageUrl ? "ready" : "pending") as "ready" | "pending",
-                persona: c?.persona ?? "",
+                persona: c.persona ?? "",
             };
-        }).sort((a, b) => b.appearances - a.appearances);
+        }).sort((a, b) => b.appearances - a.appearances || a.name.localeCompare(b.name));
 
-        const scenes: CastItem[] = Array.from(sceneCounts.entries()).map(([id, n]) => {
-            const s = scenePool.find(x => x.id === id);
-            const imageUrl = s ? resolveSceneImage(s) : undefined;
+        const scenes: CastItem[] = scenePool.map((s: any) => {
+            const imageUrl = resolveSceneImage(s);
             return {
-                id,
-                name: s?.name ?? id,
+                id: s.id,
+                name: s.name ?? s.id,
                 kind: "scene" as const,
-                appearances: n,
+                appearances: sceneCounts.get(s.id) ?? 0,
                 referenceImageUrl: imageUrl,
                 status: (imageUrl ? "ready" : "pending") as "ready" | "pending",
             };
-        }).sort((a, b) => b.appearances - a.appearances);
+        }).sort((a, b) => b.appearances - a.appearances || a.name.localeCompare(b.name));
 
-        const props: CastItem[] = Array.from(propCounts.entries()).map(([id, n]) => {
-            const p = propPool.find(x => x.id === id);
-            const imageUrl = p ? resolvePropImage(p) : undefined;
+        const props: CastItem[] = propPool.map((p: any) => {
+            const imageUrl = resolvePropImage(p);
             return {
-                id,
-                name: p?.name ?? id,
+                id: p.id,
+                name: p.name ?? p.id,
                 kind: "prop" as const,
-                appearances: n,
+                appearances: propCounts.get(p.id) ?? 0,
                 referenceImageUrl: imageUrl,
                 status: (imageUrl ? "ready" : "pending") as "ready" | "pending",
             };
-        }).sort((a, b) => b.appearances - a.appearances);
+        }).sort((a, b) => b.appearances - a.appearances || a.name.localeCompare(b.name));
 
         return { characters, scenes, props };
     }, [currentProject?.frames, currentProject?.characters, currentProject?.scenes, currentProject?.props]);
