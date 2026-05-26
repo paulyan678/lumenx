@@ -3207,11 +3207,15 @@ class ComicGenPipeline:
         preview_text: str,
         target_model: str = "cosyvoice-v3.5-plus",
     ) -> Dict[str, Any]:
-        """Mint a new design voice via dashscope, synth a preview, return both.
+        """Mint a new design voice via dashscope (preview returned inline).
 
-        Does NOT persist. User iterates by re-calling with a tweaked
-        voice_prompt. When they're happy, frontend calls voice_design_save
-        with the returned voice_id to commit to series.custom_voices[].
+        Per dashscope contract: create_voice with voice_prompt MUST be paired
+        with preview_text in the same call; the API returns both the voice_id
+        and a preview audio URL. We download the URL into our cache dir so
+        the frontend can play it through the same /files static mount used
+        by /voice/preview.
+
+        Does NOT persist; user iterates by re-calling with tweaked params.
         """
         import requests
         import hashlib
@@ -3228,43 +3232,68 @@ class ComicGenPipeline:
                 "target_model": target_model,
                 "prefix": "design",
                 "voice_prompt": voice_prompt[:500],
+                "preview_text": (preview_text or "你好，这是一段音色测试。")[:200],
             },
         }
         headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
 
         logger.info(f"[voice/design] preview voice_prompt='{voice_prompt[:60]}…' target={target_model}")
-        resp = requests.post(url, json=payload, headers=headers, timeout=60)
-        if resp.status_code != 200:
-            logger.error(f"[voice/design] dashscope error {resp.status_code}: {resp.text[:500]}")
-            raise RuntimeError(f"Voice design failed: HTTP {resp.status_code} — {resp.text[:200]}")
+        # dashscope voice design has variable latency (10-60s); the customization
+        # service occasionally returns its own timeout. Retry once on 5xx/timeout.
+        resp = None
+        last_err = None
+        for attempt in range(2):
+            try:
+                resp = requests.post(url, json=payload, headers=headers, timeout=120)
+                if resp.status_code == 200:
+                    break
+                last_err = f"HTTP {resp.status_code} — {resp.text[:200]}"
+                if resp.status_code < 500 and "Timeout" not in (resp.text or ""):
+                    break  # client error, don't retry
+                logger.warning(f"[voice/design] attempt {attempt+1} failed: {last_err}; retrying")
+            except requests.RequestException as e:
+                last_err = str(e)
+                logger.warning(f"[voice/design] attempt {attempt+1} network error: {e}; retrying")
+        if resp is None or resp.status_code != 200:
+            logger.error(f"[voice/design] all attempts failed: {last_err}")
+            raise RuntimeError(f"Voice design failed: {last_err}")
 
         data = resp.json()
-        voice_id = (
-            data.get("output", {}).get("voice")
-            or data.get("output", {}).get("voice_id")
-            or data.get("voice")
-        )
+        output = data.get("output", {}) or {}
+        voice_id = output.get("voice") or output.get("voice_id") or data.get("voice")
+        remote_preview = output.get("preview_audio") or output.get("preview_audio_url") or output.get("audio_url")
         if not voice_id:
             logger.error(f"[voice/design] no voice_id in response: {data}")
             raise RuntimeError(f"Voice design API returned no voice_id: {data}")
 
         voice_id_str = str(voice_id)
 
-        if not self.audio_generator.tts:
-            raise RuntimeError("TTS unavailable; cannot synthesize preview")
-
         cache_dir = "output/cache/voice_design_preview"
         os.makedirs(cache_dir, exist_ok=True)
         cache_key = hashlib.md5(f"{voice_id_str}|{preview_text}".encode("utf-8")).hexdigest()
         cache_path = os.path.join(cache_dir, f"{cache_key}.mp3")
 
-        self.audio_generator.tts.synthesize(
-            text=preview_text,
-            output_path=cache_path,
-            voice=voice_id_str,
-            model_override=target_model,
-            family_override="cosyvoice",
-        )
+        if remote_preview:
+            # Download the dashscope-served preview into our cache.
+            try:
+                audio_resp = requests.get(remote_preview, timeout=60)
+                audio_resp.raise_for_status()
+                with open(cache_path, "wb") as f:
+                    f.write(audio_resp.content)
+            except Exception as e:
+                logger.warning(f"[voice/design] preview download failed, falling back to local TTS: {e}")
+                remote_preview = None
+
+        if not remote_preview:
+            if not self.audio_generator.tts:
+                raise RuntimeError("TTS unavailable; cannot synthesize preview")
+            self.audio_generator.tts.synthesize(
+                text=preview_text,
+                output_path=cache_path,
+                voice=voice_id_str,
+                model_override=target_model,
+                family_override="cosyvoice",
+            )
 
         preview_url = f"cache/voice_design_preview/{cache_key}.mp3"
         return {"voice_id": voice_id_str, "preview_url": preview_url, "target_model": target_model}
@@ -3320,7 +3349,7 @@ class ComicGenPipeline:
         from .llm_adapter import LLMAdapter
 
         adapter = LLMAdapter()
-        if not adapter.is_configured():
+        if not adapter.is_configured:
             raise RuntimeError("LLM adapter not configured (missing DASHSCOPE_API_KEY)")
 
         system_prompt = (
