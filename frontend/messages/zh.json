@@ -726,7 +726,21 @@
     "downloadMP4": "下载 MP4",
     "downloading": "下载中...",
     "downloadFailed": "下载失败，请重试。",
-    "mergeFailedAlert": "视频合并失败"
+    "mergeFailedAlert": "视频合并失败",
+    "phaseTakes": "镜头精选",
+    "phaseMix": "音频混音",
+    "phaseExport": "导出",
+    "mixBgmTitle": "背景音乐",
+    "mixBgmNone": "不使用 BGM",
+    "mixLevelsTitle": "音轨电平",
+    "mixHint": "电平在最终合成时按比例混合到各声道。对白默认 100，BGM 35，避免压住人声。",
+    "mixTrack": {
+      "dialogue": "对白",
+      "bgm": "BGM",
+      "sfx": "音效"
+    },
+    "exportTitle": "导出最终视频",
+    "exportSubtitle": "已选定 {ready} / {total} 帧，准备合并为最终 MP4。"
   },
   "motion": {
     "motionParams": "动态参数",

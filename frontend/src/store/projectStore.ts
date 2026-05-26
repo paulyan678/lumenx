@@ -240,6 +240,9 @@ export interface Project {
      *  pick default tabMode for new shots. */
     default_generation_mode?: "r2v" | "i2v";
     merged_video_url?: string;
+    /** PR-3k · Assembly Mix phase fields */
+    bgm_url?: string | null;
+    mix_settings?: Record<string, number>;
     series_id?: string;
     episode_number?: number;
 }

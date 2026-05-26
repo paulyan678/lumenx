@@ -91,6 +91,13 @@ export interface ReconcileSuggestion {
     confidence: number;
 }
 
+export interface BgmPreset {
+    id: string;
+    label: string;
+    mood: string;
+    url: string;
+}
+
 export interface ReconcileAction {
     local_id: string;
     action: "merge_into_series" | "create_new_in_series" | "skip";
@@ -910,6 +917,29 @@ export const api = {
             method: "POST",
         });
         if (!response.ok) throw new Error("Failed to generate dialogue audio batch");
+        return response.json();
+    },
+
+    /** PR-3k · BGM preset catalog for Assembly Mix phase. */
+    listBgmPresets: async (): Promise<BgmPreset[]> => {
+        const response = await fetch(`${API_URL}/bgm/presets`);
+        if (!response.ok) throw new Error("Failed to list bgm presets");
+        return response.json();
+    },
+
+    /** PR-3k · Update audio mix (BGM url + per-track volumes). */
+    updateAudioMix: async (scriptId: string, payload: {
+        bgm_url?: string | null;
+        dialogue_volume?: number;
+        bgm_volume?: number;
+        sfx_volume?: number;
+    }) => {
+        const response = await fetch(`${API_URL}/projects/${scriptId}/audio_mix`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+        if (!response.ok) throw new Error("Failed to update audio mix");
         return response.json();
     },
 

@@ -726,7 +726,21 @@
     "downloadMP4": "Download MP4",
     "downloading": "Downloading...",
     "downloadFailed": "Failed to download video. Please try again.",
-    "mergeFailedAlert": "Failed to merge videos"
+    "mergeFailedAlert": "Failed to merge videos",
+    "phaseTakes": "Takes",
+    "phaseMix": "Mix",
+    "phaseExport": "Export",
+    "mixBgmTitle": "Background Music",
+    "mixBgmNone": "No BGM",
+    "mixLevelsTitle": "Track Levels",
+    "mixHint": "Levels are mixed proportionally during the final merge. Dialogue defaults to 100 and BGM to 35 to avoid masking the voice.",
+    "mixTrack": {
+      "dialogue": "Dialogue",
+      "bgm": "BGM",
+      "sfx": "SFX"
+    },
+    "exportTitle": "Export Final Video",
+    "exportSubtitle": "{ready} / {total} frames selected — ready to merge into the final MP4."
   },
   "motion": {
     "motionParams": "Motion Params",
