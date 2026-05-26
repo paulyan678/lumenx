@@ -447,6 +447,15 @@ class Script(BaseModel):
     # Merged video URL
     merged_video_url: Optional[str] = Field(None, description="URL of the merged final video")
 
+    # PR-3k · Assembly audio mix. bgm_url points at a preset library entry
+    # (e.g. "presets/bgm/calm_warm.mp3") or a user-uploaded URL. mix_settings
+    # holds per-track gain (0-100) used during ffmpeg mux in merge_videos.
+    bgm_url: Optional[str] = Field(None, description="Background music URL for the merged video")
+    mix_settings: Dict[str, int] = Field(
+        default_factory=lambda: {"dialogue": 100, "bgm": 35, "sfx": 60},
+        description="Per-track gain 0-100: dialogue / bgm / sfx",
+    )
+
     # Series association
     series_id: Optional[str] = Field(None, description="ID of the parent Series, None for standalone projects")
     episode_number: Optional[int] = Field(None, description="Episode number within the Series")

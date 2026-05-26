@@ -2580,6 +2580,45 @@ def generate_line_audio(script_id: str, frame_id: str, request: GenerateLineAudi
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ─────────────────────────────────────────────────────────────
+# PR-3k · Audio mix endpoints (BGM presets + per-script mix settings)
+# Backs the Assembly Mix phase.
+# ─────────────────────────────────────────────────────────────
+
+@app.get("/bgm/presets")
+def list_bgm_presets():
+    """Return the BGM preset catalog. UI populates the Mix phase picker."""
+    from .audio import get_bgm_presets
+    return get_bgm_presets()
+
+
+class AudioMixRequest(BaseModel):
+    bgm_url: Optional[str] = None  # null clears bgm
+    dialogue_volume: Optional[int] = None  # 0-100
+    bgm_volume: Optional[int] = None
+    sfx_volume: Optional[int] = None
+
+
+@app.put("/projects/{script_id}/audio_mix", response_model=Script)
+def update_audio_mix(script_id: str, request: AudioMixRequest):
+    """Set BGM + per-track mix levels for the final merge."""
+    script = pipeline.get_script(script_id)
+    if not script:
+        raise HTTPException(status_code=404, detail="Script not found")
+    if request.bgm_url is not None:
+        script.bgm_url = request.bgm_url or None  # empty string → clear
+    mix = dict(script.mix_settings or {"dialogue": 100, "bgm": 35, "sfx": 60})
+    if request.dialogue_volume is not None:
+        mix["dialogue"] = max(0, min(100, request.dialogue_volume))
+    if request.bgm_volume is not None:
+        mix["bgm"] = max(0, min(100, request.bgm_volume))
+    if request.sfx_volume is not None:
+        mix["sfx"] = max(0, min(100, request.sfx_volume))
+    script.mix_settings = mix
+    pipeline._save_data()
+    return signed_response(script)
+
+
 @app.post("/projects/{script_id}/dialogue_audio/batch", response_model=Script)
 def generate_dialogue_audio_batch(script_id: str):
     """PR-3j · Generate audio for every frame that has dialogue.
