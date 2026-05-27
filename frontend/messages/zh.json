@@ -51,7 +51,12 @@
     "cloning": "AI 正在复刻音色，可能需要 10-30 秒...",
     "doneCloned": "复刻成功！正在加入音色库...",
     "errorBadType": "不支持的格式（仅 MP3 / WAV / M4A）",
-    "errorTooLarge": "文件超过 10MB"
+    "errorTooLarge": "文件超过 10MB",
+    "characterContext": "角色参考",
+    "confirmCloseTitle": "确定要离开吗？",
+    "confirmCloseBody": "当前正在复刻音色，离开将取消本次操作。",
+    "confirmCloseStay": "继续等待",
+    "confirmCloseLeave": "离开"
   },
   "voicePicker": {
     "title": "选择音色",
@@ -147,6 +152,24 @@
     "promptHintScene": "目标：环境定调镜头，无人物前景。",
     "promptHintProp": "目标：道具产品图，干净背景，多角度展示。",
     "batchLabel": "本次生成数量",
+    "aspectRatioLabel": "画面比例",
+    "advancedModel": "模型切换",
+    "promptTags": "快捷关键词",
+    "appearsIn": "出现在集数",
+    "modelLabel": "生成模型",
+    "positiveLabel": "正向提示词",
+    "negativeLabel": "负向提示词",
+    "styleNotSet": "未设置风格定调 — 生成时不附加风格提示词",
+    "finalPromptPreview": "最终提示词预览",
+    "styleDisabledHint": "风格提示词已关闭，仅使用上方输入框内容",
+    "quickStats": "状态",
+    "totalVariants": "候选数",
+    "favorited": "已收藏",
+    "filterAll": "全部",
+    "filterFavorited": "收藏",
+    "noFavoritedYet": "还没有收藏的候选图 — 点击星标收藏",
+    "favoritedCount": "已收藏 {count} 张 · 切换到收藏视图精选",
+    "favoritedHint": "点击候选图左上角星标收藏，方便后续精选",
     "generating": "生成中...",
     "generateFirst": "✨ 生成第一组",
     "generateMore": "✨ 再生成 ×{count}",
@@ -165,7 +188,23 @@
     "toastGenErrUnknown": "未知错误",
     "toastSelected": "✓ 参考图已切换",
     "toastSelectErr": "切换失败",
-    "templateCharacterComposition": "镜头模板：单图分屏 — 上方为头部特写，下方为正面/侧面/背面三视图。统一光照、干净中性背景、清晰人物轮廓，便于作为角色参考表。",
+    "templateSelectLabel": "构图模板",
+    "tplSimpleLabel": "简洁三视图",
+    "tplSimpleDesc": "大头特写 + 全身三视图",
+    "tplDetailedLabel": "详细参考表",
+    "tplDetailedDesc": "三视图 + 多角度面部特写",
+    "tplDesignSheetLabel": "角色设定图",
+    "tplDesignSheetDesc": "完整设定（即将推出）",
+    "tplSwitchConfirm": "切换模板将覆盖当前提示词",
+    "tplSwitchYes": "确认切换",
+    "tplSwitchNo": "取消",
+    "generationConfig": "生成配置",
+    "currentReference": "当前参考图",
+    "noReferenceYet": "生成后选择一张作为参考",
+    "selected": "已选定",
+    "collapse": "收起",
+    "expand": "展开",
+    "templateCharacterComposition": "镜头模板：单图分屏 — 上方为头部特写（肩部以上），下方为全身正面/侧面/背面三视图（从头顶到脚底完整可见）。统一光照、干净中性背景、清晰人物轮廓，便于作为角色参考表。",
     "templateSceneComposition": "镜头模板：广角环境定调镜头，无前景人物，强调场景氛围与建筑/地形结构。光照与色调贴合剧情情绪。",
     "templatePropComposition": "镜头模板：产品摄影风格，干净中性背景，多角度展示，强调材质与细节。"
   },
@@ -184,7 +223,12 @@
     "cancel": "取消",
     "done": "已保存",
     "doneSaved": "音色已加入我的设计库",
-    "playFailed": "试听失败，请重试"
+    "playFailed": "试听失败，请重试",
+    "characterContext": "角色参考",
+    "confirmCloseTitle": "确定要离开吗？",
+    "confirmCloseBody": "当前正在生成音色，离开将取消本次操作。",
+    "confirmCloseStay": "继续等待",
+    "confirmCloseLeave": "离开"
   },
   "previousFramesRail": {
     "title": "上一集结尾分镜",
@@ -296,7 +340,9 @@
     "seriesRequired": "本集尚未关联到系列，无法管理共享素材",
     "voiceBindNone": "未绑定音色",
     "voiceBindAdd": "为该角色绑定音色",
-    "voiceBindChange": "更换音色"
+    "voiceBindChange": "更换音色",
+    "generateScene": "生成场景",
+    "generateProp": "生成道具"
   },
   "common": {
     "save": "保存",
@@ -1113,7 +1159,8 @@
     "t2iCompactRerollTooltip": "用当前提示词再抽一张首帧（结果加入候选）",
     "t2iCompactRerollDisabled": "请先在上方填写提示词",
     "t2iStoryboardBadge": "Storyboard",
-    "t2iStoryboardBadgeTooltip": "来自 Storyboard 阶段生成的图"
+    "t2iStoryboardBadgeTooltip": "来自 Storyboard 阶段生成的图",
+    "genToastNoScript": "请先输入剧本文本再生成分镜"
   },
   "assetCard": {
     "seriesSharedBadge": "系列",

@@ -51,7 +51,12 @@
     "cloning": "AI is cloning the voice — may take 10-30s...",
     "doneCloned": "Cloned! Adding to voice library...",
     "errorBadType": "Unsupported format (MP3 / WAV / M4A only)",
-    "errorTooLarge": "File exceeds 10MB"
+    "errorTooLarge": "File exceeds 10MB",
+    "characterContext": "Character Reference",
+    "confirmCloseTitle": "Leave this page?",
+    "confirmCloseBody": "Voice cloning is in progress. Leaving will cancel the current operation.",
+    "confirmCloseStay": "Stay",
+    "confirmCloseLeave": "Leave"
   },
   "voicePicker": {
     "title": "Pick voice",
@@ -147,6 +152,24 @@
     "promptHintScene": "Goal: wide environment establishing shot with no foreground subject.",
     "promptHintProp": "Goal: prop product shot on a clean background, multi-angle when possible.",
     "batchLabel": "Batch size",
+    "aspectRatioLabel": "Aspect Ratio",
+    "advancedModel": "Model",
+    "promptTags": "Quick tags",
+    "appearsIn": "Appears in episodes",
+    "modelLabel": "Model",
+    "positiveLabel": "Positive prompt",
+    "negativeLabel": "Negative prompt",
+    "styleNotSet": "No art direction set — style prompt won't be appended",
+    "finalPromptPreview": "Final prompt preview",
+    "styleDisabledHint": "Style prompt disabled — only your input prompt will be sent",
+    "quickStats": "Status",
+    "totalVariants": "Variants",
+    "favorited": "Favorited",
+    "filterAll": "All",
+    "filterFavorited": "Starred",
+    "noFavoritedYet": "No favorites yet — click the star to bookmark",
+    "favoritedCount": "{count} favorited · switch to starred view to narrow down",
+    "favoritedHint": "Star candidates to shortlist them for final selection",
     "generating": "Generating...",
     "generateFirst": "✨ Generate first batch",
     "generateMore": "✨ Generate ×{count} more",
@@ -165,7 +188,23 @@
     "toastGenErrUnknown": "Unknown error",
     "toastSelected": "✓ Reference image updated",
     "toastSelectErr": "Failed to set reference",
-    "templateCharacterComposition": "Composition: single split-frame image — head close-up on top, front / side / back three-view below. Unified lighting, clean neutral background, sharp silhouette — usable as a character reference sheet.",
+    "templateSelectLabel": "Composition Template",
+    "tplSimpleLabel": "Simple Three-View",
+    "tplSimpleDesc": "Head close-up + full-body tri-view",
+    "tplDetailedLabel": "Detailed Reference",
+    "tplDetailedDesc": "Tri-view + multi-angle face close-ups",
+    "tplDesignSheetLabel": "Design Sheet",
+    "tplDesignSheetDesc": "Full character design (coming soon)",
+    "tplSwitchConfirm": "Switching template will overwrite current prompt",
+    "tplSwitchYes": "Confirm",
+    "tplSwitchNo": "Cancel",
+    "generationConfig": "Generation Config",
+    "currentReference": "Current Reference",
+    "noReferenceYet": "Generate and select one as reference",
+    "selected": "Selected",
+    "collapse": "Less",
+    "expand": "More",
+    "templateCharacterComposition": "Composition: single split-frame image — head close-up (shoulders up) on top, full-body front / side / back three-view below (head to toe fully visible). Unified lighting, clean neutral background, sharp silhouette — usable as a character reference sheet.",
     "templateSceneComposition": "Composition: wide establishing shot of the environment, no foreground figures. Emphasize atmosphere + architecture/terrain. Lighting and palette match the scene's mood.",
     "templatePropComposition": "Composition: product-photography style, clean neutral background, multiple angles when possible, emphasize material and detail."
   },
@@ -184,7 +223,12 @@
     "cancel": "Cancel",
     "done": "Saved",
     "doneSaved": "Voice added to your design library",
-    "playFailed": "Preview failed — please retry"
+    "playFailed": "Preview failed — please retry",
+    "characterContext": "Character Reference",
+    "confirmCloseTitle": "Leave this page?",
+    "confirmCloseBody": "Voice generation is in progress. Leaving will cancel the current operation.",
+    "confirmCloseStay": "Stay",
+    "confirmCloseLeave": "Leave"
   },
   "previousFramesRail": {
     "title": "Previous episode ending",
@@ -296,7 +340,9 @@
     "seriesRequired": "Episode not linked to a series — cannot manage shared assets",
     "voiceBindNone": "No voice bound",
     "voiceBindAdd": "Bind a voice for this character",
-    "voiceBindChange": "Change voice"
+    "voiceBindChange": "Change voice",
+    "generateScene": "Generate Scene",
+    "generateProp": "Generate Prop"
   },
   "common": {
     "save": "Save",
@@ -1113,7 +1159,8 @@
     "t2iCompactRerollTooltip": "Generate another first frame with the current prompt (added to candidates)",
     "t2iCompactRerollDisabled": "Type a prompt above first",
     "t2iStoryboardBadge": "Storyboard",
-    "t2iStoryboardBadgeTooltip": "From the Storyboard stage render"
+    "t2iStoryboardBadgeTooltip": "From the Storyboard stage render",
+    "genToastNoScript": "Please enter script text before generating storyboard"
   },
   "assetCard": {
     "seriesSharedBadge": "Series",
