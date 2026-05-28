@@ -2,17 +2,18 @@
 
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { motion } from "framer-motion";
-import { Plus, Palette, Film, Loader2 } from "lucide-react";
+import { Plus, Palette, Film, Loader2, Sparkles, RefreshCw } from "lucide-react";
 import StepHeader from "@/components/shared/StepHeader";
 import PreviousEpisodeFramesRail from "./storyboard-r2v/PreviousEpisodeFramesRail";
 import { useTranslations } from "next-intl";
 import { useProjectStore } from "@/store/projectStore";
-import { api, crudApi, type VideoTask } from "@/lib/api";
+import { api, crudApi, type VideoTask, type RefineSSEEvent } from "@/lib/api";
 import { getAssetUrl } from "@/lib/utils";
 import { debugLog } from "@/lib/debugLog";
 import type { BatchSummary } from "./storyboard-r2v/shot-panel/CandidatesSection";
 import { getR2vRouteModelId, isR2vImageBased, VIDEO_I2V_MODELS, VIDEO_R2V_MODELS, DEFAULT_I2V_MODEL_ID, DEFAULT_R2V_MODEL_ID } from "@/lib/modelCatalog";
 import ShotCard, { type ShotNode } from "./storyboard-r2v/ShotCard";
+import { buildAssembledPrompt } from "./storyboard-r2v/buildAssembledPrompt";
 import DialogueAudioRow from "./storyboard-r2v/DialogueAudioRow";
 import StoryboardGenerateDialog from "./storyboard-r2v/StoryboardGenerateDialog";
 import { toast } from "@/store/toastStore";
@@ -33,6 +34,7 @@ import CandidatesSection from "./storyboard-r2v/shot-panel/CandidatesSection";
 import CompareModal from "./storyboard-r2v/shot-panel/CompareModal";
 import TaskQueueButton from "./storyboard-r2v/shot-panel/TaskQueueButton";
 import TaskQueuePanel from "./storyboard-r2v/shot-panel/TaskQueuePanel";
+import { GenerationBanner, type BannerState } from "./storyboard-r2v/GenerationBanner";
 
 export default function StoryboardR2V() {
     const currentProject = useProjectStore((state) => state.currentProject);
@@ -48,19 +50,50 @@ export default function StoryboardR2V() {
     // belt-and-suspenders for very old localStorage drafts.
     const [shots, setShots] = useState<ShotNode[]>(() => {
         if (currentProject?.frames && currentProject.frames.length > 0) {
-            return currentProject.frames.map((frame: any) => migrateShotNode({
-                id: frame.id,
-                prompt: frame.action_description || "",
-                tabMode: (frame.workbench_tab_mode as "t2i_i2v" | "direct_r2v" | undefined)
-                    ?? "direct_r2v",
-                videoUrl: frame.video_url || undefined,
-                videoStatus: frame.video_url ? ("completed" as const) : undefined,
-                imageUrl: frame.rendered_image_url || frame.image_url || undefined,
-                t2iImageUrls: Array.isArray(frame.t2i_image_urls) ? frame.t2i_image_urls : [],
-                t2iSelectedIndex: typeof frame.t2i_selected_index === "number"
-                    ? frame.t2i_selected_index
-                    : 0,
-            }));
+            const videoTasks: any[] = (currentProject as any).video_tasks ?? [];
+            return currentProject.frames.map((frame: any) => {
+                const frameTasks = videoTasks.filter((t: any) => t.frame_id === frame.id);
+                const inFlightTask = frameTasks.find((t: any) =>
+                    t.status === "pending" || t.status === "processing"
+                );
+                const latestCompleted = frameTasks.find((t: any) =>
+                    t.status === "completed" && t.video_url
+                );
+                let videoStatus: "pending" | "processing" | "completed" | "failed" | undefined;
+                let videoUrl: string | undefined = frame.dubbed_video_url || frame.video_url || undefined;
+                let videoTaskId: string | undefined;
+                if (inFlightTask) {
+                    videoStatus = inFlightTask.status;
+                    videoTaskId = inFlightTask.id;
+                } else if (videoUrl || latestCompleted) {
+                    videoStatus = "completed";
+                    videoUrl = videoUrl || latestCompleted?.video_url;
+                } else if (frameTasks.some((t: any) => t.status === "failed")) {
+                    videoStatus = "failed";
+                }
+                return migrateShotNode({
+                    id: frame.id,
+                    prompt: frame.visual_description || frame.action_description || "",
+                    tabMode: (frame.workbench_tab_mode as "t2i_i2v" | "direct_r2v" | undefined)
+                        ?? "direct_r2v",
+                    videoUrl,
+                    videoStatus,
+                    videoTaskId,
+                    imageUrl: frame.rendered_image_url || frame.image_url || undefined,
+                    t2iImageUrls: Array.isArray(frame.t2i_image_urls) ? frame.t2i_image_urls : [],
+                    t2iSelectedIndex: typeof frame.t2i_selected_index === "number"
+                        ? frame.t2i_selected_index
+                        : 0,
+                    duration: frame.duration ?? null,
+                    visualDescription: frame.visual_description ?? null,
+                    assembledPrompt: frame.assembled_prompt ?? null,
+                    dialogueStructured: frame.dialogue_structured ?? null,
+                    cameraMovementStructured: frame.camera_movement_structured ?? null,
+                    shotSize: frame.shot_size ?? null,
+                    cameraAngle: frame.camera_angle ?? null,
+                    transitionHint: frame.transition_hint ?? null,
+                });
+            });
         }
         return [migrateShotNode({ id: `shot_${Date.now()}`, prompt: "", tabMode: "direct_r2v" })];
     });
@@ -314,29 +347,42 @@ export default function StoryboardR2V() {
 
     // Flush all pending writes on unmount (e.g. user switches step tab)
     // so the last keystroke / param change isn't stranded in the debounce
-    // window. Both workbench AND prompt queues drain in parallel.
+    // window. All queues (workbench, prompt, field) drain in parallel.
     useEffect(() => {
         const wbMap = workbenchPendingRef.current;
         const pMap = promptPendingRef.current;
+        const fMap = fieldPendingRef.current;
         return () => {
             const projectId = currentProject?.id;
             if (!projectId) return;
             for (const [shotId, entry] of Array.from(wbMap.entries())) {
                 window.clearTimeout(entry.timer);
-                api.updateFrameWorkbench(projectId, shotId, entry.patch).catch(() => {
-                    /* best-effort on teardown */
-                });
+                api.updateFrameWorkbench(projectId, shotId, entry.patch).catch(() => {});
             }
             wbMap.clear();
             for (const [shotId, entry] of Array.from(pMap.entries())) {
                 window.clearTimeout(entry.timer);
-                api.updateFrame(projectId, shotId, { action_description: entry.prompt }).catch(() => {
-                    /* best-effort on teardown */
-                });
+                api.updateFrame(projectId, shotId, { action_description: entry.prompt }).catch(() => {});
             }
             pMap.clear();
+            for (const [shotId, entry] of Array.from(fMap.entries())) {
+                window.clearTimeout(entry.timer);
+                api.updateFrame(projectId, shotId, entry.fields).catch(() => {});
+            }
+            fMap.clear();
         };
     }, [currentProject?.id]);
+
+    // beforeunload guard: warn when structured field edits are pending
+    useEffect(() => {
+        const handler = (e: BeforeUnloadEvent) => {
+            if (fieldPendingRef.current.size > 0 || promptPendingRef.current.size > 0) {
+                e.preventDefault();
+            }
+        };
+        window.addEventListener("beforeunload", handler);
+        return () => window.removeEventListener("beforeunload", handler);
+    }, []);
 
     const characters = currentProject?.characters || [];
     const scenes = currentProject?.scenes || [];
@@ -406,62 +452,213 @@ export default function StoryboardR2V() {
     // setShots() when the new frames come back.
     const [genDialogOpen, setGenDialogOpen] = useState(false);
     const [generating, setGenerating] = useState(false);
+    const [bannerState, setBannerState] = useState<BannerState>(
+        () => (currentProject?.frames?.length ?? 0) > 0 ? "summary" : "idle"
+    );
+    const [refineProgress, setRefineProgress] = useState<{ current: number; total: number } | null>(null);
+    const [dialogueProgress, setDialogueProgress] = useState<{ current: number; total: number } | null>(null);
 
-    const handleGenerateStoryboard = useCallback(async () => {
+    const PHASE1_CAPTIONS = useMemo(() => [
+        "正在分析剧本结构…",
+        "识别场景切换点…",
+        "拆分镜头与动作…",
+        "琢磨每帧的构图和节奏…",
+        "快了，安排景别和运镜…",
+        "最后润色一下…",
+    ], []);
+
+    const bannerSummary = useMemo(() => {
+        if (!currentProject?.frames?.length) return null;
+        const frames = currentProject.frames as any[];
+        const frameCount = frames.length;
+        const withDialogue = frames.filter((f: any) =>
+            f.dialogue_structured?.line || f.dialogue
+        );
+        const charsWithVoice = new Set(
+            (currentProject as any).characters?.filter((c: any) => c.voice_id).map((c: any) => c.id) ?? []
+        );
+        const charNameToVoice = new Map<string, boolean>(
+            (currentProject as any).characters?.filter((c: any) => c.voice_id).map((c: any) => [c.name?.toLowerCase(), true]) ?? []
+        );
+        const hasVoiceBinding = (f: any): boolean => {
+            if (f.character_ids?.[0] && charsWithVoice.has(f.character_ids[0])) return true;
+            const speaker = f.dialogue_structured?.speaker || f.speaker;
+            return !!(speaker && charNameToVoice.has(speaker.toLowerCase()));
+        };
+        const dialogueReady = withDialogue.filter((f: any) =>
+            hasVoiceBinding(f) && !f.audio_url
+        ).length;
+        const dialogueMissing = withDialogue.filter((f: any) => !hasVoiceBinding(f)).length;
+        return { frameCount, dialogueReady, dialogueMissing };
+    }, [currentProject?.frames, (currentProject as any)?.characters]);
+
+    const handleBatchDialogue = useCallback(async () => {
+        if (!currentProject?.id) return;
+        setBannerState("dialogue");
+        setDialogueProgress(null);
+        try {
+            const frames = currentProject.frames as any[] ?? [];
+            const totalWithDialogue = frames.filter((f: any) => f.dialogue_structured?.line || f.dialogue).length;
+            setDialogueProgress({ current: 0, total: totalWithDialogue });
+            const result = await api.generateDialogueAudioBatch(currentProject.id);
+            const stats = result._batch_stats;
+            if (stats.failed > 0) {
+                toast.warning(`对白生成完成：${stats.generated} 条成功，${stats.failed} 条失败`);
+            } else if (stats.generated > 0) {
+                toast.success(`已生成 ${stats.generated} 条对白音频`);
+            } else if (stats.no_voice > 0 && stats.skipped === 0) {
+                toast.warning(`${stats.no_voice} 条对白的角色尚未绑定语音`);
+            } else if (stats.skipped > 0) {
+                toast.success("所有对白音频已是最新");
+            } else {
+                toast.warning("未找到可生成的对白");
+            }
+            const updated = await api.getProject(currentProject.id);
+            if (updated?.frames) updateProject(currentProject.id, { frames: updated.frames });
+        } catch (e) {
+            debugLog.error("Studio", "batch dialogue audio failed", e);
+            toast.error("对白批量生成失败，请重试");
+        } finally {
+            setBannerState("summary");
+            setDialogueProgress(null);
+        }
+    }, [currentProject, updateProject]);
+
+    const handleSmartGenerate = useCallback(async () => {
         if (!currentProject?.id) return;
         const projectId = currentProject.id;
-        const projectTitle = currentProject.title || "—";
+        const scriptText = (currentProject as any).originalText || (currentProject as any).original_text || "";
+        if (!scriptText.trim()) {
+            toast.warning(t("genToastNoScript"));
+            return;
+        }
         setGenerating(true);
-        const toastId = toast.progress(t("genToastStart"), {
-            projectId,
-            projectTitle,
-            body: t("genToastStartBody"),
-        });
+        setBannerState("phase1");
+        setShots([]);
         try {
-            const updated = await api.generateStoryboard(projectId);
+            // Phase 1: generate coarse frames
+            const updated = await api.analyzeToStoryboard(projectId, scriptText);
             const newFrameCount = Array.isArray(updated?.frames) ? updated.frames.length : 0;
             updateProject(projectId, updated);
-            // Re-derive shots from the response so the UI reflects the
-            // freshly-generated frames without waiting for a refetch.
             if (Array.isArray(updated?.frames)) {
                 setShots(
                     updated.frames.map((frame: any) =>
                         migrateShotNode({
                             id: frame.id,
-                            prompt: frame.action_description || "",
+                            prompt: frame.visual_description || frame.action_description || "",
                             tabMode: (frame.workbench_tab_mode as "t2i_i2v" | "direct_r2v" | undefined)
                                 ?? (currentProject.default_generation_mode === "i2v" ? "t2i_i2v" : "direct_r2v"),
-                            videoUrl: frame.video_url || undefined,
-                            videoStatus: frame.video_url ? ("completed" as const) : undefined,
+                            videoUrl: frame.dubbed_video_url || frame.video_url || undefined,
+                            videoStatus: (frame.dubbed_video_url || frame.video_url) ? ("completed" as const) : undefined,
                             imageUrl: frame.rendered_image_url || frame.image_url || undefined,
                             t2iImageUrls: Array.isArray(frame.t2i_image_urls) ? frame.t2i_image_urls : [],
                             t2iSelectedIndex: typeof frame.t2i_selected_index === "number"
                                 ? frame.t2i_selected_index : 0,
+                            duration: frame.duration ?? null,
+                            visualDescription: frame.visual_description ?? null,
+                            assembledPrompt: frame.assembled_prompt ?? null,
+                            dialogueStructured: frame.dialogue_structured ?? null,
+                            cameraMovementStructured: frame.camera_movement_structured ?? null,
+                            shotSize: frame.shot_size ?? null,
+                            cameraAngle: frame.camera_angle ?? null,
+                            transitionHint: frame.transition_hint ?? null,
                         }),
                     ),
                 );
             }
-            toast.update(toastId, {
-                kind: "success",
-                title: t("genToastDone", { count: newFrameCount }),
-                body: t("genToastDoneBody"),
-                autoCloseMs: 7000,
-            });
+
+            // Phase 2: batch refine (SSE)
+            if (newFrameCount > 0) {
+                setBannerState("phase2");
+                setRefineProgress({ current: 0, total: newFrameCount });
+                await api.refineBatchFrames(projectId, (event: RefineSSEEvent) => {
+                    if (event.type === "frame_refine_start") {
+                        setRefineProgress({ current: (event.frame_index ?? 0) + 1, total: event.total ?? newFrameCount });
+                    }
+                });
+                const refreshed = await api.getProject(projectId);
+                if (refreshed?.frames) {
+                    updateProject(projectId, { frames: refreshed.frames });
+                    setShots(
+                        refreshed.frames.map((frame: any) =>
+                            migrateShotNode({
+                                id: frame.id,
+                                prompt: frame.visual_description || frame.action_description || "",
+                                tabMode: (frame.workbench_tab_mode as "t2i_i2v" | "direct_r2v" | undefined)
+                                    ?? (currentProject.default_generation_mode === "i2v" ? "t2i_i2v" : "direct_r2v"),
+                                videoUrl: frame.video_url || undefined,
+                                videoStatus: frame.video_url ? ("completed" as const) : undefined,
+                                imageUrl: frame.rendered_image_url || frame.image_url || undefined,
+                                t2iImageUrls: Array.isArray(frame.t2i_image_urls) ? frame.t2i_image_urls : [],
+                                t2iSelectedIndex: typeof frame.t2i_selected_index === "number"
+                                    ? frame.t2i_selected_index : 0,
+                                duration: frame.duration ?? null,
+                                visualDescription: frame.visual_description ?? null,
+                                assembledPrompt: frame.assembled_prompt ?? null,
+                                dialogueStructured: frame.dialogue_structured ?? null,
+                                cameraMovementStructured: frame.camera_movement_structured ?? null,
+                                shotSize: frame.shot_size ?? null,
+                                cameraAngle: frame.camera_angle ?? null,
+                                transitionHint: frame.transition_hint ?? null,
+                            }),
+                        ),
+                    );
+                }
+            }
+            setBannerState("summary");
+            toast.success(t("genToastDone", { count: newFrameCount }));
         } catch (err: any) {
             const detail = err?.response?.data?.detail || err?.message || t("genToastErrUnknown");
-            toast.update(toastId, {
-                kind: "error",
-                title: t("genToastErr"),
-                body: String(detail).slice(0, 200),
-                action: {
-                    label: t("genToastRetry"),
-                    onClick: () => { handleGenerateStoryboard(); },
-                },
-            });
+            toast.error(`${t("genToastErr")}: ${String(detail).slice(0, 200)}`);
         } finally {
             setGenerating(false);
+            setRefineProgress(null);
+            // Determine final banner state based on actual current shots
+            setShots(currentShots => {
+                setBannerState(currentShots.length > 0 ? "summary" : "idle");
+                return currentShots;
+            });
         }
     }, [currentProject, updateProject, t]);
+
+    const handleRefineFrame = useCallback(async (frameId: string) => {
+        if (!currentProject?.id) return;
+        try {
+            await api.refineSingleFrame(currentProject.id, frameId);
+            const updated = await api.getProject(currentProject.id);
+            if (updated?.frames) {
+                updateProject(currentProject.id, { frames: updated.frames });
+                setShots(
+                    updated.frames.map((frame: any) =>
+                        migrateShotNode({
+                            id: frame.id,
+                            prompt: frame.visual_description || frame.action_description || "",
+                            tabMode: (frame.workbench_tab_mode as "t2i_i2v" | "direct_r2v" | undefined)
+                                ?? (currentProject.default_generation_mode === "i2v" ? "t2i_i2v" : "direct_r2v"),
+                            videoUrl: frame.dubbed_video_url || frame.video_url || undefined,
+                            videoStatus: (frame.dubbed_video_url || frame.video_url) ? ("completed" as const) : undefined,
+                            imageUrl: frame.rendered_image_url || frame.image_url || undefined,
+                            t2iImageUrls: Array.isArray(frame.t2i_image_urls) ? frame.t2i_image_urls : [],
+                            t2iSelectedIndex: typeof frame.t2i_selected_index === "number"
+                                ? frame.t2i_selected_index : 0,
+                            duration: frame.duration ?? null,
+                            visualDescription: frame.visual_description ?? null,
+                            assembledPrompt: frame.assembled_prompt ?? null,
+                            dialogueStructured: frame.dialogue_structured ?? null,
+                            cameraMovementStructured: frame.camera_movement_structured ?? null,
+                            shotSize: frame.shot_size ?? null,
+                            cameraAngle: frame.camera_angle ?? null,
+                            transitionHint: frame.transition_hint ?? null,
+                        }),
+                    ),
+                );
+            }
+            toast.success("精修完成");
+        } catch (err) {
+            toast.error("精修失败");
+            debugLog.warn("Studio", "single frame refine failed", err);
+        }
+    }, [currentProject, updateProject]);
 
     // Delete a shot
     const deleteShot = useCallback(async (index: number) => {
@@ -578,42 +775,157 @@ export default function StoryboardR2V() {
         }));
     }, [persistWorkbench]);
 
+    // Structured field updates — local immediate + debounce 3s auto-save
+    const fieldPendingRef = useRef<Map<string, { timer: number; fields: Record<string, any> }>>(new Map());
+    const handleUpdateField = useCallback((index: number, field: string, value: string | number | null) => {
+        setShots(prev => prev.map((s, i) => {
+            if (i !== index) return s;
+            if (field === "duration") return { ...s, duration: typeof value === "number" ? value : null };
+            if (field === "shotSize") return { ...s, shotSize: typeof value === "string" ? value : null };
+            if (field === "cameraAngle") return { ...s, cameraAngle: typeof value === "string" ? value : null };
+            if (field === "cameraMovement") {
+                const desc = typeof value === "string" ? value : "固定镜头";
+                return {
+                    ...s,
+                    cameraMovementStructured: {
+                        primary: desc,
+                        speed: s.cameraMovementStructured?.speed ?? "normal",
+                        description: desc,
+                        secondary: s.cameraMovementStructured?.secondary ?? null,
+                    },
+                };
+            }
+            if (field === "transitionHint") return { ...s, transitionHint: typeof value === "string" ? value : null };
+            return s;
+        }));
+        // Debounce 3s persist to backend
+        const shotId = shots[index]?.id;
+        if (!shotId || shotId.startsWith("shot_") || !currentProject?.id) return;
+        const projectId = currentProject.id;
+        const map = fieldPendingRef.current;
+        const existing = map.get(shotId);
+        if (existing) window.clearTimeout(existing.timer);
+        const backendField: Record<string, any> = {};
+        if (field === "duration") backendField.duration = typeof value === "number" ? value : undefined;
+        if (field === "shotSize") backendField.shot_size = typeof value === "string" ? value : undefined;
+        if (field === "cameraAngle") backendField.camera_angle = typeof value === "string" ? value : undefined;
+        if (field === "cameraMovement") backendField.camera_movement_description = typeof value === "string" ? value : undefined;
+        if (field === "transitionHint") backendField.transition_hint = typeof value === "string" ? value : undefined;
+        const merged = { ...(existing?.fields ?? {}), ...backendField };
+        const timer = window.setTimeout(() => {
+            map.delete(shotId);
+            api.updateFrame(projectId, shotId, merged)
+                .then(() => {
+                    const proj = useProjectStore.getState().currentProject;
+                    if (!proj || proj.id !== projectId) return;
+                    const nextFrames = (proj.frames ?? []).map((f: any) =>
+                        f.id === shotId ? { ...f, ...merged } : f,
+                    );
+                    updateProject(projectId, { frames: nextFrames });
+                })
+                .catch((err) => debugLog.warn("Studio", "persistField failed", err));
+        }, 3000);
+        map.set(shotId, { timer, fields: merged });
+    }, [shots, currentProject?.id, updateProject]);
+
+    // Duration editor config — derived from active R2V model's catalog entry
+    const durationEditorCfg = useMemo(() => {
+        const r2vModel = VIDEO_R2V_MODELS.find(m => m.id === videoConfig.r2vModel);
+        const dc = r2vModel?.duration;
+        if (!dc) return { min: 3, max: 15, step: 1 };
+        if (dc.type === "slider") return { min: dc.min, max: dc.max, step: dc.step };
+        if (dc.type === "buttons") return { min: Math.min(...dc.options), max: Math.max(...dc.options), step: 1 };
+        return { min: dc.value, max: dc.value, step: 1 };
+    }, [videoConfig.r2vModel]);
+
     // Parse asset tags from prompt and resolve to URLs
     const parseAssetTags = useCallback((prompt: string): string[] => {
-        const urls: string[] = [];
-        const tagPattern = /\[(character\d+|scene|prop):([^\]]+)\]/g;
+        // HappyHorse uses [characterN:name] as generic reference-image slots.
+        // N determines the position in the URL array: character1 → image[0], etc.
+        // The "name" can be a character, scene, or prop — we look up all three.
+        const slots: { idx: number; url: string }[] = [];
+        const tagPattern = /\[character(\d+):([^\]]+)\]/g;
         let match;
         while ((match = tagPattern.exec(prompt)) !== null) {
-            const [, type, name] = match;
-            if (type.startsWith("character")) {
-                const char = characters.find((c: any) => c.name === name);
-                if (char) {
-                    const asset = char.full_body_asset;
-                    if (asset?.selected_id && asset.variants?.length) {
-                        const selected = asset.variants.find((v: any) => v.id === asset.selected_id);
-                        if (selected) urls.push(selected.url);
-                    } else if (asset?.variants?.[0]) {
-                        urls.push(asset.variants[0].url);
-                    }
-                }
-            } else if (type === "scene") {
-                const scene = scenes.find((s: any) => s.name === name);
-                if (scene?.image_asset?.variants?.[0]) {
-                    urls.push(scene.image_asset.variants[0].url);
-                }
-            } else if (type === "prop") {
-                const prop = props.find((p: any) => p.name === name);
-                if (prop?.image_asset?.variants?.[0]) {
-                    urls.push(prop.image_asset.variants[0].url);
+            const slotNum = parseInt(match[1], 10);
+            const name = match[2];
+            let url: string | undefined;
+
+            // Try character first
+            const char = characters.find((c: any) => c.name === name);
+            if (char) {
+                const asset = char.full_body_asset;
+                if (asset?.selected_id && asset.variants?.length) {
+                    const selected = asset.variants.find((v: any) => v.id === asset.selected_id);
+                    if (selected) url = selected.url;
+                } else if (asset?.variants?.[0]) {
+                    url = asset.variants[0].url;
                 }
             }
+            // Try scene
+            if (!url) {
+                const scene = scenes.find((s: any) => s.name === name);
+                const sceneAsset = scene?.image_asset;
+                if (sceneAsset?.selected_id && sceneAsset.variants?.length) {
+                    const selected = sceneAsset.variants.find((v: any) => v.id === sceneAsset.selected_id);
+                    if (selected) url = selected.url;
+                } else if (sceneAsset?.variants?.[0]) {
+                    url = sceneAsset.variants[0].url;
+                }
+            }
+            // Try prop
+            if (!url) {
+                const prop = props.find((p: any) => p.name === name);
+                const propAsset = prop?.image_asset;
+                if (propAsset?.selected_id && propAsset.variants?.length) {
+                    const selected = propAsset.variants.find((v: any) => v.id === propAsset.selected_id);
+                    if (selected) url = selected.url;
+                } else if (propAsset?.variants?.[0]) {
+                    url = propAsset.variants[0].url;
+                }
+            }
+
+            if (url) slots.push({ idx: slotNum, url });
         }
-        return urls;
+        // Sort by slot number so URL array matches HappyHorse's positional mapping
+        slots.sort((a, b) => a.idx - b.idx);
+        return slots.map(s => s.url);
+    }, [characters, scenes, props]);
+
+    const hasAssetTags = useCallback((prompt: string): boolean => {
+        return /\[character\d+:[^\]]+\]/.test(prompt);
+    }, []);
+
+    const getUnresolvedAssetNames = useCallback((prompt: string): string[] => {
+        const unresolved: string[] = [];
+        const tagPattern = /\[character\d+:([^\]]+)\]/g;
+        let match;
+        while ((match = tagPattern.exec(prompt)) !== null) {
+            const name = match[1];
+            let hasImage = false;
+            // Check character
+            const char = characters.find((c: any) => c.name === name);
+            if (char) {
+                hasImage = !!(char.full_body_asset?.variants?.length);
+            }
+            // Check scene
+            if (!hasImage) {
+                const scene = scenes.find((s: any) => s.name === name);
+                hasImage = !!(scene?.image_asset?.variants?.length);
+            }
+            // Check prop
+            if (!hasImage) {
+                const prop = props.find((p: any) => p.name === name);
+                hasImage = !!(prop?.image_asset?.variants?.length);
+            }
+            if (!hasImage) unresolved.push(name);
+        }
+        return unresolved;
     }, [characters, scenes, props]);
 
     // Strip tags from prompt for clean text
     const cleanPrompt = (prompt: string): string => {
-        return prompt.replace(/\[(character\d+|scene|prop):[^\]]+\]/g, "").replace(/\s+/g, " ").trim();
+        return prompt.replace(/\[character\d+:[^\]]+\]/g, "").replace(/\s+/g, " ").trim();
     };
 
     // Generate T2I image for a shot (t2i_i2v mode stage 1)
@@ -667,7 +979,7 @@ export default function StoryboardR2V() {
         const shot = shots[index];
         if (!currentProject || !shot.prompt.trim()) return;
 
-        const promptText = cleanPrompt(shot.prompt);
+        const promptText = buildAssembledPrompt(shot);
 
         setShots(prev => prev.map((s, i) =>
             i === index ? { ...s, videoStatus: "pending" } : s
@@ -689,7 +1001,7 @@ export default function StoryboardR2V() {
                     : getR2vRouteModelId(videoConfig.model);
                 const imageBased = isR2vImageBased(routeModelId);
 
-                const task = await api.createVideoTask(
+                const tasks = await api.createVideoTask(
                     currentProject.id,
                     "",  // no image_url for R2V
                     promptText,
@@ -710,6 +1022,7 @@ export default function StoryboardR2V() {
                     undefined, undefined, // vidu params
                     imageBased ? referenceUrls : undefined, // referenceImageUrls
                 );
+                const task = Array.isArray(tasks) ? tasks[0] : tasks;
 
                 if (task && task.id) {
                     setShots(prev => prev.map((s, i) =>
@@ -761,7 +1074,7 @@ export default function StoryboardR2V() {
                     return;
                 }
 
-                const task = await api.createVideoTask(
+                const tasks = await api.createVideoTask(
                     currentProject.id,
                     imageUrl,
                     promptText,
@@ -788,6 +1101,7 @@ export default function StoryboardR2V() {
                     // HappyHorse
                     undefined,
                 );
+                const task = Array.isArray(tasks) ? tasks[0] : tasks;
 
                 if (task && task.id) {
                     setShots(prev => prev.map((s, i) =>
@@ -795,8 +1109,10 @@ export default function StoryboardR2V() {
                     ));
                 }
             }
-        } catch (error) {
+        } catch (error: any) {
             debugLog.error("Studio", "Failed to generate video for shot:", error);
+            const detail = error?.response?.data?.detail || error?.message || "未知错误";
+            toast.error(`视频生成失败：${String(detail).slice(0, 150)}`);
             setShots(prev => prev.map((s, i) =>
                 i === index ? { ...s, videoStatus: "failed" } : s
             ));
@@ -817,7 +1133,7 @@ export default function StoryboardR2V() {
     ) => {
         const shot = shots[index];
         if (!currentProject || !shot?.prompt.trim()) return;
-        const promptText = cleanPrompt(shot.prompt);
+        const promptText = buildAssembledPrompt(shot);
         const tabMode = shot.tabMode;
         const effectiveCount = Math.max(1, Math.min(6, count || 1));
 
@@ -829,25 +1145,27 @@ export default function StoryboardR2V() {
         if (tabMode === "direct_r2v") {
             const refs = parseAssetTags(shot.prompt);
             if (refs.length === 0) {
-                const r2vModelId = params?.model ?? videoConfig.r2vModel;
-                const r2vModel = VIDEO_R2V_MODELS.find(m => m.id === r2vModelId);
-                const modelLabel = r2vModel?.name ?? r2vModelId;
-                setShotErrors(prev => ({
-                    ...prev,
-                    [shot.id]: missingRefsMessage(modelLabel),
-                }));
+                const hasTags = hasAssetTags(shot.prompt);
+                let errMsg: string;
+                if (hasTags) {
+                    const unresolved = getUnresolvedAssetNames(shot.prompt);
+                    errMsg = `引用的「${unresolved.join("、")}」尚未生成图片，请先到素材步骤生成。`;
+                } else {
+                    const r2vModelId = params?.model ?? videoConfig.r2vModel;
+                    const r2vModel = VIDEO_R2V_MODELS.find(m => m.id === r2vModelId);
+                    const modelLabel = r2vModel?.name ?? r2vModelId;
+                    errMsg = missingRefsMessage(modelLabel);
+                }
+                setShotErrors(prev => ({ ...prev, [shot.id]: errMsg }));
+                toast.warning(errMsg);
                 return;
             }
         } else {
-            // I2V tab pre-flight: same lesson as R2V — without a first
-            // frame, HappyHorse / Wan I2V fail with "input.media required"
-            // mid-generation (Issue 15). Reject up-front with inline error.
             const probeImage = getActiveT2IImageUrl(shot) || shot.imageUrl || "";
             if (!probeImage) {
-                setShotErrors(prev => ({
-                    ...prev,
-                    [shot.id]: t("i2vNeedsFirstFrame") || "请先上传或生成首帧再生成视频。",
-                }));
+                const errMsg = t("i2vNeedsFirstFrame") || "请先上传或生成首帧再生成视频。";
+                setShotErrors(prev => ({ ...prev, [shot.id]: errMsg }));
+                toast.warning(errMsg);
                 return;
             }
         }
@@ -892,7 +1210,7 @@ export default function StoryboardR2V() {
                         ? explicitR2v
                         : getR2vRouteModelId(videoConfig.model);
                     const imageBased = isR2vImageBased(routeModelId);
-                    const task = await api.createVideoTask(
+                    const tasks = await api.createVideoTask(
                         currentProject.id,
                         "",
                         promptText,
@@ -912,10 +1230,11 @@ export default function StoryboardR2V() {
                         undefined, undefined, undefined,
                         undefined, undefined,
                         imageBased ? referenceUrls : undefined,
-                        params?.ratio ?? videoConfig.resolution,
+                        params?.ratio,
                         tabMode,
                         params?.watermark,
                     );
+                    const task = Array.isArray(tasks) ? tasks[0] : tasks;
                     return task?.id ?? null;
                 }
                 // I2V branch — same defensive check on the model.
@@ -926,7 +1245,7 @@ export default function StoryboardR2V() {
                     return null;
                 }
                 const imageUrl = getActiveT2IImageUrl(shot) || shot.imageUrl || "";
-                const task = await api.createVideoTask(
+                const tasks = await api.createVideoTask(
                     currentProject.id,
                     imageUrl,
                     promptText,
@@ -953,6 +1272,7 @@ export default function StoryboardR2V() {
                     tabMode,
                     params?.watermark,
                 );
+                const task = Array.isArray(tasks) ? tasks[0] : tasks;
                 return task?.id ?? null;
             };
 
@@ -961,6 +1281,12 @@ export default function StoryboardR2V() {
             )).filter((id): id is string => !!id);
 
             if (taskIds.length > 0) {
+                setShotErrors(prev => {
+                    if (!prev[shot.id]) return prev;
+                    const next = { ...prev };
+                    delete next[shot.id];
+                    return next;
+                });
                 setShots(prev => prev.map((s, i) => {
                     if (i !== index) return s;
                     // Mirror the latest task id on the legacy single
@@ -976,20 +1302,19 @@ export default function StoryboardR2V() {
                     };
                 }));
             } else {
+                toast.error("视频生成失败：任务提交未成功，请检查参数后重试");
                 setShots(prev => prev.map((s, i) =>
                     i === index ? { ...s, videoStatus: "failed" as const } : s
                 ));
             }
         } catch (error: any) {
             debugLog.error("Studio", "Batch generate failed for shot:", error);
-            // Surface backend validation failures (HTTP 400) inline
-            // on the shot's panel so the user sees what to fix
-            // instead of just a generic "failed" pill on the card.
             const status = error?.response?.status;
-            const detail = error?.response?.data?.detail;
+            const detail = error?.response?.data?.detail || error?.message || "未知错误";
             if (status === 400 && typeof detail === "string") {
                 setShotErrors(prev => ({ ...prev, [shot.id]: detail }));
             }
+            toast.error(`视频生成失败：${String(detail).slice(0, 150)}`);
             setShots(prev => prev.map((s, i) =>
                 i === index ? { ...s, videoStatus: "failed" as const } : s
             ));
@@ -1152,6 +1477,31 @@ export default function StoryboardR2V() {
         [allVideoTasks],
     );
 
+    // Sync shot.videoStatus from project.video_tasks when the
+    // project-level poll refreshes. Video task status is only visible
+    // via project refresh (GET /tasks/ only covers asset tasks).
+    useEffect(() => {
+        if (!allVideoTasks.length) return;
+        setShots(prev => {
+            let changed = false;
+            const next = prev.map(s => {
+                if (!s.videoTaskId) return s;
+                const task = allVideoTasks.find(t => t.id === s.videoTaskId);
+                if (!task) return s;
+                if (task.status === "completed" && s.videoStatus !== "completed") {
+                    changed = true;
+                    return { ...s, videoStatus: "completed" as const, videoUrl: (task as any).video_url };
+                }
+                if (task.status === "failed" && s.videoStatus !== "failed") {
+                    changed = true;
+                    return { ...s, videoStatus: "failed" as const };
+                }
+                return s;
+            });
+            return changed ? next : prev;
+        });
+    }, [allVideoTasks]);
+
     // Compare modal needs the actual VideoTask objects for the
     // currently-selected ids (in whatever order they were selected).
     const compareTasks = useMemo(() => {
@@ -1192,13 +1542,13 @@ export default function StoryboardR2V() {
         const modelId = isR2v ? videoConfig.r2vModel : videoConfig.model;
         return {
             model: modelId,
-            duration: videoConfig.duration,
+            duration: shot.duration ?? videoConfig.duration,
             count: shotCounts[shot.id] ?? 1,
             // Per-shot seed override (Sweep G fix); undefined means
             // "random per generation".
             seed: shotSeeds[shot.id],
             resolution: videoConfig.resolution,
-            ratio: videoConfig.resolution,
+            ratio: undefined,
             negativePrompt: videoConfig.negativePrompt,
             promptExtend: videoConfig.promptExtend,
             cfgScale: videoConfig.cfgScale,
@@ -1222,6 +1572,11 @@ export default function StoryboardR2V() {
             persistWorkbench(shot.id, { workbench_generate_count: next.count });
         }
         setShotCounts(prev => ({ ...prev, [shot.id]: next.count }));
+        // Sync duration back to structured field (single source of truth)
+        if (next.duration !== (shot.duration ?? videoConfig.duration)) {
+            const idx = shots.findIndex(s => s.id === shot.id);
+            if (idx >= 0) handleUpdateField(idx, "duration", next.duration);
+        }
         // Seed: track per-shot. Undefined ↔ "random" — stored as
         // delete-from-map so the entry doesn't accrete forever.
         setShotSeeds(prev => {
@@ -1335,10 +1690,12 @@ export default function StoryboardR2V() {
             });
             return;
         }
-        if (task.video_url) {
-            window.open(getAssetUrl(task.video_url), "_blank", "noopener");
+        const frame = currentProject?.frames?.find((f: any) => f.dubbed_video_task_id === task.id);
+        const url = frame?.dubbed_video_url || task.video_url;
+        if (url) {
+            window.open(getAssetUrl(url), "_blank", "noopener");
         }
-    }, []);
+    }, [currentProject]);
 
     // 复用此批参数: copy a batch's model + neg_prompt into videoConfig,
     // so the next Generate uses the same recipe. We don't change count
@@ -1457,32 +1814,20 @@ export default function StoryboardR2V() {
                     <Plus size={13} strokeWidth={2} />
                     {t("addShot")}
                 </motion.button>
-                {/* LLM-generate frames from script. Always visible; dialog
-                    runs pre-flight checks and surfaces "needs script /
-                    needs entities" friendly errors with quick-jump. */}
                 <button
                     type="button"
                     onClick={() => setGenDialogOpen(true)}
                     disabled={generating}
                     className="inline-flex h-7 items-center gap-1.5 rounded px-2.5 font-mono text-[10.5px] uppercase tracking-[0.14em] font-medium text-primary border border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors disabled:opacity-40"
                 >
-                    {generating ? <Loader2 size={11} className="animate-spin" /> : <Wand2 size={11} />}
-                    {generating ? t("genInFlight") : t("genShots")}
+                    {generating
+                        ? <Loader2 size={11} className="animate-spin" />
+                        : shots.length > 0
+                            ? <RefreshCw size={11} />
+                            : <Sparkles size={11} />
+                    }
+                    {generating ? t("genInFlight") : shots.length > 0 ? "重新生成" : "✨ 智能分镜"}
                 </button>
-                {/* PR-3j · Batch generate dialogue audio for every frame with
-                    dialogue. Skips frames whose hash still matches. */}
-                <BatchDialogueAudioButton
-                    scriptId={currentProject?.id ?? null}
-                    onDone={async () => {
-                        if (!currentProject) return;
-                        try {
-                            const updated = await api.getProject(currentProject.id);
-                            if (updated?.frames) updateProject(currentProject.id, { frames: updated.frames });
-                        } catch (e) {
-                            debugLog.warn("Studio", "refresh after batch audio failed", e);
-                        }
-                    }}
-                />
                 {shots.length > 1 ? (
                     <div className="ml-auto flex items-center gap-1">
                         <button
@@ -1505,17 +1850,19 @@ export default function StoryboardR2V() {
                 ) : null}
             </div>
 
-            {/* R2V v2 P2-a — Previous episode last-frames reference rail.
-                Renders only when this episode has a previous episode in
-                the same series. Collapsible, doesn't steal vertical space. */}
+            <GenerationBanner
+                state={bannerState}
+                phase1Captions={PHASE1_CAPTIONS}
+                refineProgress={refineProgress}
+                dialogueProgress={dialogueProgress}
+                summary={bannerSummary}
+                onGenerateDialogue={handleBatchDialogue}
+            />
+
             <PreviousEpisodeFramesRail
                 scriptId={currentProject?.id ?? null}
                 seriesId={currentProject?.series_id ?? null}
             />
-
-            {/* Shot List (Timeline) — px tightens on narrow so the
-                shot cards + their attached workbench panels keep
-                breathing room without overflowing. */}
             <div className="flex-1 overflow-y-auto px-3 py-4 space-y-3 sm:px-6">
                 {shots.length === 0 && (
                     <div className="h-full min-h-[300px] flex flex-col items-center justify-center text-center px-6">
@@ -1575,6 +1922,8 @@ export default function StoryboardR2V() {
                             scenes={scenes}
                             props={props}
                             onUpdatePrompt={(prompt) => updatePrompt(index, prompt)}
+                            onUpdateField={(field, value) => handleUpdateField(index, field, value)}
+                            durationEditorConfig={durationEditorCfg}
                             onGenerateT2I={() => generateT2I(index)}
                             onGenerateVideo={() => generateVideo(index)}
                             onDelete={() => deleteShot(index)}
@@ -1623,13 +1972,28 @@ export default function StoryboardR2V() {
                             onSetGenerateCount={(n) => handleShotParamsChange(shot, { ...paramsState, count: n })}
                             onGenerateBatch={(n) => generateVideoBatch(index, n, paramsState)}
                             inFlightCount={shotInFlight}
+                            onRefineFrame={() => handleRefineFrame(shot.id)}
+                            onUpdateDialogue={async (text: string) => {
+                                if (!currentProject) return;
+                                try {
+                                    await api.updateFrame(currentProject.id, shot.id, { dialogue: text });
+                                    const updated = await api.getProject(currentProject.id);
+                                    if (updated?.frames) updateProject(currentProject.id, { frames: updated.frames });
+                                } catch (e) {
+                                    debugLog.error("Studio", "update dialogue failed", e);
+                                }
+                            }}
                         />
                         {/* PR-3j · Frame-level dialogue audio row. Only renders
                             when the frame has dialogue text; resolves the
                             bound character's voice_id and tracks stale state. */}
                         {(() => {
                             const frame = currentProject?.frames?.find((f: any) => f.id === shot.id);
-                            if (!frame || !frame.dialogue?.trim()) return null;
+                            if (!frame) return null;
+                            const dialogueText = frame?.dialogue_structured?.line || frame?.dialogue;
+                            const hasVideoTask = !!(frame.selected_video_id || (currentProject as any)?.video_tasks?.find((t: any) => t.frame_id === frame.id && t.status === "completed"));
+                            // Show row when dialogue exists, or when video exists (dub available)
+                            if (!dialogueText?.trim() && !hasVideoTask) return null;
                             const charId = Array.isArray(frame.character_ids) ? frame.character_ids[0] : null;
                             const speaker = charId ? characters.find((c: any) => c.id === charId) : null;
                             return (
@@ -1637,16 +2001,24 @@ export default function StoryboardR2V() {
                                     <DialogueAudioRow
                                         scriptId={currentProject!.id}
                                         frameId={frame.id}
-                                        dialogue={frame.dialogue}
+                                        dialogue={dialogueText}
                                         voiceId={speaker?.voice_id}
                                         audioUrl={frame.audio_url}
                                         audioError={frame.audio_error}
-                                        snapshotDialogue={frame.dialogue}
+                                        snapshotDialogue={dialogueText}
                                         snapshotVoiceId={frame.dialogue_voice_id}
                                         snapshotInstructions={frame.dialogue_instructions}
+                                        onUpdateDialogue={async (text: string) => {
+                                            if (!currentProject) return;
+                                            try {
+                                                await api.updateFrame(currentProject.id, frame.id, { dialogue: text });
+                                                const updated = await api.getProject(currentProject.id);
+                                                if (updated?.frames) updateProject(currentProject.id, { frames: updated.frames });
+                                            } catch (e) {
+                                                debugLog.error("Studio", "update dialogue from audio row failed", e);
+                                            }
+                                        }}
                                         onAudioUpdated={async () => {
-                                            // Refresh project so frame.audio_url + dialogue_text_hash
-                                            // round-trip back into UI
                                             if (!currentProject) return;
                                             try {
                                                 const updated = await api.getProject(currentProject.id);
@@ -1655,6 +2027,44 @@ export default function StoryboardR2V() {
                                                 }
                                             } catch (e) {
                                                 debugLog.warn("Studio", "refresh after audio gen failed", e);
+                                            }
+                                        }}
+                                        videoUrl={(() => {
+                                            const selectedId = frame.selected_video_id;
+                                            const task = (currentProject as any)?.video_tasks?.find(
+                                                (t: any) => selectedId ? t.id === selectedId : (t.frame_id === frame.id && t.status === "completed")
+                                            );
+                                            return task?.video_url;
+                                        })()}
+                                        videoTaskId={frame.selected_video_id ||
+                                            (currentProject as any)?.video_tasks?.find(
+                                                (t: any) => t.frame_id === frame.id && t.status === "completed"
+                                            )?.id}
+                                        previewVideoUrl={frame.preview_video_url}
+                                        dubbedVideoUrl={frame.dubbed_video_url}
+                                        dubOffsetMs={frame.dub_offset_ms ?? 0}
+                                        onPreviewDub={async (videoTaskId: string, offsetMs: number) => {
+                                            if (!currentProject) return;
+                                            await api.previewDub(currentProject.id, frame.id, videoTaskId, offsetMs);
+                                            const updated = await api.getProject(currentProject.id);
+                                            if (updated?.frames) {
+                                                updateProject(currentProject.id, { frames: updated.frames });
+                                            }
+                                        }}
+                                        onApplyDub={async () => {
+                                            if (!currentProject) return;
+                                            await api.applyDub(currentProject.id, frame.id);
+                                            const updated = await api.getProject(currentProject.id);
+                                            if (updated?.frames) {
+                                                updateProject(currentProject.id, { frames: updated.frames });
+                                            }
+                                        }}
+                                        onRevertDub={async () => {
+                                            if (!currentProject) return;
+                                            await api.revertDub(currentProject.id, frame.id);
+                                            const updated = await api.getProject(currentProject.id);
+                                            if (updated?.frames) {
+                                                updateProject(currentProject.id, { frames: updated.frames });
                                             }
                                         }}
                                     />
@@ -1806,6 +2216,8 @@ export default function StoryboardR2V() {
                                     tasks={shotTasks}
                                     activeModel={paramsState.model}
                                     compareSelectedIds={compareSelectedIds}
+                                    dubbedVideoUrl={currentProject?.frames?.find((f: any) => f.id === shot.id)?.dubbed_video_url}
+                                    dubbedVideoTaskId={currentProject?.frames?.find((f: any) => f.id === shot.id)?.dubbed_video_task_id}
                                     onClickThumb={handleCandidateClick}
                                     onToggleStar={handleToggleStar}
                                     onSetLabel={handleSetLabel}
@@ -1875,7 +2287,7 @@ export default function StoryboardR2V() {
             onClose={() => setGenDialogOpen(false)}
             project={currentProject as any}
             existingShotCount={shots.length}
-            onConfirm={handleGenerateStoryboard}
+            onConfirm={handleSmartGenerate}
             onJumpToScript={() => {
                 setGenDialogOpen(false);
                 window.dispatchEvent(new CustomEvent("navigateStep", { detail: "script" }));
@@ -1885,37 +2297,3 @@ export default function StoryboardR2V() {
     );
 }
 
-// PR-3j · Top toolbar batch generator. Lazy state to keep the parent
-// re-render cost zero while idle.
-function BatchDialogueAudioButton({
-    scriptId,
-    onDone,
-}: {
-    scriptId: string | null;
-    onDone: () => void | Promise<void>;
-}) {
-    const t = useTranslations("dialogueAudio");
-    const [busy, setBusy] = useState(false);
-    if (!scriptId) return null;
-    const handleClick = async () => {
-        setBusy(true);
-        try {
-            await api.generateDialogueAudioBatch(scriptId);
-            await onDone();
-        } catch (e) {
-            debugLog.error("Studio", "batch dialogue audio failed", e);
-        } finally {
-            setBusy(false);
-        }
-    };
-    return (
-        <button
-            type="button"
-            onClick={handleClick}
-            disabled={busy}
-            className="inline-flex h-7 items-center gap-1.5 rounded px-2.5 font-mono text-[10.5px] uppercase tracking-[0.14em] font-medium text-primary border border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors disabled:opacity-40"
-        >
-            {busy ? "…" : t("batchGenerate")}
-        </button>
-    );
-}

@@ -40,6 +40,18 @@ export function usePanelSectionState(
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [shotId, section]);
 
+    // Listen for global override events (e.g. "expand all" toolbar button)
+    // so externally-flipped localStorage values reflect immediately without
+    // the user having to interact with each section. Same-window writes
+    // do NOT fire the native 'storage' event, so we use a custom one.
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const handler = () => setOpen(readState(shotId, section, defaultOpen));
+        window.addEventListener(PANEL_SECTION_OVERRIDE_EVENT, handler);
+        return () => window.removeEventListener(PANEL_SECTION_OVERRIDE_EVENT, handler);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [shotId, section]);
+
     const set = useCallback((next: boolean) => {
         setOpen(next);
         if (typeof window === "undefined") return;
@@ -51,4 +63,30 @@ export function usePanelSectionState(
     }, [shotId, section]);
 
     return [open, set];
+}
+
+export const PANEL_SECTION_OVERRIDE_EVENT = "lumenx:panel-section-override";
+
+/**
+ * Bulk-set every (shotId × section) pair's persisted state and notify
+ * all live `usePanelSectionState` hooks to re-read. Used by the
+ * Storyboard R2V toolbar's "expand all" / "collapse all" actions to
+ * override sticky preferences.
+ */
+export function overridePanelSectionState(
+    shotIds: string[],
+    sections: string[],
+    open: boolean,
+): void {
+    if (typeof window === "undefined") return;
+    try {
+        for (const sid of shotIds) {
+            for (const sec of sections) {
+                window.localStorage.setItem(key(sid, sec), open ? "1" : "0");
+            }
+        }
+    } catch {
+        /* quota / private mode — partial writes still benefit from the event */
+    }
+    window.dispatchEvent(new Event(PANEL_SECTION_OVERRIDE_EVENT));
 }

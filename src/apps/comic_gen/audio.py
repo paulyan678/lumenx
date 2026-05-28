@@ -38,6 +38,28 @@ def get_bgm_presets() -> List[Dict[str, Any]]:
     return list(BGM_PRESETS)
 
 
+def _effective_dialogue_text(frame: StoryboardFrame) -> str:
+    """Prefer dialogue_structured.line, fall back to legacy frame.dialogue."""
+    if frame.dialogue_structured and frame.dialogue_structured.line:
+        return frame.dialogue_structured.line
+    return frame.dialogue or ""
+
+
+def _effective_instructions(frame: StoryboardFrame) -> Optional[str]:
+    """Prefer explicit dialogue_instructions; lazy-build from dialogue_structured if missing."""
+    if frame.dialogue_instructions:
+        return frame.dialogue_instructions
+    if frame.dialogue_structured:
+        parts = []
+        if frame.dialogue_structured.emotion:
+            parts.append(f"情绪：{frame.dialogue_structured.emotion}")
+        if frame.dialogue_structured.delivery:
+            parts.append(f"演绎：{frame.dialogue_structured.delivery}")
+        if parts:
+            return "；".join(parts)
+    return None
+
+
 def dialogue_audio_is_stale(frame: StoryboardFrame, character: Optional[Character]) -> bool:
     """True when frame.audio_url exists but its snapshot no longer matches
     the current (dialogue|voice|instructions) state."""
@@ -46,7 +68,9 @@ def dialogue_audio_is_stale(frame: StoryboardFrame, character: Optional[Characte
     if not frame.dialogue_text_hash:
         return True  # legacy frame without snapshot — treat as stale
     voice_id = character.voice_id if character else frame.dialogue_voice_id
-    current = _compute_dialogue_hash(frame.dialogue or "", voice_id, frame.dialogue_instructions)
+    text = _effective_dialogue_text(frame)
+    instructions = _effective_instructions(frame)
+    current = _compute_dialogue_hash(text, voice_id, instructions)
     return current != frame.dialogue_text_hash
 
 class AudioGenerator:
@@ -108,12 +132,14 @@ class AudioGenerator:
         family_override: Optional[str] = None,
     ) -> StoryboardFrame:
         """Generates TTS audio for the dialogue."""
-        if not frame.dialogue:
+        text = _effective_dialogue_text(frame)
+        if not text:
             return frame
 
         frame.status = GenerationStatus.PROCESSING
 
-        text = frame.dialogue
+        if instructions is None:
+            instructions = _effective_instructions(frame)
 
         logger.info(f"Generating dialogue for {character.name}: {text} (Speed: {speed}, Pitch: {pitch}, Volume: {volume}, instr: {instructions or '-'})")
 

@@ -21,7 +21,7 @@
  * Spec: r2v-workflow-v3-unified.md §4.2 + Q2-Q5 + Q15
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { X, Play, Pause, Check, Sparkles, Loader2, Plus, Trash2 } from "lucide-react";
+import { X, Play, Pause, Check, Sparkles, Loader2, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { api, type VoiceMeta, type CustomVoice } from "@/lib/api";
 import { getAssetUrl } from "@/lib/utils";
@@ -406,21 +406,22 @@ export default function VoicePickerModal({
                 </div>
             </div>
 
-            {/* PR-3h · Voice clone sub-modal (Q16.2 B) */}
             {seriesId && (
                 <VoiceCloneModal
                     isOpen={cloneModalOpen}
                     onClose={() => setCloneModalOpen(false)}
                     seriesId={seriesId}
+                    characterName={characterName}
+                    characterDescription={characterDescription}
                     onCreated={handleCloneCreated}
                 />
             )}
-            {/* PR-3i · Voice design sub-modal */}
             {seriesId && (
                 <VoiceDesignModal
                     isOpen={designModalOpen}
                     onClose={() => setDesignModalOpen(false)}
                     seriesId={seriesId}
+                    characterName={characterName}
                     characterDescription={characterDescription}
                     onCreated={handleDesignCreated}
                 />
@@ -581,7 +582,6 @@ function CustomVoiceList({
                 onClick={onCreate}
                 className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-dashed border-primary/40 bg-primary/5 px-4 py-3 text-[13px] font-medium text-primary hover:bg-primary/10 hover:border-primary/60 transition-colors"
             >
-                <Plus size={14} />
                 {createLabel}
             </button>
 

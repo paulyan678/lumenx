@@ -1,25 +1,16 @@
 "use client";
 /**
- * VoiceCloneModal — PR-3h #4
+ * VoiceCloneModal — PR-3h #4 (revised)
  *
- * Small sub-modal opened from VoicePickerModal "+ 上传新音频" button
- * (我的复刻 tab). Captures one audio sample + label, uploads via
- * /upload to get URL, then calls /voice/clone which dispatches the
- * dashscope customization API.
+ * Sub-modal for cloning a voice from an audio sample.
+ * Captures one audio sample + label, uploads, then calls /voice/clone.
  *
- * Per Q16.2 推荐 B: dedicated sub-modal keeps picker focused on
- * SELECTION; creation has its own UX surface that matches the simple
- * transactional flow (upload → wait → done).
- *
- * Audio requirements (frontend pre-validation per dashscope doc):
- *   - MP3 / WAV / M4A
- *   - ≤ 10 MB
- *   - Recommend 10-20s, max 60s (not enforced — backend will reject)
- *
- * Spec: r2v-workflow-v3-unified.md §6.1 PR-3h + Q15.2 + Q16
+ * Improvements:
+ *   - Shows character context (name + description) as reference
+ *   - Allow closing during clone with confirmation
  */
 import { useRef, useState } from "react";
-import { X, Upload, Loader2, Check } from "lucide-react";
+import { X, Upload, Loader2, Check, Users } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { api, type CustomVoice } from "@/lib/api";
 
@@ -31,18 +22,21 @@ interface VoiceCloneModalProps {
     isOpen: boolean;
     onClose: () => void;
     seriesId: string;
+    characterName?: string;
+    characterDescription?: string;
     onCreated: (voice: CustomVoice) => void;
 }
 
 type Phase = "pick" | "uploading" | "cloning" | "done" | "error";
 
-export default function VoiceCloneModal({ isOpen, onClose, seriesId, onCreated }: VoiceCloneModalProps) {
+export default function VoiceCloneModal({ isOpen, onClose, seriesId, characterName, characterDescription, onCreated }: VoiceCloneModalProps) {
     const t = useTranslations("voiceClone");
     const [file, setFile] = useState<File | null>(null);
     const [label, setLabel] = useState("");
     const [phase, setPhase] = useState<Phase>("pick");
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [dragHot, setDragHot] = useState(false);
+    const [confirmClose, setConfirmClose] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     if (!isOpen) return null;
@@ -52,10 +46,21 @@ export default function VoiceCloneModal({ isOpen, onClose, seriesId, onCreated }
         setLabel("");
         setPhase("pick");
         setErrorMsg(null);
+        setConfirmClose(false);
     };
 
+    const inFlight = phase === "uploading" || phase === "cloning";
+
     const handleClose = () => {
-        if (phase === "uploading" || phase === "cloning") return; // block close mid-flight
+        if (inFlight) {
+            setConfirmClose(true);
+            return;
+        }
+        reset();
+        onClose();
+    };
+
+    const handleForceClose = () => {
         reset();
         onClose();
     };
@@ -78,7 +83,6 @@ export default function VoiceCloneModal({ isOpen, onClose, seriesId, onCreated }
         }
         setFile(f);
         if (!label.trim()) {
-            // Auto-suggest label from filename minus extension
             const base = f.name.replace(/\.[^.]+$/, "");
             setLabel(base.slice(0, 30));
         }
@@ -89,7 +93,6 @@ export default function VoiceCloneModal({ isOpen, onClose, seriesId, onCreated }
         setErrorMsg(null);
         setPhase("uploading");
         try {
-            // Step 1: upload audio file to get a URL
             const formData = new FormData();
             formData.append("file", file);
             const uploadResp = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "/api"}/upload`, {
@@ -102,7 +105,6 @@ export default function VoiceCloneModal({ isOpen, onClose, seriesId, onCreated }
             const { url } = await uploadResp.json();
             if (!url) throw new Error("Upload response missing url");
 
-            // Step 2: call /voice/clone
             setPhase("cloning");
             const voice = await api.cloneVoice({
                 series_id: seriesId,
@@ -111,7 +113,6 @@ export default function VoiceCloneModal({ isOpen, onClose, seriesId, onCreated }
             });
 
             setPhase("done");
-            // Allow user to see success briefly, then close
             setTimeout(() => {
                 onCreated(voice);
                 reset();
@@ -123,12 +124,10 @@ export default function VoiceCloneModal({ isOpen, onClose, seriesId, onCreated }
         }
     };
 
-    const inFlight = phase === "uploading" || phase === "cloning";
-
     return (
         <div className="fixed inset-0 z-[110] grid place-items-center bg-overlay backdrop-blur-sm" onClick={handleClose}>
             <div
-                className="w-full max-w-md rounded-2xl border border-glass-border bg-elevated shadow-[0_24px_64px_-12px_rgba(0,0,0,0.7)]"
+                className="w-full max-w-lg rounded-2xl border border-glass-border bg-elevated shadow-[0_24px_64px_-12px_rgba(0,0,0,0.7)]"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
@@ -136,9 +135,8 @@ export default function VoiceCloneModal({ isOpen, onClose, seriesId, onCreated }
                     <h2 className="text-display font-medium text-foreground">{t("title")}</h2>
                     <button
                         onClick={handleClose}
-                        disabled={inFlight}
                         aria-label={t("close")}
-                        className="p-1.5 rounded-lg hover:bg-hover-bg text-text-muted hover:text-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        className="p-1.5 rounded-lg hover:bg-hover-bg text-text-muted hover:text-foreground transition-colors"
                     >
                         <X size={15} />
                     </button>
@@ -146,6 +144,26 @@ export default function VoiceCloneModal({ isOpen, onClose, seriesId, onCreated }
 
                 {/* Body */}
                 <div className="px-5 py-4 space-y-4">
+                    {/* Character context panel */}
+                    {(characterName || characterDescription) && (
+                        <div className="rounded-lg border border-glass-border bg-black/20 px-4 py-3">
+                            <div className="flex items-center gap-2 mb-1.5">
+                                <Users size={12} className="text-text-muted" />
+                                <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-text-muted">
+                                    {t("characterContext")}
+                                </span>
+                            </div>
+                            {characterName && (
+                                <p className="text-[13px] font-medium text-foreground">{characterName}</p>
+                            )}
+                            {characterDescription && (
+                                <p className="mt-1 text-[12px] text-text-secondary leading-relaxed line-clamp-3">
+                                    {characterDescription}
+                                </p>
+                            )}
+                        </div>
+                    )}
+
                     {/* Drop zone */}
                     <div
                         onDragOver={(e) => { e.preventDefault(); if (!inFlight) setDragHot(true); }}
@@ -216,7 +234,7 @@ export default function VoiceCloneModal({ isOpen, onClose, seriesId, onCreated }
                         </div>
                     )}
 
-                    {/* Status banner during flight */}
+                    {/* Status banner */}
                     {inFlight && (
                         <div className="flex items-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-body-sm text-foreground">
                             <Loader2 size={13} className="animate-spin text-primary" />
@@ -235,8 +253,7 @@ export default function VoiceCloneModal({ isOpen, onClose, seriesId, onCreated }
                 <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-glass-border">
                     <button
                         onClick={handleClose}
-                        disabled={inFlight}
-                        className="inline-flex items-center px-3 py-1.5 rounded-md bg-glass border border-glass-border text-text-secondary hover:text-foreground hover:bg-hover-bg transition-colors text-[12px] disabled:opacity-30"
+                        className="inline-flex items-center px-3 py-1.5 rounded-md bg-glass border border-glass-border text-text-secondary hover:text-foreground hover:bg-hover-bg transition-colors text-[12px]"
                     >
                         {t("cancel")}
                     </button>
@@ -250,6 +267,36 @@ export default function VoiceCloneModal({ isOpen, onClose, seriesId, onCreated }
                     </button>
                 </div>
             </div>
+
+            {/* Confirm close dialog during clone */}
+            {confirmClose && (
+                <div
+                    className="fixed inset-0 z-[120] grid place-items-center bg-overlay/60"
+                    onClick={(e) => { e.stopPropagation(); setConfirmClose(false); }}
+                >
+                    <div
+                        className="w-full max-w-xs rounded-xl border border-glass-border bg-elevated p-5 shadow-[0_16px_48px_-8px_rgba(0,0,0,0.7)]"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <p className="text-[13px] text-foreground font-medium mb-1">{t("confirmCloseTitle")}</p>
+                        <p className="text-[12px] text-text-secondary mb-4">{t("confirmCloseBody")}</p>
+                        <div className="flex items-center gap-2 justify-end">
+                            <button
+                                onClick={() => setConfirmClose(false)}
+                                className="px-3 py-1.5 rounded-md bg-glass border border-glass-border text-text-secondary hover:text-foreground text-[12px] transition-colors"
+                            >
+                                {t("confirmCloseStay")}
+                            </button>
+                            <button
+                                onClick={handleForceClose}
+                                className="px-3 py-1.5 rounded-md bg-status-failed-bg border border-status-failed-border text-status-failed-fg hover:bg-status-failed-bg/80 text-[12px] font-medium transition-colors"
+                            >
+                                {t("confirmCloseLeave")}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

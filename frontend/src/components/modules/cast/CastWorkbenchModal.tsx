@@ -29,6 +29,57 @@ import PreviewImage from "@/components/shared/preview/PreviewImage";
 
 export type CastKind = "character" | "scene" | "prop";
 
+// Module-level poll registry — survives modal close/reopen.
+export const activePolls = new Map<string, ReturnType<typeof setInterval>>();
+
+function startAssetPoll(
+    entityId: string,
+    taskId: string,
+    projectId: string,
+    kind: CastKind,
+    generationType: string,
+    getStore: () => {
+        updateProject: (id: string, data: any) => void;
+        removeGeneratingTask: (assetId: string, generationType: string) => void;
+    },
+    progressToastId?: string,
+) {
+    if (activePolls.has(entityId)) return;
+    const interval = setInterval(async () => {
+        try {
+            const status = await api.getTaskStatus(taskId);
+            if (status?.status === "completed") {
+                clearInterval(interval);
+                activePolls.delete(entityId);
+                if (progressToastId) toast.dismiss(progressToastId);
+                const fresh = await api.getProject(projectId);
+                const { updateProject, removeGeneratingTask } = getStore();
+                updateProject(projectId, fresh);
+                removeGeneratingTask(entityId, generationType);
+                const entityPool = (kind === "character" ? fresh.characters : kind === "scene" ? fresh.scenes : fresh.props) || [];
+                const updatedEntity = entityPool.find((e: any) => e.id === entityId);
+                const count = updatedEntity ? readVariants(updatedEntity, kind).length : 0;
+                toast.success(`生成完成`, { body: `已生成 ${count} 张变体` });
+            } else if (status?.status === "failed") {
+                clearInterval(interval);
+                activePolls.delete(entityId);
+                if (progressToastId) toast.dismiss(progressToastId);
+                const { removeGeneratingTask } = getStore();
+                removeGeneratingTask(entityId, generationType);
+                toast.error("生成失败", { body: status?.error?.slice(0, 200) || "未知错误" });
+            }
+        } catch (err) {
+            clearInterval(interval);
+            activePolls.delete(entityId);
+            if (progressToastId) toast.dismiss(progressToastId);
+            const { removeGeneratingTask } = getStore();
+            removeGeneratingTask(entityId, generationType);
+            toast.error("轮询异常", { body: "请刷新页面查看结果" });
+        }
+    }, 2500);
+    activePolls.set(entityId, interval);
+}
+
 interface CastWorkbenchModalProps {
     isOpen: boolean;
     kind: CastKind | null;
@@ -134,6 +185,9 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
     const currentSeries = useProjectStore((state) => state.currentSeries);
     const allProjects = useProjectStore((state) => state.projects);
     const updateProject = useProjectStore((state) => state.updateProject);
+    const generatingTasks = useProjectStore((state) => state.generatingTasks);
+    const addGeneratingTask = useProjectStore((state) => state.addGeneratingTask);
+    const removeGeneratingTask = useProjectStore((state) => state.removeGeneratingTask);
 
     // Look up the live entity from the store so it stays in sync after
     // generation calls patch the project.
@@ -158,7 +212,7 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
     const [negativeExpanded, setNegativeExpanded] = useState(false);
     const [applyStyle, setApplyStyle] = useState(true);
     const [galleryFilter, setGalleryFilter] = useState<"all" | "favorited">("all");
-    const [generating, setGenerating] = useState(false);
+    const generating = generatingTasks.some((t) => t.assetId === entityId);
     const [selectedTemplate, setSelectedTemplate] = useState<CharacterTemplate>("simple");
     const [pendingTemplate, setPendingTemplate] = useState<CharacterTemplate | null>(null);
     const [promptDirty, setPromptDirty] = useState(false);
@@ -241,90 +295,51 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
             });
             return;
         }
-        setGenerating(true);
-        const toastId = toast.progress(t("toastGenStart", { kind: t(`kind.${kind}`) }), {
+        const effectiveBatchSize = Math.max(1, Math.min(4, batchSize));
+        addGeneratingTask(entity.id, "all", effectiveBatchSize);
+
+        const progressId = toast.progress(t("toastGenStart", { kind: t(`kind.${kind}`) }), {
             projectId: currentProject.id,
             projectTitle: currentProject.title,
             body: t("toastGenStartBody"),
         });
+
         try {
             const resp = await api.generateAsset(
                 currentProject.id,
                 entity.id,
                 kind,
                 currentProject.style_preset || "realistic",
-                applyStyle ? stylePositive : "",  // stylePrompt
-                "all",                    // generationType
-                prompt.trim(),            // prompt override
-                applyStyle,               // applyStyle
-                [applyStyle ? styleNegative : "", getTemplateNegative(kind, selectedTemplate)].filter(Boolean).join(", "),  // negativePrompt
-                Math.max(1, Math.min(4, batchSize)),
+                applyStyle ? stylePositive : "",
+                "all",
+                prompt.trim(),
+                applyStyle,
+                [applyStyle ? styleNegative : "", getTemplateNegative(kind, selectedTemplate)].filter(Boolean).join(", "),
+                effectiveBatchSize,
                 modelOverride || currentProject.model_settings?.t2i_model,
                 aspectRatioOverride || undefined,
             );
-            // Backend returns either the updated script (sync) or { script, _task_id } for async.
+
             const taskId = (resp as any)?._task_id;
             if (taskId) {
-                // Poll until done.
-                let attempts = 0;
-                while (attempts < 60) {
-                    await new Promise((r) => setTimeout(r, 2000));
-                    attempts += 1;
-                    try {
-                        const status = await api.getTaskStatus(taskId);
-                        if (status?.status === "completed") {
-                            // Refresh project to pick up new variants.
-                            const fresh = await api.getProject(currentProject.id);
-                            updateProject(currentProject.id, fresh);
-                            const fresheEntity = (kind === "character"
-                                ? fresh.characters
-                                : kind === "scene"
-                                    ? fresh.scenes
-                                    : fresh.props)?.find((e: any) => e.id === entity.id);
-                            const newCount = readVariants(fresheEntity, kind).length;
-                            toast.update(toastId, {
-                                kind: "success",
-                                title: t("toastGenDone", { kind: t(`kind.${kind}`) }),
-                                body: t("toastGenDoneBody", { count: newCount }),
-                                autoCloseMs: 6000,
-                            });
-                            break;
-                        }
-                        if (status?.status === "failed") {
-                            throw new Error(status?.error || t("toastGenErrUnknown"));
-                        }
-                    } catch (e) {
-                        if (attempts >= 60) throw e;
-                    }
-                }
+                const capturedEntityId = entity.id;
+                const capturedKind = kind;
+                const capturedProjectId = currentProject.id;
+                startAssetPoll(capturedEntityId, taskId, capturedProjectId, capturedKind, "all", () => ({
+                    updateProject: useProjectStore.getState().updateProject,
+                    removeGeneratingTask: useProjectStore.getState().removeGeneratingTask,
+                }), progressId);
             } else if (resp) {
+                toast.dismiss(progressId);
                 updateProject(currentProject.id, resp);
-                const fresheEntity = (kind === "character"
-                    ? resp.characters
-                    : kind === "scene"
-                        ? resp.scenes
-                        : resp.props)?.find((e: any) => e.id === entity.id);
-                const newCount = readVariants(fresheEntity, kind).length;
-                toast.update(toastId, {
-                    kind: "success",
-                    title: t("toastGenDone", { kind: t(`kind.${kind}`) }),
-                    body: t("toastGenDoneBody", { count: newCount }),
-                    autoCloseMs: 6000,
-                });
+                removeGeneratingTask(entity.id, "all");
+                toast.success(t("toastGenDone", { kind: t(`kind.${kind}`) }));
             }
         } catch (err: any) {
+            toast.dismiss(progressId);
+            removeGeneratingTask(entity.id, "all");
             const detail = err?.response?.data?.detail || err?.message || t("toastGenErrUnknown");
-            toast.update(toastId, {
-                kind: "error",
-                title: t("toastGenErr"),
-                body: String(detail).slice(0, 240),
-                action: {
-                    label: t("retry"),
-                    onClick: () => { handleGenerate(); },
-                },
-            });
-        } finally {
-            setGenerating(false);
+            toast.error(t("toastGenErr"), { body: String(detail).slice(0, 240) });
         }
     };
 

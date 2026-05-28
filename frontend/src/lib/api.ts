@@ -147,6 +147,56 @@ export interface VideoTask {
     provider_request_id?: string | null;
 }
 
+// ─── Storyboard Schema v2 types ─────────────────────────────────────────────
+
+export interface DialogueStructured {
+    speaker: string;
+    line: string;
+    emotion?: string | null;
+    delivery?: string | null;
+}
+
+export interface CameraMovementStructured {
+    primary: string;
+    secondary?: string | null;
+    speed: string;
+    description?: string | null;
+}
+
+export interface BlockingData {
+    description?: string | null;
+    stage?: Array<{
+        ref: string;
+        zone?: string | null;
+        depth?: string | null;
+        height?: string | null;
+        facing?: string | null;
+        posture?: string | null;
+    }> | null;
+    camera_relation?: string | null;
+}
+
+export interface AudioNoteData {
+    sfx?: string | null;
+    ambience?: string | null;
+    bgm_note?: string | null;
+}
+
+export interface LightingData {
+    direction?: string | null;
+    quality?: string | null;
+    color_temp?: string | null;
+    description?: string | null;
+}
+
+export interface RefineSSEEvent {
+    type: "frame_refine_start" | "frame_refine_complete" | "frame_refine_error" | "batch_complete";
+    frame_id?: string;
+    frame_index?: number;
+    total?: number;
+    error?: string;
+}
+
 export const api = {
     createProject: async (title: string, text: string, skipAnalysis: boolean = false, workflowMode: string = "r2v") => {
         const res = await axios.post(`${API_URL}/projects`, { title, text, workflow_mode: workflowMode }, {
@@ -173,6 +223,11 @@ export const api = {
     reparseProject: async (scriptId: string, text: string) => {
         const res = await axios.put(`${API_URL}/projects/${scriptId}/reparse`, { text });
         return { ...res.data, originalText: res.data.original_text };
+    },
+
+    extractPreview: async (scriptId: string, text: string) => {
+        const res = await axios.post(`${API_URL}/projects/${scriptId}/extract_preview`, { text });
+        return res.data as { characters: any[]; scenes: any[]; props: any[] };
     },
 
     /** Persist `original_text` without LLM reparse. Used for textarea
@@ -414,7 +469,7 @@ export const api = {
         return response.json();
     },
 
-    generateAsset: async (scriptId: string, assetId: string, assetType: string, stylePreset: string, stylePrompt?: string, generationType: string = "all", prompt: string = "", applyStyle: boolean = true, negativePrompt: string = "", batchSize: number = 1, modelName?: string) => {
+    generateAsset: async (scriptId: string, assetId: string, assetType: string, stylePreset: string, stylePrompt?: string, generationType: string = "all", prompt: string = "", applyStyle: boolean = true, negativePrompt: string = "", batchSize: number = 1, modelName?: string, aspectRatio?: string) => {
         const res = await axios.post(`${API_URL}/projects/${scriptId}/assets/generate`, {
             asset_id: assetId,
             asset_type: assetType,
@@ -425,9 +480,9 @@ export const api = {
             apply_style: applyStyle,
             negative_prompt: negativePrompt,
             batch_size: batchSize,
-            model_name: modelName
+            model_name: modelName,
+            aspect_ratio: aspectRatio,
         });
-        // Now returns { ...script, _task_id: string }
         return res.data;
     },
 
@@ -673,6 +728,10 @@ export const api = {
         camera_angle?: string;
         scene_id?: string;
         character_ids?: string[];
+        duration?: number;
+        shot_size?: string;
+        camera_movement_description?: string;
+        transition_hint?: string;
     }) => {
         const res = await axios.post(`${API_URL}/projects/${scriptId}/frames/update`, {
             frame_id: frameId,
@@ -919,12 +978,72 @@ export const api = {
 
     /** PR-3j · Generate dialogue audio for every frame with dialogue.
      *  Skips frames whose snapshot hash still matches. */
-    generateDialogueAudioBatch: async (scriptId: string) => {
+    generateDialogueAudioBatch: async (scriptId: string): Promise<{ _batch_stats: { generated: number; skipped: number; failed: number; no_voice: number } }> => {
         const response = await fetch(`${API_URL}/projects/${scriptId}/dialogue_audio/batch`, {
             method: "POST",
         });
         if (!response.ok) throw new Error("Failed to generate dialogue audio batch");
         return response.json();
+    },
+
+    previewDub: async (scriptId: string, frameId: string, videoTaskId: string, offsetMs: number = 0) => {
+        const res = await axios.post(`${API_URL}/projects/${scriptId}/frames/${frameId}/dub/preview`, {
+            video_task_id: videoTaskId,
+            offset_ms: offsetMs,
+        }, { timeout: 120000 });
+        return res.data;
+    },
+
+    applyDub: async (scriptId: string, frameId: string) => {
+        const res = await axios.post(`${API_URL}/projects/${scriptId}/frames/${frameId}/dub/apply`);
+        return res.data;
+    },
+
+    revertDub: async (scriptId: string, frameId: string) => {
+        const res = await axios.delete(`${API_URL}/projects/${scriptId}/frames/${frameId}/dub`);
+        return res.data;
+    },
+
+    /** Schema v2 · Refine a single frame (Phase 2 rich fields). */
+    refineSingleFrame: async (scriptId: string, frameId: string) => {
+        const response = await fetch(`${API_URL}/projects/${scriptId}/frames/${frameId}/refine`, {
+            method: "POST",
+        });
+        if (!response.ok) throw new Error("Failed to refine frame");
+        return response.json();
+    },
+
+    /** Schema v2 · Batch refine all frames via SSE stream. */
+    refineBatchFrames: async (
+        scriptId: string,
+        onEvent: (event: RefineSSEEvent) => void,
+    ): Promise<void> => {
+        const response = await fetch(`${API_URL}/projects/${scriptId}/storyboard/refine_batch`, {
+            method: "POST",
+        });
+        if (!response.ok) throw new Error("Failed to start batch refine");
+        const reader = response.body?.getReader();
+        if (!reader) return;
+        const decoder = new TextDecoder();
+        let buffer = "";
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || "";
+            let currentEventType = "";
+            for (const line of lines) {
+                if (line.startsWith("event: ")) {
+                    currentEventType = line.slice(7).trim();
+                } else if (line.startsWith("data: ")) {
+                    try {
+                        const data = JSON.parse(line.slice(6));
+                        onEvent({ type: currentEventType as RefineSSEEvent["type"], ...data });
+                    } catch { /* skip malformed lines */ }
+                }
+            }
+        }
     },
 
     /** PR-3k · BGM preset catalog for Assembly Mix phase. */
@@ -1220,7 +1339,8 @@ export const api = {
     createEpisodeForSeries: async (seriesId: string, title: string, episodeNumber: number, workflowMode: string = "r2v") => {
         const project = await api.createProject(title, "", true, workflowMode);
         await api.addEpisodeToSeries(seriesId, project.id, episodeNumber);
-        return project;
+        const refreshed = await api.getProject(project.id);
+        return refreshed;
     },
 
     // File Import

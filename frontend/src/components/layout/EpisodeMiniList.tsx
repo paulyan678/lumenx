@@ -19,7 +19,7 @@
  * to silent hide on fetch error — non-blocking.
  */
 import { useEffect, useState } from "react";
-import { Tv } from "lucide-react";
+import { Tv, Plus } from "lucide-react";
 import clsx from "clsx";
 import { useTranslations } from "next-intl";
 import { api } from "@/lib/api";
@@ -38,6 +38,12 @@ interface EpisodeMiniListProps {
      *  user lands on the same module (storyboard → storyboard) in the
      *  new episode. */
     activeStep: string;
+}
+
+function navigateToSeriesAddEpisode(seriesId: string): void {
+    // Send the user to the SeriesDetailPage where they can add a
+    // new episode. The page handles import / create flows.
+    window.location.hash = `/series/${seriesId}`;
 }
 
 export default function EpisodeMiniList({
@@ -78,9 +84,14 @@ export default function EpisodeMiniList({
         return () => { cancelled = true; };
     }, [seriesId]);
 
-    // Don't render anything for standalone projects or while loading
-    // empty — keeps the sidebar layout stable.
-    if (loading || !episodes || episodes.length <= 1) return null;
+    // Always render when this project is part of a series — even
+    // if the series only has 1 episode today. The previous
+    // "<=1 hide" gate made the affordance undiscoverable: users
+    // never saw the widget so they never realized they could add
+    // more episodes from inside Studio. Now they get the badge
+    // plus a "+ Add" CTA that jumps to SeriesDetailPage's add-
+    // episode flow.
+    if (loading || !episodes || episodes.length === 0) return null;
 
     const handleSwitch = (epId: string) => {
         if (epId === currentProjectId) return;
@@ -92,9 +103,22 @@ export default function EpisodeMiniList({
 
     return (
         <div className="border-b border-glass-border px-4 py-3">
-            <div className="mb-2 flex items-center gap-2 font-mono text-chrome-sm font-medium uppercase text-text-muted">
-                <Tv size={11} aria-hidden="true" />
-                {t("title", { count: episodes.length })}
+            <div className="mb-2 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 font-mono text-chrome-sm font-medium uppercase text-text-muted">
+                    <Tv size={11} aria-hidden="true" />
+                    {t("title", { count: episodes.length })}
+                </div>
+                {/* Add-episode CTA — always available so growing the
+                    series doesn't require leaving Studio. */}
+                <button
+                    type="button"
+                    onClick={() => navigateToSeriesAddEpisode(seriesId)}
+                    aria-label={t("addEpisode")}
+                    title={t("addEpisode")}
+                    className="btn-tip -m-1 grid h-6 w-6 place-items-center rounded text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                >
+                    <Plus size={11} aria-hidden="true" />
+                </button>
             </div>
             <div className="max-h-[180px] space-y-1 overflow-y-auto pr-1">
                 {episodes.map((ep) => {

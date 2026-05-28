@@ -31,6 +31,10 @@ export interface VideoConfig {
     // Vidu
     viduAudio?: boolean;
     movementAmplitude?: string;
+    // Watermark toggle (wan / kling / vidu / pixverse / happyhorse video).
+    // Lives in videoConfig so the user's choice survives shot switches +
+    // page reloads, same lifecycle as negativePrompt / promptExtend.
+    watermark?: boolean;
 }
 
 /** Which model dropdown the modal should drive: I2V models for the

@@ -33,6 +33,9 @@ interface CandidatesSectionProps {
      *  candidates from the other tab don't leak in. */
     activeModel?: string;
     compareSelectedIds: Set<string>;
+    /** Dub info: if a task was dubbed, show dubbed version in its thumb. */
+    dubbedVideoUrl?: string;
+    dubbedVideoTaskId?: string;
     onClickThumb: (task: VideoTask, modifiers: { shift: boolean; meta: boolean }) => void;
     onToggleStar: (task: VideoTask, next: boolean) => Promise<void> | void;
     onSetLabel: (task: VideoTask, next: string | null) => Promise<void> | void;
@@ -109,6 +112,8 @@ export default function CandidatesSection({
     tasks,
     activeModel,
     compareSelectedIds,
+    dubbedVideoUrl,
+    dubbedVideoTaskId,
     onClickThumb,
     onToggleStar,
     onSetLabel,
@@ -174,19 +179,25 @@ export default function CandidatesSection({
                             this model
                         </FilterChip>
                     ) : null}
-                    {/* Sort flipper */}
+                    {/* Sort flipper — text label inline so users know what
+                        the click toggles (Issue 12: icon-only version was
+                        opaque; users saw an icon flip but couldn't tell what
+                        changed). Label updates in lockstep with state. */}
                     <button
                         type="button"
                         onClick={() => setSort((s) => (s === "time" ? "model" : "time"))}
-                        title={`Sort by ${sort === "time" ? "time" : "model"} (click to switch)`}
-                        aria-label={`Sort by ${sort === "time" ? "time" : "model"}; click to switch`}
-                        className="btn-tip -m-1 grid h-7 w-7 place-items-center rounded text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                        title={`Currently sorting by ${sort}. Click to switch to ${sort === "time" ? "model" : "time"}.`}
+                        aria-label={`Sort: ${sort}. Click to switch.`}
+                        className="btn-tip -m-1 inline-flex h-7 items-center gap-1 rounded px-1.5 text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                     >
                         {sort === "time" ? (
                             <Clock size={11} aria-hidden="true" />
                         ) : (
                             <Film size={11} aria-hidden="true" />
                         )}
+                        <span className="font-mono text-chrome-sm font-medium uppercase tracking-tight">
+                            sort: {sort}
+                        </span>
                     </button>
                 </>
             }
@@ -238,6 +249,8 @@ export default function CandidatesSection({
                             batch={batch}
                             defaultOpen={batchIdx === 0}
                             compareSelectedIds={compareSelectedIds}
+                            dubbedVideoUrl={dubbedVideoUrl}
+                            dubbedVideoTaskId={dubbedVideoTaskId}
                             resolveUrl={resolveUrl}
                             onClickThumb={onClickThumb}
                             onToggleStar={onToggleStar}
@@ -285,6 +298,8 @@ function BatchBlock({
     batch,
     defaultOpen,
     compareSelectedIds,
+    dubbedVideoUrl,
+    dubbedVideoTaskId,
     resolveUrl,
     onClickThumb,
     onToggleStar,
@@ -296,6 +311,8 @@ function BatchBlock({
     batch: BatchSummary;
     defaultOpen: boolean;
     compareSelectedIds: Set<string>;
+    dubbedVideoUrl?: string;
+    dubbedVideoTaskId?: string;
     resolveUrl?: (url: string) => string;
     onClickThumb: CandidatesSectionProps["onClickThumb"];
     onToggleStar: CandidatesSectionProps["onToggleStar"];
@@ -381,6 +398,7 @@ function BatchBlock({
                             key={task.id}
                             task={task}
                             isCompareSelected={compareSelectedIds.has(task.id)}
+                            dubbedVideoUrl={task.id === dubbedVideoTaskId ? dubbedVideoUrl : undefined}
                             resolveUrl={resolveUrl}
                             onClick={onClickThumb}
                             onToggleStar={onToggleStar}

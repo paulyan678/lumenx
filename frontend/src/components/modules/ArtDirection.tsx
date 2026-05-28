@@ -1,14 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Palette, Wand2, Plus, Check, Loader2, ChevronRight, Lock, RotateCcw, ArrowUp, AlertTriangle, X } from "lucide-react";
-import { useProjectStore, type StyleConfig, type StylePreset } from "@/store/projectStore"; // Combined imports
+import { Sparkles, Palette, Wand2, Plus, Check, ChevronRight, Lock, RotateCcw, ArrowUp, AlertTriangle, X, Image as ImageIcon, Pencil } from "lucide-react";
+import { useProjectStore, type StyleConfig, type StylePreset, type StylePresetCategory } from "@/store/projectStore";
 import { api } from "@/lib/api";
 import StepHeader from "@/components/shared/StepHeader";
 import WorkflowActionButton from "@/components/shared/WorkflowActionButton";
-import SidePanelHeader from "@/components/shared/SidePanelHeader";
 import { toast } from "@/store/toastStore";
 
 export default function ArtDirection() {
@@ -24,29 +23,44 @@ export default function ArtDirection() {
     const [selectedStyle, setSelectedStyle] = useState<StyleConfig | null>(null);
     const [customStyles, setCustomStyles] = useState<StyleConfig[]>([]);
     const [aiRecommendations, setAiRecommendations] = useState<StyleConfig[]>([]);
-    const [presets, setPresets] = useState<StylePreset[]>([]); // Changed type to StylePreset[]
+    const [presets, setPresets] = useState<StylePreset[]>([]);
+    const [categories, setCategories] = useState<StylePresetCategory[]>([]);
+    const [activeCategory, setActiveCategory] = useState<string>("all");
 
-    // Editor state
+    // Modal state
+    const [modalPreset, setModalPreset] = useState<StylePreset | null>(null);
+    const [modalEditing, setModalEditing] = useState(false);
+    const [modalPositive, setModalPositive] = useState("");
+    const [modalNegative, setModalNegative] = useState("");
+
+    // AI Recommendation modal state
+    const [aiModalStyle, setAiModalStyle] = useState<StyleConfig | null>(null);
+    const [aiModalEditing, setAiModalEditing] = useState(false);
+    const [aiModalPositive, setAiModalPositive] = useState("");
+    const [aiModalNegative, setAiModalNegative] = useState("");
+
+    // Track if current selection is modified from original preset
+    const [isModified, setIsModified] = useState(false);
+
+    // Editor state (kept for Apply logic)
     const [editingName, setEditingName] = useState("");
     const [editingPositive, setEditingPositive] = useState("");
     const [editingNegative, setEditingNegative] = useState("");
     const [isSaving, setIsSaving] = useState(false);
 
-    // Series baseline (inherit source). Fetched on mount/project change.
+    const filteredPresets = useMemo(() => {
+        if (activeCategory === "all") return presets;
+        return presets.filter(p => p.category === activeCategory);
+    }, [presets, activeCategory]);
+
+    // Series baseline (inherit source)
     const [seriesBaseline, setSeriesBaseline] = useState<StyleConfig | null>(null);
     const [seriesBaselineLoading, setSeriesBaselineLoading] = useState(false);
     const [bannerBusy, setBannerBusy] = useState(false);
-    // Confirm-override dialog (gates the first preset click while inheriting,
-    // per design grill: never silently 'unlock' — always explicit when
-    // diverging from the series baseline).
     const [pendingOverrideStyle, setPendingOverrideStyle] = useState<StyleConfig | null>(null);
-    // True after the user explicitly accepted the override prompt for this
-    // editing session but before they hit Apply. Drives the amber 'preview'
-    // banner + editor ring so the user knows their changes aren't yet saved.
     const [overrideAccepted, setOverrideAccepted] = useState(false);
 
     useEffect(() => {
-        // Reset session-only state when switching projects
         setOverrideAccepted(false);
         setPendingOverrideStyle(null);
         const seriesId = currentProject?.series_id;
@@ -63,32 +77,24 @@ export default function ArtDirection() {
             .finally(() => setSeriesBaselineLoading(false));
     }, [currentProject?.series_id, currentProject?.id]);
 
-    // Inherit-state derivation (project relative to series baseline).
     const projectStyle = currentProject?.art_direction?.style_config ?? null;
     const inSeries = !!currentProject?.series_id;
     const isInherit = inSeries && !!seriesBaseline && !projectStyle;
     const isOverridden = inSeries && !!seriesBaseline && !!projectStyle;
     const canPromote = inSeries && !seriesBaseline && !!projectStyle;
-    // 'Preview' = user clicked override-confirm in inherit mode and is
-    // editing/selecting a new style that hasn't been Applied yet.
     const isPreview = isInherit && overrideAccepted;
-    // Editor textareas: read-only ONLY when truly inheriting without an
-    // active override decision. The old isUnlocked toggle is gone —
-    // accepting the override dialog flips the editor to editable directly.
-    const editorReadOnly = isInherit && !overrideAccepted;
 
-    // R2V v2 Phase P0-b — clear project art_direction (return to series inherit).
     const handleResetToSeries = async () => {
         if (!currentProject?.id) return;
         setBannerBusy(true);
         try {
             const fresh = await api.clearProjectArtDirection(currentProject.id);
-            // Refresh project in store
             updateProject(currentProject.id, fresh);
             setSelectedStyle(null);
             setEditingName("");
             setEditingPositive("");
             setEditingNegative("");
+            setIsModified(false);
             setOverrideAccepted(false);
             toast.success(ta("toastResetDone"), {
                 projectId: currentProject.id,
@@ -112,7 +118,6 @@ export default function ArtDirection() {
             await api.updateSeries(currentProject.series_id, {
                 art_direction: currentProject.art_direction as any,
             });
-            // Reload series baseline locally
             const s = await api.getSeries(currentProject.series_id);
             setSeriesBaseline(s?.art_direction?.style_config ?? null);
         } catch (err) {
@@ -122,46 +127,41 @@ export default function ArtDirection() {
         }
     };
 
-    // Load presets only once on mount (separate from project-dependent state)
     useEffect(() => {
         loadPresets();
-    }, []);  // Empty dependency - only run on mount
+    }, []);
 
-    // Load art direction from project when it changes. If the project
-    // itself has none but the parent series does (isInherit), display the
-    // series baseline as the visible style — otherwise the banner says
-    // "继承自 Pixar 3D" while the editor below stays blank, which the user
-    // (rightly) read as "系列风格在 episode 看不到".
+    const resolvePositivePrompt = (style: StyleConfig | null): string => {
+        if (!style) return "";
+        if (style.positive_prompt) return style.positive_prompt;
+        if (style.id && presets.length > 0) {
+            const match = presets.find(p => p.id === style.id);
+            if (match) return match.positive_prompt || "";
+        }
+        return "";
+    };
+
     useEffect(() => {
         const projectAD = currentProject?.art_direction;
         const projectStyleConfig = projectAD?.style_config ?? null;
         if (projectStyleConfig) {
-            console.log("Loading Art Direction (project override):", projectAD);
             setSelectedStyle(projectStyleConfig);
             setEditingName(projectStyleConfig.name || "");
-            setEditingPositive(projectStyleConfig.positive_prompt || "");
+            setEditingPositive(resolvePositivePrompt(projectStyleConfig));
             setEditingNegative(projectStyleConfig.negative_prompt || "");
             setCustomStyles(projectAD?.custom_styles || []);
             if (projectAD?.ai_recommendations && projectAD.ai_recommendations.length > 0) {
                 setAiRecommendations(projectAD.ai_recommendations);
             }
         } else if (seriesBaseline) {
-            // Inherit display: project has no override → mirror series baseline
-            // into editor fields so user can SEE what they're inheriting.
-            // Editor stays locked (editorLocked = isInherit && !isUnlocked)
-            // until user explicitly clicks 解锁编辑.
-            console.log("Loading Art Direction (series baseline inherit):", seriesBaseline);
             setSelectedStyle(seriesBaseline);
             setEditingName(seriesBaseline.name || "");
-            setEditingPositive(seriesBaseline.positive_prompt || "");
+            setEditingPositive(resolvePositivePrompt(seriesBaseline));
             setEditingNegative(seriesBaseline.negative_prompt || "");
             setCustomStyles(projectAD?.custom_styles || []);
-        } else {
-            console.log("No Art Direction found in currentProject or series");
         }
-    }, [currentProject?.id, currentProject?.art_direction, seriesBaseline]);
+    }, [currentProject?.id, currentProject?.art_direction, seriesBaseline, presets]);
 
-    // Sync local aiRecommendations with store when it updates (e.g. after analysis finishes)
     useEffect(() => {
         if (currentProject?.art_direction?.ai_recommendations) {
             setAiRecommendations(currentProject.art_direction.ai_recommendations);
@@ -171,8 +171,8 @@ export default function ArtDirection() {
     const loadPresets = async () => {
         try {
             const data = await api.getStylePresets();
-            console.log("Loaded presets:", data.presets);
             setPresets(data.presets || []);
+            setCategories(data.categories || []);
         } catch (error) {
             console.error("Failed to load presets:", error);
         }
@@ -180,8 +180,6 @@ export default function ArtDirection() {
 
     const handleAnalyze = async () => {
         if (!currentProject) return;
-
-        // Use global action
         try {
             await analyzeArtStyle(
                 currentProject.id,
@@ -197,45 +195,42 @@ export default function ArtDirection() {
     };
 
     const toStyleConfig = (style: StyleConfig | StylePreset): StyleConfig => {
-        if ("positive_prompt" in style) {
-            return style;
+        if ("is_custom" in style) {
+            return style as StyleConfig;
         }
-
+        const preset = style as StylePreset;
         return {
-            id: style.id,
-            name: style.name,
-            positive_prompt: style.prompt,
-            negative_prompt: style.negative_prompt || "",
+            id: preset.id,
+            name: preset.name,
+            positive_prompt: preset.positive_prompt,
+            negative_prompt: preset.negative_prompt || "",
             is_custom: false,
         };
     };
 
-    const applyStyleToEditor = (style: StyleConfig | StylePreset) => {
+    const applyStyleToState = (style: StyleConfig | StylePreset) => {
         const normalizedStyle = toStyleConfig(style);
         setSelectedStyle(normalizedStyle);
         setEditingName(normalizedStyle.name);
         setEditingPositive(normalizedStyle.positive_prompt);
         setEditingNegative(normalizedStyle.negative_prompt);
+        setIsModified(false);
     };
 
     const handleSelectStyle = (style: StyleConfig | StylePreset) => {
         const normalizedStyle = toStyleConfig(style);
-        // Picking the same style that's already the series baseline is a
-        // no-op — let it through without an override prompt.
         const isSeriesBaseline = isInherit && seriesBaseline && normalizedStyle.id === seriesBaseline.id;
-        // Inherit mode + user picks something other than the series baseline
-        // → open the explicit override confirm dialog (per design grill).
         if (isInherit && !overrideAccepted && !isSeriesBaseline) {
             setPendingOverrideStyle(normalizedStyle);
             return;
         }
-        applyStyleToEditor(normalizedStyle);
+        applyStyleToState(normalizedStyle);
     };
 
     const confirmOverridePreview = () => {
         if (!pendingOverrideStyle) return;
         setOverrideAccepted(true);
-        applyStyleToEditor(pendingOverrideStyle);
+        applyStyleToState(pendingOverrideStyle);
         toast.info(ta("toastOverridePreviewing", { name: pendingOverrideStyle.name }), {
             projectId: currentProject?.id,
             projectTitle: currentProject?.title,
@@ -246,50 +241,102 @@ export default function ArtDirection() {
 
     const cancelOverrideConfirm = () => setPendingOverrideStyle(null);
 
-    const handleSaveCustom = async () => {
-        if (!editingName || !editingPositive) {
-            toast.warning(ta("fillNameAndPrompt"), {
-                projectId: currentProject?.id,
-                projectTitle: currentProject?.title,
-            });
+    // Modal: open preset detail
+    const openPresetModal = (preset: StylePreset) => {
+        setModalPreset(preset);
+        setModalEditing(false);
+        setModalPositive(preset.positive_prompt);
+        setModalNegative(preset.negative_prompt);
+    };
+
+    const closePresetModal = () => {
+        setModalPreset(null);
+        setModalEditing(false);
+    };
+
+    // AI Recommendation modal handlers
+    const openAiModal = (style: StyleConfig) => {
+        setAiModalStyle(style);
+        setAiModalEditing(false);
+        setAiModalPositive(style.positive_prompt);
+        setAiModalNegative(style.negative_prompt);
+    };
+
+    const closeAiModal = () => {
+        setAiModalStyle(null);
+        setAiModalEditing(false);
+    };
+
+    const handleAiModalApply = () => {
+        if (!aiModalStyle) return;
+        const isCustomized = aiModalEditing && (
+            aiModalPositive !== aiModalStyle.positive_prompt ||
+            aiModalNegative !== aiModalStyle.negative_prompt
+        );
+
+        const config: StyleConfig = {
+            id: aiModalStyle.id,
+            name: aiModalStyle.name,
+            positive_prompt: isCustomized ? aiModalPositive : aiModalStyle.positive_prompt,
+            negative_prompt: isCustomized ? aiModalNegative : aiModalStyle.negative_prompt,
+            is_custom: false,
+        };
+
+        const isSeriesBaseline = isInherit && seriesBaseline && config.id === seriesBaseline.id;
+        if (isInherit && !overrideAccepted && !isSeriesBaseline) {
+            setPendingOverrideStyle(config);
+            closeAiModal();
             return;
         }
 
-        const newCustomStyle: StyleConfig = {
-            id: `custom-${Date.now()}`,
-            name: editingName,
-            positive_prompt: editingPositive,
-            negative_prompt: editingNegative,
-            is_custom: true
+        setSelectedStyle(config);
+        setEditingName(config.name);
+        setEditingPositive(config.positive_prompt);
+        setEditingNegative(config.negative_prompt);
+        setIsModified(isCustomized);
+        closeAiModal();
+    };
+
+    // Modal: use this style (original or customized)
+    const handleModalApplyStyle = () => {
+        if (!modalPreset) return;
+        const isCustomized = modalEditing && (
+            modalPositive !== modalPreset.positive_prompt ||
+            modalNegative !== modalPreset.negative_prompt
+        );
+
+        const config: StyleConfig = {
+            id: modalPreset.id,
+            name: modalPreset.name,
+            positive_prompt: isCustomized ? modalPositive : modalPreset.positive_prompt,
+            negative_prompt: isCustomized ? modalNegative : modalPreset.negative_prompt,
+            is_custom: false,
         };
 
-        const updatedCustomStyles = [...customStyles, newCustomStyle];
-        setCustomStyles(updatedCustomStyles);
+        // Go through override check if in series inherit mode
+        const isSeriesBaseline = isInherit && seriesBaseline && config.id === seriesBaseline.id;
+        if (isInherit && !overrideAccepted && !isSeriesBaseline) {
+            setPendingOverrideStyle(config);
+            closePresetModal();
+            return;
+        }
 
-        // Always try to save immediately
-        if (currentProject && selectedStyle) {
-            try {
-                // Use the newly created style as the selected style if it's the one being edited
-                // Or keep the currently selected style
-                const updated = await api.saveArtDirection(
-                    currentProject.id,
-                    selectedStyle.id,
-                    selectedStyle,
-                    updatedCustomStyles,
-                    aiRecommendations
-                );
-                updateProject(currentProject.id, updated);
-                toast.success(ta("customStyleSaved"), {
-                    projectId: currentProject.id,
-                    projectTitle: currentProject.title,
-                });
-            } catch (error) {
-                console.error("Failed to save custom style:", error);
-                toast.error(ta("saveFailed"), {
-                    projectId: currentProject?.id,
-                    projectTitle: currentProject?.title,
-                });
-            }
+        setSelectedStyle(config);
+        setEditingName(config.name);
+        setEditingPositive(config.positive_prompt);
+        setEditingNegative(config.negative_prompt);
+        setIsModified(isCustomized);
+        closePresetModal();
+    };
+
+    // Restore to original preset prompts
+    const handleRestoreOriginal = () => {
+        if (!selectedStyle) return;
+        const original = presets.find(p => p.id === selectedStyle.id);
+        if (original) {
+            setEditingPositive(original.positive_prompt);
+            setEditingNegative(original.negative_prompt);
+            setIsModified(false);
         }
     };
 
@@ -319,7 +366,7 @@ export default function ArtDirection() {
                 aiRecommendations
             );
             updateProject(currentProject.id, updated);
-            setOverrideAccepted(false); // override is now persisted, leave preview state
+            setOverrideAccepted(false);
             toast.success(ta("styleApplied"), {
                 projectId: currentProject.id,
                 projectTitle: currentProject.title,
@@ -337,156 +384,183 @@ export default function ArtDirection() {
     };
 
     return (
-        // Layout v4: outermost horizontal split. Right Style editor is its
-        // own floor-to-ceiling column; main left column owns StepHeader + AI/
-        // presets + bottom action bar.
-        <div className="flex h-full w-full overflow-hidden">
-            {/* Left: main column */}
-            <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-                <StepHeader
-                    stepNumber={2}
-                    icon={<Palette />}
-                    englishName="Style"
-                    title={tStep("styleTitle")}
-                    subtitle={tStep("styleSubtitle")}
-                    /* trailing intentionally empty — 应用并继续 moved to
-                       bottom sticky bar (semantically a "末步 footer"). */
-                />
+        <div className="flex flex-col h-full w-full overflow-hidden">
+            <StepHeader
+                stepNumber={2}
+                icon={<Palette />}
+                englishName="Style"
+                title={tStep("styleTitle")}
+                subtitle={tStep("styleSubtitle")}
+            />
 
-                {/* Scrollable AI + Presets */}
-                <div className="flex-1 min-h-0 flex flex-col p-8 overflow-y-auto gap-8 bg-surface">
-                    {/* R2V v2 Phase 2: inherit / preview / override / promote banner */}
-                    {inSeries && !seriesBaselineLoading && (
-                        <>
-                            {/* INHERIT — pure: project tracks series baseline,
-                                no override decision pending. Action hint:
-                                'pick any preset below to override'. No
-                                unlock button (legacy concept removed). */}
-                            {isInherit && !overrideAccepted && (
-                                <div className="flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/10 px-4 py-3">
-                                    <Lock size={16} className="text-primary shrink-0" />
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-sm text-foreground">
-                                            <span className="text-text-secondary">{ta("inheritsBaseline")}</span>{" "}
-                                            <span className="font-medium">{seriesBaseline?.name}</span>
-                                        </p>
-                                        <p className="text-[11px] text-text-muted mt-0.5">{ta("inheritHint")}</p>
-                                    </div>
+            {/* Scrollable content — full width */}
+            <div className="flex-1 min-h-0 overflow-y-auto p-8 space-y-8 bg-surface">
+                {/* Series inherit/override banners */}
+                {inSeries && !seriesBaselineLoading && (
+                    <>
+                        {isInherit && !overrideAccepted && (
+                            <div className="flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/10 px-4 py-3">
+                                <Lock size={16} className="text-primary shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm text-foreground">
+                                        <span className="text-text-secondary">{ta("inheritsBaseline")}</span>{" "}
+                                        <span className="font-medium">{seriesBaseline?.name}</span>
+                                    </p>
+                                    <p className="text-[11px] text-text-muted mt-0.5">{ta("inheritHint")}</p>
                                 </div>
-                            )}
-                            {/* PREVIEW — user accepted override but hasn't
-                                Applied yet. Amber banner makes it obvious
-                                the change isn't saved + drives them toward
-                                the Apply CTA in the sticky footer. */}
-                            {isPreview && (
-                                <div className="flex items-center gap-3 rounded-lg border border-amber-400/40 bg-amber-400/10 px-4 py-3">
-                                    <AlertTriangle size={16} className="text-amber-300 shrink-0" />
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-sm text-foreground">
-                                            <span className="text-amber-200">{ta("previewBannerTitle")}</span>{" "}
-                                            <span className="font-medium">{selectedStyle?.name ?? "—"}</span>
-                                            <span className="text-text-secondary text-[12px]">
-                                                {" "}({ta("baselineLabel")}: {seriesBaseline?.name})
-                                            </span>
-                                        </p>
-                                        <p className="text-[11px] text-text-muted mt-0.5">{ta("previewBannerHint")}</p>
-                                    </div>
-                                    <WorkflowActionButton
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => {
-                                            setOverrideAccepted(false);
-                                            // Reset editor back to series baseline display
-                                            if (seriesBaseline) applyStyleToEditor(seriesBaseline);
-                                        }}
-                                    >
-                                        {ta("cancelOverride")}
-                                    </WorkflowActionButton>
+                            </div>
+                        )}
+                        {isPreview && (
+                            <div className="flex items-center gap-3 rounded-lg border border-amber-400/40 bg-amber-400/10 px-4 py-3">
+                                <AlertTriangle size={16} className="text-amber-300 shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm text-foreground">
+                                        <span className="text-amber-200">{ta("previewBannerTitle")}</span>{" "}
+                                        <span className="font-medium">{selectedStyle?.name ?? "—"}</span>
+                                    </p>
+                                    <p className="text-[11px] text-text-muted mt-0.5">{ta("previewBannerHint")}</p>
                                 </div>
-                            )}
-                            {isOverridden && (
-                                <div className="flex items-center gap-3 rounded-lg border border-amber-400/30 bg-amber-400/10 px-4 py-3">
-                                    <RotateCcw size={16} className="text-amber-300 shrink-0" />
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-sm text-foreground">
-                                            <span className="text-amber-200">{ta("overridingBaseline")}</span>{" "}
-                                            <span className="text-text-secondary text-[12px]">
-                                                ({ta("baselineLabel")}: {seriesBaseline?.name})
-                                            </span>
-                                        </p>
-                                        <p className="text-[11px] text-text-muted mt-0.5">{ta("overrideHint")}</p>
-                                    </div>
-                                    <WorkflowActionButton
-                                        variant="secondary"
-                                        size="sm"
-                                        loading={bannerBusy}
-                                        leftIcon={<RotateCcw />}
-                                        onClick={handleResetToSeries}
-                                    >
-                                        {ta("resetToSeries")}
-                                    </WorkflowActionButton>
+                                <WorkflowActionButton
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                        setOverrideAccepted(false);
+                                        if (seriesBaseline) applyStyleToState(seriesBaseline);
+                                    }}
+                                >
+                                    {ta("cancelOverride")}
+                                </WorkflowActionButton>
+                            </div>
+                        )}
+                        {isOverridden && (
+                            <div className="flex items-center gap-3 rounded-lg border border-amber-400/30 bg-amber-400/10 px-4 py-3">
+                                <RotateCcw size={16} className="text-amber-300 shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm text-foreground">
+                                        <span className="text-amber-200">{ta("overridingBaseline")}</span>{" "}
+                                        <span className="text-text-secondary text-[12px]">
+                                            ({ta("baselineLabel")}: {seriesBaseline?.name})
+                                        </span>
+                                    </p>
+                                    <p className="text-[11px] text-text-muted mt-0.5">{ta("overrideHint")}</p>
                                 </div>
-                            )}
-                            {canPromote && (
-                                <div className="flex items-center gap-3 rounded-lg border border-purple-400/30 bg-purple-400/10 px-4 py-3">
-                                    <ArrowUp size={16} className="text-purple-300 shrink-0" />
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-sm text-foreground">{ta("promotePromptTitle")}</p>
-                                        <p className="text-[11px] text-text-muted mt-0.5">{ta("promotePromptHint")}</p>
-                                    </div>
-                                    <WorkflowActionButton
-                                        variant="secondary"
-                                        size="sm"
-                                        loading={bannerBusy}
-                                        leftIcon={<ArrowUp />}
-                                        onClick={handlePromoteToSeries}
-                                    >
-                                        {ta("promoteBtn")}
-                                    </WorkflowActionButton>
+                                <WorkflowActionButton
+                                    variant="secondary"
+                                    size="sm"
+                                    loading={bannerBusy}
+                                    leftIcon={<RotateCcw />}
+                                    onClick={handleResetToSeries}
+                                >
+                                    {ta("resetToSeries")}
+                                </WorkflowActionButton>
+                            </div>
+                        )}
+                        {canPromote && (
+                            <div className="flex items-center gap-3 rounded-lg border border-purple-400/30 bg-purple-400/10 px-4 py-3">
+                                <ArrowUp size={16} className="text-purple-300 shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm text-foreground">{ta("promotePromptTitle")}</p>
+                                    <p className="text-[11px] text-text-muted mt-0.5">{ta("promotePromptHint")}</p>
                                 </div>
-                            )}
-                        </>
-                    )}
+                                <WorkflowActionButton
+                                    variant="secondary"
+                                    size="sm"
+                                    loading={bannerBusy}
+                                    leftIcon={<ArrowUp />}
+                                    onClick={handlePromoteToSeries}
+                                >
+                                    {ta("promoteBtn")}
+                                </WorkflowActionButton>
+                            </div>
+                        )}
+                    </>
+                )}
 
-                    {/* AI Recommendations */}
-                    <div>
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
-                                <Sparkles size={20} className="text-yellow-400" />
-                                {ta("aiRecommendations")}
-                            </h3>
-                            <WorkflowActionButton
-                                variant="secondary"
-                                loading={isAnalyzingArtStyle}
-                                leftIcon={<Wand2 />}
-                                onClick={handleAnalyze}
-                                disabled={isAnalyzingArtStyle}
+                {/* AI Recommendations */}
+                <div>
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+                            <Sparkles size={20} className="text-yellow-400" />
+                            {ta("aiRecommendations")}
+                        </h3>
+                        <WorkflowActionButton
+                            variant="secondary"
+                            loading={isAnalyzingArtStyle}
+                            leftIcon={<Wand2 />}
+                            onClick={handleAnalyze}
+                            disabled={isAnalyzingArtStyle}
+                        >
+                            {isAnalyzingArtStyle ? ta("analyzing") : ta("analyzeScript")}
+                        </WorkflowActionButton>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                        {aiRecommendations.map((style) => (
+                            <AIRecommendationCard
+                                key={style.id}
+                                style={style}
+                                isSelected={selectedStyle?.id === style.id}
+                                onClick={() => openAiModal(style)}
+                            />
+                        ))}
+                    </div>
+                </div>
+
+                {/* Built-in Presets v2 */}
+                <div>
+                    <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+                        <Palette size={20} className="text-blue-400" />
+                        {ta("builtInPresets")}
+                    </h3>
+
+                    {/* Category tabs */}
+                    <div className="flex items-center gap-1.5 mb-5 overflow-x-auto pb-1">
+                        <button
+                            onClick={() => setActiveCategory("all")}
+                            className={`shrink-0 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors ${
+                                activeCategory === "all"
+                                    ? "bg-primary/20 text-primary border border-primary/30"
+                                    : "bg-white/5 text-text-secondary hover:bg-white/10 border border-transparent"
+                            }`}
+                        >
+                            全部
+                        </button>
+                        {categories.map(cat => (
+                            <button
+                                key={cat.id}
+                                onClick={() => setActiveCategory(cat.id)}
+                                className={`shrink-0 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors ${
+                                    activeCategory === cat.id
+                                        ? "bg-primary/20 text-primary border border-primary/30"
+                                        : "bg-white/5 text-text-secondary hover:bg-white/10 border border-transparent"
+                                }`}
                             >
-                                {isAnalyzingArtStyle ? ta("analyzing") : ta("analyzeScript")}
-                            </WorkflowActionButton>
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-4">
-                            {aiRecommendations.map((style) => (
-                                <StyleRecommendationCard
-                                    key={style.id}
-                                    style={style}
-                                    isSelected={selectedStyle?.id === style.id}
-                                    onSelect={() => handleSelectStyle(style)}
-                                />
-                            ))}
-                        </div>
+                                {cat.name_zh}
+                            </button>
+                        ))}
                     </div>
 
-                    {/* Built-in Presets */}
+                    {/* Preset grid */}
+                    <div className="grid grid-cols-3 gap-3">
+                        {filteredPresets.map((style) => (
+                            <StylePresetCardV2
+                                key={style.id}
+                                style={style}
+                                isSelected={selectedStyle?.id === style.id}
+                                onClick={() => openPresetModal(style)}
+                            />
+                        ))}
+                    </div>
+                </div>
+
+                {/* Custom Styles */}
+                {customStyles.length > 0 && (
                     <div>
                         <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
-                            <Palette size={20} className="text-blue-400" />
-                            {ta("builtInPresets")}
+                            <Plus size={20} className="text-green-400" />
+                            {ta("customStyles")}
                         </h3>
-
-                        <div className="grid grid-cols-2 gap-4">
-                            {presets.map((style) => (
+                        <div className="grid grid-cols-3 gap-3">
+                            {customStyles.map((style) => (
                                 <StylePresetCard
                                     key={style.id}
                                     style={style}
@@ -496,104 +570,89 @@ export default function ArtDirection() {
                             ))}
                         </div>
                     </div>
+                )}
+            </div>
 
-                    {/* Custom Styles */}
-                    {customStyles.length > 0 && (
-                        <div>
-                            <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
-                                <Plus size={20} className="text-green-400" />
-                                {ta("customStyles")}
-                            </h3>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                {customStyles.map((style) => (
-                                    <StylePresetCard
-                                        key={style.id}
-                                        style={style}
-                                        isSelected={selectedStyle?.id === style.id}
-                                        onSelect={() => handleSelectStyle(style)}
-                                    />
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* Bottom sticky bar — "末步 footer" 语义：在 main 完成所有
-                    style 选择后，主行动按钮 sticky 在底部承接"进入下一步"意图。
-                    比挂在 page header 右侧更符合用户的操作流。 */}
-                <div className="shrink-0 border-t border-glass-border bg-surface/95 backdrop-blur-md px-8 py-3 flex items-center justify-end gap-3">
-                    {selectedStyle ? (
+            {/* Bottom sticky bar */}
+            <div className="shrink-0 border-t border-glass-border bg-surface/95 backdrop-blur-md px-8 py-3 flex items-center justify-end gap-3">
+                {selectedStyle ? (
+                    <div className="flex items-center gap-2">
                         <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">
                             <span className="text-foreground">{selectedStyle.name}</span>
-                            <span className="mx-1.5">·</span>
-                            <span>selected</span>
+                            {isModified && (
+                                <>
+                                    <span className="mx-1.5 text-amber-300">·</span>
+                                    <span className="text-amber-300">已修改</span>
+                                    <button
+                                        onClick={handleRestoreOriginal}
+                                        className="ml-2 text-[9px] text-text-muted hover:text-foreground underline"
+                                    >
+                                        还原
+                                    </button>
+                                </>
+                            )}
                         </span>
-                    ) : (
-                        <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">
-                            select a style →
-                        </span>
-                    )}
-                    <WorkflowActionButton
-                        variant="primary"
-                        loading={isSaving}
-                        rightIcon={<ChevronRight />}
-                        onClick={handleApply}
-                        disabled={!selectedStyle}
-                    >
-                        {isSaving ? ta("saving") : ta("applyAndContinue")}
-                    </WorkflowActionButton>
-                </div>
+                    </div>
+                ) : (
+                    <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">
+                        select a style →
+                    </span>
+                )}
+                <WorkflowActionButton
+                    variant="primary"
+                    loading={isSaving}
+                    rightIcon={<ChevronRight />}
+                    onClick={handleApply}
+                    disabled={!selectedStyle}
+                >
+                    {isSaving ? ta("saving") : ta("applyAndContinue")}
+                </WorkflowActionButton>
             </div>
 
-            {/* Right: independent Style Editor panel — floor-to-ceiling.
-                Border + status pill switch color to reflect override state
-                so the user can SEE that the panel is editable / will save. */}
-            <div
-                className={`w-[360px] shrink-0 flex flex-col bg-surface border-l overflow-hidden transition-colors ${
-                    isPreview
-                        ? "border-amber-400/60"
-                        : isOverridden
-                            ? "border-amber-400/40"
-                            : "border-glass-border"
-                }`}
-            >
-                <SidePanelHeader
-                    icon={<Palette />}
-                    title={ta("styleEditor")}
-                    subtitle={selectedStyle?.name ?? ta("selectStyleHint")}
-                />
-                {(isPreview || isOverridden) && (
-                    <div className={`px-4 py-2 border-b ${isPreview ? "border-amber-400/40 bg-amber-400/10" : "border-amber-400/30 bg-amber-400/5"}`}>
-                        <p className="font-mono text-[9.5px] uppercase tracking-[0.18em] text-amber-200">
-                            {isPreview ? ta("editorStatePreview") : ta("editorStateOverride")}
-                        </p>
-                    </div>
-                )}
-                {editorReadOnly && (
-                    <div className="px-4 py-2 border-b border-primary/30 bg-primary/5">
-                        <p className="font-mono text-[9.5px] uppercase tracking-[0.18em] text-primary">
-                            {ta("editorStateInherit")}
-                        </p>
-                    </div>
-                )}
-                <div className="flex-1 overflow-y-auto p-6">
-                    <StyleEditor
-                        name={editingName}
-                        positivePrompt={editingPositive}
-                        negativePrompt={editingNegative}
-                        onNameChange={setEditingName}
-                        onPositiveChange={setEditingPositive}
-                        onNegativeChange={setEditingNegative}
-                        onSaveCustom={handleSaveCustom}
-                        selectedStyle={selectedStyle}
-                        readOnly={editorReadOnly}
+            {/* AI Recommendation Detail Modal */}
+            <AnimatePresence>
+                {aiModalStyle && (
+                    <AIRecommendationModal
+                        style={aiModalStyle}
+                        isSelected={selectedStyle?.id === aiModalStyle.id}
+                        editing={aiModalEditing}
+                        positivePrompt={aiModalPositive}
+                        negativePrompt={aiModalNegative}
+                        onPositiveChange={setAiModalPositive}
+                        onNegativeChange={setAiModalNegative}
+                        onStartEditing={() => setAiModalEditing(true)}
+                        onApply={handleAiModalApply}
+                        onClose={closeAiModal}
                     />
-                </div>
-            </div>
+                )}
+            </AnimatePresence>
 
-            {/* Override confirmation dialog (per design grill: explicit
-                step before forking from the series baseline). */}
+            {/* Preset Detail Modal */}
+            <AnimatePresence>
+                {modalPreset && (
+                    <PresetDetailModal
+                        preset={modalPreset}
+                        isSelected={selectedStyle?.id === modalPreset.id}
+                        editing={modalEditing}
+                        positivePrompt={modalPositive}
+                        negativePrompt={modalNegative}
+                        onPositiveChange={setModalPositive}
+                        onNegativeChange={setModalNegative}
+                        onStartEditing={() => setModalEditing(true)}
+                        onApply={handleModalApplyStyle}
+                        onClose={closePresetModal}
+                        sameCategoryPresets={presets.filter(p => p.category === modalPreset.category && p.id !== modalPreset.id)}
+                        onSwitchPreset={(p) => {
+                            setModalPreset(p);
+                            setModalEditing(false);
+                            setModalPositive(p.positive_prompt);
+                            setModalNegative(p.negative_prompt);
+                        }}
+                    />
+                )}
+            </AnimatePresence>
+
+            {/* Override confirmation dialog */}
             {pendingOverrideStyle && (
                 <div
                     className="fixed inset-0 z-[110] bg-overlay backdrop-blur-sm grid place-items-center p-4"
@@ -610,7 +669,7 @@ export default function ArtDirection() {
                             </div>
                             <button
                                 onClick={cancelOverrideConfirm}
-                                aria-label={ta("close") || "Close"}
+                                aria-label="Close"
                                 className="p-1.5 rounded-lg hover:bg-hover-bg text-text-muted hover:text-foreground transition-colors"
                             >
                                 <X size={15} />
@@ -645,42 +704,215 @@ export default function ArtDirection() {
     );
 }
 
-// Sub-components
-function StyleRecommendationCard({ style, isSelected, onSelect }: any) {
-    const ta = useTranslations("artDirection");
+// ─── Sub-components ────────────────────────────────────────────────────────
+
+function AIRecommendationCard({ style, isSelected, onClick }: {
+    style: StyleConfig;
+    isSelected: boolean;
+    onClick: () => void;
+}) {
     return (
         <motion.div
             layout
-            onClick={onSelect}
-            className={`p-6 rounded-xl border-2 cursor-pointer transition-all ${isSelected
-                ? "bg-purple-500/20 border-purple-500 shadow-lg shadow-purple-500/20"
-                : "bg-surface border-glass-border hover:border-glass-border hover:bg-hover-bg"
-                }`}
+            onClick={onClick}
+            className={`group relative rounded-xl border overflow-hidden cursor-pointer transition-all ${
+                isSelected
+                    ? "border-yellow-400/60 shadow-lg shadow-yellow-500/15 ring-1 ring-yellow-400/30"
+                    : "border-glass-border hover:border-white/20 hover:shadow-sm"
+            }`}
         >
-            <div className="flex items-start gap-4">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isSelected ? 'bg-purple-500' : 'bg-hover-bg'}`}>
-                    {isSelected ? <Check size={16} className=": text-foreground" /> : <Sparkles size={16} className="text-text-secondary" />}
-                </div>
-                <div className="flex-1">
-                    <h4 className="font-bold text-foreground mb-1">{style.name}</h4>
-                    <p className="text-xs text-text-secondary mb-3">{style.description}</p>
-                    {style.reason && (
-                        <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 mb-3">
-                            <p className="text-xs text-yellow-300">
-                                <span className="font-bold">{ta("reasonLabel")}</span>
-                                {style.reason}
-                            </p>
+            <div className="p-4 space-y-2">
+                {/* Header: AI badge + name */}
+                <div className="flex items-start gap-2">
+                    <div className="shrink-0 mt-0.5 flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-yellow-500/15 border border-yellow-500/20">
+                        <Sparkles size={9} className="text-yellow-400" />
+                        <span className="text-[9px] font-medium text-yellow-300">AI</span>
+                    </div>
+                    <h4 className="text-[13px] font-semibold text-foreground leading-tight line-clamp-1 flex-1">
+                        {style.name}
+                    </h4>
+                    {isSelected && (
+                        <div className="shrink-0 w-5 h-5 rounded-full bg-yellow-400 flex items-center justify-center">
+                            <Check size={11} className="text-black" />
                         </div>
                     )}
-                    <div className="flex flex-wrap gap-2">
-                        {style.positive_prompt.split(",").slice(0, 3).map((keyword: string, i: number) => (
-                            <span key={i} className="text-[10px] px-2 py-1 bg-primary/20 text-primary rounded border border-primary/30">
-                                {keyword.trim()}
-                            </span>
-                        ))}
+                </div>
+
+                {/* Description */}
+                {style.description && (
+                    <p className="text-[11px] text-text-secondary leading-relaxed line-clamp-2">
+                        {style.description}
+                    </p>
+                )}
+
+                {/* Reason */}
+                {(style as any).reason && (
+                    <p className="text-[10px] text-yellow-400/80 leading-relaxed line-clamp-2 border-l-2 border-yellow-400/30 pl-2">
+                        {(style as any).reason}
+                    </p>
+                )}
+            </div>
+        </motion.div>
+    );
+}
+
+function AIRecommendationModal({ style, isSelected, editing, positivePrompt, negativePrompt, onPositiveChange, onNegativeChange, onStartEditing, onApply, onClose }: {
+    style: StyleConfig;
+    isSelected: boolean;
+    editing: boolean;
+    positivePrompt: string;
+    negativePrompt: string;
+    onPositiveChange: (v: string) => void;
+    onNegativeChange: (v: string) => void;
+    onStartEditing: () => void;
+    onApply: () => void;
+    onClose: () => void;
+}) {
+    const ta = useTranslations("artDirection");
+    const keywords = style.positive_prompt
+        .split(",")
+        .map(s => s.trim())
+        .filter(s => s.length > 0 && s.length < 40)
+        .slice(0, 6);
+
+    const isCustomized = editing && (
+        positivePrompt !== style.positive_prompt ||
+        negativePrompt !== style.negative_prompt
+    );
+
+    return (
+        <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="fixed inset-0 z-[100] bg-overlay backdrop-blur-sm grid place-items-center p-6"
+            onClick={onClose}
+        >
+            <motion.div
+                initial={{ opacity: 0, scale: 0.96, y: 8 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.96, y: 8 }}
+                transition={{ duration: 0.2 }}
+                className="w-[70vw] max-w-[1100px] min-w-[700px] max-h-[90vh] rounded-2xl border border-glass-border bg-elevated shadow-[0_24px_64px_-12px_rgba(0,0,0,0.7)] overflow-hidden flex flex-col"
+                onClick={(e) => e.stopPropagation()}
+            >
+                {/* Header */}
+                <header className="flex items-center justify-between px-6 py-4 border-b border-glass-border shrink-0">
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-yellow-500/15 border border-yellow-500/20">
+                            <Sparkles size={12} className="text-yellow-400" />
+                            <span className="text-[11px] font-medium text-yellow-300">AI</span>
+                        </div>
+                        <div>
+                            <h2 className="text-[18px] font-bold text-foreground">{style.name}</h2>
+                            {style.description && (
+                                <p className="text-[12px] text-text-muted mt-0.5">{style.description}</p>
+                            )}
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="p-2 rounded-lg hover:bg-hover-bg text-text-muted hover:text-foreground transition-colors">
+                        <X size={18} />
+                    </button>
+                </header>
+
+                {/* Body: left reason + tags | right prompts */}
+                <div className="flex-1 min-h-0 flex overflow-hidden">
+                    {/* Left panel: reason + keyword tags */}
+                    <div className="w-[38%] shrink-0 bg-white/[0.02] border-r border-glass-border p-6 flex flex-col justify-center">
+                        {(style as any).reason && (
+                            <div className="mb-6">
+                                <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-yellow-400/70 mb-2">{ta("reasonLabel")}</p>
+                                <p className="text-[14px] text-foreground/90 leading-relaxed">
+                                    {(style as any).reason}
+                                </p>
+                            </div>
+                        )}
+                        <div>
+                            <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-text-muted mb-3">{ta("keywordsLabel") || "Keywords"}</p>
+                            <div className="flex flex-wrap gap-2">
+                                {keywords.map((kw, i) => (
+                                    <span key={i} className="text-[11px] px-2.5 py-1 rounded-md bg-yellow-500/10 text-yellow-300/90 border border-yellow-500/20">
+                                        {kw}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Right panel: prompts */}
+                    <div className="flex-1 p-6 overflow-y-auto custom-scrollbar space-y-5">
+                        {/* Positive prompt */}
+                        <div>
+                            <div className="flex items-center justify-between mb-2">
+                                <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-primary/70">{ta("positivePromptLabel")}</p>
+                                {!editing && (
+                                    <button
+                                        onClick={onStartEditing}
+                                        className="flex items-center gap-1 text-[11px] text-text-muted hover:text-foreground transition-colors"
+                                    >
+                                        <Pencil size={10} />
+                                        {ta("customizeBtn") || "自定义"}
+                                    </button>
+                                )}
+                            </div>
+                            {editing ? (
+                                <textarea
+                                    value={positivePrompt}
+                                    onChange={(e) => onPositiveChange(e.target.value)}
+                                    className="w-full h-32 rounded-lg border border-glass-border bg-white/5 px-3 py-2.5 text-[12px] text-foreground leading-relaxed resize-none focus:outline-none focus:border-primary/50 custom-scrollbar"
+                                />
+                            ) : (
+                                <div className="rounded-lg border border-glass-border bg-white/[0.02] px-3 py-2.5">
+                                    <p className="text-[12px] text-text-secondary leading-relaxed whitespace-pre-wrap">
+                                        {positivePrompt}
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Negative prompt */}
+                        <div>
+                            <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-red-400/70 mb-2">{ta("negativePromptLabel")}</p>
+                            {editing ? (
+                                <textarea
+                                    value={negativePrompt}
+                                    onChange={(e) => onNegativeChange(e.target.value)}
+                                    className="w-full h-24 rounded-lg border border-glass-border bg-white/5 px-3 py-2.5 text-[12px] text-foreground leading-relaxed resize-none focus:outline-none focus:border-red-400/30 custom-scrollbar"
+                                />
+                            ) : (
+                                <div className="rounded-lg border border-glass-border bg-white/[0.02] px-3 py-2.5">
+                                    <p className="text-[12px] text-text-secondary leading-relaxed whitespace-pre-wrap">
+                                        {negativePrompt || ta("noNegativePrompt") || "—"}
+                                    </p>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
-            </div>
+
+                {/* Footer */}
+                <footer className="flex items-center justify-between px-6 py-3 border-t border-glass-border shrink-0">
+                    <div className="text-[11px] text-text-muted">
+                        {isCustomized && (
+                            <span className="text-amber-300">{ta("modifiedLabel") || "已修改"}</span>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <WorkflowActionButton variant="ghost" size="sm" onClick={onClose}>
+                            {ta("cancelBtn") || "取消"}
+                        </WorkflowActionButton>
+                        <WorkflowActionButton
+                            variant="primary"
+                            size="sm"
+                            leftIcon={isSelected ? <Check /> : undefined}
+                            onClick={onApply}
+                        >
+                            {isSelected ? (ta("currentStyle") || "当前风格") : (ta("useThisStyle") || "使用该风格")}
+                        </WorkflowActionButton>
+                    </div>
+                </footer>
+            </motion.div>
         </motion.div>
     );
 }
@@ -697,7 +929,7 @@ export function StylePresetCard({ style, isSelected, onSelect }: any) {
         >
             <div className="flex items-center gap-3 mb-2">
                 <div className={`w-6 h-6 rounded-full flex items-center justify-center ${isSelected ? 'bg-blue-500' : 'bg-hover-bg'}`}>
-                    {isSelected && <Check size={12} className=": text-foreground" />}
+                    {isSelected && <Check size={12} className="text-foreground" />}
                 </div>
                 <h4 className="font-bold text-foreground text-sm">{style.name}</h4>
             </div>
@@ -711,90 +943,260 @@ export function StylePresetCard({ style, isSelected, onSelect }: any) {
     );
 }
 
-function StyleEditor({ name, positivePrompt, negativePrompt, onNameChange, onPositiveChange, onNegativeChange, onSaveCustom, selectedStyle, readOnly = false }: any) {
-    const ta = useTranslations("artDirection");
-    const inputClass = readOnly
-        ? "w-full bg-glass border border-glass-border rounded-lg p-3 text-sm text-text-secondary placeholder-text-muted cursor-default opacity-80"
-        : "w-full bg-glass border border-glass-border rounded-lg p-3 text-sm text-foreground placeholder-text-muted focus:border-primary focus:outline-none";
-    const textareaClass = readOnly
-        ? "w-full bg-input-bg border border-glass-border rounded-lg p-3 text-sm text-text-secondary placeholder-text-muted resize-none cursor-default opacity-80"
-        : "w-full bg-input-bg border border-glass-border rounded-lg p-3 text-sm text-foreground placeholder-text-muted focus:border-primary focus:outline-none resize-none";
+function StylePresetCardV2({ style, isSelected, onClick }: {
+    style: StylePreset;
+    isSelected: boolean;
+    onClick: () => void;
+}) {
     return (
-        <div className="space-y-6">
-            {!selectedStyle && (
-                <div className="text-sm text-text-muted italic">
-                    {ta("selectStyleHint")}
-                </div>
-            )}
-
-            <div>
-                <label className="block text-sm font-medium text-text-secondary mb-2">
-                    {ta("styleName")}
-                </label>
-                <input
-                    type="text"
-                    value={name}
-                    readOnly={readOnly}
-                    onChange={(e) => onNameChange(e.target.value)}
-                    placeholder={ta("styleNamePlaceholder")}
-                    className={inputClass}
-                />
+        <motion.div
+            layout
+            onClick={onClick}
+            className={`group relative rounded-xl border overflow-hidden cursor-pointer transition-all ${
+                isSelected
+                    ? "border-primary shadow-lg shadow-primary/20 ring-1 ring-primary/40"
+                    : "border-glass-border hover:border-white/20 hover:shadow-sm"
+            }`}
+        >
+            {/* Thumbnail */}
+            <div className="relative aspect-[4/3] bg-white/5 overflow-hidden">
+                {style.thumbnail ? (
+                    <img
+                        src={style.thumbnail}
+                        alt={style.name_zh}
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        style={{ objectPosition: style.object_position || "center" }}
+                    />
+                ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-white/5 to-white/[0.02]">
+                        <ImageIcon size={24} className="text-text-muted/40" />
+                    </div>
+                )}
+                {isSelected && (
+                    <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center shadow-md">
+                        <Check size={11} className="text-foreground" />
+                    </div>
+                )}
             </div>
 
-            <div>
-                <label className="block text-sm font-medium text-text-secondary mb-2">
-                    {ta("positivePrompt")}
-                </label>
-                <textarea
-                    value={positivePrompt}
-                    readOnly={readOnly}
-                    onChange={(e) => onPositiveChange(e.target.value)}
-                    placeholder={ta("positivePromptPlaceholder")}
-                    rows={6}
-                    className={textareaClass}
-                />
-                <p className="text-xs text-text-muted mt-1">
-                    {ta("positivePromptHint")}
-                </p>
-            </div>
-
-            <div>
-                <label className="block text-sm font-medium text-text-secondary mb-2">
-                    {ta("negativePrompt")}
-                </label>
-                <textarea
-                    value={negativePrompt}
-                    readOnly={readOnly}
-                    onChange={(e) => onNegativeChange(e.target.value)}
-                    placeholder={ta("negativePromptPlaceholder")}
-                    rows={4}
-                    className={textareaClass}
-                />
-                <p className="text-xs text-text-muted mt-1">
-                    {ta("negativePromptHint")}
-                </p>
-            </div>
-
-            <div className="pt-4 border-t border-glass-border">
-                <button
-                    onClick={onSaveCustom}
-                    disabled={readOnly || !name || !positivePrompt}
-                    className="w-full px-4 py-2 bg-hover-bg hover:bg-hover-bg text-foreground text-sm rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                    <Plus size={14} />
-                    {ta("saveAsCustom")}
-                </button>
-            </div>
-
-            {/* Preview */}
-            {positivePrompt && (
-                <div className="bg-surface border border-glass-border rounded-lg p-4">
-                    <p className="text-xs text-text-muted mb-2">{ta("previewLabel")}</p>
-                    <p className="text-xs text-blue-400 font-mono">
-                        &quot;{positivePrompt}, [user description]&quot;
+            {/* Info strip */}
+            <div className="px-3 py-2.5">
+                <h4 className="text-[12px] font-semibold text-foreground leading-tight truncate">
+                    {style.name_zh}
+                </h4>
+                {style.subtitle_zh && (
+                    <p className="text-[10px] text-text-muted mt-0.5 truncate">
+                        {style.subtitle_zh}
                     </p>
+                )}
+            </div>
+        </motion.div>
+    );
+}
+
+function PresetDetailModal({ preset, isSelected, editing, positivePrompt, negativePrompt, onPositiveChange, onNegativeChange, onStartEditing, onApply, onClose, sameCategoryPresets, onSwitchPreset }: {
+    preset: StylePreset;
+    isSelected: boolean;
+    editing: boolean;
+    positivePrompt: string;
+    negativePrompt: string;
+    onPositiveChange: (v: string) => void;
+    onNegativeChange: (v: string) => void;
+    onStartEditing: () => void;
+    onApply: () => void;
+    onClose: () => void;
+    sameCategoryPresets: StylePreset[];
+    onSwitchPreset: (p: StylePreset) => void;
+}) {
+    const isCustomized = editing && (
+        positivePrompt !== preset.positive_prompt ||
+        negativePrompt !== preset.negative_prompt
+    );
+
+    return (
+        <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="fixed inset-0 z-[100] bg-overlay backdrop-blur-sm grid place-items-center p-6"
+            onClick={onClose}
+        >
+            <motion.div
+                initial={{ opacity: 0, scale: 0.96, y: 8 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.96, y: 8 }}
+                transition={{ duration: 0.2 }}
+                className="w-[70vw] max-w-[1100px] min-w-[700px] max-h-[90vh] rounded-2xl border border-glass-border bg-elevated shadow-[0_24px_64px_-12px_rgba(0,0,0,0.7)] overflow-hidden flex flex-col"
+                onClick={(e) => e.stopPropagation()}
+            >
+                {/* Header */}
+                <header className="flex items-center justify-between px-6 py-4 border-b border-glass-border shrink-0">
+                    <div>
+                        <h2 className="text-[18px] font-bold text-foreground">{preset.name_zh}</h2>
+                        <p className="text-[12px] text-text-muted mt-0.5">{preset.name}</p>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="p-2 rounded-lg hover:bg-hover-bg text-text-muted hover:text-foreground transition-colors"
+                    >
+                        <X size={18} />
+                    </button>
+                </header>
+
+                {/* Body: left image + right details */}
+                <div className="flex-1 min-h-0 grid grid-cols-[1fr_1fr] overflow-hidden">
+                    {/* Left: full image display (no crop) */}
+                    <div className="bg-black/40 flex items-center justify-center p-4 overflow-hidden">
+                        {preset.thumbnail ? (
+                            <img
+                                src={preset.thumbnail}
+                                alt={preset.name_zh}
+                                className="max-w-full max-h-full object-contain rounded-lg"
+                            />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                                <ImageIcon size={48} className="text-text-muted/30" />
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Right: details (scrollable) */}
+                    <div className="p-6 space-y-5 overflow-y-auto">
+                        {/* Description */}
+                        {preset.description && (
+                            <p className="text-[13px] text-text-secondary leading-relaxed">{preset.description}</p>
+                        )}
+
+                        {/* Tags */}
+                        {preset.best_for && preset.best_for.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                                {preset.best_for.map((tag, i) => (
+                                    <span key={i} className="text-[11px] px-2.5 py-1 rounded-md bg-green-500/10 text-green-300 border border-green-500/20">
+                                        {tag}
+                                    </span>
+                                ))}
+                                {preset.avoid_for?.map((tag, i) => (
+                                    <span key={`avoid-${i}`} className="text-[11px] px-2.5 py-1 rounded-md bg-red-500/10 text-red-300/70 border border-red-500/15 line-through">
+                                        {tag}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Prompts section */}
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                                <p className="text-[11px] uppercase tracking-wider text-text-muted font-medium">提示词</p>
+                                {!editing && (
+                                    <button
+                                        onClick={onStartEditing}
+                                        className="flex items-center gap-1.5 text-[11px] text-text-muted hover:text-foreground transition-colors"
+                                    >
+                                        <Pencil size={12} />
+                                        <span>自定义</span>
+                                    </button>
+                                )}
+                                {editing && isCustomized && (
+                                    <span className="text-[10px] text-amber-300 font-medium">已修改</span>
+                                )}
+                            </div>
+
+                            {!editing ? (
+                                <>
+                                    <div>
+                                        <p className="text-[10px] text-text-muted mb-1.5">正向</p>
+                                        <p className="text-[13px] text-text-secondary leading-relaxed">
+                                            {preset.positive_prompt}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] text-text-muted mb-1.5">负向</p>
+                                        <p className="text-[13px] text-text-secondary leading-relaxed">
+                                            {preset.negative_prompt}
+                                        </p>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <div>
+                                        <p className="text-[10px] text-text-muted mb-1.5">正向</p>
+                                        <textarea
+                                            value={positivePrompt}
+                                            onChange={(e) => onPositiveChange(e.target.value)}
+                                            rows={5}
+                                            className="w-full bg-input-bg border border-glass-border rounded-lg p-3 text-[13px] text-foreground placeholder-text-muted focus:border-primary focus:outline-none resize-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] text-text-muted mb-1.5">负向</p>
+                                        <textarea
+                                            value={negativePrompt}
+                                            onChange={(e) => onNegativeChange(e.target.value)}
+                                            rows={3}
+                                            className="w-full bg-input-bg border border-glass-border rounded-lg p-3 text-[13px] text-foreground placeholder-text-muted focus:border-primary focus:outline-none resize-none"
+                                        />
+                                    </div>
+                                </>
+                            )}
+                        </div>
+
+                        {/* Sample prompt */}
+                        {preset.sample_prompt && !editing && (
+                            <div>
+                                <p className="text-[10px] uppercase tracking-wider text-text-muted mb-1.5">示例描述</p>
+                                <p className="text-[13px] text-text-secondary/70 leading-relaxed italic">
+                                    {preset.sample_prompt}
+                                </p>
+                            </div>
+                        )}
+                    </div>
                 </div>
-            )}
-        </div>
+
+                {/* Same-category comparison strip */}
+                {sameCategoryPresets.length > 0 && (
+                    <div className="border-t border-glass-border px-6 py-3 shrink-0">
+                        <p className="text-[10px] uppercase tracking-wider text-text-muted mb-2">同类风格</p>
+                        <div className="flex gap-2.5 overflow-x-auto pb-1">
+                            {sameCategoryPresets.slice(0, 5).map(p => (
+                                <button
+                                    key={p.id}
+                                    onClick={() => onSwitchPreset(p)}
+                                    className="shrink-0 w-24 rounded-lg overflow-hidden border border-glass-border hover:border-white/20 transition-colors"
+                                >
+                                    {p.thumbnail ? (
+                                        <img
+                                            src={p.thumbnail}
+                                            alt={p.name_zh}
+                                            className="w-full aspect-[16/9] object-cover"
+                                            style={{ objectPosition: p.object_position || "center" }}
+                                        />
+                                    ) : (
+                                        <div className="w-full aspect-[16/9] bg-white/5 flex items-center justify-center">
+                                            <ImageIcon size={12} className="text-text-muted/40" />
+                                        </div>
+                                    )}
+                                    <p className="text-[10px] text-text-muted px-1.5 py-1 truncate">{p.name_zh}</p>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Footer actions */}
+                <footer className="flex items-center justify-end gap-3 px-6 py-4 border-t border-glass-border shrink-0">
+                    <WorkflowActionButton variant="ghost" onClick={onClose}>
+                        取消
+                    </WorkflowActionButton>
+                    <WorkflowActionButton
+                        variant="primary"
+                        leftIcon={<Check />}
+                        onClick={onApply}
+                    >
+                        {isSelected ? "已选择" : isCustomized ? "应用自定义风格" : "使用此风格"}
+                    </WorkflowActionButton>
+                </footer>
+            </motion.div>
+        </motion.div>
     );
 }

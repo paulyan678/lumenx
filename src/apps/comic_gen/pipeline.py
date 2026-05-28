@@ -8,7 +8,7 @@ import subprocess
 import threading
 import platform
 from urllib.parse import quote
-from .models import Script, GenerationStatus, VideoTask, Character, Scene, StoryboardFrame, Series, PromptConfig
+from .models import Script, GenerationStatus, VideoTask, Character, Scene, StoryboardFrame, Series, PromptConfig, ArtDirection
 from .llm import ScriptProcessor
 from .assets import AssetGenerator
 from .storyboard import StoryboardGenerator
@@ -62,7 +62,11 @@ class ComicGenPipeline:
         self._save_lock = threading.RLock()  # Reentrant lock to prevent concurrent file writes
         self.scripts: Dict[str, Script] = self._load_data()
         self.series_store: Dict[str, Series] = self._load_series_data()
-        
+        self._repair_series_bindings()
+
+        # Extraction preview cache: {project_id: (timestamp, Script)}
+        self._extraction_cache: Dict[str, tuple] = {}
+
         # Task management for async asset generation
         # Format: { task_id: { status: str, progress: int, error: str, script_id: str, asset_id: str, created_at: float } }
         self.asset_generation_tasks: Dict[str, Dict[str, Any]] = {}
@@ -72,6 +76,11 @@ class ComicGenPipeline:
         # Cached model instances for Kling/Vidu (lazily initialized)
         self._kling_model = None
         self._vidu_model = None
+
+        # Pre-download Demucs model in background so first dub request is fast
+        self._demucs_ready = threading.Event()
+        self._demucs_error: Optional[str] = None
+        threading.Thread(target=self._warmup_demucs_model, daemon=True).start()
 
         # Recover orphan async tasks. FastAPI BackgroundTasks live in
         # process memory — any restart between submit + execute leaves
@@ -371,6 +380,21 @@ class ComicGenPipeline:
             except Exception as e:
                 logger.error(f"Failed to save data: {e}")
 
+    def _repair_series_bindings(self):
+        """Repair episodes listed in series.episode_ids that have series_id=None."""
+        repaired = False
+        for series_id, series in self.series_store.items():
+            for ep_id in series.episode_ids:
+                script = self.scripts.get(ep_id)
+                if script and not script.series_id:
+                    script.series_id = series_id
+                    if not script.episode_number:
+                        script.episode_number = series.episode_ids.index(ep_id) + 1
+                    repaired = True
+                    logger.info(f"Repaired series binding: episode {ep_id} → series {series_id}")
+        if repaired:
+            self._save_data()
+
     def create_project(self, title: str, text: str, skip_analysis: bool = False, workflow_mode: str = "i2v_legacy") -> Script:
         """Step 1: Parse novel and create project."""
         if skip_analysis:
@@ -383,14 +407,27 @@ class ComicGenPipeline:
         self._save_data()
         return script
     
+    def extract_preview(self, script_id: str, text: str) -> Script:
+        """Run entity extraction without saving. Cache result for subsequent apply."""
+        existing_script = self.scripts.get(script_id)
+        if not existing_script:
+            raise ValueError("Script not found")
+        new_script = self.script_processor.parse_novel(existing_script.title, text)
+        self._extraction_cache[script_id] = (time.time(), new_script)
+        return new_script
+
     def reparse_project(self, script_id: str, text: str) -> Script:
         """Re-parse the text for an existing project, replacing all entities."""
         existing_script = self.scripts.get(script_id)
         if not existing_script:
             raise ValueError("Script not found")
-        
-        # Parse the new text (this generates new entities with new IDs)
-        new_script = self.script_processor.parse_novel(existing_script.title, text)
+
+        # Use cached extraction if available (from extract_preview)
+        cached = self._extraction_cache.pop(script_id, None)
+        if cached and (time.time() - cached[0]) < 300:
+            new_script = cached[1]
+        else:
+            new_script = self.script_processor.parse_novel(existing_script.title, text)
         
         # Preserve the original script ID and timestamps
         new_script.id = existing_script.id
@@ -447,7 +484,7 @@ class ComicGenPipeline:
         self._save_data()
         return script
 
-    def generate_asset(self, script_id: str, asset_id: str, asset_type: str, style_preset: str = None, reference_image_url: str = None, style_prompt: str = None, generation_type: str = "all", prompt: str = None, apply_style: bool = True, negative_prompt: str = None, batch_size: int = 1, model_name: str = None) -> Script:
+    def generate_asset(self, script_id: str, asset_id: str, asset_type: str, style_preset: str = None, reference_image_url: str = None, style_prompt: str = None, generation_type: str = "all", prompt: str = None, apply_style: bool = True, negative_prompt: str = None, batch_size: int = 1, model_name: str = None, aspect_ratio: str = None) -> Script:
         """Step 2: Generate a specific asset (character/scene/prop).
         If style_preset is None, uses the project's global style."""
         script = self.scripts.get(script_id)
@@ -458,45 +495,52 @@ class ComicGenPipeline:
         t2i_model = model_name or script.model_settings.t2i_model
         i2i_model = script.model_settings.i2i_model
         
-        # Get effective size based on asset type
+        # Get effective size based on asset type (aspect_ratio param overrides model_settings)
         from .assets import ASPECT_RATIO_TO_SIZE
-        if asset_type == "character":
-            aspect_ratio = script.model_settings.character_aspect_ratio
-            default_size = "576*1024"  # Portrait
+        if aspect_ratio:
+            effective_aspect = aspect_ratio
+        elif asset_type == "character":
+            effective_aspect = script.model_settings.character_aspect_ratio
         elif asset_type == "scene":
-            aspect_ratio = script.model_settings.scene_aspect_ratio
-            default_size = "1024*576"  # Landscape
+            effective_aspect = script.model_settings.scene_aspect_ratio
         elif asset_type == "prop":
-            aspect_ratio = script.model_settings.prop_aspect_ratio
-            default_size = "1024*1024"  # Square
+            effective_aspect = script.model_settings.prop_aspect_ratio
         else:
-            aspect_ratio = "9:16"
+            effective_aspect = "9:16"
+
+        if asset_type == "character":
             default_size = "576*1024"
-        
-        effective_size = ASPECT_RATIO_TO_SIZE.get(aspect_ratio, default_size)
+        elif asset_type == "scene":
+            default_size = "1024*576"
+        else:
+            default_size = "1024*1024"
+
+        effective_size = ASPECT_RATIO_TO_SIZE.get(effective_aspect, default_size)
         
         # Determine effective style: Art Direction > passed style > legacy style
         effective_positive_prompt = ""
-        effective_negative_prompt = negative_prompt or "" # Use passed negative prompt if available
-        
-        # Only calculate style prompt if apply_style is True
+        effective_negative_prompt = negative_prompt or ""
+
+        # Resolve art_direction: episode own > series inherited
+        resolved_art_direction = script.art_direction
+        if not resolved_art_direction and script.series_id:
+            series = self.series_store.get(script.series_id)
+            if series and series.art_direction:
+                resolved_art_direction = series.art_direction
+        if isinstance(resolved_art_direction, dict):
+            resolved_art_direction = ArtDirection(**resolved_art_direction)
+
         if apply_style:
-            if script.art_direction and script.art_direction.style_config:
-                # Use Art Direction (highest priority)
-                effective_positive_prompt = script.art_direction.style_config.get('positive_prompt', '')
-                # Append global negative prompt if not overridden or append to it?
-                # Let's append global negative prompt to the specific one for better results
-                global_neg = script.art_direction.style_config.get('negative_prompt', '')
+            if resolved_art_direction and resolved_art_direction.style_config:
+                effective_positive_prompt = resolved_art_direction.style_config.get('positive_prompt', '')
+                global_neg = resolved_art_direction.style_config.get('negative_prompt', '')
                 if global_neg:
                     effective_negative_prompt = f"{effective_negative_prompt}, {global_neg}" if effective_negative_prompt else global_neg
             elif style_prompt:
-                # Use passed style_prompt (for manual override)
                 effective_positive_prompt = style_prompt
             elif style_preset:
-                # Use passed style_preset (legacy)
                 effective_positive_prompt = f"{style_preset} style"
             elif script.style_preset:
-                # Fallback to script's legacy style_preset
                 effective_positive_prompt = f"{script.style_preset} style"
                 if script.style_prompt:
                     effective_positive_prompt += f", {script.style_prompt}"
@@ -556,12 +600,12 @@ class ComicGenPipeline:
         
         return script
 
-    def create_asset_generation_task(self, script_id: str, asset_id: str, asset_type: str, 
-                                      style_preset: str = None, reference_image_url: str = None, 
-                                      style_prompt: str = None, generation_type: str = "all", 
-                                      prompt: str = None, apply_style: bool = True, 
-                                      negative_prompt: str = None, batch_size: int = 1, 
-                                      model_name: str = None) -> Tuple[Script, str]:
+    def create_asset_generation_task(self, script_id: str, asset_id: str, asset_type: str,
+                                      style_preset: str = None, reference_image_url: str = None,
+                                      style_prompt: str = None, generation_type: str = "all",
+                                      prompt: str = None, apply_style: bool = True,
+                                      negative_prompt: str = None, batch_size: int = 1,
+                                      model_name: str = None, aspect_ratio: str = None) -> Tuple[Script, str]:
         """Creates an async asset generation task and returns (script, task_id) immediately."""
         script = self.scripts.get(script_id)
         if not script:
@@ -604,7 +648,8 @@ class ComicGenPipeline:
                 "apply_style": apply_style,
                 "negative_prompt": negative_prompt,
                 "batch_size": batch_size,
-                "model_name": model_name
+                "model_name": model_name,
+                "aspect_ratio": aspect_ratio,
             }
         }
         
@@ -639,7 +684,8 @@ class ComicGenPipeline:
                     params["apply_style"],
                     params["negative_prompt"],
                     params["batch_size"],
-                    params["model_name"]
+                    params["model_name"],
+                    params.get("aspect_ratio"),
                 )
             task["status"] = "completed"
             task["progress"] = 100
@@ -1197,21 +1243,25 @@ class ComicGenPipeline:
             elif not scene_id:
                 scene_id = str(uuid.uuid4())  # Generate a placeholder ID
 
-            # Resolve character IDs by names
+            # Resolve character IDs by names (case-insensitive, bidirectional contains)
             char_ref_names = frame_data.get("character_ref_names", [])
             character_ids = []
             for char_name in char_ref_names:
+                cn = char_name.strip().lower()
                 for char in all_characters:
-                    if char.name == char_name or char_name in char.name:
+                    cname = char.name.strip().lower()
+                    if cname == cn or cn in cname or cname in cn:
                         character_ids.append(char.id)
                         break
 
-            # Resolve prop IDs by names
+            # Resolve prop IDs by names (case-insensitive, bidirectional contains)
             prop_ref_names = frame_data.get("prop_ref_names", [])
             prop_ids = []
             for prop_name in prop_ref_names:
+                pn = prop_name.strip().lower()
                 for prop in all_props:
-                    if prop.name == prop_name or prop_name in prop.name:
+                    pname = prop.name.strip().lower()
+                    if pname == pn or pn in pname or pname in pn:
                         prop_ids.append(prop.id)
                         break
             
@@ -1220,18 +1270,14 @@ class ComicGenPipeline:
                 scene_id=scene_id,
                 character_ids=character_ids,
                 prop_ids=prop_ids,
-                # Action description - now a unified field combining character acting and physics
-                action_description=frame_data.get("action_description", ""),
-                # Visual atmosphere
+                action_description=frame_data.get("action_summary", frame_data.get("action_description", "")),
                 visual_atmosphere=frame_data.get("visual_atmosphere"),
-                # Camera parameters
                 shot_size=frame_data.get("shot_size"),
                 camera_angle=frame_data.get("camera_angle", "平视"),
                 camera_movement=frame_data.get("camera_movement"),
-                # Dialogue
                 dialogue=frame_data.get("dialogue"),
                 speaker=frame_data.get("speaker"),
-                # Status
+                duration=frame_data.get("duration"),
                 status=GenerationStatus.PENDING
             )
             new_frames.append(frame)
@@ -1243,6 +1289,183 @@ class ComicGenPipeline:
         logger.info(f"Generated {len(new_frames)} frames from text analysis")
         self._save_data()
         return script
+
+    def refine_frame(self, script_id: str, frame_id: str) -> Optional[StoryboardFrame]:
+        """Phase 2: Refine a single coarse frame into a rich frame."""
+        from .prompt_assembly import assemble_prompt, sync_dialogue_to_tts
+        from .models import DialogueStructured, CameraMovementData, Blocking, AudioNote, LightingData, StageSubject
+
+        script = self.scripts.get(script_id)
+        if not script:
+            raise ValueError("Script not found")
+
+        frame = next((f for f in script.frames if f.id == frame_id), None)
+        if not frame:
+            raise ValueError(f"Frame {frame_id} not found")
+
+        frame_idx = script.frames.index(frame)
+        resolved = self.resolve_episode_assets(script)
+        all_characters = resolved["characters"]
+        all_scenes = resolved["scenes"]
+
+        # Build coarse frame dict for LLM
+        coarse = {
+            "action_summary": frame.action_description,
+            "shot_size": frame.shot_size,
+            "camera_angle": frame.camera_angle,
+            "camera_movement": frame.camera_movement,
+            "dialogue": frame.dialogue,
+            "speaker": frame.speaker,
+            "duration": frame.duration,
+            "character_names": [c.name for c in all_characters if c.id in frame.character_ids],
+            "scene_name": next((s.name for s in all_scenes if s.id == frame.scene_id), None),
+        }
+
+        # Character/scene assets
+        char_assets = [
+            {"name": c.name, "description": c.description, "clothing": c.clothing or ""}
+            for c in all_characters if c.id in frame.character_ids
+        ]
+        scene_assets = [
+            {"name": s.name, "description": s.description}
+            for s in all_scenes if s.id == frame.scene_id
+        ]
+
+        # Adjacent frame context
+        prev_ctx = None
+        if frame_idx > 0:
+            pf = script.frames[frame_idx - 1]
+            prev_ctx = f"Action: {pf.action_description}. Shot: {pf.shot_size}, {pf.camera_angle}."
+        next_ctx = None
+        if frame_idx < len(script.frames) - 1:
+            nf = script.frames[frame_idx + 1]
+            next_ctx = f"Action: {nf.action_description}. Shot: {nf.shot_size}, {nf.camera_angle}."
+
+        result = self.script_processor.refine_frame_to_rich(
+            coarse, char_assets, scene_assets, prev_ctx, next_ctx
+        )
+        if not result:
+            return frame
+
+        # Map result onto frame fields
+        if result.get("visual_description"):
+            from .prompt_assembly import inject_reference_tags
+            frame.visual_description = inject_reference_tags(
+                result["visual_description"], frame, all_characters, all_scenes
+            )
+        if result.get("shot_size"):
+            frame.shot_size = result["shot_size"]
+        if result.get("camera_angle"):
+            frame.camera_angle = result["camera_angle"]
+        if result.get("duration"):
+            frame.duration = result["duration"]
+        if result.get("transition_hint"):
+            frame.transition_hint = result["transition_hint"]
+
+        # Camera movement structured
+        cm = result.get("camera_movement")
+        if cm and isinstance(cm, dict) and cm.get("primary"):
+            frame.camera_movement_structured = CameraMovementData(
+                primary=cm["primary"],
+                secondary=cm.get("secondary"),
+                speed=cm.get("speed", "normal"),
+                description=cm.get("description"),
+            )
+
+        # Blocking
+        blk = result.get("blocking")
+        if blk and isinstance(blk, dict) and blk.get("description"):
+            stage_list = None
+            if blk.get("stage") and isinstance(blk["stage"], list):
+                stage_list = [
+                    StageSubject(
+                        ref=s.get("ref", ""),
+                        zone=s.get("zone", "center"),
+                        depth=s.get("depth", "mid"),
+                        height=s.get("height"),
+                        facing=s.get("facing"),
+                        posture=s.get("posture"),
+                    )
+                    for s in blk["stage"] if isinstance(s, dict)
+                ]
+            frame.blocking = Blocking(
+                description=blk["description"],
+                stage=stage_list,
+                camera_relation=blk.get("camera_relation"),
+            )
+
+        # Dialogue structured
+        ds = result.get("dialogue_structured")
+        if ds and isinstance(ds, dict) and ds.get("line"):
+            frame.dialogue_structured = DialogueStructured(
+                speaker=ds.get("speaker", frame.speaker or ""),
+                line=ds["line"],
+                emotion=ds.get("emotion"),
+                delivery=ds.get("delivery"),
+            )
+
+        # Audio note
+        an = result.get("audio_note")
+        if an and isinstance(an, dict) and (an.get("sfx") or an.get("ambience")):
+            frame.audio_note = AudioNote(
+                sfx=an.get("sfx"),
+                ambience=an.get("ambience"),
+                bgm_note=an.get("bgm_note"),
+            )
+
+        # Lighting
+        lt = result.get("lighting")
+        if lt and isinstance(lt, dict) and (lt.get("description") or lt.get("direction")):
+            frame.lighting = LightingData(
+                direction=lt.get("direction"),
+                quality=lt.get("quality"),
+                color_temp=lt.get("color_temp"),
+                description=lt.get("description"),
+            )
+
+        # Sync dialogue → TTS instructions & compute assembled prompt
+        sync_dialogue_to_tts(frame)
+        frame.assembled_prompt = assemble_prompt(frame, all_characters)
+        frame.updated_at = time.time()
+
+        self._save_data()
+        return frame
+
+    def refine_batch_generator(self, script_id: str):
+        """Phase 2: Generator that yields SSE events while refining all frames."""
+        script = self.scripts.get(script_id)
+        if not script:
+            raise ValueError("Script not found")
+
+        total = len(script.frames)
+        success = 0
+        failed = 0
+
+        for idx, frame in enumerate(script.frames):
+            yield ("frame_refine_start", {
+                "frame_id": frame.id,
+                "frame_index": idx,
+                "total": total,
+                "label": frame.action_description[:40] if frame.action_description else f"Frame {idx+1}",
+            })
+            try:
+                self.refine_frame(script_id, frame.id)
+                success += 1
+                yield ("frame_refine_complete", {
+                    "frame_id": frame.id,
+                    "frame_index": idx,
+                    "total": total,
+                })
+            except Exception as exc:
+                failed += 1
+                logger.error(f"[refine_batch] frame={frame.id} error={exc}")
+                yield ("frame_refine_error", {
+                    "frame_id": frame.id,
+                    "frame_index": idx,
+                    "error": str(exc),
+                })
+
+        yield ("batch_complete", {"total": total, "success": success, "failed": failed})
 
     def refine_frame_prompt(self, script_id: str, frame_id: str, raw_prompt: str, assets: List[Dict[str, Any]], feedback: str = "") -> Dict[str, Any]:
         """
@@ -1319,6 +1542,23 @@ class ComicGenPipeline:
             frame.scene_id = kwargs['scene_id']
         if kwargs.get('character_ids') is not None:
             frame.character_ids = kwargs['character_ids']
+        if kwargs.get('duration') is not None:
+            frame.duration = kwargs['duration']
+        if kwargs.get('shot_size') is not None:
+            frame.shot_size = kwargs['shot_size']
+        if kwargs.get('camera_movement_description') is not None:
+            if frame.camera_movement_structured:
+                frame.camera_movement_structured.description = kwargs['camera_movement_description']
+                frame.camera_movement_structured.primary = kwargs['camera_movement_description']
+            else:
+                from .models import CameraMovementData
+                frame.camera_movement_structured = CameraMovementData(
+                    primary=kwargs['camera_movement_description'],
+                    speed="normal",
+                    description=kwargs['camera_movement_description'],
+                )
+        if kwargs.get('transition_hint') is not None:
+            frame.transition_hint = kwargs['transition_hint']
         
         self._save_data()
         return script
@@ -1770,6 +2010,14 @@ class ComicGenPipeline:
             logger.error(f"Failed to snapshot input image: {e}")
             # Fallback to original URL
 
+        # Enrich prompt with dialogue cue when a frame has dialogue text.
+        # This gives the video model explicit mouth-movement instructions.
+        if frame_id and prompt:
+            frame = next((f for f in script.frames if f.id == frame_id), None)
+            if frame:
+                from .prompt_assembly import enrich_prompt_with_dialogue
+                prompt = enrich_prompt_with_dialogue(prompt, frame)
+
         task = VideoTask(
             id=task_id,
             project_id=script_id,
@@ -1983,6 +2231,349 @@ class ComicGenPipeline:
         self._save_data()
         return script
 
+    def _resolve_media_path(self, url: str, suffix: str = "") -> Optional[str]:
+        """Resolve a media URL to a local file path.
+
+        Handles three cases:
+        1. Local relative path (e.g. 'video/xxx.mp4') → resolve under output/
+        2. OSS object key (e.g. 'lumenx/videos/xxx.mp4') → sign URL then download
+        3. Full HTTP URL → download directly
+        """
+        if not url:
+            return None
+
+        # Case 1: Try as local path first
+        if not url.startswith("http"):
+            local_path = _safe_resolve_path("output", url)
+            if os.path.exists(local_path):
+                return local_path
+            # Not found locally — might be an OSS object key
+            if is_object_key(url):
+                from ...utils.oss_utils import OSSImageUploader
+                uploader = OSSImageUploader()
+                if uploader.is_configured:
+                    url = uploader.sign_url_for_api(url)
+                else:
+                    logger.error(f"[DUB] File not local and OSS not configured: {url}")
+                    return None
+            else:
+                return None
+
+        # Case 2 & 3: Download from HTTP URL
+        import hashlib
+        url_hash = hashlib.md5(url.split("?")[0].encode()).hexdigest()[:12]
+        cache_dir = os.path.join("output", "cache")
+        os.makedirs(cache_dir, exist_ok=True)
+        cached = os.path.join(cache_dir, f"{url_hash}{suffix}")
+        if os.path.exists(cached) and os.path.getsize(cached) > 0:
+            return cached
+        try:
+            import requests
+            resp = requests.get(url, stream=True, timeout=60)
+            resp.raise_for_status()
+            with open(cached, "wb") as f:
+                for chunk in resp.iter_content(chunk_size=65536):
+                    f.write(chunk)
+            logger.info(f"[DUB] Downloaded remote media -> {cached}")
+            return cached
+        except Exception as e:
+            logger.error(f"[DUB] Failed to download media: {e}")
+            if os.path.exists(cached):
+                os.remove(cached)
+            return None
+
+    def _warmup_demucs_model(self):
+        """Pre-download htdemucs model at startup so first dub request is fast."""
+        try:
+            from demucs.pretrained import get_model
+            get_model("htdemucs")
+            logger.info("[DUB] Demucs htdemucs model ready")
+            self._demucs_ready.set()
+        except Exception as e:
+            self._demucs_error = str(e)
+            self._demucs_ready.set()
+            logger.warning(f"[DUB] Demucs model warmup failed: {e}")
+
+    def _separate_background_audio(self, video_path: str, work_dir: str) -> Optional[str]:
+        """Extract audio from video and separate background (no_vocals) using Demucs.
+
+        Returns the path to the background audio WAV file, or None if
+        separation fails (caller falls back to simple replacement).
+        """
+        ffmpeg_path = get_ffmpeg_path()
+        extracted_audio = os.path.join(work_dir, "original_audio.wav")
+
+        # Step 1: Extract audio from video
+        extract_cmd = [
+            ffmpeg_path, "-y",
+            "-i", video_path,
+            "-vn", "-acodec", "pcm_s16le", "-ar", "44100", "-ac", "2",
+            extracted_audio,
+        ]
+        try:
+            result = subprocess.run(extract_cmd, capture_output=True, timeout=30)
+            if result.returncode != 0 or not os.path.exists(extracted_audio):
+                logger.warning("[DUB] No audio track in source video, skipping separation")
+                return None
+        except Exception as e:
+            logger.warning(f"[DUB] Audio extraction failed: {e}")
+            return None
+
+        # Check if extracted audio has any content (some videos are silent)
+        if os.path.getsize(extracted_audio) < 1000:
+            logger.info("[DUB] Source video has negligible audio, skipping separation")
+            return None
+
+        # Step 2: Run Demucs separation (two-stems: vocals + no_vocals)
+        # Wait for background model warmup to finish (avoids duplicate download)
+        if not self._demucs_ready.wait(timeout=120):
+            raise RuntimeError("Demucs 模型正在下载中（首次约需30秒），请稍后重试。")
+
+        try:
+            import demucs.separate
+            demucs.separate.main([
+                "--two-stems", "vocals",
+                "-n", "htdemucs",
+                "--out", work_dir,
+                extracted_audio,
+            ])
+        except Exception as e:
+            logger.warning(f"[DUB] Demucs separation failed: {e}, falling back to simple replacement")
+            return None
+
+        # Demucs outputs to: {work_dir}/htdemucs/original_audio/no_vocals.wav
+        bg_path = os.path.join(work_dir, "htdemucs", "original_audio", "no_vocals.wav")
+        if not os.path.exists(bg_path):
+            # Try alternate path structures
+            for root, dirs, files in os.walk(work_dir):
+                if "no_vocals.wav" in files:
+                    bg_path = os.path.join(root, "no_vocals.wav")
+                    break
+
+        if os.path.exists(bg_path):
+            logger.info(f"[DUB] Background audio separated successfully: {bg_path}")
+            return bg_path
+
+        logger.warning("[DUB] Demucs output not found, falling back to simple replacement")
+        return None
+
+    def _ensure_bg_audio_cached(self, frame, video_path: str, video_url: str) -> Optional[str]:
+        """Ensure background audio is separated and cached for this frame's video.
+
+        Returns absolute path to bg audio WAV, or None if video has no audio.
+        Caches result to output/audio/bg_{frame_id}.wav — only re-runs Demucs
+        if video source changed.
+        """
+        if frame.bg_audio_url and frame.bg_audio_source_video == video_url:
+            cached_path = _safe_resolve_path("output", frame.bg_audio_url)
+            if os.path.exists(cached_path):
+                logger.info(f"[DUB] Background audio cache hit: {frame.bg_audio_url}")
+                return cached_path
+
+        import tempfile
+        import shutil
+        work_dir = tempfile.mkdtemp(prefix="demucs_")
+        try:
+            bg_path = self._separate_background_audio(video_path, work_dir)
+            if not bg_path:
+                frame.bg_audio_url = None
+                frame.bg_audio_source_video = video_url
+                return None
+
+            cache_filename = f"bg_{frame.id}.wav"
+            cache_path = _safe_resolve_path(os.path.join("output", "audio"), cache_filename)
+            os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+            shutil.copy2(bg_path, cache_path)
+
+            frame.bg_audio_url = f"audio/{cache_filename}"
+            frame.bg_audio_source_video = video_url
+            logger.info(f"[DUB] Background audio cached: {cache_filename}")
+            return cache_path
+        finally:
+            shutil.rmtree(work_dir, ignore_errors=True)
+
+    def preview_dub(self, script_id: str, frame_id: str, video_task_id: str, offset_ms: int = 0) -> "Script":
+        """Generate a preview dubbed video (Demucs cached + fast adelay+amix+mux).
+
+        Replaces any existing preview_video_url (lazy cleanup).
+        Does NOT touch dubbed_video_url.
+        """
+        _validate_safe_id(script_id, "script_id")
+        script = self.scripts.get(script_id)
+        if not script:
+            raise ValueError("Script not found")
+
+        frame = next((f for f in script.frames if f.id == frame_id), None)
+        if not frame:
+            raise ValueError(f"Frame {frame_id} not found")
+
+        if not frame.audio_url:
+            raise ValueError("Frame has no TTS audio (audio_url). Generate dialogue audio first.")
+
+        video_task = next((t for t in script.video_tasks if t.id == video_task_id), None)
+        if not video_task or not video_task.video_url:
+            raise ValueError(f"Video task {video_task_id} not found or has no video_url")
+
+        ffmpeg_path = get_ffmpeg_path()
+        if not ffmpeg_path:
+            raise RuntimeError("FFmpeg is required for audio dubbing but was not found.")
+
+        video_path = self._resolve_media_path(video_task.video_url, suffix=".mp4")
+        tts_path = self._resolve_media_path(frame.audio_url, suffix=".mp3")
+
+        if not video_path or not os.path.exists(video_path):
+            raise ValueError(f"Video file not found: {video_task.video_url}")
+        if not tts_path or not os.path.exists(tts_path):
+            raise ValueError(f"Audio file not found: {frame.audio_url}")
+        if os.path.getsize(tts_path) < 1000:
+            raise ValueError("TTS audio file is invalid or empty. Please regenerate dialogue audio.")
+
+        # Delete old preview (lazy cleanup)
+        if frame.preview_video_url:
+            old_preview = _safe_resolve_path("output", frame.preview_video_url)
+            if os.path.exists(old_preview):
+                try:
+                    os.remove(old_preview)
+                except OSError:
+                    pass
+
+        output_filename = f"preview_{frame_id}_{int(time.time())}.mp4"
+        output_path = _safe_resolve_path(os.path.join("output", "video"), output_filename)
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+        # Ensure background audio is cached (Demucs runs only on first call or video change)
+        bg_audio_path = self._ensure_bg_audio_cached(frame, video_path, video_task.video_url)
+
+        import tempfile
+        work_dir = tempfile.mkdtemp(prefix="dub_mix_")
+        try:
+            if bg_audio_path:
+                mixed_audio = os.path.join(work_dir, "mixed.wav")
+                delay_str = f"{offset_ms}|{offset_ms}"
+
+                mix_cmd = [
+                    ffmpeg_path, "-y",
+                    "-i", bg_audio_path,
+                    "-i", tts_path,
+                    "-filter_complex",
+                    f"[1:a]adelay={delay_str}[tts];[0:a][tts]amix=inputs=2:duration=first:weights=1 1[out]",
+                    "-map", "[out]",
+                    "-ac", "2", "-ar", "44100",
+                    mixed_audio,
+                ]
+
+                logger.info(f"[DUB] Mixing TTS with background (adelay={offset_ms}ms)")
+                subprocess.run(mix_cmd, check=True, capture_output=True, timeout=60)
+
+                if not os.path.exists(mixed_audio):
+                    raise RuntimeError("Audio mixing failed: output file not created")
+
+                mux_cmd = [
+                    ffmpeg_path, "-y",
+                    "-i", video_path,
+                    "-i", mixed_audio,
+                    "-map", "0:v",
+                    "-map", "1:a",
+                    "-c:v", "copy",
+                    "-c:a", "aac", "-b:a", "192k",
+                    "-movflags", "+faststart",
+                    output_path,
+                ]
+                subprocess.run(mux_cmd, check=True, capture_output=True, timeout=60)
+            else:
+                delay_str = f"{offset_ms}|{offset_ms}"
+                cmd = [
+                    ffmpeg_path, "-y",
+                    "-i", video_path,
+                    "-i", tts_path,
+                    "-filter_complex",
+                    f"[1:a]adelay={delay_str}[tts];[tts]apad[out]",
+                    "-map", "0:v",
+                    "-map", "[out]",
+                    "-c:v", "copy",
+                    "-c:a", "aac", "-b:a", "192k",
+                    "-movflags", "+faststart",
+                    output_path,
+                ]
+                logger.info(f"[DUB] Simple replacement with adelay={offset_ms}ms")
+                subprocess.run(cmd, check=True, capture_output=True, timeout=120)
+
+        except subprocess.CalledProcessError as e:
+            stderr_msg = e.stderr.decode() if e.stderr else "No error output"
+            logger.error(f"[DUB] FFmpeg failed: {stderr_msg[:400]}")
+            raise RuntimeError(f"Audio dubbing failed: {stderr_msg[:200]}")
+        finally:
+            import shutil
+            shutil.rmtree(work_dir, ignore_errors=True)
+
+        if not os.path.exists(output_path):
+            raise RuntimeError("Preview video was not created")
+
+        frame.preview_video_url = f"video/{output_filename}"
+        frame.dubbed_video_task_id = video_task_id
+        frame.dub_offset_ms = offset_ms
+        self._save_data()
+
+        logger.info(f"[DUB] Preview generated: {output_filename}")
+        return script
+
+    def apply_dub(self, script_id: str, frame_id: str) -> "Script":
+        """Promote preview_video_url to dubbed_video_url."""
+        _validate_safe_id(script_id, "script_id")
+        script = self.scripts.get(script_id)
+        if not script:
+            raise ValueError("Script not found")
+
+        frame = next((f for f in script.frames if f.id == frame_id), None)
+        if not frame:
+            raise ValueError(f"Frame {frame_id} not found")
+
+        if not frame.preview_video_url:
+            raise ValueError("No preview to apply. Generate a preview first.")
+
+        # Delete old dubbed file
+        if frame.dubbed_video_url:
+            old_path = _safe_resolve_path("output", frame.dubbed_video_url)
+            if os.path.exists(old_path):
+                try:
+                    os.remove(old_path)
+                except OSError:
+                    pass
+
+        frame.dubbed_video_url = frame.preview_video_url
+        frame.preview_video_url = None
+        self._save_data()
+
+        logger.info(f"[DUB] Applied: {frame.dubbed_video_url}")
+        return script
+
+    def revert_dub(self, script_id: str, frame_id: str) -> "Script":
+        """Revert dubbing — clear dubbed and preview, keep bg cache."""
+        _validate_safe_id(script_id, "script_id")
+        script = self.scripts.get(script_id)
+        if not script:
+            raise ValueError("Script not found")
+
+        frame = next((f for f in script.frames if f.id == frame_id), None)
+        if not frame:
+            raise ValueError(f"Frame {frame_id} not found")
+
+        for url_field in ("dubbed_video_url", "preview_video_url"):
+            url = getattr(frame, url_field)
+            if url:
+                path = _safe_resolve_path("output", url)
+                if os.path.exists(path):
+                    try:
+                        os.remove(path)
+                    except OSError:
+                        pass
+                setattr(frame, url_field, None)
+
+        frame.dub_offset_ms = 0
+        frame.dubbed_video_task_id = None
+        self._save_data()
+        return script
+
     def merge_videos(self, script_id: str) -> Script:
         """Step 5b: Merge selected videos into a single file."""
         _validate_safe_id(script_id, "script_id")
@@ -2025,7 +2616,17 @@ class ComicGenPipeline:
         video_paths = []
         for i, frame in enumerate(script.frames):
             logger.info(f"[MERGE] Processing frame {i+1}/{len(script.frames)}: {frame.id}")
-            
+
+            # Prefer dubbed version (TTS audio already overlaid with lip-sync offset)
+            if frame.dubbed_video_url:
+                dubbed_path = _safe_resolve_path("output", frame.dubbed_video_url)
+                if os.path.exists(dubbed_path):
+                    logger.debug(f"[MERGE]   -> Using dubbed video: {frame.dubbed_video_url}")
+                    video_paths.append(frame.dubbed_video_url)
+                    continue
+                else:
+                    logger.warning(f"[MERGE]   -> Dubbed video file missing: {dubbed_path}, falling back")
+
             if not frame.selected_video_id:
                 # Try to find a default completed video
                 default_video = next((v for v in script.video_tasks if v.frame_id == frame.id and v.status == "completed"), None)
@@ -2751,10 +3352,25 @@ class ComicGenPipeline:
         if not frame:
             raise ValueError("Frame not found")
 
-        if frame.dialogue:
+        dialogue_text = (
+            (frame.dialogue_structured.line if frame.dialogue_structured else None)
+            or frame.dialogue
+        )
+        if dialogue_text:
             speaker = None
             if frame.character_ids:
                 speaker = next((c for c in script.characters if c.id == frame.character_ids[0]), None)
+            speaker_name = frame.speaker or (
+                frame.dialogue_structured.speaker if frame.dialogue_structured else None
+            )
+            if not speaker and speaker_name:
+                key = speaker_name.strip().lower()
+                speaker = next(
+                    (c for c in script.characters if c.name.strip().lower() == key
+                     or key in c.name.strip().lower()
+                     or c.name.strip().lower() in key),
+                    None,
+                )
 
             if speaker:
                 model_override = None
@@ -3105,6 +3721,8 @@ class ComicGenPipeline:
                 raise ValueError("Series not found")
             for key, value in updates.items():
                 if hasattr(series, key) and key not in ("id", "created_at", "episode_ids"):
+                    if key == "art_direction" and isinstance(value, dict):
+                        value = ArtDirection(**value)
                     setattr(series, key, value)
             series.updated_at = time.time()
             self.series_store[series_id] = series
@@ -3664,10 +4282,13 @@ class ComicGenPipeline:
 
         effective_positive_prompt = ""
         effective_negative_prompt = negative_prompt or ""
+        resolved_art_dir = series.art_direction
+        if isinstance(resolved_art_dir, dict):
+            resolved_art_dir = ArtDirection(**resolved_art_dir)
         if apply_style:
-            if series.art_direction and series.art_direction.style_config:
-                effective_positive_prompt = series.art_direction.style_config.get('positive_prompt', '')
-                global_neg = series.art_direction.style_config.get('negative_prompt', '')
+            if resolved_art_dir and resolved_art_dir.style_config:
+                effective_positive_prompt = resolved_art_dir.style_config.get('positive_prompt', '')
+                global_neg = resolved_art_dir.style_config.get('negative_prompt', '')
                 if global_neg:
                     effective_negative_prompt = f"{effective_negative_prompt}, {global_neg}" if effective_negative_prompt else global_neg
             elif style_prompt:

@@ -19,16 +19,17 @@
  *   · NO inspector right rail yet (Q9 decision: 3-section flat, no inspector)
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Users, MapPin, Box, ImageIcon, AlertTriangle, Sparkles, Plus, Upload, X, Loader2, Play, Pause, Volume2, Wand2, Layers } from "lucide-react";
+import { Users, MapPin, Box, AlertTriangle, Sparkles, Plus, Upload, X, Loader2, Play, Pause, Volume2, Wand2, Layers, Maximize2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useProjectStore } from "@/store/projectStore";
 import { api } from "@/lib/api";
 import { getAssetUrl } from "@/lib/utils";
+import { useLightbox } from "@/components/shared/preview/LightboxProvider";
 import StepHeader from "@/components/shared/StepHeader";
 import PreviewImage from "@/components/shared/preview/PreviewImage";
 import WorkflowActionButton from "@/components/shared/WorkflowActionButton";
 import VoicePickerModal from "./cast/VoicePickerModal";
-import CastWorkbenchModal from "./cast/CastWorkbenchModal";
+import CastWorkbenchModal, { activePolls } from "./cast/CastWorkbenchModal";
 
 type AssetKind = "character" | "scene" | "prop";
 
@@ -83,6 +84,17 @@ export default function Cast() {
     // PR-3* · Cast redesign — tab filter + workbench launcher.
     const [activeTab, setActiveTab] = useState<"all" | "character" | "scene" | "prop">("all");
     const [workbench, setWorkbench] = useState<{ kind: "character" | "scene" | "prop"; entityId: string } | null>(null);
+
+    const removeGeneratingTask = useProjectStore((s) => s.removeGeneratingTask);
+    const generatingTasks = useProjectStore((s) => s.generatingTasks);
+    useEffect(() => {
+        if (generatingTasks.length === 0) return;
+        for (const task of generatingTasks) {
+            if (!activePolls.has(task.assetId)) {
+                removeGeneratingTask(task.assetId, task.generationType);
+            }
+        }
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     /**
      * Aggregate per-asset appearance counts from frame references, then
@@ -670,10 +682,12 @@ function CastSection({ kind, icon, title, items, emptyLabel, onAddNew, addLabel,
 
 function CastCard({ item, onOpenWorkbench }: { item: CastItem; onOpenWorkbench?: () => void }) {
     const t = useTranslations("cast");
+    const { open: openLightbox } = useLightbox();
     const updateProject = useProjectStore((state) => state.updateProject);
     const currentProject = useProjectStore((state) => state.currentProject);
+    const generatingTasks = useProjectStore((state) => state.generatingTasks);
+    const isGenerating = generatingTasks.some((task) => task.assetId === item.id);
     const [historyOpen, setHistoryOpen] = useState(false);
-    // PR-3g Stage B — voice picker + inline preview state
     const [pickerOpen, setPickerOpen] = useState(false);
     const [previewing, setPreviewing] = useState(false);
     const [playing, setPlaying] = useState(false);
@@ -737,60 +751,135 @@ function CastCard({ item, onOpenWorkbench }: { item: CastItem; onOpenWorkbench?:
         }
     }, []);
 
-    // Per-kind visual treatment: aspect ratio, hover accent.
-    // (Static class strings — Tailwind JIT can't resolve dynamic
-    // `bg-${kind}-500/15` strings, so we ship the whole literal.)
-    const kindStyles: Record<AssetKind, { aspect: string; accentBorderHover: string; ctaText: string; ctaBg: string }> = {
+    // Per-kind visual treatment WITHOUT bulk color fills (per impeccable
+    // product register: 'Heavy color or full-saturation accents on inactive
+    // states' is banned). Differentiation is carried by:
+    //   1. Aspect ratio (already in section grid + the `aspect` class)
+    //   2. A subtle CSS pattern on the empty thumb (hairlines for character,
+    //      horizon for scene, dot grid for prop) — all in 3-6% white
+    //   3. A small mono-caps kind chip top-right with hairline border
+    //   4. Hover only: a quiet 1px top-edge hairline in the kind tint
+    // No saturated background fills anywhere. Color only appears on hover
+    // (an active state) and on the kind chip (which is itself near-mono).
+    const kindStyles: Record<AssetKind, {
+        aspect: string;
+        emptyPattern: React.CSSProperties;
+        chipLabel: string;
+        hoverAccent: string;
+        watermarkIcon: React.ReactNode;
+        ctaIcon: React.ReactNode;
+        ctaLabel: string;
+    }> = {
         character: {
-            aspect: "aspect-[3/4]",
-            accentBorderHover: "hover:border-purple-400/40",
-            ctaText: "text-purple-200",
-            ctaBg: "bg-purple-500/10 border-purple-500/30 hover:bg-purple-500/15",
+            aspect: "aspect-[4/3]",
+            emptyPattern: {
+                backgroundImage:
+                    "repeating-linear-gradient(0deg, transparent 0, transparent 23px, rgba(255,255,255,0.025) 23px, rgba(255,255,255,0.025) 24px)",
+            },
+            chipLabel: t("tabCharacters"),
+            hoverAccent: "rgba(167,139,250,0.55)",
+            watermarkIcon: <Users size={48} className="text-white/[0.04]" strokeWidth={1} />,
+            ctaIcon: <Wand2 size={14} strokeWidth={1.75} />,
+            ctaLabel: t("generateReference"),
         },
         scene: {
             aspect: "aspect-[16/9]",
-            accentBorderHover: "hover:border-emerald-400/40",
-            ctaText: "text-emerald-200",
-            ctaBg: "bg-emerald-500/10 border-emerald-500/30 hover:bg-emerald-500/15",
+            emptyPattern: {
+                backgroundImage: [
+                    "linear-gradient(to bottom, transparent calc(33% - 0.5px), rgba(255,255,255,0.03) 33%, transparent calc(33% + 0.5px))",
+                    "linear-gradient(to bottom, transparent calc(66% - 0.5px), rgba(255,255,255,0.05) 66%, transparent calc(66% + 0.5px))",
+                ].join(", "),
+            },
+            chipLabel: t("tabScenes"),
+            hoverAccent: "rgba(110,231,183,0.5)",
+            watermarkIcon: <MapPin size={64} className="text-white/[0.035]" strokeWidth={0.75} />,
+            ctaIcon: <Sparkles size={14} strokeWidth={1.75} />,
+            ctaLabel: t("generateScene"),
         },
         prop: {
             aspect: "aspect-square",
-            accentBorderHover: "hover:border-amber-400/40",
-            ctaText: "text-amber-200",
-            ctaBg: "bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/15",
+            emptyPattern: {
+                backgroundImage:
+                    "radial-gradient(rgba(255,255,255,0.04) 0.8px, transparent 0.8px)",
+                backgroundSize: "10px 10px",
+                backgroundPosition: "5px 5px",
+            },
+            chipLabel: t("tabProps"),
+            hoverAccent: "rgba(252,211,77,0.5)",
+            watermarkIcon: <Box size={40} className="text-white/[0.04]" strokeWidth={1} />,
+            ctaIcon: <Layers size={13} strokeWidth={1.75} />,
+            ctaLabel: t("generateProp"),
         },
     };
     const k = kindStyles[item.kind];
 
+    const cardRadius = item.kind === "scene" ? "rounded-md" : "rounded-lg";
+
     return (
         <>
-            <div className={`group/cast-card relative flex flex-col gap-2 rounded-lg border border-glass-border bg-glass p-2 transition-colors duration-fast ease-out-quart ${k.accentBorderHover}`}>
-                <div className={`${k.aspect} overflow-hidden rounded-md bg-black/40 relative`}>
+            <div
+                className={`group/cast-card relative flex flex-col gap-2 ${cardRadius} border border-glass-border bg-glass p-2 transition-[border-color,background-color] duration-fast ease-out-quart hover:border-white/15`}
+            >
+                {/* Kind chip — top-right, near-mono. Sits on TOP of the thumb
+                    so it works for both empty and ready states without
+                    occluding the image (small + corner-tucked). */}
+                <span className="absolute top-2.5 right-2.5 z-10 pointer-events-none inline-flex items-center rounded-sm border border-white/10 bg-black/40 px-1.5 py-[1px] font-mono text-[8.5px] uppercase tracking-[0.18em] text-text-muted backdrop-blur-sm">
+                    {k.chipLabel}
+                </span>
+                {/* Hover hairline accent — single top edge, animated on group-hover */}
+                <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-x-2 top-0 h-px opacity-0 group-hover/cast-card:opacity-100 transition-opacity"
+                    style={{ background: k.hoverAccent }}
+                />
+                <div
+                    className={`${k.aspect} overflow-hidden rounded-md bg-black/40 relative cursor-pointer`}
+                    onClick={() => item.referenceImageUrl && onOpenWorkbench?.()}
+                >
                     {item.referenceImageUrl ? (
                         <>
-                            <PreviewImage src={item.referenceImageUrl} alt={item.name} className="h-full w-full" clickToLightbox />
-                            {/* Re-generate / iterate affordance — hover-revealed
-                                so the thumbnail stays the focus when at rest. */}
+                            <PreviewImage src={item.referenceImageUrl} alt={item.name} className="h-full w-full object-contain" noLightbox />
                             <button
-                                onClick={(e) => { e.stopPropagation(); onOpenWorkbench?.(); }}
-                                title={t("editReference")}
-                                className="absolute bottom-1 right-1 inline-flex items-center gap-1 rounded-md border border-white/20 bg-black/60 px-1.5 py-0.5 text-[10px] text-white opacity-0 group-hover/cast-card:opacity-100 transition-opacity backdrop-blur-sm"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    openLightbox({ src: getAssetUrl(item.referenceImageUrl!), alt: item.name, kind: "image" });
+                                }}
+                                aria-label="放大查看"
+                                title="放大查看"
+                                className="absolute left-1.5 top-1.5 z-10 grid h-6 w-6 place-items-center rounded bg-black/55 text-white/80 backdrop-blur opacity-0 group-hover/cast-card:opacity-100 transition-opacity hover:bg-black/75"
                             >
-                                <Wand2 size={10} />
-                                {t("editReferenceShort")}
+                                <Maximize2 size={11} />
                             </button>
                         </>
                     ) : (
-                        // Empty thumbnail IS the generate CTA.
                         <button
                             onClick={() => onOpenWorkbench?.()}
-                            className={`grid h-full w-full place-items-center border border-dashed ${k.ctaBg} ${k.ctaText} transition-colors`}
+                            className="relative grid h-full w-full place-items-center bg-black/20 text-text-secondary hover:text-foreground transition-colors overflow-hidden"
+                            style={k.emptyPattern}
                         >
-                            <span className="flex flex-col items-center gap-1.5">
-                                <Wand2 size={item.kind === "scene" ? 18 : 16} />
-                                <span className="text-[11px] font-medium">{t("generateReference")}</span>
+                            <span className="pointer-events-none absolute inset-0 grid place-items-center">
+                                {k.watermarkIcon}
+                            </span>
+                            {item.kind === "scene" && (
+                                <>
+                                    <span className="pointer-events-none absolute inset-x-0 top-0 h-3 bg-gradient-to-b from-black/30 to-transparent" aria-hidden="true" />
+                                    <span className="pointer-events-none absolute inset-x-0 bottom-0 h-3 bg-gradient-to-t from-black/30 to-transparent" aria-hidden="true" />
+                                </>
+                            )}
+                            <CornerMarks />
+                            <span className="relative flex flex-col items-center gap-1.5 z-10">
+                                {k.ctaIcon}
+                                <span className="text-[10px] font-medium tracking-wide">{k.ctaLabel}</span>
                             </span>
                         </button>
+                    )}
+                    {isGenerating && (
+                        <div className="absolute inset-0 z-20 grid place-items-center bg-black/60 backdrop-blur-sm rounded-md">
+                            <div className="flex flex-col items-center gap-1.5">
+                                <Loader2 size={20} className="animate-spin text-primary" />
+                                <span className="text-[10px] text-text-secondary">生成中...</span>
+                            </div>
+                        </div>
                     )}
                 </div>
                 <div className="space-y-1 px-0.5">
@@ -937,6 +1026,31 @@ function CharacterHistoryPopover({ seriesId, characterId, onClose }: { seriesId:
                 )}
             </div>
         </div>
+    );
+}
+
+function CornerMarks() {
+    const stroke = "rgba(255,255,255,0.12)";
+    const size = 10;
+    return (
+        <>
+            {/* TL */}
+            <svg className="pointer-events-none absolute top-2 left-2" width={size} height={size} aria-hidden="true">
+                <path d={`M0 ${size} V0 H${size}`} fill="none" stroke={stroke} strokeWidth="1" />
+            </svg>
+            {/* TR */}
+            <svg className="pointer-events-none absolute top-2 right-2" width={size} height={size} aria-hidden="true">
+                <path d={`M${size} ${size} V0 H0`} fill="none" stroke={stroke} strokeWidth="1" />
+            </svg>
+            {/* BL */}
+            <svg className="pointer-events-none absolute bottom-2 left-2" width={size} height={size} aria-hidden="true">
+                <path d={`M0 0 V${size} H${size}`} fill="none" stroke={stroke} strokeWidth="1" />
+            </svg>
+            {/* BR */}
+            <svg className="pointer-events-none absolute bottom-2 right-2" width={size} height={size} aria-hidden="true">
+                <path d={`M${size} 0 V${size} H0`} fill="none" stroke={stroke} strokeWidth="1" />
+            </svg>
+        </>
     );
 }
 

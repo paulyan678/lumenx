@@ -12,9 +12,9 @@
  *     overlay) so users can switch projects and learn when the other one
  *     finishes via the global ToastContainer.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Wand2, X, AlertTriangle, ArrowRight, Loader2, Film, Sparkles } from "lucide-react";
+import { Wand2, X, AlertTriangle, ArrowRight, Film, Sparkles } from "lucide-react";
 import { useTranslations } from "next-intl";
 import WorkflowActionButton from "@/components/shared/WorkflowActionButton";
 
@@ -31,9 +31,9 @@ interface StoryboardGenerateDialogProps {
         frames?: any[];
     } | null;
     existingShotCount: number;
-    /** Called when the user confirms. The parent owns the actual API
-     *  call so it can wire its own toast lifecycle. */
-    onConfirm: () => Promise<void>;
+    /** Called when the user confirms. Dialog closes immediately; parent
+     *  runs the API call in the background with toast feedback. */
+    onConfirm: () => void;
     /** Jump to the Script step (used by the empty-text quick fix link). */
     onJumpToScript?: () => void;
 }
@@ -47,7 +47,6 @@ export default function StoryboardGenerateDialog({
     onJumpToScript,
 }: StoryboardGenerateDialogProps) {
     const t = useTranslations("storyboardGen");
-    const [submitting, setSubmitting] = useState(false);
 
     const text = (project as any)?.original_text ?? project?.originalText ?? "";
     const charsCount = project?.characters?.length ?? 0;
@@ -70,19 +69,10 @@ export default function StoryboardGenerateDialog({
 
     const allPass = checks.every((c) => c.pass);
 
-    useEffect(() => {
-        if (!isOpen) setSubmitting(false);
-    }, [isOpen]);
-
-    const handleConfirm = async () => {
+    const handleConfirm = () => {
         if (!allPass) return;
-        setSubmitting(true);
-        try {
-            await onConfirm();
-            onClose();
-        } finally {
-            setSubmitting(false);
-        }
+        onClose();
+        onConfirm();
     };
 
     return (
@@ -111,9 +101,8 @@ export default function StoryboardGenerateDialog({
                             </div>
                             <button
                                 onClick={onClose}
-                                disabled={submitting}
                                 aria-label={t("close")}
-                                className="p-1.5 rounded-lg hover:bg-hover-bg text-text-muted hover:text-foreground transition-colors disabled:opacity-30"
+                                className="p-1.5 rounded-lg hover:bg-hover-bg text-text-muted hover:text-foreground transition-colors"
                             >
                                 <X size={15} />
                             </button>
@@ -194,23 +183,19 @@ export default function StoryboardGenerateDialog({
                                 variant="ghost"
                                 size="sm"
                                 onClick={onClose}
-                                disabled={submitting}
                             >
                                 {t("cancel")}
                             </WorkflowActionButton>
                             <WorkflowActionButton
                                 variant="primary"
                                 size="sm"
-                                loading={submitting}
                                 disabled={!allPass}
-                                leftIcon={submitting ? <Loader2 /> : <Wand2 />}
+                                leftIcon={<Wand2 />}
                                 onClick={handleConfirm}
                             >
-                                {submitting
-                                    ? t("generating")
-                                    : existingShotCount > 0
-                                        ? t("replaceAndGenerate")
-                                        : t("generate")}
+                                {existingShotCount > 0
+                                    ? t("replaceAndGenerate")
+                                    : t("generate")}
                             </WorkflowActionButton>
                         </footer>
                     </motion.div>

@@ -180,7 +180,11 @@ export default function VideoAssembly() {
                                     <div className="w-48 aspect-video relative flex-shrink-0 border-r border-glass-border bg-elevated">
                                         {selectedVideo ? (
                                             <video
-                                                src={getAssetUrl(selectedVideo.video_url)}
+                                                src={getAssetUrl(
+                                                    frame.dubbed_video_task_id === selectedVideo.id && frame.dubbed_video_url
+                                                        ? frame.dubbed_video_url
+                                                        : selectedVideo.video_url
+                                                )}
                                                 className="w-full h-full object-cover"
                                                 muted
                                                 onMouseOver={(e) => e.currentTarget.play()}
@@ -307,7 +311,11 @@ export default function VideoAssembly() {
                                             >
                                                 <div className="aspect-video relative bg-black">
                                                     <video
-                                                        src={getAssetUrl(video.video_url)}
+                                                        src={getAssetUrl(
+                                                            selectedFrame?.dubbed_video_task_id === video.id && selectedFrame?.dubbed_video_url
+                                                                ? selectedFrame.dubbed_video_url
+                                                                : video.video_url
+                                                        )}
                                                         className="w-full h-full object-contain"
                                                         controls
                                                     />

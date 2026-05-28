@@ -201,6 +201,17 @@ body {
   to   { opacity: 1; }
 }
 
+/* LightboxProvider entrance — backdrop fade + media scale-in.
+   Matches CompareModal's spring feel without the spring physics. */
+@keyframes lightboxFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes lightboxScaleIn {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
 /* Respect reduced-motion preference: kill all custom animations.
    The above transitions still apply (CSS transitions on hover etc
    are kept), but the orchestrated entrance keyframes go away for

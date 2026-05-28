@@ -127,12 +127,27 @@ export interface StoryboardFrame {
     // ... other fields
 }
 
-export interface StylePreset {
+export interface StylePresetCategory {
     id: string;
     name: string;
-    color: string;
-    prompt: string;
-    negative_prompt?: string;
+    name_zh: string;
+    sort_order: number;
+}
+
+export interface StylePreset {
+    id: string;
+    category: string;
+    name: string;
+    name_zh: string;
+    subtitle_zh?: string;
+    description?: string;
+    best_for?: string[];
+    avoid_for?: string[];
+    positive_prompt: string;
+    negative_prompt: string;
+    sample_prompt?: string;
+    thumbnail: string | null;
+    object_position?: string;
 }
 
 export interface StyleConfig {
@@ -156,9 +171,11 @@ export interface ArtDirection {
 export type ModelSettings = FrontendModelSettings;
 
 export const ASPECT_RATIOS = [
-    { id: '9:16', name: '9:16', description: 'Portrait (576*1024)' },
-    { id: '16:9', name: '16:9', description: 'Landscape (1024*576)' },
-    { id: '1:1', name: '1:1', description: 'Square (1024*1024)' },
+    { id: '9:16', name: '9:16', description: 'Portrait (576×1024)' },
+    { id: '3:4', name: '3:4', description: 'Portrait mild (768×1024)' },
+    { id: '1:1', name: '1:1', description: 'Square (1024×1024)' },
+    { id: '4:3', name: '4:3', description: 'Landscape mild (1024×768)' },
+    { id: '16:9', name: '16:9', description: 'Landscape (1024×576)' },
 ];
 
 export interface VideoParams {
@@ -290,6 +307,10 @@ interface ProjectStore {
     isAnalyzingStoryboard: boolean;
     setIsAnalyzingStoryboard: (value: boolean) => void;
 
+    // Global async operation tracker — persists across step/tab switches
+    runningOps: Record<string, boolean>;
+    setRunningOp: (key: string, running: boolean) => void;
+
     // Series State
     seriesList: Series[];
     currentSeries: Series | null;
@@ -386,6 +407,18 @@ export const useProjectStore = create<ProjectStore>()(
                                 p.id === id ? latestProject : p
                             ),
                         }));
+
+                        // Auto-load parent series for style inheritance (always fetch fresh for up-to-date art_direction)
+                        const seriesId = latestProject.series_id;
+                        if (seriesId) {
+                            const cached = get().seriesList.find((s) => s.id === seriesId);
+                            if (cached) {
+                                set({ currentSeries: cached });
+                            }
+                            get().fetchSeries(seriesId);
+                        } else {
+                            set({ currentSeries: null });
+                        }
                     }
                 } catch (error) {
                     console.error('Failed to fetch latest project data:', error);
@@ -464,7 +497,7 @@ export const useProjectStore = create<ProjectStore>()(
 
                 } catch (error) {
                     console.error("Failed to analyze art style:", error);
-                    // We could add an error state here if needed
+                    throw error;
                 } finally {
                     set({ isAnalyzingArtStyle: false });
                 }
@@ -504,6 +537,15 @@ export const useProjectStore = create<ProjectStore>()(
             isAnalyzingStoryboard: false,
             setIsAnalyzingStoryboard: (value: boolean) => set({ isAnalyzingStoryboard: value }),
 
+            // Global async operation tracker
+            runningOps: {},
+            setRunningOp: (key: string, running: boolean) => set((state) => {
+                const next = { ...state.runningOps };
+                if (running) next[key] = true;
+                else delete next[key];
+                return { runningOps: next };
+            }),
+
             // Series State
             seriesList: [],
             currentSeries: null,
@@ -520,7 +562,12 @@ export const useProjectStore = create<ProjectStore>()(
             fetchSeries: async (id: string) => {
                 try {
                     const series = await api.getSeries(id);
-                    set({ currentSeries: series });
+                    set((state) => ({
+                        currentSeries: series,
+                        seriesList: state.seriesList.some((s) => s.id === id)
+                            ? state.seriesList.map((s) => s.id === id ? series : s)
+                            : state.seriesList,
+                    }));
                 } catch (error) {
                     console.error('Failed to fetch series:', error);
                 }
@@ -552,7 +599,12 @@ export const useProjectStore = create<ProjectStore>()(
                 }
             },
 
-            setCurrentSeries: (series: Series | null) => set({ currentSeries: series }),
+            setCurrentSeries: (series: Series | null) => set((state) => ({
+                currentSeries: series,
+                seriesList: series
+                    ? state.seriesList.map((s) => s.id === series.id ? series : s)
+                    : state.seriesList,
+            })),
         }),
         {
             name: 'project-storage',

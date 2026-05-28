@@ -14,11 +14,14 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Star, AlertCircle, Check, Pencil } from "lucide-react";
 import { PendingTaskAffordance } from "@/components/shared/PendingTaskAffordance";
+import PreviewVideo from "@/components/shared/preview/PreviewVideo";
 import type { VideoTask } from "@/lib/api";
 
 interface CandidateThumbProps {
     task: VideoTask;
     isCompareSelected: boolean;
+    /** If this task was dubbed, show the dubbed video URL instead. */
+    dubbedVideoUrl?: string;
     /** Optional: resolve a URL to display-ready form (asset prefix). */
     resolveUrl?: (url: string) => string;
     onClick: (task: VideoTask, modifiers: { shift: boolean; meta: boolean }) => void;
@@ -33,6 +36,7 @@ const MAX_LABEL_LEN = 20;
 export default function CandidateThumb({
     task,
     isCompareSelected,
+    dubbedVideoUrl,
     resolveUrl,
     onClick,
     onToggleStar,
@@ -46,7 +50,7 @@ export default function CandidateThumb({
     const isCompleted = status === "completed";
     const display = (u?: string | null) => (u && resolveUrl ? resolveUrl(u) : u ?? undefined);
 
-    const videoUrl = isCompleted ? display(task.video_url) : undefined;
+    const videoUrl = isCompleted ? display(dubbedVideoUrl || task.video_url) : undefined;
 
     const [editingLabel, setEditingLabel] = useState(false);
     const [labelDraft, setLabelDraft] = useState(task.label ?? "");
@@ -97,24 +101,15 @@ export default function CandidateThumb({
                 }`}
                 title="Click to play · Shift+Click to add to Compare"
             >
-                {/* Thumbnail / preview */}
+                {/* Thumbnail / preview — Issue 14: routes through PreviewVideo
+                    for onError fallback + lightbox affordance. Click thumb
+                    body is still owned by parent for select/play, but the
+                    🔍 magnify button on hover opens fullscreen lightbox. */}
                 {videoUrl ? (
-                    <video
+                    <PreviewVideo
                         src={videoUrl}
-                        muted
-                        loop
-                        playsInline
-                        preload="metadata"
-                        className="h-full w-full object-cover"
-                        onMouseEnter={(e) => {
-                            const v = e.currentTarget;
-                            v.play().catch(() => { /* autoplay may be blocked */ });
-                        }}
-                        onMouseLeave={(e) => {
-                            const v = e.currentTarget;
-                            v.pause();
-                            try { v.currentTime = 0; } catch { /* ignore */ }
-                        }}
+                        alt={`Take ${task.id}`}
+                        className="h-full w-full"
                     />
                 ) : (
                     <div className="grid h-full w-full place-items-center">

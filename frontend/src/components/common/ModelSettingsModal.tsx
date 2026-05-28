@@ -157,7 +157,7 @@ export default function ModelSettingsModal({ isOpen, onClose }: ModelSettingsMod
                                             <button
                                                 key={ratio.id}
                                                 onClick={() => setCharacterAspectRatio(ratio.id)}
-                                                className={`w-full flex flex-col items-center py-2 px-2 rounded border transition-all ${characterAspectRatio === ratio.id
+                                                className={`w-full flex flex-col items-center py-1.5 px-2 rounded border transition-all ${characterAspectRatio === ratio.id
                                                         ? 'border-green-500/50 bg-green-500/10'
                                                         : 'border-glass-border hover:border-glass-border bg-glass'
                                                     }`}
@@ -179,7 +179,7 @@ export default function ModelSettingsModal({ isOpen, onClose }: ModelSettingsMod
                                             <button
                                                 key={ratio.id}
                                                 onClick={() => setSceneAspectRatio(ratio.id)}
-                                                className={`w-full flex flex-col items-center py-2 px-2 rounded border transition-all ${sceneAspectRatio === ratio.id
+                                                className={`w-full flex flex-col items-center py-1.5 px-2 rounded border transition-all ${sceneAspectRatio === ratio.id
                                                         ? 'border-green-500/50 bg-green-500/10'
                                                         : 'border-glass-border hover:border-glass-border bg-glass'
                                                     }`}
@@ -201,7 +201,7 @@ export default function ModelSettingsModal({ isOpen, onClose }: ModelSettingsMod
                                             <button
                                                 key={ratio.id}
                                                 onClick={() => setPropAspectRatio(ratio.id)}
-                                                className={`w-full flex flex-col items-center py-2 px-2 rounded border transition-all ${propAspectRatio === ratio.id
+                                                className={`w-full flex flex-col items-center py-1.5 px-2 rounded border transition-all ${propAspectRatio === ratio.id
                                                         ? 'border-green-500/50 bg-green-500/10'
                                                         : 'border-glass-border hover:border-glass-border bg-glass'
                                                     }`}

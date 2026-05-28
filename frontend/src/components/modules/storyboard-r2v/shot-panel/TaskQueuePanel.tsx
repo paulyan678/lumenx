@@ -14,8 +14,11 @@
  * "jump to shot" does.
  */
 import { useMemo, useState } from "react";
-import { X, ArrowRight, Loader2 } from "lucide-react";
+import { X, ArrowRight, Loader2, Copy, Check, RefreshCw, ChevronDown, ChevronRight, ListChecks } from "lucide-react";
 import type { VideoTask } from "@/lib/api";
+import PreviewImage from "@/components/shared/preview/PreviewImage";
+import PreviewVideo from "@/components/shared/preview/PreviewVideo";
+import SidePanelHeader from "@/components/shared/SidePanelHeader";
 
 type TabKey = "active" | "done" | "failed";
 
@@ -95,23 +98,21 @@ export default function TaskQueuePanel({
                     "max-md:w-screen max-md:max-w-none",
                 ].join(" ")}
             >
-            <header className="flex shrink-0 items-center justify-between gap-2 border-b border-glass-border px-3.5 py-3">
-                <div className="flex items-baseline gap-2">
-                    {/* Display tier — primary panel title (P0-2). */}
-                    <span className="font-display text-display-sm font-semibold tracking-tight text-foreground">Task queue</span>
-                    <span className="font-mono text-chrome-sm font-medium uppercase text-text-muted">
-                        {tasks.length} total
-                    </span>
-                </div>
-                <button
-                    type="button"
-                    aria-label="Close queue"
-                    onClick={onClose}
-                    className="-m-1 grid h-7 w-7 place-items-center rounded text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
-                >
-                    <X size={13} aria-hidden="true" />
-                </button>
-            </header>
+            <SidePanelHeader
+                icon={<ListChecks />}
+                title="Task queue"
+                subtitle={`${tasks.length} total`}
+                trailing={(
+                    <button
+                        type="button"
+                        aria-label="Close queue"
+                        onClick={onClose}
+                        className="p-1.5 hover:bg-hover-bg rounded-md text-text-secondary hover:text-foreground transition-colors"
+                    >
+                        <X size={13} aria-hidden="true" />
+                    </button>
+                )}
+            />
 
             <div role="tablist" className="flex shrink-0 border-b border-glass-border px-3 py-1.5">
                 {(
@@ -171,6 +172,20 @@ export default function TaskQueuePanel({
     );
 }
 
+/**
+ * TaskRow — two-density card (Issue 17 plan B + Q3b row-expand).
+ *
+ * Compact (default): status dot + shot label + thumb + clipped prompt
+ * + meta line. Optimized for "10 active tasks" panoramic scan.
+ *
+ * Expanded: full prompt (no clamp), 96×54 thumbs (input + output side
+ * by side), full params line including duration/seed, full provider
+ * IDs with copy buttons, full error text wrap, retry + copy-diagnose.
+ *
+ * Failed tasks default-expanded — when something failed, the user
+ * always wants the diagnose surface immediately. Active/completed
+ * default-collapsed; user toggles via the row-level chevron.
+ */
 function TaskRow({
     task,
     shotLabel,
@@ -184,11 +199,15 @@ function TaskRow({
     onCancel?: (task: VideoTask) => Promise<void> | void;
     onRetry?: (task: VideoTask) => Promise<void> | void;
 }) {
-    const isInFlight = task.status === "pending" || task.status === "processing";
+    const [copiedField, setCopiedField] = useState<"providerId" | "providerRequest" | "diagnose" | null>(null);
+    const [retrying, setRetrying] = useState(false);
     const isFailed = task.status === "failed";
-    // Status dot uses the semantic token palette (Sweep A); a single
-    // pulse on processing keeps the eye on what's moving without
-    // jittering the whole row.
+    const isCompleted = task.status === "completed";
+    const isInFlight = task.status === "pending" || task.status === "processing";
+    // Failed tasks always come up expanded — user wants the diagnose
+    // surface immediately. Others default collapsed; user toggles.
+    const [expanded, setExpanded] = useState<boolean>(isFailed);
+
     const dotClass =
         task.status === "completed"
             ? "bg-status-completed-fg"
@@ -197,6 +216,7 @@ function TaskRow({
                 : task.status === "processing"
                     ? "bg-status-processing-fg animate-pulse"
                     : "bg-status-pending-fg";
+
     const elapsedS = Math.max(0, Math.floor(Date.now() / 1000 - task.created_at));
     const elapsedLabel = elapsedS < 60
         ? `${elapsedS}s`
@@ -204,15 +224,77 @@ function TaskRow({
             ? `${Math.floor(elapsedS / 60)}m`
             : `${Math.floor(elapsedS / 3600)}h`;
 
-    // Row title includes the full task id only via tooltip (P2-3); the
-    // visible #idShort was redundant noise next to shotLabel which is
-    // already disambiguating.
+    const promptPreview = (task.prompt || "").trim().slice(0, 60) || "—";
+
+    // Output (when completed) overrides input thumb; otherwise show input frame.
+    // 48×27 = 16:9 minimum readable scale.
+    const inputThumbUrl = task.image_url || undefined;
+    const outputVideoUrl = task.video_url || undefined;
+
+    // Provider ID display: when provider_name=dashscope, label as "百炼"
+    // (user-friendly Chinese name) since that's the console they'll paste into.
+    const providerLabel =
+        task.provider_name === "dashscope" ? "百炼"
+            : task.provider_name === "kling" ? "可灵"
+                : task.provider_name === "vidu" ? "Vidu"
+                    : task.provider_name === "pixverse" ? "PixVerse"
+                        : task.provider_name || "provider";
+
+    // Build diagnose blob — copy-pasteable into a support ticket.
+    const diagnoseBlob = [
+        `Local task: ${task.id}`,
+        task.provider_name && task.provider_task_id
+            ? `${providerLabel} task: ${task.provider_task_id}`
+            : null,
+        task.provider_request_id
+            ? `${providerLabel} request: ${task.provider_request_id}`
+            : null,
+        `Model: ${task.model || "?"}`,
+        `Status: ${task.status}`,
+        task.error ? `Error: ${task.error}` : null,
+    ].filter(Boolean).join("\n");
+
+    const handleCopy = async (field: "providerId" | "providerRequest" | "diagnose", text: string) => {
+        try {
+            await navigator.clipboard.writeText(text);
+            setCopiedField(field);
+            window.setTimeout(() => setCopiedField(prev => prev === field ? null : prev), 1500);
+        } catch {
+            /* clipboard blocked */
+        }
+    };
+
+    const handleRetry = async () => {
+        if (!onRetry || retrying) return;
+        setRetrying(true);
+        try {
+            await onRetry(task);
+        } finally {
+            // Clear after a short delay even on success — the task disappears
+            // from "failed" bucket once retried, so spinner becomes moot.
+            window.setTimeout(() => setRetrying(false), 800);
+        }
+    };
+
+    const fullPrompt = (task.prompt || "").trim();
+
     return (
         <div
-            className="group/row rounded-md border border-glass-border bg-glass px-2.5 py-2 transition-colors duration-fast ease-out-quart hover:border-white/15"
+            className="group/row space-y-1.5 rounded-md border border-glass-border bg-glass px-2.5 py-2 transition-colors duration-fast ease-out-quart hover:border-white/15"
             title={`Task id: ${task.id}`}
         >
-            <div className="flex items-center gap-2">
+            {/* Header row — chevron + status + shot label + actions */}
+            <div className="flex items-center gap-1.5">
+                <button
+                    type="button"
+                    onClick={() => setExpanded(v => !v)}
+                    aria-expanded={expanded}
+                    aria-label={expanded ? "Collapse task details" : "Expand task details"}
+                    title={expanded ? "收起" : "展开详情"}
+                    className="-m-1 grid h-6 w-6 place-items-center rounded text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                >
+                    {expanded ? <ChevronDown size={12} aria-hidden="true" /> : <ChevronRight size={12} aria-hidden="true" />}
+                </button>
                 <span className={`h-2 w-2 shrink-0 rounded-full ${dotClass}`} aria-hidden="true" />
                 <span className="truncate font-sans text-body-sm font-medium text-foreground">
                     {shotLabel}
@@ -225,7 +307,7 @@ function TaskRow({
                         <button
                             type="button"
                             aria-label="Jump to shot"
-                            title="Jump to shot"
+                            title="跳转到该 shot"
                             onClick={() => onJumpToShot(task.frame_id!)}
                             className="-m-1 grid h-7 w-7 place-items-center rounded text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                         >
@@ -243,25 +325,170 @@ function TaskRow({
                             <X size={11} aria-hidden="true" />
                         </button>
                     ) : null}
-                    {isFailed && onRetry ? (
-                        <button
-                            type="button"
-                            aria-label="Retry task"
-                            title="Retry"
-                            onClick={() => { void onRetry(task); }}
-                            className="min-h-[24px] rounded border border-status-failed-border bg-status-failed-bg px-1.5 py-[2px] font-mono text-chrome-sm font-medium uppercase text-status-failed-fg transition-colors duration-fast ease-out-quart hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-failed-border"
-                        >
-                            retry
-                        </button>
-                    ) : null}
                 </span>
             </div>
-            <div className="mt-1 truncate font-mono text-chrome-sm tracking-tight text-text-muted">
-                {task.model || "—"} · {elapsedLabel} ago
-                {isFailed && task.error ? (
-                    <span className="ml-1 text-status-failed-fg"> · {task.error.slice(0, 60)}</span>
-                ) : null}
-            </div>
+
+            {!expanded ? (
+                /* Compact body — single 64×36 thumb + clipped prompt + meta line */
+                <div className="flex items-start gap-2">
+                    <div className="h-[36px] w-[64px] shrink-0 overflow-hidden rounded border border-glass-border bg-black/40">
+                        {isCompleted && outputVideoUrl ? (
+                            <PreviewVideo src={outputVideoUrl} alt="output" className="h-full w-full" hoverPlay={false} alwaysShowMagnify clickToLightbox />
+                        ) : inputThumbUrl ? (
+                            <PreviewImage src={inputThumbUrl} alt="input" className="h-full w-full" alwaysShowMagnify clickToLightbox />
+                        ) : (
+                            <div className="grid h-full w-full place-items-center font-mono text-[9px] uppercase text-text-muted">
+                                no thumb
+                            </div>
+                        )}
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-0.5">
+                        <p className="line-clamp-2 font-sans text-body-sm leading-snug text-foreground/90" title={fullPrompt}>
+                            {promptPreview}
+                        </p>
+                        <p className="truncate font-mono text-chrome-sm tracking-tight text-text-muted">
+                            {task.model || "—"}
+                            {task.resolution ? ` · ${task.resolution}` : ""}
+                            {` · ${elapsedLabel} ago`}
+                        </p>
+                    </div>
+                </div>
+            ) : (
+                /* Expanded body — bigger thumbs side-by-side + full prompt
+                   + full params + provider IDs + error + actions. */
+                <div className="space-y-2">
+                    {/* Thumbs — input always; output added when completed */}
+                    {(inputThumbUrl || (isCompleted && outputVideoUrl)) ? (
+                        <div className="flex flex-wrap items-start gap-2">
+                            {inputThumbUrl ? (
+                                <div className="space-y-0.5">
+                                    <p className="font-mono text-[9px] uppercase tracking-wider text-text-muted">input</p>
+                                    <div className="h-[68px] w-[120px] overflow-hidden rounded border border-glass-border bg-black/40">
+                                        <PreviewImage src={inputThumbUrl} alt="input" className="h-full w-full" alwaysShowMagnify clickToLightbox />
+                                    </div>
+                                </div>
+                            ) : null}
+                            {isCompleted && outputVideoUrl ? (
+                                <div className="space-y-0.5">
+                                    <p className="font-mono text-[9px] uppercase tracking-wider text-text-muted">output</p>
+                                    <div className="h-[68px] w-[120px] overflow-hidden rounded border border-glass-border bg-black/40">
+                                        <PreviewVideo src={outputVideoUrl} alt="output" className="h-full w-full" alwaysShowMagnify clickToLightbox />
+                                    </div>
+                                </div>
+                            ) : null}
+                        </div>
+                    ) : null}
+
+                    {/* Full prompt — preserves whitespace, no clamp */}
+                    {fullPrompt ? (
+                        <div className="space-y-0.5">
+                            <p className="font-mono text-[9px] uppercase tracking-wider text-text-muted">prompt</p>
+                            <p className="whitespace-pre-wrap rounded border border-glass-border/60 bg-black/30 px-2 py-1.5 font-sans text-body-sm leading-snug text-foreground/90">
+                                {fullPrompt}
+                            </p>
+                        </div>
+                    ) : null}
+
+                    {/* Full params — model · res · duration · seed · timeAgo · mode */}
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-chrome-sm text-text-muted">
+                        <span className="text-text-secondary">{task.model || "—"}</span>
+                        {task.resolution ? <span>· {task.resolution}</span> : null}
+                        {task.duration ? <span>· {task.duration}s</span> : null}
+                        {typeof task.seed === "number" ? <span>· seed {task.seed}</span> : null}
+                        <span>· {elapsedLabel} ago</span>
+                        {task.generation_mode ? <span>· {task.generation_mode}</span> : null}
+                    </div>
+
+                    {/* Failure — full error text wrap */}
+                    {isFailed && task.error ? (
+                        <div className="space-y-0.5">
+                            <p className="font-mono text-[9px] uppercase tracking-wider text-status-failed-fg/80">error</p>
+                            <p className="whitespace-pre-wrap rounded border border-status-failed-border/40 bg-status-failed-bg/60 px-2 py-1.5 font-mono text-chrome-sm leading-snug text-status-failed-fg">
+                                ⚠ {task.error}
+                            </p>
+                        </div>
+                    ) : null}
+
+                    {/* Provider IDs — full + copy buttons */}
+                    {task.provider_task_id || task.provider_request_id ? (
+                        <div className="space-y-1 rounded border border-glass-border/60 bg-black/30 px-2 py-1.5">
+                            <p className="font-mono text-[9px] uppercase tracking-wider text-text-muted">{providerLabel} ids</p>
+                            {task.provider_task_id ? (
+                                <div className="flex items-center gap-1.5">
+                                    <span className="font-mono text-chrome-sm text-text-muted">task:</span>
+                                    <code className="min-w-0 flex-1 truncate font-mono text-chrome-sm text-foreground/90" title={task.provider_task_id}>
+                                        {task.provider_task_id}
+                                    </code>
+                                    <button
+                                        type="button"
+                                        onClick={() => void handleCopy("providerId", task.provider_task_id!)}
+                                        title="复制 task ID"
+                                        aria-label="Copy task ID"
+                                        className="-m-1 grid h-6 w-6 place-items-center rounded text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                                    >
+                                        {copiedField === "providerId" ? <Check size={10} /> : <Copy size={10} />}
+                                    </button>
+                                </div>
+                            ) : null}
+                            {task.provider_request_id ? (
+                                <div className="flex items-center gap-1.5">
+                                    <span className="font-mono text-chrome-sm text-text-muted">req:</span>
+                                    <code className="min-w-0 flex-1 truncate font-mono text-chrome-sm text-foreground/90" title={task.provider_request_id}>
+                                        {task.provider_request_id}
+                                    </code>
+                                    <button
+                                        type="button"
+                                        onClick={() => void handleCopy("providerRequest", task.provider_request_id!)}
+                                        title="复制 request ID"
+                                        aria-label="Copy request ID"
+                                        className="-m-1 grid h-6 w-6 place-items-center rounded text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                                    >
+                                        {copiedField === "providerRequest" ? <Check size={10} /> : <Copy size={10} />}
+                                    </button>
+                                </div>
+                            ) : null}
+                        </div>
+                    ) : null}
+
+                    {/* Local task id — for support tickets */}
+                    <div className="flex items-center gap-1.5 font-mono text-chrome-sm text-text-muted">
+                        <span>local:</span>
+                        <code className="truncate text-text-muted/80" title={task.id}>{task.id.slice(0, 18)}…</code>
+                    </div>
+
+                    {/* Actions */}
+                    {(isFailed || isCompleted) ? (
+                        <div className="flex items-center justify-end gap-1 pt-0.5">
+                            <button
+                                type="button"
+                                onClick={() => void handleCopy("diagnose", diagnoseBlob)}
+                                title="复制完整诊断信息"
+                                className="inline-flex min-h-[24px] items-center gap-1 rounded border border-glass-border bg-black/30 px-2 py-[2px] font-mono text-chrome-sm font-medium text-text-secondary transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                            >
+                                {copiedField === "diagnose" ? <Check size={10} /> : <Copy size={10} />}
+                                {copiedField === "diagnose" ? "已复制" : "复制诊断"}
+                            </button>
+                            {isFailed && onRetry ? (
+                                <button
+                                    type="button"
+                                    aria-label="Retry task"
+                                    title="Retry"
+                                    disabled={retrying}
+                                    onClick={() => void handleRetry()}
+                                    className="inline-flex min-h-[24px] items-center gap-1 rounded border border-status-failed-border bg-status-failed-bg px-2 py-[2px] font-mono text-chrome-sm font-medium uppercase text-status-failed-fg transition-colors duration-fast ease-out-quart hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-failed-border disabled:cursor-not-allowed disabled:opacity-70"
+                                >
+                                    {retrying ? (
+                                        <Loader2 size={10} className="animate-spin" />
+                                    ) : (
+                                        <RefreshCw size={10} />
+                                    )}
+                                    {retrying ? "Retrying…" : "Retry"}
+                                </button>
+                            ) : null}
+                        </div>
+                    ) : null}
+                </div>
+            )}
         </div>
     );
 }

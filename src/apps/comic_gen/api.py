@@ -29,6 +29,7 @@ import asyncio
 import time
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
+import json
 import os
 import shutil
 import uuid
@@ -165,6 +166,7 @@ class GenerateAssetRequest(BaseModel):
     negative_prompt: Optional[str] = None
     batch_size: int = 1
     model_name: Optional[str] = None
+    aspect_ratio: Optional[str] = None
 
 class ToggleLockRequest(BaseModel):
     asset_id: str
@@ -385,6 +387,26 @@ async def reparse_project(script_id: str, request: ReparseProjectRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+
+@app.post("/projects/{script_id}/extract_preview")
+async def extract_preview(script_id: str, request: ReparseProjectRequest):
+    """Dry-run entity extraction — returns entities without saving."""
+    try:
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            partial(pipeline.extract_preview, script_id, request.text)
+        )
+        return {
+            "characters": [c.dict() for c in result.characters],
+            "scenes": [s.dict() for s in result.scenes],
+            "props": [p.dict() for p in result.props],
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/projects/", response_model=List[dict])
@@ -1786,6 +1808,37 @@ def refine_storyboard_prompt(script_id: str, request: RefinePromptRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/projects/{script_id}/frames/{frame_id}/refine")
+def refine_single_frame(script_id: str, frame_id: str):
+    """Phase 2: Refine a single coarse frame into a rich frame with structured fields."""
+    try:
+        frame = pipeline.refine_frame(script_id, frame_id)
+        if not frame:
+            raise HTTPException(status_code=500, detail="Refine returned no result")
+        return frame.model_dump() if hasattr(frame, 'model_dump') else frame.dict()
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error in refine_single_frame: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/projects/{script_id}/storyboard/refine_batch")
+def refine_storyboard_batch(script_id: str):
+    """Phase 2: Batch refine all coarse frames. Streams SSE events."""
+    from fastapi.responses import StreamingResponse
+
+    script = pipeline.get_script(script_id)
+    if not script:
+        raise HTTPException(status_code=404, detail="Script not found")
+
+    def event_stream():
+        for event_type, data in pipeline.refine_batch_generator(script_id):
+            yield f"event: {event_type}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
 @app.post("/projects/{script_id}/generate_storyboard", response_model=Script)
 def generate_storyboard(script_id: str):
     """Triggers storyboard generation."""
@@ -2033,7 +2086,8 @@ def generate_single_asset(script_id: str, request: GenerateAssetRequest, backgro
             request.apply_style,
             request.negative_prompt,
             request.batch_size,
-            request.model_name
+            request.model_name,
+            request.aspect_ratio,
         )
         
         # Add background processing
@@ -2640,13 +2694,56 @@ def update_audio_mix(script_id: str, request: AudioMixRequest):
     return signed_response(script)
 
 
-@app.post("/projects/{script_id}/dialogue_audio/batch", response_model=Script)
+class DubPreviewRequest(BaseModel):
+    video_task_id: str
+    offset_ms: int = 0
+
+
+@app.post("/projects/{script_id}/frames/{frame_id}/dub/preview")
+def preview_dub(script_id: str, frame_id: str, request: DubPreviewRequest):
+    """Generate a preview dub (cached Demucs + fast adelay+amix+mux)."""
+    try:
+        updated_script = pipeline.preview_dub(
+            script_id, frame_id,
+            video_task_id=request.video_task_id,
+            offset_ms=request.offset_ms,
+        )
+        return signed_response(updated_script)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/projects/{script_id}/frames/{frame_id}/dub/apply")
+def apply_dub(script_id: str, frame_id: str):
+    """Promote current preview to official dubbed video."""
+    try:
+        updated_script = pipeline.apply_dub(script_id, frame_id)
+        return signed_response(updated_script)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.delete("/projects/{script_id}/frames/{frame_id}/dub")
+def revert_frame_dub(script_id: str, frame_id: str):
+    """Revert dubbing — remove dubbed+preview, keep bg cache."""
+    try:
+        updated_script = pipeline.revert_dub(script_id, frame_id)
+        return signed_response(updated_script)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.post("/projects/{script_id}/dialogue_audio/batch")
 def generate_dialogue_audio_batch(script_id: str):
     """PR-3j · Generate audio for every frame that has dialogue.
 
     Idempotent re-use: frames whose audio is already up-to-date (matching
     text/voice/instructions hash) are skipped. Stale + missing frames get
     regenerated using each character's bound voice.
+
+    Returns the updated script plus _batch_stats with generated/skipped/failed counts.
     """
     from .audio import dialogue_audio_is_stale
     try:
@@ -2654,16 +2751,34 @@ def generate_dialogue_audio_batch(script_id: str):
         if not script:
             raise HTTPException(status_code=404, detail="Script not found")
         char_lookup = {c.id: c for c in script.characters}
+        char_name_lookup = {c.name.strip().lower(): c for c in script.characters}
         generated = 0
         skipped = 0
         failed = 0
+        no_voice = 0
         for frame in script.frames:
-            if not frame.dialogue:
+            dialogue_text = (
+                (frame.dialogue_structured.line if hasattr(frame, 'dialogue_structured') and frame.dialogue_structured else None)
+                or frame.dialogue
+            )
+            if not dialogue_text:
                 continue
             speaker = None
             if frame.character_ids:
                 speaker = char_lookup.get(frame.character_ids[0])
+            speaker_name = frame.speaker or (
+                frame.dialogue_structured.speaker if frame.dialogue_structured else None
+            )
+            if not speaker and speaker_name:
+                key = speaker_name.strip().lower()
+                speaker = char_name_lookup.get(key)
+                if not speaker:
+                    for name, char in char_name_lookup.items():
+                        if key in name or name in key:
+                            speaker = char
+                            break
             if not speaker or not speaker.voice_id:
+                no_voice += 1
                 continue
             if frame.audio_url and not dialogue_audio_is_stale(frame, speaker):
                 skipped += 1
@@ -2674,8 +2789,11 @@ def generate_dialogue_audio_batch(script_id: str):
             except Exception as exc:
                 logger.error(f"[batch_dialogue_audio] frame={frame.id} error={exc}")
                 failed += 1
-        logger.info(f"[batch_dialogue_audio] script={script_id} generated={generated} skipped={skipped} failed={failed}")
-        return signed_response(script)
+        logger.info(f"[batch_dialogue_audio] script={script_id} generated={generated} skipped={skipped} failed={failed} no_voice={no_voice}")
+        script = pipeline.get_script(script_id)
+        response_data = script.model_dump() if hasattr(script, 'model_dump') else script.dict()
+        response_data["_batch_stats"] = {"generated": generated, "skipped": skipped, "failed": failed, "no_voice": no_voice}
+        return signed_response(response_data)
     except HTTPException:
         raise
     except Exception as e:
@@ -2732,6 +2850,10 @@ class UpdateFrameRequest(BaseModel):
     camera_angle: Optional[str] = None
     scene_id: Optional[str] = None
     character_ids: Optional[List[str]] = None
+    duration: Optional[int] = None
+    shot_size: Optional[str] = None
+    camera_movement_description: Optional[str] = None
+    transition_hint: Optional[str] = None
 
 @app.post("/projects/{script_id}/frames/update", response_model=Script)
 def update_frame(script_id: str, request: UpdateFrameRequest):
@@ -2745,7 +2867,11 @@ def update_frame(script_id: str, request: UpdateFrameRequest):
             dialogue=request.dialogue,
             camera_angle=request.camera_angle,
             scene_id=request.scene_id,
-            character_ids=request.character_ids
+            character_ids=request.character_ids,
+            duration=request.duration,
+            shot_size=request.shot_size,
+            camera_movement_description=request.camera_movement_description,
+            transition_hint=request.transition_hint,
         )
         return signed_response(updated_script)
     except ValueError as e:
@@ -3155,24 +3281,23 @@ def save_art_direction(script_id: str, request: SaveArtDirectionRequest):
 
 @app.get("/art_direction/presets")
 def get_style_presets():
-    """Get built-in style presets"""
+    """Get built-in style presets (v2: categories + presets)"""
     try:
         import json
         import os
         preset_file = os.path.join(os.path.dirname(__file__), "style_presets.json")
-        logger.debug(f"Loading presets from {preset_file}")
-        logger.debug(f"File exists: {os.path.exists(preset_file)}")
 
         if not os.path.exists(preset_file):
-            logger.debug("DEBUG: Preset file not found!")
-            return {"presets": []}
+            return {"version": 2, "categories": [], "presets": []}
 
         with open(preset_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
-            return {"presets": data}
+            if isinstance(data, dict) and data.get("version") == 2:
+                return data
+            # Legacy fallback: plain array
+            return {"version": 2, "categories": [], "presets": data if isinstance(data, list) else []}
     except Exception as e:
-        import traceback
-        logger.exception("An error occurred")
+        logger.exception("Failed to load style presets")
         raise HTTPException(status_code=500, detail=str(e))
 
 

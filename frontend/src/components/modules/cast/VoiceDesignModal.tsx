@@ -1,18 +1,17 @@
 "use client";
 /**
- * VoiceDesignModal — PR-3i #4
+ * VoiceDesignModal — PR-3i #4 (revised)
  *
- * Sub-modal opened from VoicePickerModal "+ 设计新音色" button (我的设计 tab).
- * Iterative flow:
- *   write/translate voice_prompt → preview → tweak → preview → … → accept
+ * Sub-modal for designing a new voice from a text prompt.
+ * Iterative flow: write/translate voice_prompt → preview → tweak → accept.
  *
- * Each preview call mints a NEW voice on dashscope and synthesizes a sample;
- * we only persist via /voice/design/accept when the user explicitly commits.
- *
- * Per Q15 + r2v-workflow-v3-unified.md §6.1 PR-3i.
+ * Improvements over v1:
+ *   - Character description shown as read-only context panel at top
+ *   - Allow closing (X) during generation with confirmation dialog
+ *   - Wider modal to better utilize space
  */
 import { useEffect, useRef, useState } from "react";
-import { X, Loader2, Check, Play, Pause, Sparkles, RefreshCw } from "lucide-react";
+import { X, Loader2, Check, Play, Pause, Sparkles, RefreshCw, Users } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { api, type CustomVoice } from "@/lib/api";
 import { getAssetUrl } from "@/lib/utils";
@@ -23,7 +22,7 @@ interface VoiceDesignModalProps {
     isOpen: boolean;
     onClose: () => void;
     seriesId: string;
-    /** Optional — when present, enables ✨ 一键转 LLM translate button */
+    characterName?: string;
     characterDescription?: string;
     onCreated: (voice: CustomVoice) => void;
 }
@@ -34,6 +33,7 @@ export default function VoiceDesignModal({
     isOpen,
     onClose,
     seriesId,
+    characterName,
     characterDescription,
     onCreated,
 }: VoiceDesignModalProps) {
@@ -46,6 +46,7 @@ export default function VoiceDesignModal({
     const [previewVoiceId, setPreviewVoiceId] = useState<string | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [playing, setPlaying] = useState(false);
+    const [confirmClose, setConfirmClose] = useState(false);
     const audioRef = useRef<HTMLAudioElement | null>(null);
 
     const reset = () => {
@@ -61,10 +62,10 @@ export default function VoiceDesignModal({
         setPreviewVoiceId(null);
         setPreviewUrl(null);
         setPlaying(false);
+        setConfirmClose(false);
     };
 
     useEffect(() => {
-        // Stop audio when modal closes
         if (!isOpen && audioRef.current) {
             audioRef.current.pause();
             audioRef.current = null;
@@ -77,7 +78,15 @@ export default function VoiceDesignModal({
     const inFlight = phase === "translating" || phase === "previewing" || phase === "saving";
 
     const handleClose = () => {
-        if (inFlight) return;
+        if (inFlight) {
+            setConfirmClose(true);
+            return;
+        }
+        reset();
+        onClose();
+    };
+
+    const handleForceClose = () => {
         reset();
         onClose();
     };
@@ -113,7 +122,6 @@ export default function VoiceDesignModal({
             setPreviewVoiceId(voice_id);
             setPreviewUrl(preview_url);
             setPhase("preview_ready");
-            // Auto-play preview
             const audio = new Audio(getAssetUrl(preview_url));
             audio.onended = () => {
                 setPlaying(false);
@@ -138,14 +146,6 @@ export default function VoiceDesignModal({
             audioRef.current.pause();
             setPlaying(false);
             return;
-        }
-        if (audioRef.current && !playing) {
-            try {
-                await audioRef.current.play();
-                setPlaying(true);
-            } catch (_) {
-                // fallthrough — create new
-            }
         }
         const audio = new Audio(getAssetUrl(previewUrl));
         audio.onended = () => {
@@ -183,27 +183,46 @@ export default function VoiceDesignModal({
     return (
         <div className="fixed inset-0 z-[110] grid place-items-center bg-overlay backdrop-blur-sm" onClick={handleClose}>
             <div
-                className="w-full max-w-xl max-h-[90vh] flex flex-col rounded-2xl border border-glass-border bg-elevated shadow-[0_24px_64px_-12px_rgba(0,0,0,0.7)]"
+                className="w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl border border-glass-border bg-elevated shadow-[0_24px_64px_-12px_rgba(0,0,0,0.7)]"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-glass-border">
+                <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-glass-border">
                     <h2 className="text-display font-medium text-foreground">{t("title")}</h2>
                     <button
                         onClick={handleClose}
-                        disabled={inFlight}
                         aria-label={t("close")}
-                        className="p-1.5 rounded-lg hover:bg-hover-bg text-text-muted hover:text-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        className="p-1.5 rounded-lg hover:bg-hover-bg text-text-muted hover:text-foreground transition-colors"
                     >
                         <X size={15} />
                     </button>
                 </div>
 
                 {/* Body */}
-                <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 custom-scrollbar">
+                <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5 custom-scrollbar">
+                    {/* Character context panel */}
+                    {(characterName || characterDescription) && (
+                        <div className="rounded-lg border border-glass-border bg-black/20 px-4 py-3">
+                            <div className="flex items-center gap-2 mb-1.5">
+                                <Users size={12} className="text-text-muted" />
+                                <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-text-muted">
+                                    {t("characterContext")}
+                                </span>
+                            </div>
+                            {characterName && (
+                                <p className="text-[13px] font-medium text-foreground">{characterName}</p>
+                            )}
+                            {characterDescription && (
+                                <p className="mt-1 text-[12px] text-text-secondary leading-relaxed line-clamp-3">
+                                    {characterDescription}
+                                </p>
+                            )}
+                        </div>
+                    )}
+
                     {/* Voice prompt */}
                     <div>
-                        <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center justify-between mb-1.5">
                             <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">
                                 {t("voicePromptLabel")}
                             </label>
@@ -229,7 +248,7 @@ export default function VoiceDesignModal({
                             disabled={inFlight}
                             rows={5}
                             maxLength={500}
-                            className="w-full rounded-md border border-glass-border bg-black/30 px-3 py-2 text-[13px] text-foreground placeholder:text-text-muted focus:outline-none focus:border-primary/40 disabled:opacity-60 resize-none"
+                            className="w-full rounded-md border border-glass-border bg-black/30 px-3 py-2.5 text-[13px] text-foreground placeholder:text-text-muted focus:outline-none focus:border-primary/40 disabled:opacity-60 resize-none"
                         />
                         <p className="mt-1 text-right font-mono text-[10px] text-text-muted">
                             {voicePrompt.length}/500
@@ -238,7 +257,7 @@ export default function VoiceDesignModal({
 
                     {/* Preview text */}
                     <div>
-                        <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted mb-1">
+                        <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted mb-1.5">
                             {t("previewTextLabel")}
                         </label>
                         <input
@@ -246,7 +265,7 @@ export default function VoiceDesignModal({
                             value={previewText}
                             onChange={(e) => setPreviewText(e.target.value)}
                             disabled={inFlight}
-                            className="w-full rounded-md border border-glass-border bg-black/30 px-3 py-2 text-[13px] text-foreground placeholder:text-text-muted focus:outline-none focus:border-primary/40 disabled:opacity-60"
+                            className="w-full rounded-md border border-glass-border bg-black/30 px-3 py-2.5 text-[13px] text-foreground placeholder:text-text-muted focus:outline-none focus:border-primary/40 disabled:opacity-60"
                         />
                     </div>
 
@@ -254,7 +273,7 @@ export default function VoiceDesignModal({
                     <button
                         onClick={handlePreview}
                         disabled={!voicePrompt.trim() || inFlight}
-                        className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md bg-glass border border-primary/40 text-primary hover:bg-primary/10 transition-colors text-[13px] font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-md bg-glass border border-primary/40 text-primary hover:bg-primary/10 transition-colors text-[13px] font-medium disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                         {phase === "previewing" ? (
                             <Loader2 size={13} className="animate-spin" />
@@ -268,7 +287,7 @@ export default function VoiceDesignModal({
 
                     {/* Preview audio bar */}
                     {previewUrl && phase !== "previewing" && (
-                        <div className="flex items-center gap-2 rounded-md border border-glass-border bg-black/30 px-3 py-2">
+                        <div className="flex items-center gap-2 rounded-md border border-glass-border bg-black/30 px-3 py-2.5">
                             <button
                                 onClick={handleReplay}
                                 aria-label={playing ? "Pause" : "Play"}
@@ -283,9 +302,9 @@ export default function VoiceDesignModal({
                     )}
 
                     {/* Label input (only after first preview) */}
-                    {phase === "preview_ready" || phase === "saving" || phase === "done" ? (
+                    {(phase === "preview_ready" || phase === "saving" || phase === "done") && (
                         <div>
-                            <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted mb-1">
+                            <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted mb-1.5">
                                 {t("labelLabel")}
                             </label>
                             <input
@@ -295,10 +314,10 @@ export default function VoiceDesignModal({
                                 placeholder={t("labelPlaceholder")}
                                 disabled={inFlight || phase === "done"}
                                 maxLength={30}
-                                className="w-full rounded-md border border-glass-border bg-black/30 px-3 py-2 text-[13px] text-foreground placeholder:text-text-muted focus:outline-none focus:border-primary/40 disabled:opacity-60"
+                                className="w-full rounded-md border border-glass-border bg-black/30 px-3 py-2.5 text-[13px] text-foreground placeholder:text-text-muted focus:outline-none focus:border-primary/40 disabled:opacity-60"
                             />
                         </div>
-                    ) : null}
+                    )}
 
                     {/* Error */}
                     {errorMsg && (
@@ -317,11 +336,10 @@ export default function VoiceDesignModal({
                 </div>
 
                 {/* Footer */}
-                <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-glass-border">
+                <div className="flex items-center justify-end gap-2 px-6 py-3 border-t border-glass-border">
                     <button
                         onClick={handleClose}
-                        disabled={inFlight}
-                        className="inline-flex items-center px-3 py-1.5 rounded-md bg-glass border border-glass-border text-text-secondary hover:text-foreground hover:bg-hover-bg transition-colors text-[12px] disabled:opacity-30"
+                        className="inline-flex items-center px-3 py-1.5 rounded-md bg-glass border border-glass-border text-text-secondary hover:text-foreground hover:bg-hover-bg transition-colors text-[12px]"
                     >
                         {t("cancel")}
                     </button>
@@ -336,6 +354,36 @@ export default function VoiceDesignModal({
                     </button>
                 </div>
             </div>
+
+            {/* Confirm close dialog during generation */}
+            {confirmClose && (
+                <div
+                    className="fixed inset-0 z-[120] grid place-items-center bg-overlay/60"
+                    onClick={(e) => { e.stopPropagation(); setConfirmClose(false); }}
+                >
+                    <div
+                        className="w-full max-w-xs rounded-xl border border-glass-border bg-elevated p-5 shadow-[0_16px_48px_-8px_rgba(0,0,0,0.7)]"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <p className="text-[13px] text-foreground font-medium mb-1">{t("confirmCloseTitle")}</p>
+                        <p className="text-[12px] text-text-secondary mb-4">{t("confirmCloseBody")}</p>
+                        <div className="flex items-center gap-2 justify-end">
+                            <button
+                                onClick={() => setConfirmClose(false)}
+                                className="px-3 py-1.5 rounded-md bg-glass border border-glass-border text-text-secondary hover:text-foreground text-[12px] transition-colors"
+                            >
+                                {t("confirmCloseStay")}
+                            </button>
+                            <button
+                                onClick={handleForceClose}
+                                className="px-3 py-1.5 rounded-md bg-status-failed-bg border border-status-failed-border text-status-failed-fg hover:bg-status-failed-bg/80 text-[12px] font-medium transition-colors"
+                            >
+                                {t("confirmCloseLeave")}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

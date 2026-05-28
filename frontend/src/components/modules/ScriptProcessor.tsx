@@ -11,6 +11,7 @@ import StepHeader from "@/components/shared/StepHeader";
 import WorkflowActionButton from "@/components/shared/WorkflowActionButton";
 import PreviousEpisodeSummary from "@/components/modules/PreviousEpisodeSummary";
 import ReconcileModal from "@/components/modules/ReconcileModal";
+import EntityConfirmModal, { type ExtractionPreview } from "@/components/modules/EntityConfirmModal";
 
 interface ScriptNode {
     type: "character" | "scene" | "prop";
@@ -92,10 +93,11 @@ export default function ScriptProcessor() {
     // when the episode belongs to a series (series_id !== null).
     const [reconcileOpen, setReconcileOpen] = useState(false);
 
+    // Entity extraction confirmation state
+    const [extractionPreview, setExtractionPreview] = useState<ExtractionPreview | null>(null);
+    const [confirmModalOpen, setConfirmModalOpen] = useState(false);
+
     const handleAnalyze = async () => {
-        // Silent return on empty script used to make the button look like
-        // a no-op when users hit it before typing — now we surface the
-        // reason via the toast system (replaces native alert).
         if (!script.trim()) {
             toast.warning(ts("scriptEmpty"), {
                 projectId: currentProject?.id,
@@ -103,28 +105,28 @@ export default function ScriptProcessor() {
             });
             return;
         }
-        const projectId = currentProject?.id;
-        const projectTitle = currentProject?.title;
+        if (!currentProject?.id) return;
+        const projectId = currentProject.id;
+        const projectTitle = currentProject.title;
         const toastId = toast.progress(ts("analyzingScript"), {
             projectId,
             projectTitle,
             body: ts("analyzingScriptBody"),
         });
         try {
-            await analyzeProject(script);
-            const refreshed = useProjectStore.getState().currentProject;
-            const charCount = refreshed?.characters?.length ?? 0;
-            const sceneCount = refreshed?.scenes?.length ?? 0;
-            const propCount = refreshed?.props?.length ?? 0;
+            const preview = await api.extractPreview(projectId, script);
             toast.update(toastId, {
                 kind: "success",
                 title: ts("analysisDone"),
-                body: ts("analysisDoneBody", { c: charCount, s: sceneCount, p: propCount }),
-                autoCloseMs: 7000,
+                body: ts("analysisDoneBody", {
+                    c: preview.characters.length,
+                    s: preview.scenes.length,
+                    p: preview.props.length,
+                }),
+                autoCloseMs: 5000,
             });
-            if (refreshed?.series_id) {
-                setReconcileOpen(true);
-            }
+            setExtractionPreview(preview);
+            setConfirmModalOpen(true);
         } catch (error: any) {
             console.error("Failed to analyze script:", error);
             const errorMessage = error?.response?.data?.detail || error?.message || "未知错误";
@@ -138,6 +140,27 @@ export default function ScriptProcessor() {
                 },
             });
         }
+    };
+
+    const handleConfirmExtraction = async () => {
+        setConfirmModalOpen(false);
+        try {
+            await analyzeProject(script);
+            const refreshed = useProjectStore.getState().currentProject;
+            if (refreshed?.series_id) {
+                setReconcileOpen(true);
+            }
+        } catch (error: any) {
+            console.error("Failed to apply extraction:", error);
+            toast.error(ts("analysisFailedShort"));
+        }
+        setExtractionPreview(null);
+    };
+
+    const handleDiscardExtraction = () => {
+        setConfirmModalOpen(false);
+        setExtractionPreview(null);
+        toast.info(ts("extractionDiscarded"));
     };
 
     const handleDeleteNode = async (node: ScriptNode, e: React.MouseEvent) => {
@@ -276,6 +299,18 @@ export default function ScriptProcessor() {
                 isOpen={reconcileOpen}
                 scriptId={currentProject?.id ?? null}
                 onClose={() => setReconcileOpen(false)}
+            />
+
+            <EntityConfirmModal
+                isOpen={confirmModalOpen}
+                preview={extractionPreview}
+                currentCounts={{
+                    characters: currentProject?.characters?.length ?? 0,
+                    scenes: currentProject?.scenes?.length ?? 0,
+                    props: currentProject?.props?.length ?? 0,
+                }}
+                onConfirm={handleConfirmExtraction}
+                onDiscard={handleDiscardExtraction}
             />
         </div>
     );

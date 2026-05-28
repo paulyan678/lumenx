@@ -1,9 +1,8 @@
 "use client";
 
-import { useRef, useCallback, useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { useRef, useCallback, useEffect, useState, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
-    Play,
     Trash2,
     ChevronUp,
     ChevronDown,
@@ -16,11 +15,15 @@ import {
     PanelBottomClose,
     Sparkles,
     Loader2,
+    Code2,
+    ChevronRight,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import AssetChipBar from "./AssetChipBar";
 import PromptExpandModal from "./PromptExpandModal";
 import PolishPanel from "./PolishPanel";
+import FieldTagChip, { AddFieldButton, type FieldType } from "./FieldTagChip";
+import { buildAssembledPrompt } from "./buildAssembledPrompt";
 import { PendingTaskAffordance } from "@/components/shared/PendingTaskAffordance";
 import PreviewImage from "@/components/shared/preview/PreviewImage";
 import PreviewVideo from "@/components/shared/preview/PreviewVideo";
@@ -67,6 +70,26 @@ export interface ShotNode {
         direct_r2v?: string[];
     };
     imageUrl?: string;
+
+    // ─── Storyboard Schema v2 fields ────────────────────────────────
+    duration?: number | null;
+    visualDescription?: string | null;
+    assembledPrompt?: string | null;
+    dialogueStructured?: {
+        speaker: string;
+        line: string;
+        emotion?: string | null;
+        delivery?: string | null;
+    } | null;
+    cameraMovementStructured?: {
+        primary: string;
+        secondary?: string | null;
+        speed: string;
+        description?: string | null;
+    } | null;
+    shotSize?: string | null;
+    cameraAngle?: string | null;
+    transitionHint?: string | null;
 }
 
 /** Cap on T2I image history per shot. Older drops off FIFO when adding. */
@@ -80,6 +103,7 @@ interface ShotCardProps {
     scenes: any[];
     props: any[];
     onUpdatePrompt: (prompt: string) => void;
+    onUpdateField: (field: string, value: string | number | null) => void;
     onGenerateT2I: () => void;
     onGenerateVideo: () => void;
     onDelete: () => void;
@@ -89,6 +113,8 @@ interface ShotCardProps {
     onSetTabMode: (mode: "t2i_i2v" | "direct_r2v") => void;
     onOpenDrawer: () => void;
     onInsertAsset: (type: string, name: string) => void;
+    /** Duration editor config derived from model catalog */
+    durationEditorConfig?: { min: number; max: number; step: number };
     /** Optional: Cancel CTA shown inside the pending-state affordance
      *  after the soft-stuck threshold (60 s by default). Caller should
      *  hit the backend cancel endpoint and refresh local state. */
@@ -109,6 +135,8 @@ interface ShotCardProps {
     onGenerateBatch?: (count: number) => void;
     /** Active in-flight count for label flip (生成 ×N → 生成中 · N). */
     inFlightCount?: number;
+    onRefineFrame?: () => void;
+    onUpdateDialogue?: (text: string) => void;
 }
 
 export default function ShotCard({
@@ -119,6 +147,7 @@ export default function ShotCard({
     scenes,
     props,
     onUpdatePrompt,
+    onUpdateField,
     onGenerateT2I,
     onGenerateVideo,
     onDelete,
@@ -127,7 +156,8 @@ export default function ShotCard({
     onDuplicate,
     onSetTabMode,
     onOpenDrawer,
-    onInsertAsset,
+    onInsertAsset: _onInsertAsset,
+    durationEditorConfig,
     onCancelVideo,
     expanded,
     onToggleExpanded,
@@ -136,6 +166,7 @@ export default function ShotCard({
     onSetGenerateCount,
     onGenerateBatch,
     inFlightCount = 0,
+    onRefineFrame,
 }: ShotCardProps) {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const cardRef = useRef<HTMLDivElement>(null);
@@ -144,6 +175,7 @@ export default function ShotCard({
     // opens it; saving syncs back via onUpdatePrompt; cancel
     // discards the modal's draft without touching parent state.
     const [expandOpen, setExpandOpen] = useState(false);
+    const [promptPreviewOpen, setPromptPreviewOpen] = useState(false);
     // currentProjectId — needed by PolishPanel to look up the
     // project's PromptConfig override server-side.
     const currentProjectId = useProjectStore((state) => state.currentProject?.id);
@@ -218,11 +250,10 @@ export default function ShotCard({
         return out;
     }, [shot.prompt, characters])();
 
-    // Auto-grow the textarea up to a cap (B2: ~10 rows). Re-runs
-    // when prompt changes or the textarea mounts. The cap is
-    // enforced by CSS (max-h-[260px] ≈ 10 lines @ leading-relaxed
-    // 14px) so anything beyond scrolls in-place instead of pushing
-    // the whole shot card off the viewport.
+    const assembledPromptPreview = useMemo(() => buildAssembledPrompt(shot), [
+        shot.prompt, shot.shotSize, shot.cameraAngle, shot.cameraMovementStructured, shot.transitionHint,
+    ]);
+
     useEffect(() => {
         const ta = textareaRef.current;
         if (!ta) return;
@@ -398,13 +429,26 @@ export default function ShotCard({
     // onGenerateVideo / onGenerateT2I are still wired for the inline
     // retry buttons inside renderPreview when a take fails.
 
-    const handleInsertAssetFromChip = (type: string, name: string) => {
-        const tag = `[${type}:${name}]`;
+    const handleInsertAssetFromChip = (_type: string, name: string) => {
+        const currentPrompt = shot.prompt;
+        // Check if this asset is already referenced in the prompt
+        const existingTag = new RegExp(`\\[character\\d+:${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\]`);
+        if (existingTag.test(currentPrompt)) return;
+
+        // Find the next available characterN slot
+        const usedNums: number[] = [];
+        const slotRe = /\[character(\d+):/g;
+        let m;
+        while ((m = slotRe.exec(currentPrompt)) !== null) {
+            usedNums.push(parseInt(m[1], 10));
+        }
+        const nextSlot = usedNums.length > 0 ? Math.max(...usedNums) + 1 : 1;
+        const tag = `[character${nextSlot}:${name}]`;
+
         const textarea = textareaRef.current;
         if (textarea) {
             const start = textarea.selectionStart;
             const end = textarea.selectionEnd;
-            const currentPrompt = shot.prompt;
             const newPrompt = currentPrompt.slice(0, start) + tag + currentPrompt.slice(end);
             onUpdatePrompt(newPrompt);
             setTimeout(() => {
@@ -412,7 +456,7 @@ export default function ShotCard({
                 textarea.focus();
             }, 0);
         } else {
-            onUpdatePrompt(shot.prompt + " " + tag);
+            onUpdatePrompt(currentPrompt + " " + tag);
         }
     };
 
@@ -594,6 +638,120 @@ export default function ShotCard({
                             onApply={onUpdatePrompt}
                         />
 
+                        {/* Structured field tags — interactive Popover editors */}
+                        <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                            {/* Duration: always visible */}
+                            <FieldTagChip
+                                field="duration"
+                                value={shot.duration}
+                                editorConfig={durationEditorConfig
+                                    ? { type: "duration", ...durationEditorConfig }
+                                    : { type: "duration", min: 3, max: 15, step: 1 }
+                                }
+                                onChange={(v) => onUpdateField("duration", v)}
+                            />
+                            {/* Shot size: visible when has value */}
+                            {shot.shotSize !== undefined && shot.shotSize !== null && (
+                                <FieldTagChip
+                                    field="shotSize"
+                                    value={shot.shotSize}
+                                    editorConfig={{ type: "preset", presets: ["特写", "近景", "中景", "全景", "远景", "大特写"] }}
+                                    onChange={(v) => onUpdateField("shotSize", v)}
+                                />
+                            )}
+                            {/* Camera angle: visible when has value */}
+                            {shot.cameraAngle !== undefined && shot.cameraAngle !== null && (
+                                <FieldTagChip
+                                    field="cameraAngle"
+                                    value={shot.cameraAngle}
+                                    editorConfig={{ type: "preset", presets: ["平视", "俯视", "仰视", "鸟瞰", "低角度"] }}
+                                    onChange={(v) => onUpdateField("cameraAngle", v)}
+                                />
+                            )}
+                            {/* Camera movement: visible when has value */}
+                            {shot.cameraMovementStructured && (
+                                <FieldTagChip
+                                    field="cameraMovement"
+                                    value={shot.cameraMovementStructured.description || shot.cameraMovementStructured.primary}
+                                    editorConfig={{ type: "preset", presets: ["固定镜头", "缓慢推进", "跟随平移", "环绕旋转", "快速拉远", "缓慢上升"] }}
+                                    onChange={(v) => onUpdateField("cameraMovement", v)}
+                                />
+                            )}
+                            {/* Transition hint: visible when has value */}
+                            {shot.transitionHint !== undefined && shot.transitionHint !== null && (
+                                <FieldTagChip
+                                    field="transitionHint"
+                                    value={shot.transitionHint}
+                                    editorConfig={{ type: "preset", presets: ["硬切", "淡入淡出", "溶解", "闪白", "划像"], allowCustom: true }}
+                                    onChange={(v) => onUpdateField("transitionHint", v)}
+                                />
+                            )}
+                            {/* "+" button to add optional fields */}
+                            <AddFieldButton
+                                onAdd={(field: FieldType) => {
+                                    if (field === "cameraMovement") {
+                                        onUpdateField("cameraMovement", "固定镜头");
+                                    } else {
+                                        onUpdateField(field, "");
+                                    }
+                                }}
+                            />
+                        </div>
+
+                        {/* Dialogue text display (read-only — editing via 配音工作台 modal) */}
+                        {shot.dialogueStructured?.line && (
+                            <div className="mt-1.5 flex items-start gap-1.5 px-1.5 py-1 -mx-1.5">
+                                <span className="text-[10px] text-text-muted font-medium shrink-0 mt-px">
+                                    {shot.dialogueStructured.speaker}:
+                                </span>
+                                <span className="text-[11px] text-text-secondary italic leading-relaxed">
+                                    「{shot.dialogueStructured.line}」
+                                </span>
+                            </div>
+                        )}
+
+                        {/* Assembled prompt preview (read-only, collapsible) — uses buildAssembledPrompt for real-time computation */}
+                        {(shot.prompt || shot.shotSize || shot.cameraMovementStructured) && (
+                            <div className="mt-1">
+                                <button
+                                    type="button"
+                                    onClick={() => setPromptPreviewOpen(v => !v)}
+                                    className="inline-flex items-center gap-1 text-[11px] text-text-muted hover:text-text-secondary transition-colors"
+                                >
+                                    <Code2 size={12} strokeWidth={1.5} />
+                                    <span>查看最终提示词</span>
+                                    <ChevronRight
+                                        size={11}
+                                        className={`transition-transform duration-200 ${promptPreviewOpen ? "rotate-90" : ""}`}
+                                    />
+                                </button>
+                                <AnimatePresence>
+                                    {promptPreviewOpen && (
+                                        <motion.div
+                                            initial={{ height: 0, opacity: 0 }}
+                                            animate={{ height: "auto", opacity: 1 }}
+                                            exit={{ height: 0, opacity: 0 }}
+                                            transition={{ duration: 0.2 }}
+                                            className="overflow-hidden"
+                                        >
+                                            <div className="mt-1.5 rounded-md border border-white/[0.06] bg-black/20 px-3 py-2 text-[11.5px] leading-relaxed font-mono space-y-2">
+                                                {/* Final prompt as model receives it (computed real-time) */}
+                                                <p className="text-text-secondary whitespace-pre-wrap">
+                                                    {assembledPromptPreview}
+                                                </p>
+                                                {/* Duration is the only field NOT in prompt — show as API param note */}
+                                                {shot.duration && (
+                                                    <p className="text-text-muted border-t border-white/[0.04] pt-1.5">
+                                                        <span className="text-emerald-300/70">时长:</span> {shot.duration}s (API参数，不入提示词)
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+                        )}
+
                         {/* Asset Chip Bar */}
                         <AssetChipBar
                             characters={characters}
@@ -626,6 +784,7 @@ export default function ShotCard({
                                     onClick={onMoveUp}
                                     disabled={index === 0}
                                     className="p-1.5 rounded-lg hover:bg-white/[0.06] text-text-secondary hover:text-foreground transition-colors disabled:opacity-20 disabled:hover:bg-transparent"
+                                    title="上移"
                                 >
                                     <ChevronUp size={14} strokeWidth={1.5} />
                                 </motion.button>
@@ -635,6 +794,7 @@ export default function ShotCard({
                                     onClick={onMoveDown}
                                     disabled={index === totalShots - 1}
                                     className="p-1.5 rounded-lg hover:bg-white/[0.06] text-text-secondary hover:text-foreground transition-colors disabled:opacity-20 disabled:hover:bg-transparent"
+                                    title="下移"
                                 >
                                     <ChevronDown size={14} strokeWidth={1.5} />
                                 </motion.button>
@@ -656,6 +816,20 @@ export default function ShotCard({
                                 >
                                     <Trash2 size={13} strokeWidth={1.5} />
                                 </motion.button>
+                                {onRefineFrame && (
+                                    <>
+                                        <div className="w-px h-3.5 bg-white/[0.06] mx-0.5" />
+                                        <motion.button
+                                            whileHover={{ scale: 1.08 }}
+                                            whileTap={{ scale: 0.92 }}
+                                            onClick={onRefineFrame}
+                                            className="p-1.5 rounded-lg hover:bg-white/[0.06] text-text-secondary hover:text-amber-400 transition-colors"
+                                            title="精修此帧"
+                                        >
+                                            <Sparkles size={13} strokeWidth={1.5} />
+                                        </motion.button>
+                                    </>
+                                )}
                             </div>
 
                             <div className="flex items-center gap-2">
@@ -669,6 +843,7 @@ export default function ShotCard({
                                             onClick={() => onSetGenerateCount?.(n)}
                                             aria-pressed={active}
                                             aria-label={`Generate ${n} at a time`}
+                                            title={`每次生成 ${n} 条候选`}
                                             className={`grid h-9 w-9 place-items-center rounded-md border font-mono text-[11px] font-medium transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 ${
                                                 active
                                                     ? "border-primary/55 bg-primary/15 text-primary"
@@ -690,7 +865,7 @@ export default function ShotCard({
                                     ? (shot.tabMode === "t2i_i2v"
                                         ? "请先在上方生成或上传首帧"
                                         : "请先输入提示词")
-                                    : undefined}
+                                    : `生成 ${generateCount} 条视频候选`}
                                 className="inline-flex items-center justify-center gap-1.5 rounded-md px-5 py-2 min-w-[140px] font-sans text-[13px] font-semibold tracking-tight transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 disabled:cursor-not-allowed disabled:opacity-40 bg-primary text-white border border-[rgba(100,108,255,0.65)] shadow-[inset_0_1.5px_0_rgba(255,255,255,0.14),inset_0_-1px_0_rgba(60,68,200,0.45),0_4px_14px_-2px_rgba(100,108,255,0.45)] hover:bg-[#7a82ff] hover:border-[rgba(100,108,255,0.85)] disabled:hover:bg-primary disabled:hover:border-[rgba(100,108,255,0.65)]"
                             >
                                 {inFlightCount > 0 ? (

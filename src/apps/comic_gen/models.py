@@ -21,6 +21,89 @@ class GenerationStatus(str, Enum):
     FAILED = "failed"
 
 
+# === Storyboard Schema v2: Enums ===
+
+class ShotSizeEnum(str, Enum):
+    EXTREME_CLOSE_UP = "大特写"
+    CLOSE_UP = "特写"
+    MEDIUM_CLOSE_UP = "近景"
+    MEDIUM_SHOT = "中景"
+    FULL_SHOT = "全景"
+    LONG_SHOT = "远景"
+    EXTREME_LONG_SHOT = "大远景"
+
+class CameraAngleEnum(str, Enum):
+    EYE_LEVEL = "平视"
+    HIGH_ANGLE = "俯视"
+    LOW_ANGLE = "仰视"
+    BIRDS_EYE = "鸟瞰"
+    WORMS_EYE = "蚁视"
+    OVER_SHOULDER = "过肩"
+    DUTCH_ANGLE = "荷兰角"
+    POV = "主观视角"
+
+class CameraMovementType(str, Enum):
+    STATIC = "static"
+    PUSH_IN = "push_in"
+    PULL_OUT = "pull_out"
+    PAN_LEFT = "pan_left"
+    PAN_RIGHT = "pan_right"
+    TILT_UP = "tilt_up"
+    TILT_DOWN = "tilt_down"
+    ORBIT = "orbit"
+    FOLLOW = "follow"
+    CRANE_UP = "crane_up"
+    CRANE_DOWN = "crane_down"
+    HANDHELD = "handheld"
+    ZOOM_IN = "zoom_in"
+    ZOOM_OUT = "zoom_out"
+
+class CameraSpeed(str, Enum):
+    SLOW = "slow"
+    NORMAL = "normal"
+    FAST = "fast"
+
+# === Storyboard Schema v2: Compound structures ===
+
+class CameraMovementData(BaseModel):
+    primary: str = Field(..., description="主运镜类型")
+    secondary: Optional[str] = Field(None, description="副运镜（最多一个）")
+    speed: str = Field("normal", description="运镜速度: slow/normal/fast")
+    description: Optional[str] = Field(None, description="自然语言运镜描述")
+
+class StageSubject(BaseModel):
+    ref: str = Field(..., description="角色/道具名称引用")
+    zone: str = Field(..., description="屏幕区域: left/center/right")
+    depth: str = Field(..., description="纵深: fore/mid/back")
+    height: Optional[str] = Field(None, description="垂直: ground/low/surface/eye/high/overhead")
+    facing: Optional[str] = Field(None, description="朝向: toward-camera/away/left/right")
+    posture: Optional[str] = Field(None, description="体态: standing/sitting/lying/crouching/dynamic")
+
+class Blocking(BaseModel):
+    description: str = Field(..., description="自然语言站位描述")
+    stage: Optional[List[StageSubject]] = Field(None, description="结构化站位数据")
+    camera_relation: Optional[str] = Field(None, description="相机相对场景的空间关系")
+
+class DialogueStructured(BaseModel):
+    speaker: str = Field(..., description="说话人")
+    line: str = Field(..., description="台词内容")
+    emotion: Optional[str] = Field(None, description="情绪标签")
+    delivery: Optional[str] = Field(None, description="演绎方式")
+
+class AudioNote(BaseModel):
+    sfx: Optional[str] = Field(None, description="音效描述")
+    ambience: Optional[str] = Field(None, description="环境音描述")
+    bgm_note: Optional[str] = Field(None, description="BGM 变化标注")
+
+class LightingData(BaseModel):
+    direction: Optional[str] = Field(None, description="光源方向")
+    azimuth: Optional[float] = Field(None, description="方位角(度)")
+    elevation: Optional[float] = Field(None, description="仰角(度)")
+    quality: Optional[str] = Field(None, description="光质: soft/hard")
+    color_temp: Optional[str] = Field(None, description="色温: warm/neutral/cool")
+    description: Optional[str] = Field(None, description="自然语言光影描述")
+
+
 class ProviderBackend(str, Enum):
     DASHSCOPE = "dashscope"
     VENDOR = "vendor"
@@ -289,7 +372,18 @@ class StoryboardFrame(BaseModel):
     
     # Composition Data (JSON structure for canvas)
     composition_data: Optional[Dict[str, Any]] = Field(None, description="JSON data representing the canvas composition")
-    
+
+    # === Storyboard Schema v2: Rich frame fields ===
+    duration: Optional[int] = Field(None, description="建议时长（秒）")
+    visual_description: Optional[str] = Field(None, description="画面描述：环境氛围 + 角色表演 + 物理动作的综合自然语言描述")
+    dialogue_structured: Optional[DialogueStructured] = Field(None, description="结构化对白（speaker + line + emotion + delivery）")
+    camera_movement_structured: Optional[CameraMovementData] = Field(None, description="结构化运镜（primary + secondary + speed + description）")
+    blocking: Optional[Blocking] = Field(None, description="空间站位")
+    audio_note: Optional[AudioNote] = Field(None, description="音效/环境音标注")
+    lighting: Optional[LightingData] = Field(None, description="光影方向与质感")
+    transition_hint: Optional[str] = Field(None, description="与下一帧的转场方式")
+    assembled_prompt: Optional[str] = Field(None, description="由 visual_description + 结构化字段自动拼装的最终 prompt（只读）")
+
     # === Prompts ===
     image_prompt: Optional[str] = Field(None, description="Optimized prompt for T2I/I2I (Legacy)")
     image_prompt_cn: Optional[str] = Field(None, description="Polished Chinese prompt for user confirmation")
@@ -313,6 +407,13 @@ class StoryboardFrame(BaseModel):
     dialogue_voice_id: Optional[str] = Field(None, description="Voice id used to generate the current audio")
     dialogue_instructions: Optional[str] = Field(None, description="Emotion/style instructions used for the current audio")
     
+    dubbed_video_url: Optional[str] = Field(None, description="URL of the video with TTS audio dubbed over original track")
+    dubbed_video_task_id: Optional[str] = Field(None, description="ID of the VideoTask that was dubbed (for UI display)")
+    dub_offset_ms: int = Field(0, description="Audio offset in ms for dubbing (positive = audio starts later)")
+    bg_audio_url: Optional[str] = Field(None, description="Cached background audio (Demucs no_vocals) path")
+    bg_audio_source_video: Optional[str] = Field(None, description="Video URL that bg_audio_url was separated from (cache key)")
+    preview_video_url: Optional[str] = Field(None, description="Current preview dubbed video (temporary, not committed)")
+
     selected_video_id: Optional[str] = Field(None, description="ID of the selected VideoTask for this frame")
     locked: bool = Field(False, description="Whether this frame is locked from regeneration")
     status: GenerationStatus = GenerationStatus.PENDING
