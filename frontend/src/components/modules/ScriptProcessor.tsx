@@ -11,7 +11,6 @@ import StepHeader from "@/components/shared/StepHeader";
 import WorkflowActionButton from "@/components/shared/WorkflowActionButton";
 import PreviousEpisodeSummary from "@/components/modules/PreviousEpisodeSummary";
 import ReconcileModal from "@/components/modules/ReconcileModal";
-import EntityConfirmModal, { type ExtractionPreview } from "@/components/modules/EntityConfirmModal";
 
 interface ScriptNode {
     type: "character" | "scene" | "prop";
@@ -93,9 +92,11 @@ export default function ScriptProcessor() {
     // when the episode belongs to a series (series_id !== null).
     const [reconcileOpen, setReconcileOpen] = useState(false);
 
-    // Entity extraction confirmation state
-    const [extractionPreview, setExtractionPreview] = useState<ExtractionPreview | null>(null);
-    const [confirmModalOpen, setConfirmModalOpen] = useState(false);
+    useEffect(() => {
+        const handler = () => setReconcileOpen(true);
+        document.addEventListener("lumenx:openReconcile", handler);
+        return () => document.removeEventListener("lumenx:openReconcile", handler);
+    }, []);
 
     const handleAnalyze = async () => {
         if (!script.trim()) {
@@ -108,6 +109,7 @@ export default function ScriptProcessor() {
         if (!currentProject?.id) return;
         const projectId = currentProject.id;
         const projectTitle = currentProject.title;
+        useProjectStore.setState({ isAnalyzing: true });
         const toastId = toast.progress(ts("analyzingScript"), {
             projectId,
             projectTitle,
@@ -125,9 +127,13 @@ export default function ScriptProcessor() {
                 }),
                 autoCloseMs: 5000,
             });
-            setExtractionPreview(preview);
-            setConfirmModalOpen(true);
+            useProjectStore.setState({
+                pendingExtraction: preview,
+                pendingExtractionScript: script,
+                isAnalyzing: false,
+            });
         } catch (error: any) {
+            useProjectStore.setState({ isAnalyzing: false });
             console.error("Failed to analyze script:", error);
             const errorMessage = error?.response?.data?.detail || error?.message || "未知错误";
             toast.update(toastId, {
@@ -140,27 +146,6 @@ export default function ScriptProcessor() {
                 },
             });
         }
-    };
-
-    const handleConfirmExtraction = async () => {
-        setConfirmModalOpen(false);
-        try {
-            await analyzeProject(script);
-            const refreshed = useProjectStore.getState().currentProject;
-            if (refreshed?.series_id) {
-                setReconcileOpen(true);
-            }
-        } catch (error: any) {
-            console.error("Failed to apply extraction:", error);
-            toast.error(ts("analysisFailedShort"));
-        }
-        setExtractionPreview(null);
-    };
-
-    const handleDiscardExtraction = () => {
-        setConfirmModalOpen(false);
-        setExtractionPreview(null);
-        toast.info(ts("extractionDiscarded"));
     };
 
     const handleDeleteNode = async (node: ScriptNode, e: React.MouseEvent) => {
@@ -301,17 +286,6 @@ export default function ScriptProcessor() {
                 onClose={() => setReconcileOpen(false)}
             />
 
-            <EntityConfirmModal
-                isOpen={confirmModalOpen}
-                preview={extractionPreview}
-                currentCounts={{
-                    characters: currentProject?.characters?.length ?? 0,
-                    scenes: currentProject?.scenes?.length ?? 0,
-                    props: currentProject?.props?.length ?? 0,
-                }}
-                onConfirm={handleConfirmExtraction}
-                onDiscard={handleDiscardExtraction}
-            />
         </div>
     );
 }

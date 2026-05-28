@@ -21,6 +21,7 @@ import ModelSettingsModal from "@/components/common/ModelSettingsModal";
 import EnvConfigDialog from "@/components/project/EnvConfigDialog";
 import PromptConfigModal from "@/components/project/PromptConfigModal";
 import StoryboardR2V from "@/components/modules/StoryboardR2V";
+import EntityConfirmModal from "@/components/modules/EntityConfirmModal";
 import dynamic from "next/dynamic";
 
 const CreativeCanvas = dynamic(() => import("@/components/canvas/CreativeCanvas"), { ssr: false });
@@ -227,10 +228,49 @@ export default function ProjectClient({ id, breadcrumbSegments }: { id: string; 
                     {activeStep === "motion" && <VideoGenerator />}
                     {activeStep === "assembly" && <VideoAssembly />}
                 </div>
-                {/* PropertiesPanel removed in R2V v2. Each step now owns
-                    its own side rail (Script → "Previously on..."; Cast/
-                    Storyboard/Assembly → their own SidePanelHeader columns). */}
             </div>
+
+            <EntityExtractionConfirm />
         </main>
+    );
+}
+
+function EntityExtractionConfirm() {
+    const ts = useTranslations("script");
+    const pendingExtraction = useProjectStore((s) => s.pendingExtraction);
+    const currentProject = useProjectStore((s) => s.currentProject);
+    const confirmExtraction = useProjectStore((s) => s.confirmExtraction);
+    const discardExtraction = useProjectStore((s) => s.discardExtraction);
+
+    const handleConfirm = async () => {
+        try {
+            await confirmExtraction();
+            const refreshed = useProjectStore.getState().currentProject;
+            if (refreshed?.series_id) {
+                document.dispatchEvent(new CustomEvent("lumenx:openReconcile"));
+            }
+        } catch {
+            const { toast } = await import("@/store/toastStore");
+            toast.error(ts("analysisFailedShort"));
+        }
+    };
+
+    const handleDiscard = () => {
+        discardExtraction();
+        import("@/store/toastStore").then(({ toast }) => toast.info(ts("extractionDiscarded")));
+    };
+
+    return (
+        <EntityConfirmModal
+            isOpen={!!pendingExtraction}
+            preview={pendingExtraction}
+            currentCounts={{
+                characters: currentProject?.characters?.length ?? 0,
+                scenes: currentProject?.scenes?.length ?? 0,
+                props: currentProject?.props?.length ?? 0,
+            }}
+            onConfirm={handleConfirm}
+            onDiscard={handleDiscard}
+        />
     );
 }

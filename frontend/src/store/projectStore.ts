@@ -271,7 +271,11 @@ interface ProjectStore {
     isAnalyzing: boolean;
     isAnalyzingArtStyle: boolean;
 
-
+    // Entity extraction confirmation (persists across step switches)
+    pendingExtraction: { characters: any[]; scenes: any[]; props: any[] } | null;
+    pendingExtractionScript: string | null;
+    confirmExtraction: () => Promise<void>;
+    discardExtraction: () => void;
 
     // Global Selection State
     selectedFrameId: string | null;
@@ -329,6 +333,34 @@ export const useProjectStore = create<ProjectStore>()(
             isLoading: false,
             isAnalyzing: false,
             selectedFrameId: null,
+
+            // Entity extraction confirmation
+            pendingExtraction: null,
+            pendingExtractionScript: null,
+            confirmExtraction: async () => {
+                const { currentProject, pendingExtractionScript } = get();
+                if (!currentProject?.id || !pendingExtractionScript) return;
+                set({ isAnalyzing: true });
+                try {
+                    const project = await api.reparseProject(currentProject.id, pendingExtractionScript);
+                    set((state) => ({
+                        projects: state.projects.map((p) =>
+                            p.id === project.id ? { ...project, updatedAt: new Date().toISOString() } : p
+                        ),
+                        currentProject: { ...project, updatedAt: new Date().toISOString() },
+                        pendingExtraction: null,
+                        pendingExtractionScript: null,
+                        isAnalyzing: false,
+                    }));
+                } catch (error) {
+                    console.error("Failed to apply extraction:", error);
+                    set({ isAnalyzing: false });
+                    throw error;
+                }
+            },
+            discardExtraction: () => {
+                set({ pendingExtraction: null, pendingExtractionScript: null });
+            },
 
             // Sync projects from backend
             setProjects: (projects: Project[]) => set({ projects }),
