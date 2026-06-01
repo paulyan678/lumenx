@@ -2676,18 +2676,25 @@ class AudioMixRequest(BaseModel):
 
 @app.put("/projects/{script_id}/audio_mix", response_model=Script)
 def update_audio_mix(script_id: str, request: AudioMixRequest):
-    """Set BGM + per-track mix levels for the final merge."""
+    """Set BGM + per-track mix levels for the final merge.
+
+    PATCH-style: only fields explicitly present in the request body are
+    applied. Using `model_fields_set` (Pydantic v2) lets us distinguish
+    "omitted" from "explicit null" — clients pass `bgm_url: null` to clear
+    the BGM, which the old `is not None` check silently swallowed.
+    """
     script = pipeline.get_script(script_id)
     if not script:
         raise HTTPException(status_code=404, detail="Script not found")
-    if request.bgm_url is not None:
-        script.bgm_url = request.bgm_url or None  # empty string → clear
+    fields_set = request.model_fields_set
+    if "bgm_url" in fields_set:
+        script.bgm_url = request.bgm_url or None  # null and "" both clear
     mix = dict(script.mix_settings or {"dialogue": 100, "bgm": 35, "sfx": 60})
-    if request.dialogue_volume is not None:
+    if "dialogue_volume" in fields_set and request.dialogue_volume is not None:
         mix["dialogue"] = max(0, min(100, request.dialogue_volume))
-    if request.bgm_volume is not None:
+    if "bgm_volume" in fields_set and request.bgm_volume is not None:
         mix["bgm"] = max(0, min(100, request.bgm_volume))
-    if request.sfx_volume is not None:
+    if "sfx_volume" in fields_set and request.sfx_volume is not None:
         mix["sfx"] = max(0, min(100, request.sfx_volume))
     script.mix_settings = mix
     pipeline._save_data()
@@ -2979,6 +2986,41 @@ def select_video(script_id: str, frame_id: str, request: SelectVideoRequest):
     """Selects a video variant for a specific frame."""
     try:
         updated_script = pipeline.select_video_for_frame(script_id, frame_id, request.video_id)
+        return signed_response(updated_script)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/projects/{script_id}/frames/{frame_id}/auto_select_latest_video", response_model=Script)
+def auto_select_latest_video(script_id: str, frame_id: str):
+    """Auto-pick the latest completed video as this frame's active take.
+
+    Idempotent; skipped when the frame is pinned (is_video_pinned=True).
+    Frontend calls this on every task-completion poll so the freshly
+    generated take surfaces on the hero — unless the user has explicitly
+    pinned a different take.
+    """
+    try:
+        updated_script = pipeline.auto_select_latest_video(script_id, frame_id)
+        return signed_response(updated_script)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/projects/{script_id}/frames/{frame_id}/unpin_video", response_model=Script)
+def unpin_video(script_id: str, frame_id: str):
+    """Clear the manual pin; auto_select_latest_video resumes on next poll.
+
+    Leaves selected_video_id / video_url untouched — the user keeps seeing
+    the current take until a new generation produces a newer completed
+    task.
+    """
+    try:
+        updated_script = pipeline.unpin_video(script_id, frame_id)
         return signed_response(updated_script)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
