@@ -39,6 +39,13 @@ interface CandidatesSectionProps {
     onClickThumb: (task: VideoTask, modifiers: { shift: boolean; meta: boolean }) => void;
     onToggleStar: (task: VideoTask, next: boolean) => Promise<void> | void;
     onSetLabel: (task: VideoTask, next: string | null) => Promise<void> | void;
+    /** When provided, each thumb shows a 📌 Set-as-active button (only on
+     *  completed tasks). The task with id === activeTaskId is rendered
+     *  with the primary border + filled Pin badge. */
+    onSetActive?: (task: VideoTask) => Promise<void> | void;
+    /** The frame's currently selected video id (frame.selected_video_id),
+     *  used to highlight the active thumb. */
+    activeTaskId?: string | null;
     onCancel?: (task: VideoTask) => Promise<void> | void;
     onRetry?: (task: VideoTask) => Promise<void> | void;
     onReuseBatchParams?: (batch: BatchSummary) => void;
@@ -117,6 +124,8 @@ export default function CandidatesSection({
     onClickThumb,
     onToggleStar,
     onSetLabel,
+    onSetActive,
+    activeTaskId,
     onCancel,
     onRetry,
     onReuseBatchParams,
@@ -249,12 +258,14 @@ export default function CandidatesSection({
                             batch={batch}
                             defaultOpen={batchIdx === 0}
                             compareSelectedIds={compareSelectedIds}
+                            activeTaskId={activeTaskId}
                             dubbedVideoUrl={dubbedVideoUrl}
                             dubbedVideoTaskId={dubbedVideoTaskId}
                             resolveUrl={resolveUrl}
                             onClickThumb={onClickThumb}
                             onToggleStar={onToggleStar}
                             onSetLabel={onSetLabel}
+                            onSetActive={onSetActive}
                             onCancel={onCancel}
                             onRetry={onRetry}
                             onReuseBatchParams={onReuseBatchParams}
@@ -298,12 +309,14 @@ function BatchBlock({
     batch,
     defaultOpen,
     compareSelectedIds,
+    activeTaskId,
     dubbedVideoUrl,
     dubbedVideoTaskId,
     resolveUrl,
     onClickThumb,
     onToggleStar,
     onSetLabel,
+    onSetActive,
     onCancel,
     onRetry,
     onReuseBatchParams,
@@ -311,12 +324,14 @@ function BatchBlock({
     batch: BatchSummary;
     defaultOpen: boolean;
     compareSelectedIds: Set<string>;
+    activeTaskId?: string | null;
     dubbedVideoUrl?: string;
     dubbedVideoTaskId?: string;
     resolveUrl?: (url: string) => string;
     onClickThumb: CandidatesSectionProps["onClickThumb"];
     onToggleStar: CandidatesSectionProps["onToggleStar"];
     onSetLabel: CandidatesSectionProps["onSetLabel"];
+    onSetActive?: CandidatesSectionProps["onSetActive"];
     onCancel?: CandidatesSectionProps["onCancel"];
     onRetry?: CandidatesSectionProps["onRetry"];
     onReuseBatchParams?: CandidatesSectionProps["onReuseBatchParams"];
@@ -398,11 +413,13 @@ function BatchBlock({
                             key={task.id}
                             task={task}
                             isCompareSelected={compareSelectedIds.has(task.id)}
+                            isActive={!!activeTaskId && task.id === activeTaskId}
                             dubbedVideoUrl={task.id === dubbedVideoTaskId ? dubbedVideoUrl : undefined}
                             resolveUrl={resolveUrl}
                             onClick={onClickThumb}
                             onToggleStar={onToggleStar}
                             onSetLabel={onSetLabel}
+                            onSetActive={onSetActive}
                             onCancel={onCancel}
                             onRetry={onRetry}
                         />

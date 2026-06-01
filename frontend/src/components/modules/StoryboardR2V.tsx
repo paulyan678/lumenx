@@ -26,6 +26,7 @@ import {
     setActiveT2IIndex,
     removeT2IImage,
     getActiveT2IImageUrl,
+    frameToShotNode,
 } from "./storyboard-r2v/shotNodeHelpers";
 import { overridePanelSectionState } from "./storyboard-r2v/shot-panel/usePanelSectionState";
 import ParamsSection, { type ParamsState } from "./storyboard-r2v/shot-panel/ParamsSection";
@@ -51,49 +52,7 @@ export default function StoryboardR2V() {
     const [shots, setShots] = useState<ShotNode[]>(() => {
         if (currentProject?.frames && currentProject.frames.length > 0) {
             const videoTasks: any[] = (currentProject as any).video_tasks ?? [];
-            return currentProject.frames.map((frame: any) => {
-                const frameTasks = videoTasks.filter((t: any) => t.frame_id === frame.id);
-                const inFlightTask = frameTasks.find((t: any) =>
-                    t.status === "pending" || t.status === "processing"
-                );
-                const latestCompleted = frameTasks.find((t: any) =>
-                    t.status === "completed" && t.video_url
-                );
-                let videoStatus: "pending" | "processing" | "completed" | "failed" | undefined;
-                let videoUrl: string | undefined = frame.dubbed_video_url || frame.video_url || undefined;
-                let videoTaskId: string | undefined;
-                if (inFlightTask) {
-                    videoStatus = inFlightTask.status;
-                    videoTaskId = inFlightTask.id;
-                } else if (videoUrl || latestCompleted) {
-                    videoStatus = "completed";
-                    videoUrl = videoUrl || latestCompleted?.video_url;
-                } else if (frameTasks.some((t: any) => t.status === "failed")) {
-                    videoStatus = "failed";
-                }
-                return migrateShotNode({
-                    id: frame.id,
-                    prompt: frame.visual_description || frame.action_description || "",
-                    tabMode: (frame.workbench_tab_mode as "t2i_i2v" | "direct_r2v" | undefined)
-                        ?? "direct_r2v",
-                    videoUrl,
-                    videoStatus,
-                    videoTaskId,
-                    imageUrl: frame.rendered_image_url || frame.image_url || undefined,
-                    t2iImageUrls: Array.isArray(frame.t2i_image_urls) ? frame.t2i_image_urls : [],
-                    t2iSelectedIndex: typeof frame.t2i_selected_index === "number"
-                        ? frame.t2i_selected_index
-                        : 0,
-                    duration: frame.duration ?? null,
-                    visualDescription: frame.visual_description ?? null,
-                    assembledPrompt: frame.assembled_prompt ?? null,
-                    dialogueStructured: frame.dialogue_structured ?? null,
-                    cameraMovementStructured: frame.camera_movement_structured ?? null,
-                    shotSize: frame.shot_size ?? null,
-                    cameraAngle: frame.camera_angle ?? null,
-                    transitionHint: frame.transition_hint ?? null,
-                });
-            });
+            return currentProject.frames.map((frame: any) => frameToShotNode(frame, videoTasks));
         }
         return [migrateShotNode({ id: `shot_${Date.now()}`, prompt: "", tabMode: "direct_r2v" })];
     });
@@ -541,30 +500,9 @@ export default function StoryboardR2V() {
             const newFrameCount = Array.isArray(updated?.frames) ? updated.frames.length : 0;
             updateProject(projectId, updated);
             if (Array.isArray(updated?.frames)) {
-                setShots(
-                    updated.frames.map((frame: any) =>
-                        migrateShotNode({
-                            id: frame.id,
-                            prompt: frame.visual_description || frame.action_description || "",
-                            tabMode: (frame.workbench_tab_mode as "t2i_i2v" | "direct_r2v" | undefined)
-                                ?? (currentProject.default_generation_mode === "i2v" ? "t2i_i2v" : "direct_r2v"),
-                            videoUrl: frame.dubbed_video_url || frame.video_url || undefined,
-                            videoStatus: (frame.dubbed_video_url || frame.video_url) ? ("completed" as const) : undefined,
-                            imageUrl: frame.rendered_image_url || frame.image_url || undefined,
-                            t2iImageUrls: Array.isArray(frame.t2i_image_urls) ? frame.t2i_image_urls : [],
-                            t2iSelectedIndex: typeof frame.t2i_selected_index === "number"
-                                ? frame.t2i_selected_index : 0,
-                            duration: frame.duration ?? null,
-                            visualDescription: frame.visual_description ?? null,
-                            assembledPrompt: frame.assembled_prompt ?? null,
-                            dialogueStructured: frame.dialogue_structured ?? null,
-                            cameraMovementStructured: frame.camera_movement_structured ?? null,
-                            shotSize: frame.shot_size ?? null,
-                            cameraAngle: frame.camera_angle ?? null,
-                            transitionHint: frame.transition_hint ?? null,
-                        }),
-                    ),
-                );
+                const defaultMode = currentProject.default_generation_mode === "i2v" ? "t2i_i2v" : "direct_r2v";
+                const videoTasks: any[] = (updated as any).video_tasks ?? [];
+                setShots(updated.frames.map((frame: any) => frameToShotNode(frame, videoTasks, defaultMode)));
             }
 
             // Phase 2: batch refine (SSE)
@@ -579,30 +517,9 @@ export default function StoryboardR2V() {
                 const refreshed = await api.getProject(projectId);
                 if (refreshed?.frames) {
                     updateProject(projectId, { frames: refreshed.frames });
-                    setShots(
-                        refreshed.frames.map((frame: any) =>
-                            migrateShotNode({
-                                id: frame.id,
-                                prompt: frame.visual_description || frame.action_description || "",
-                                tabMode: (frame.workbench_tab_mode as "t2i_i2v" | "direct_r2v" | undefined)
-                                    ?? (currentProject.default_generation_mode === "i2v" ? "t2i_i2v" : "direct_r2v"),
-                                videoUrl: frame.video_url || undefined,
-                                videoStatus: frame.video_url ? ("completed" as const) : undefined,
-                                imageUrl: frame.rendered_image_url || frame.image_url || undefined,
-                                t2iImageUrls: Array.isArray(frame.t2i_image_urls) ? frame.t2i_image_urls : [],
-                                t2iSelectedIndex: typeof frame.t2i_selected_index === "number"
-                                    ? frame.t2i_selected_index : 0,
-                                duration: frame.duration ?? null,
-                                visualDescription: frame.visual_description ?? null,
-                                assembledPrompt: frame.assembled_prompt ?? null,
-                                dialogueStructured: frame.dialogue_structured ?? null,
-                                cameraMovementStructured: frame.camera_movement_structured ?? null,
-                                shotSize: frame.shot_size ?? null,
-                                cameraAngle: frame.camera_angle ?? null,
-                                transitionHint: frame.transition_hint ?? null,
-                            }),
-                        ),
-                    );
+                    const defaultMode = currentProject.default_generation_mode === "i2v" ? "t2i_i2v" : "direct_r2v";
+                    const videoTasks: any[] = (refreshed as any).video_tasks ?? [];
+                    setShots(refreshed.frames.map((frame: any) => frameToShotNode(frame, videoTasks, defaultMode)));
                 }
             }
             setBannerState("summary");
@@ -628,30 +545,9 @@ export default function StoryboardR2V() {
             const updated = await api.getProject(currentProject.id);
             if (updated?.frames) {
                 updateProject(currentProject.id, { frames: updated.frames });
-                setShots(
-                    updated.frames.map((frame: any) =>
-                        migrateShotNode({
-                            id: frame.id,
-                            prompt: frame.visual_description || frame.action_description || "",
-                            tabMode: (frame.workbench_tab_mode as "t2i_i2v" | "direct_r2v" | undefined)
-                                ?? (currentProject.default_generation_mode === "i2v" ? "t2i_i2v" : "direct_r2v"),
-                            videoUrl: frame.dubbed_video_url || frame.video_url || undefined,
-                            videoStatus: (frame.dubbed_video_url || frame.video_url) ? ("completed" as const) : undefined,
-                            imageUrl: frame.rendered_image_url || frame.image_url || undefined,
-                            t2iImageUrls: Array.isArray(frame.t2i_image_urls) ? frame.t2i_image_urls : [],
-                            t2iSelectedIndex: typeof frame.t2i_selected_index === "number"
-                                ? frame.t2i_selected_index : 0,
-                            duration: frame.duration ?? null,
-                            visualDescription: frame.visual_description ?? null,
-                            assembledPrompt: frame.assembled_prompt ?? null,
-                            dialogueStructured: frame.dialogue_structured ?? null,
-                            cameraMovementStructured: frame.camera_movement_structured ?? null,
-                            shotSize: frame.shot_size ?? null,
-                            cameraAngle: frame.camera_angle ?? null,
-                            transitionHint: frame.transition_hint ?? null,
-                        }),
-                    ),
-                );
+                const defaultMode = currentProject.default_generation_mode === "i2v" ? "t2i_i2v" : "direct_r2v";
+                const videoTasks: any[] = (updated as any).video_tasks ?? [];
+                setShots(updated.frames.map((frame: any) => frameToShotNode(frame, videoTasks, defaultMode)));
             }
             toast.success("精修完成");
         } catch (err) {
@@ -1376,6 +1272,16 @@ export default function StoryboardR2V() {
                             setShots(prev => prev.map(s =>
                                 s.id === shot.id ? { ...s, videoStatus: "completed", videoUrl: status.video_url } : s
                             ));
+                            // Persist as the frame's active take so reloads, refines, and
+                            // cross-device opens see the same hero video. Backend skips
+                            // the update when the user has pinned a take. Fire-and-forget
+                            // — UI already updated above, so failure here is non-fatal.
+                            const projectId = currentProject?.id;
+                            if (projectId) {
+                                api.autoSelectLatestVideo(projectId, shot.id)
+                                    .then(updated => updateProject(projectId, { frames: updated.frames }))
+                                    .catch(err => debugLog.warn("Studio", "autoSelectLatestVideo failed:", err));
+                            }
                         } else if (status.status === "failed") {
                             setShots(prev => prev.map(s =>
                                 s.id === shot.id ? { ...s, videoStatus: "failed" } : s
@@ -1482,6 +1388,7 @@ export default function StoryboardR2V() {
     // via project refresh (GET /tasks/ only covers asset tasks).
     useEffect(() => {
         if (!allVideoTasks.length) return;
+        const autoSelectFrameIds: string[] = [];
         setShots(prev => {
             let changed = false;
             const next = prev.map(s => {
@@ -1490,6 +1397,7 @@ export default function StoryboardR2V() {
                 if (!task) return s;
                 if (task.status === "completed" && s.videoStatus !== "completed") {
                     changed = true;
+                    autoSelectFrameIds.push(s.id);
                     return { ...s, videoStatus: "completed" as const, videoUrl: (task as any).video_url };
                 }
                 if (task.status === "failed" && s.videoStatus !== "failed") {
@@ -1500,7 +1408,26 @@ export default function StoryboardR2V() {
             });
             return changed ? next : prev;
         });
-    }, [allVideoTasks]);
+        // Persist newly-completed videos as the frame's active take so the
+        // hero survives reload / refine / cross-device opens. Backend skips
+        // pinned frames; failures here are non-fatal (UI already updated).
+        const projectId = currentProject?.id;
+        if (projectId && autoSelectFrameIds.length > 0) {
+            Promise.all(
+                autoSelectFrameIds.map(frameId =>
+                    api.autoSelectLatestVideo(projectId, frameId).catch(err => {
+                        debugLog.warn("Studio", "autoSelectLatestVideo failed for frame:", frameId, err);
+                        return null;
+                    })
+                )
+            ).then(results => {
+                // Use the last successful response's frames (all calls
+                // converge on the same script state — last write wins).
+                const last = results.filter(Boolean).pop() as any;
+                if (last?.frames) updateProject(projectId, { frames: last.frames });
+            });
+        }
+    }, [allVideoTasks, currentProject?.id, updateProject]);
 
     // Compare modal needs the actual VideoTask objects for the
     // currently-selected ids (in whatever order they were selected).
@@ -1641,6 +1568,43 @@ export default function StoryboardR2V() {
             debugLog.error("Studio", "Failed to toggle star:", err);
         }
     }, [currentProject?.id, refreshProject]);
+
+    // Manual pin: user explicitly chose this take as the frame's active
+    // video. Backend sets is_video_pinned=true so subsequent auto-selects
+    // (polling completion) skip this frame. Locally we update the shot's
+    // videoUrl + videoStatus immediately so the hero swaps without waiting
+    // for the project refresh round-trip.
+    const handleSetActive = useCallback(async (frameId: string, task: VideoTask) => {
+        if (!currentProject?.id) return;
+        const taskVideoUrl = (task as any).video_url as string | undefined;
+        setShots(prev => prev.map(s =>
+            s.id === frameId
+                ? { ...s, videoUrl: taskVideoUrl, videoStatus: "completed" as const, isVideoPinned: true }
+                : s
+        ));
+        try {
+            const updated = await api.selectVideo(currentProject.id, frameId, task.id);
+            updateProject(currentProject.id, { frames: updated.frames });
+        } catch (err) {
+            debugLog.error("Studio", "Failed to set active take:", err);
+        }
+    }, [currentProject?.id, updateProject]);
+
+    // Unpin: clear the manual pin so auto-select resumes on next
+    // completion. Selected_video_id / video_url stay put — user keeps
+    // seeing the current take until a newer one arrives.
+    const handleUnpinVideo = useCallback(async (frameId: string) => {
+        if (!currentProject?.id) return;
+        setShots(prev => prev.map(s =>
+            s.id === frameId ? { ...s, isVideoPinned: false } : s
+        ));
+        try {
+            const updated = await api.unpinVideo(currentProject.id, frameId);
+            updateProject(currentProject.id, { frames: updated.frames });
+        } catch (err) {
+            debugLog.error("Studio", "Failed to unpin video:", err);
+        }
+    }, [currentProject?.id, updateProject]);
 
     const handleSetLabel = useCallback(async (task: VideoTask, next: string | null) => {
         if (!currentProject?.id) return;
@@ -1973,6 +1937,7 @@ export default function StoryboardR2V() {
                             onGenerateBatch={(n) => generateVideoBatch(index, n, paramsState)}
                             inFlightCount={shotInFlight}
                             onRefineFrame={() => handleRefineFrame(shot.id)}
+                            onUnpinVideo={() => handleUnpinVideo(shot.id)}
                             onUpdateDialogue={async (text: string) => {
                                 if (!currentProject) return;
                                 try {
@@ -2216,11 +2181,13 @@ export default function StoryboardR2V() {
                                     tasks={shotTasks}
                                     activeModel={paramsState.model}
                                     compareSelectedIds={compareSelectedIds}
+                                    activeTaskId={currentProject?.frames?.find((f: any) => f.id === shot.id)?.selected_video_id ?? null}
                                     dubbedVideoUrl={currentProject?.frames?.find((f: any) => f.id === shot.id)?.dubbed_video_url}
                                     dubbedVideoTaskId={currentProject?.frames?.find((f: any) => f.id === shot.id)?.dubbed_video_task_id}
                                     onClickThumb={handleCandidateClick}
                                     onToggleStar={handleToggleStar}
                                     onSetLabel={handleSetLabel}
+                                    onSetActive={(task) => handleSetActive(shot.id, task)}
                                     onCancel={handleCancelTask}
                                     onRetry={handleRetryTask}
                                     onReuseBatchParams={handleReuseBatchParams}

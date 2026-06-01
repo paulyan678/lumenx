@@ -17,6 +17,8 @@ import {
     Loader2,
     Code2,
     ChevronRight,
+    Pin,
+    PinOff,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import AssetChipBar from "./AssetChipBar";
@@ -90,6 +92,12 @@ export interface ShotNode {
     shotSize?: string | null;
     cameraAngle?: string | null;
     transitionHint?: string | null;
+
+    /** When true, the user has manually pinned an active take. Hero
+     *  shows a "Pinned" chip; autoSelectLatestVideo skips this frame on
+     *  the backend, so new completed tasks stay in Candidates without
+     *  overwriting the user's pick. Sourced from frame.is_video_pinned. */
+    isVideoPinned?: boolean;
 }
 
 /** Cap on T2I image history per shot. Older drops off FIFO when adding. */
@@ -137,6 +145,10 @@ interface ShotCardProps {
     inFlightCount?: number;
     onRefineFrame?: () => void;
     onUpdateDialogue?: (text: string) => void;
+    /** Active-take pin controls. When the user has manually pinned an
+     *  active take (shot.isVideoPinned=true), the hero shows a "📌 Pinned"
+     *  chip; clicking it fires onUnpinVideo to resume auto latest-wins. */
+    onUnpinVideo?: () => void;
 }
 
 export default function ShotCard({
@@ -167,6 +179,7 @@ export default function ShotCard({
     onGenerateBatch,
     inFlightCount = 0,
     onRefineFrame,
+    onUnpinVideo,
 }: ShotCardProps) {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const cardRef = useRef<HTMLDivElement>(null);
@@ -431,9 +444,10 @@ export default function ShotCard({
 
     const handleInsertAssetFromChip = (_type: string, name: string) => {
         const currentPrompt = shot.prompt;
-        // Check if this asset is already referenced in the prompt
-        const existingTag = new RegExp(`\\[character\\d+:${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\]`);
-        if (existingTag.test(currentPrompt)) return;
+        // Repeats allowed: narrative scenes ("A 看着自己的影子") map the
+        // same actor into multiple slots, and backend r2v polish keys off
+        // characterN slot index — character1/character2 both naming the
+        // same actor resolve to two reference inputs as intended.
 
         // Find the next available characterN slot
         const usedNums: number[] = [];
@@ -529,6 +543,33 @@ export default function ShotCard({
                     {/* Left: Preview */}
                     <div className="w-44 shrink-0 bg-black/20 flex flex-col items-center justify-center relative border-r border-white/[0.04]">
                         {renderPreview()}
+                        {/* Pinned chip — overlays the hero when the user has
+                            manually pinned an active take. Group/peer makes
+                            the "Unpin" CTA fade in on hover so the chip stays
+                            calm in the resting state. Only shown when a
+                            video is actually rendered (no point pinning a
+                            "no video" placeholder). */}
+                        {shot.isVideoPinned && shot.videoUrl && onUnpinVideo ? (
+                            <div className="group/pin absolute top-1.5 right-1.5 z-10 flex items-center gap-1">
+                                <span
+                                    className="inline-flex items-center gap-1 rounded-full border border-primary/55 bg-primary/20 backdrop-blur-sm px-2 py-[2px] font-mono text-[9.5px] uppercase tracking-[0.14em] text-primary shadow-[0_0_10px_-2px_rgba(100,108,255,0.55)]"
+                                    title={t("activeTakePinnedTooltip")}
+                                >
+                                    <Pin size={9} aria-hidden="true" strokeWidth={2.2} fill="currentColor" />
+                                    {t("activeTakePinned")}
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); onUnpinVideo(); }}
+                                    title={t("unpinActiveTakeTooltip")}
+                                    aria-label={t("unpinActiveTake")}
+                                    className="opacity-0 transition-opacity duration-fast ease-out-quart group-hover/pin:opacity-100 focus-visible:opacity-100 inline-flex items-center gap-1 rounded-full border border-white/15 bg-black/55 backdrop-blur-sm px-1.5 py-[2px] font-mono text-[9.5px] uppercase tracking-[0.14em] text-white/80 hover:text-foreground hover:border-white/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                                >
+                                    <PinOff size={9} aria-hidden="true" strokeWidth={2.2} />
+                                    {t("unpinActiveTakeShort")}
+                                </button>
+                            </div>
+                        ) : null}
                     </div>
 
                     {/* Right: Prompt + Controls */}
