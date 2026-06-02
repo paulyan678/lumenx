@@ -435,6 +435,17 @@ function MixPhase({
                     {ta("mixBgmTitle")}
                     {saving && <Loader2 size={12} className="animate-spin text-primary" />}
                 </h3>
+                {/* Preview banner — backend amix is wired (pipeline.merge_videos),
+                    but the preset audio files aren't shipped yet, so the merged
+                    output today is silent regardless of selection. We surface
+                    this honestly so users don't keep selecting BGM and wondering
+                    why the export has no music. */}
+                <div className="mb-3 flex items-start gap-2 rounded-md border border-amber-500/25 bg-amber-500/[0.06] px-3 py-2">
+                    <AlertTriangle size={13} className="mt-0.5 shrink-0 text-amber-400/85" aria-hidden="true" />
+                    <p className="text-[11.5px] leading-relaxed text-amber-100/85">
+                        {ta("mixBgmPreviewNotice")}
+                    </p>
+                </div>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
                     <button
                         onClick={() => handlePick(null)}
