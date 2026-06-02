@@ -158,6 +158,70 @@ export function appendVideoTaskId(
     };
 }
 
+/** Convert a backend frame + the project's full video_tasks array into
+ *  a ShotNode, including videoStatus / videoUrl / videoTaskId derived
+ *  from in-flight or latest-completed tasks.
+ *
+ *  Single source of truth for frame→shot conversion. Init useState,
+ *  handleRefineFrame, and any other "refresh from project state" path
+ *  must route through here so the hero video stays consistent — earlier
+ *  drift between init (had a latestCompleted fallback) and refine (only
+ *  checked frame.video_url) caused hero to go blank after refine when
+ *  the backend hadn't persisted frame.video_url yet.
+ *
+ *  `defaultTabMode` lets callers override the fallback ("direct_r2v")
+ *  when they have more context (e.g. project-level i2v default). */
+export function frameToShotNode(
+    frame: any,
+    videoTasks: any[],
+    defaultTabMode: "t2i_i2v" | "direct_r2v" = "direct_r2v",
+): ShotNode {
+    const frameTasks = (videoTasks ?? []).filter((t: any) => t.frame_id === frame.id);
+    const inFlightTask = frameTasks.find((t: any) =>
+        t.status === "pending" || t.status === "processing"
+    );
+    const latestCompleted = frameTasks.find((t: any) =>
+        t.status === "completed" && t.video_url
+    );
+
+    let videoStatus: "pending" | "processing" | "completed" | "failed" | undefined;
+    let videoUrl: string | undefined = frame.dubbed_video_url || frame.video_url || undefined;
+    let videoTaskId: string | undefined;
+
+    if (inFlightTask) {
+        videoStatus = inFlightTask.status;
+        videoTaskId = inFlightTask.id;
+    } else if (videoUrl || latestCompleted) {
+        videoStatus = "completed";
+        videoUrl = videoUrl || latestCompleted?.video_url;
+    } else if (frameTasks.some((t: any) => t.status === "failed")) {
+        videoStatus = "failed";
+    }
+
+    return migrateShotNode({
+        id: frame.id,
+        prompt: frame.visual_description || frame.action_description || "",
+        tabMode: (frame.workbench_tab_mode as "t2i_i2v" | "direct_r2v" | undefined) ?? defaultTabMode,
+        videoUrl,
+        videoStatus,
+        videoTaskId,
+        imageUrl: frame.rendered_image_url || frame.image_url || undefined,
+        t2iImageUrls: Array.isArray(frame.t2i_image_urls) ? frame.t2i_image_urls : [],
+        t2iSelectedIndex: typeof frame.t2i_selected_index === "number"
+            ? frame.t2i_selected_index
+            : 0,
+        duration: frame.duration ?? null,
+        visualDescription: frame.visual_description ?? null,
+        assembledPrompt: frame.assembled_prompt ?? null,
+        dialogueStructured: frame.dialogue_structured ?? null,
+        cameraMovementStructured: frame.camera_movement_structured ?? null,
+        shotSize: frame.shot_size ?? null,
+        cameraAngle: frame.camera_angle ?? null,
+        transitionHint: frame.transition_hint ?? null,
+        isVideoPinned: Boolean(frame.is_video_pinned),
+    });
+}
+
 /** Per-tab task id list, with legacy single-id fallback. */
 export function videoTaskIdsForTab(
     shot: ShotNode,

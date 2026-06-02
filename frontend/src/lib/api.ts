@@ -609,9 +609,27 @@ export const api = {
     },
 
     selectVideo: async (scriptId: string, frameId: string, videoId: string) => {
+        // Manual pick — sets frame.is_video_pinned=true so future
+        // auto_select_latest_video calls (fired by R2V poll completion)
+        // skip this frame.
         const res = await axios.post(`${API_URL}/projects/${scriptId}/frames/${frameId}/select_video`, {
             video_id: videoId
         });
+        return res.data;
+    },
+
+    autoSelectLatestVideo: async (scriptId: string, frameId: string) => {
+        // Fire-and-forget on every R2V poll completion. Backend picks the
+        // latest completed task for this frame and updates frame.video_url
+        // unless the user has pinned a different take.
+        const res = await axios.post(`${API_URL}/projects/${scriptId}/frames/${frameId}/auto_select_latest_video`);
+        return res.data;
+    },
+
+    unpinVideo: async (scriptId: string, frameId: string) => {
+        // Clear the pin; selected_video_id and video_url stay put until
+        // the next auto-select picks a newer completed task.
+        const res = await axios.post(`${API_URL}/projects/${scriptId}/frames/${frameId}/unpin_video`);
         return res.data;
     },
 

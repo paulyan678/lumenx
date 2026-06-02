@@ -17,6 +17,8 @@ import {
     Loader2,
     Code2,
     ChevronRight,
+    Pin,
+    PinOff,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import AssetChipBar from "./AssetChipBar";
@@ -90,6 +92,12 @@ export interface ShotNode {
     shotSize?: string | null;
     cameraAngle?: string | null;
     transitionHint?: string | null;
+
+    /** When true, the user has manually pinned an active take. Hero
+     *  shows a "Pinned" chip; autoSelectLatestVideo skips this frame on
+     *  the backend, so new completed tasks stay in Candidates without
+     *  overwriting the user's pick. Sourced from frame.is_video_pinned. */
+    isVideoPinned?: boolean;
 }
 
 /** Cap on T2I image history per shot. Older drops off FIFO when adding. */
@@ -137,6 +145,10 @@ interface ShotCardProps {
     inFlightCount?: number;
     onRefineFrame?: () => void;
     onUpdateDialogue?: (text: string) => void;
+    /** Active-take pin controls. When the user has manually pinned an
+     *  active take (shot.isVideoPinned=true), the hero shows a "📌 Pinned"
+     *  chip; clicking it fires onUnpinVideo to resume auto latest-wins. */
+    onUnpinVideo?: () => void;
 }
 
 export default function ShotCard({
@@ -167,6 +179,7 @@ export default function ShotCard({
     onGenerateBatch,
     inFlightCount = 0,
     onRefineFrame,
+    onUnpinVideo,
 }: ShotCardProps) {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const cardRef = useRef<HTMLDivElement>(null);
@@ -181,18 +194,27 @@ export default function ShotCard({
     const currentProjectId = useProjectStore((state) => state.currentProject?.id);
     // r2vSlots — when R2V tab is active, derive slot context from
     // @character references in the prompt so the polish system
-    // prompt knows what character1/character2 ID maps to.
+    // prompt knows what character1/character2 ID maps to. Dedup by
+    // slot number (first-seen wins) and sort ascending so the list
+    // index aligns with HappyHorse's characterN positional mapping.
+    // Backend polish_r2v_prompt re-numbers with enumerate(slots),
+    // which only matches the prompt's characterN tags when slots
+    // are unique and ordered.
     const r2vSlots = useCallback((): { description: string }[] => {
         if (shot.tabMode !== "direct_r2v") return [];
-        const out: { description: string }[] = [];
-        const tagPattern = /\[character\d+:([^\]]+)\]/g;
+        const bySlot = new Map<number, string>();
+        const tagPattern = /\[character(\d+):([^\]]+)\]/g;
         let match;
         while ((match = tagPattern.exec(shot.prompt)) !== null) {
-            const [, name] = match;
+            const slotN = parseInt(match[1], 10);
+            if (bySlot.has(slotN)) continue;
+            const name = match[2];
             const char = characters.find((c: any) => c.name === name);
-            out.push({ description: char?.description ? `${name}: ${char.description}` : name });
+            bySlot.set(slotN, char?.description ? `${name}: ${char.description}` : name);
         }
-        return out;
+        return Array.from(bySlot.entries())
+            .sort((a, b) => a[0] - b[0])
+            .map(([, description]) => ({ description }));
     }, [shot.tabMode, shot.prompt, characters])();
 
     // polishImageUrls — feed vision-capable polish (Issue 13) with the
@@ -431,19 +453,37 @@ export default function ShotCard({
 
     const handleInsertAssetFromChip = (_type: string, name: string) => {
         const currentPrompt = shot.prompt;
-        // Check if this asset is already referenced in the prompt
-        const existingTag = new RegExp(`\\[character\\d+:${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\]`);
-        if (existingTag.test(currentPrompt)) return;
+        // Each unique character gets one fixed slot number throughout this
+        // prompt: slot N → reference_image_urls[N-1] in HappyHorse R2V, so
+        // referencing the same actor twice must reuse the same slot —
+        // otherwise the model would expect two separate reference images.
+        // Examples:
+        //   first @小兔子 → [character1:小兔子]
+        //   then @小狗 → [character2:小狗]
+        //   then @小兔子 again → [character1:小兔子]   (reuse, NOT [character3:…])
+        const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const existingTagRe = new RegExp(`\\[character(\\d+):${escapedName}\\]`);
+        const existingMatch = currentPrompt.match(existingTagRe);
 
-        // Find the next available characterN slot
-        const usedNums: number[] = [];
-        const slotRe = /\[character(\d+):/g;
-        let m;
-        while ((m = slotRe.exec(currentPrompt)) !== null) {
-            usedNums.push(parseInt(m[1], 10));
+        let slot: number;
+        if (existingMatch) {
+            slot = parseInt(existingMatch[1], 10);
+        } else {
+            // Map of (slot → name) already in the prompt; first-seen wins
+            // per slot so accidental dup tags don't inflate the count.
+            const usedSlotByName = new Map<number, string>();
+            const slotRe = /\[character(\d+):([^\]]+)\]/g;
+            let m;
+            while ((m = slotRe.exec(currentPrompt)) !== null) {
+                const slotN = parseInt(m[1], 10);
+                if (!usedSlotByName.has(slotN)) {
+                    usedSlotByName.set(slotN, m[2]);
+                }
+            }
+            const usedSlots = Array.from(usedSlotByName.keys());
+            slot = usedSlots.length > 0 ? Math.max(...usedSlots) + 1 : 1;
         }
-        const nextSlot = usedNums.length > 0 ? Math.max(...usedNums) + 1 : 1;
-        const tag = `[character${nextSlot}:${name}]`;
+        const tag = `[character${slot}:${name}]`;
 
         const textarea = textareaRef.current;
         if (textarea) {
@@ -529,6 +569,33 @@ export default function ShotCard({
                     {/* Left: Preview */}
                     <div className="w-44 shrink-0 bg-black/20 flex flex-col items-center justify-center relative border-r border-white/[0.04]">
                         {renderPreview()}
+                        {/* Pinned chip — overlays the hero when the user has
+                            manually pinned an active take. Group/peer makes
+                            the "Unpin" CTA fade in on hover so the chip stays
+                            calm in the resting state. Only shown when a
+                            video is actually rendered (no point pinning a
+                            "no video" placeholder). */}
+                        {shot.isVideoPinned && shot.videoUrl && onUnpinVideo ? (
+                            <div className="group/pin absolute top-1.5 right-1.5 z-10 flex items-center gap-1">
+                                <span
+                                    className="inline-flex items-center gap-1 rounded-full border border-primary/55 bg-primary/20 backdrop-blur-sm px-2 py-[2px] font-mono text-[9.5px] uppercase tracking-[0.14em] text-primary shadow-[0_0_10px_-2px_rgba(100,108,255,0.55)]"
+                                    title={t("activeTakePinnedTooltip")}
+                                >
+                                    <Pin size={9} aria-hidden="true" strokeWidth={2.2} fill="currentColor" />
+                                    {t("activeTakePinned")}
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); onUnpinVideo(); }}
+                                    title={t("unpinActiveTakeTooltip")}
+                                    aria-label={t("unpinActiveTake")}
+                                    className="opacity-0 transition-opacity duration-fast ease-out-quart group-hover/pin:opacity-100 focus-visible:opacity-100 inline-flex items-center gap-1 rounded-full border border-white/15 bg-black/55 backdrop-blur-sm px-1.5 py-[2px] font-mono text-[9.5px] uppercase tracking-[0.14em] text-white/80 hover:text-foreground hover:border-white/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                                >
+                                    <PinOff size={9} aria-hidden="true" strokeWidth={2.2} />
+                                    {t("unpinActiveTakeShort")}
+                                </button>
+                            </div>
+                        ) : null}
                     </div>
 
                     {/* Right: Prompt + Controls */}

@@ -2209,25 +2209,95 @@ class ComicGenPipeline:
             logger.error(f"Failed to download image: {e}")
             raise
     def select_video_for_frame(self, script_id: str, frame_id: str, video_id: str) -> Script:
-        """Step 5a: Select a video variant for a frame."""
+        """Manual select: user pins this video as the active take.
+
+        Sets is_video_pinned=True so subsequent auto_select_latest_video
+        calls (fired by polling completion) skip this frame and don't
+        overwrite the user's hand-picked choice.
+        """
         script = self.scripts.get(script_id)
         if not script:
             raise ValueError("Script not found")
-            
+
         frame = next((f for f in script.frames if f.id == frame_id), None)
         if not frame:
             raise ValueError("Frame not found")
-            
-        # Verify video exists and belongs to project
+
         video = next((v for v in script.video_tasks if v.id == video_id), None)
         if not video:
             raise ValueError("Video task not found")
-            
+
         frame.selected_video_id = video_id
-        
-        # Also update the frame's video_url to point to this video for easy access
         frame.video_url = video.video_url
-        
+        frame.is_video_pinned = True
+
+        self._save_data()
+        return script
+
+    def auto_select_latest_video(self, script_id: str, frame_id: str) -> Script:
+        """Auto select: pick the latest completed video task for this frame.
+
+        Idempotent. Skips the update entirely if the frame is pinned by the
+        user (is_video_pinned=True). Called by the frontend on every task
+        completion poll — the pin check is what makes latest-wins respect
+        user intent.
+        """
+        script = self.scripts.get(script_id)
+        if not script:
+            raise ValueError("Script not found")
+
+        frame = next((f for f in script.frames if f.id == frame_id), None)
+        if not frame:
+            raise ValueError("Frame not found")
+
+        if frame.is_video_pinned:
+            return script  # user has manually pinned — don't overwrite
+
+        # Latest completed task wins. VideoTask carries created_at
+        # (default_factory=time.time); we use it as the "completion order"
+        # proxy. Backend doesn't track per-task completion time, but tasks
+        # in the same batch are queued at roughly the same created_at and
+        # complete in arrival order — close enough for "show me what just
+        # came out" UX.
+        frame_tasks = [
+            t for t in script.video_tasks
+            if t.frame_id == frame_id
+            and t.status == GenerationStatus.COMPLETED
+            and t.video_url
+        ]
+        if not frame_tasks:
+            return script  # nothing to select yet
+
+        latest = max(frame_tasks, key=lambda t: getattr(t, "created_at", 0) or 0)
+        if frame.selected_video_id == latest.id and frame.video_url == latest.video_url:
+            return script  # already selected — no-op
+
+        frame.selected_video_id = latest.id
+        frame.video_url = latest.video_url
+        # is_video_pinned stays False — this is an auto-select
+
+        self._save_data()
+        return script
+
+    def unpin_video(self, script_id: str, frame_id: str) -> Script:
+        """Clear the manual pin so auto_select_latest_video resumes.
+
+        Intentionally does NOT touch selected_video_id or video_url — the
+        user keeps seeing the same take until the next generation runs
+        and auto_select picks a newer one.
+        """
+        script = self.scripts.get(script_id)
+        if not script:
+            raise ValueError("Script not found")
+
+        frame = next((f for f in script.frames if f.id == frame_id), None)
+        if not frame:
+            raise ValueError("Frame not found")
+
+        if not frame.is_video_pinned:
+            return script  # already unpinned — no-op
+
+        frame.is_video_pinned = False
         self._save_data()
         return script
 

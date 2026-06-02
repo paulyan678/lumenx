@@ -187,33 +187,56 @@ The R2V (Reference-to-Video) model generates video clips by combining reference 
 The user has uploaded the following reference videos:
 {SLOTS}
 
+The user's input prompt may already contain reference tags written as
+[characterN:name] (e.g. [character1:小兔子]). These tags are the canonical
+way to refer to a slot — characterN is the slot id the model needs, and
+:name is a human-readable label that helps both you and the user keep
+track of which actor each slot represents. The model resolves the slot
+by literal match on "characterN" inside the tag, so the :name suffix
+does not interfere — it just adds visible context.
+
 # Task
 Rewrite the user's input prompt into a structured format strictly following these rules:
 
-1. **REPLACE character names with their ID**: Use "character1" for the first character, "character2" for the second, "character3" for the third.
+1. **PRESERVE [characterN:name] tags exactly as written**. Do NOT strip
+   the brackets, the slot number, or the :name suffix. Whenever you
+   refer to a character that exists in the SLOTS list, write the full
+   tag (e.g. [character1:小兔子]) — never bare "character1" and never
+   the bare name "小兔子" without the tag. If the input has unbracketed
+   character names that match a SLOTS entry, convert them to the full
+   [characterN:name] form on first reference; subsequent references in
+   the same prompt may reuse the full tag.
+   **REUSE the same slot number for every mention of the same actor.**
+   The slot number is fixed per actor by the SLOTS list above —
+   [character1:小兔子] referenced three times stays [character1:小兔子]
+   all three times. Do NOT invent new slot numbers like [character3:小兔子]
+   for an actor that already has a slot. Each slot maps 1:1 to a
+   reference image, so adding a new slot would break the model's
+   expectation of how many references it has.
 2. **STRUCTURE**: Use this format:
    - Scene setup (environment, lighting, mood)
-   - Character action (what character1/character2/character3 are doing, their expressions, movements)
+   - Character action (what [characterN:name] is doing, their expressions, movements)
    - Camera movement (if applicable)
-3. **DIALOGUE FORMAT**: If the prompt includes dialogue, format it as: 'character1 says: "dialogue content"'
-4. **PRESERVE**: Keep the original intent and emotional tone.
+3. **DIALOGUE FORMAT**: If the prompt includes dialogue, format it as:
+   '[character1:name] says: "dialogue content"'
+4. **PRESERVE INTENT**: Keep the original intent and emotional tone.
 5. **ENHANCE**: Add visual details for dramatic effect (lighting, speed descriptors like "slowly", "rapidly").
 
 # Output Format
 Return STRICTLY a JSON object:
 {{
-    "prompt_cn": "润色后的中文提示词，使用 character1/character2/character3 格式",
-    "prompt_en": "Polished English prompt using character1/character2/character3 format"
+    "prompt_cn": "润色后的中文提示词，保留 [characterN:name] 完整标签",
+    "prompt_en": "Polished English prompt, preserving [characterN:name] tags verbatim"
 }}
 
 # Examples
 
 INPUT: 主角从门里跳出来说话
-SLOTS: character1 = "White rabbit", character2 = "Robot dog"
+SLOTS: character1 = "White rabbit / 小兔子", character2 = "Robot dog / 机械狗"
 OUTPUT:
 {{
-    "prompt_cn": "character1 从门里猛然跳出，落地时耳朵竖起，充满活力。房间昏暗，温暖的光线从尘土飞扬的窗户中透入。character1 兴奋地环顾四周说道：'我正好赶上了！' 镜头随着跳跃略微倾斜。",
-    "prompt_en": "character1 bursts through the door with an exaggerated jump, landing energetically with ears perked up. The room is dimly lit with warm ambient light streaming through dusty windows. character1 looks around excitedly and says: 'I made it just in time!' Camera follows the jump with a slight tilt."
+    "prompt_cn": "[character1:小兔子] 从门里猛然跳出，落地时耳朵竖起，充满活力。房间昏暗，温暖的光线从尘土飞扬的窗户中透入。[character1:小兔子] 兴奋地环顾四周说道：'我正好赶上了！' 镜头随着跳跃略微倾斜。",
+    "prompt_en": "[character1:White rabbit] bursts through the door with an exaggerated jump, landing energetically with ears perked up. The room is dimly lit with warm ambient light streaming through dusty windows. [character1:White rabbit] looks around excitedly and says: 'I made it just in time!' Camera follows the jump with a slight tilt."
 }}""".strip()
 
 class ScriptProcessor:

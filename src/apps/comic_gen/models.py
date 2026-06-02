@@ -415,6 +415,7 @@ class StoryboardFrame(BaseModel):
     preview_video_url: Optional[str] = Field(None, description="Current preview dubbed video (temporary, not committed)")
 
     selected_video_id: Optional[str] = Field(None, description="ID of the selected VideoTask for this frame")
+    is_video_pinned: bool = Field(False, description="True when the user has manually pinned an active video take; auto_select_latest_video skips pinned frames so newly generated takes don't overwrite a hand-picked selection")
     locked: bool = Field(False, description="Whether this frame is locked from regeneration")
     status: GenerationStatus = GenerationStatus.PENDING
     updated_at: float = Field(default_factory=time.time, description="Timestamp of last update")

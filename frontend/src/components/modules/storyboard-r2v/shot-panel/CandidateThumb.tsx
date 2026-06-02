@@ -12,7 +12,7 @@
  * Always shows status; PendingTaskAffordance handles stuck > 60s.
  */
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Star, AlertCircle, Check, Pencil } from "lucide-react";
+import { Loader2, Star, AlertCircle, Check, Pencil, Pin } from "lucide-react";
 import { PendingTaskAffordance } from "@/components/shared/PendingTaskAffordance";
 import PreviewVideo from "@/components/shared/preview/PreviewVideo";
 import type { VideoTask } from "@/lib/api";
@@ -20,6 +20,10 @@ import type { VideoTask } from "@/lib/api";
 interface CandidateThumbProps {
     task: VideoTask;
     isCompareSelected: boolean;
+    /** True when this task is the frame's currently-active take (i.e.
+     *  frame.selected_video_id === task.id). Drives the primary-color
+     *  border + the filled Pin badge state. */
+    isActive?: boolean;
     /** If this task was dubbed, show the dubbed video URL instead. */
     dubbedVideoUrl?: string;
     /** Optional: resolve a URL to display-ready form (asset prefix). */
@@ -27,6 +31,9 @@ interface CandidateThumbProps {
     onClick: (task: VideoTask, modifiers: { shift: boolean; meta: boolean }) => void;
     onToggleStar: (task: VideoTask, next: boolean) => Promise<void> | void;
     onSetLabel: (task: VideoTask, next: string | null) => Promise<void> | void;
+    /** Pin this take as the frame's active video (manual select). When
+     *  omitted the Pin badge is hidden — useful for legacy/I2V flows. */
+    onSetActive?: (task: VideoTask) => Promise<void> | void;
     onCancel?: (task: VideoTask) => Promise<void> | void;
     onRetry?: (task: VideoTask) => Promise<void> | void;
 }
@@ -36,11 +43,13 @@ const MAX_LABEL_LEN = 20;
 export default function CandidateThumb({
     task,
     isCompareSelected,
+    isActive = false,
     dubbedVideoUrl,
     resolveUrl,
     onClick,
     onToggleStar,
     onSetLabel,
+    onSetActive,
     onCancel,
     onRetry,
 }: CandidateThumbProps) {
@@ -93,13 +102,19 @@ export default function CandidateThumb({
                 className={`group relative h-[80px] overflow-hidden rounded-md border bg-black/40 transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-1 focus-visible:ring-offset-black ${
                     isCompareSelected
                         ? "border-status-starred-border ring-2 ring-status-starred-bg"
-                        : isCompleted
-                            ? "border-glass-border hover:border-primary/45"
-                            : isFailed
-                                ? "border-status-failed-border"
-                                : "border-status-pending-border"
+                        : isActive
+                            ? "border-primary ring-1 ring-primary/40 shadow-[0_0_12px_-2px_rgba(100,108,255,0.55)]"
+                            : isCompleted
+                                ? "border-glass-border hover:border-primary/45"
+                                : isFailed
+                                    ? "border-status-failed-border"
+                                    : "border-status-pending-border"
                 }`}
-                title="Click to play · Shift+Click to add to Compare"
+                title={
+                    isActive
+                        ? "Active take · Click to play · Shift+Click to add to Compare"
+                        : "Click to play · Shift+Click to add to Compare"
+                }
             >
                 {/* Thumbnail / preview — Issue 14: routes through PreviewVideo
                     for onError fallback + lightbox affordance. Click thumb
@@ -144,6 +159,39 @@ export default function CandidateThumb({
                         )}
                     </div>
                 )}
+
+                {/* 📌 Set-as-active button (top-right, left of ★).
+                    Hidden for in-flight / failed tasks (nothing to pin
+                    yet). Active state = filled blue badge always visible;
+                    inactive = ghost badge that fades in on hover. */}
+                {onSetActive && isCompleted ? (
+                    <button
+                        type="button"
+                        aria-pressed={isActive}
+                        aria-label={isActive ? "Active take (click to keep pinned)" : "Set as active take"}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            void onSetActive(task);
+                        }}
+                        className="absolute right-[34px] top-0.5 grid h-7 w-7 place-items-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                    >
+                        <span
+                            aria-hidden="true"
+                            className={`grid h-[22px] w-[22px] place-items-center rounded-full border transition-all duration-fast ease-out-quart active:scale-90 ${
+                                isActive
+                                    ? "border-primary bg-primary/85 text-white shadow-[0_0_10px_-2px_rgba(100,108,255,0.7)]"
+                                    : "border-white/15 bg-black/55 text-white/70 opacity-0 group-hover:opacity-100 hover:text-primary"
+                            }`}
+                        >
+                            <Pin
+                                size={11}
+                                aria-hidden="true"
+                                fill={isActive ? "currentColor" : "none"}
+                                strokeWidth={isActive ? 0 : 1.5}
+                            />
+                        </span>
+                    </button>
+                ) : null}
 
                 {/* ★ toggle top-right — always visible per design grill.
                     28×28 hit area (P0-1) via wrapper padding; visual
