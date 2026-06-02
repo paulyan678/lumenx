@@ -194,18 +194,27 @@ export default function ShotCard({
     const currentProjectId = useProjectStore((state) => state.currentProject?.id);
     // r2vSlots — when R2V tab is active, derive slot context from
     // @character references in the prompt so the polish system
-    // prompt knows what character1/character2 ID maps to.
+    // prompt knows what character1/character2 ID maps to. Dedup by
+    // slot number (first-seen wins) and sort ascending so the list
+    // index aligns with HappyHorse's characterN positional mapping.
+    // Backend polish_r2v_prompt re-numbers with enumerate(slots),
+    // which only matches the prompt's characterN tags when slots
+    // are unique and ordered.
     const r2vSlots = useCallback((): { description: string }[] => {
         if (shot.tabMode !== "direct_r2v") return [];
-        const out: { description: string }[] = [];
-        const tagPattern = /\[character\d+:([^\]]+)\]/g;
+        const bySlot = new Map<number, string>();
+        const tagPattern = /\[character(\d+):([^\]]+)\]/g;
         let match;
         while ((match = tagPattern.exec(shot.prompt)) !== null) {
-            const [, name] = match;
+            const slotN = parseInt(match[1], 10);
+            if (bySlot.has(slotN)) continue;
+            const name = match[2];
             const char = characters.find((c: any) => c.name === name);
-            out.push({ description: char?.description ? `${name}: ${char.description}` : name });
+            bySlot.set(slotN, char?.description ? `${name}: ${char.description}` : name);
         }
-        return out;
+        return Array.from(bySlot.entries())
+            .sort((a, b) => a[0] - b[0])
+            .map(([, description]) => ({ description }));
     }, [shot.tabMode, shot.prompt, characters])();
 
     // polishImageUrls — feed vision-capable polish (Issue 13) with the
@@ -444,20 +453,37 @@ export default function ShotCard({
 
     const handleInsertAssetFromChip = (_type: string, name: string) => {
         const currentPrompt = shot.prompt;
-        // Repeats allowed: narrative scenes ("A 看着自己的影子") map the
-        // same actor into multiple slots, and backend r2v polish keys off
-        // characterN slot index — character1/character2 both naming the
-        // same actor resolve to two reference inputs as intended.
+        // Each unique character gets one fixed slot number throughout this
+        // prompt: slot N → reference_image_urls[N-1] in HappyHorse R2V, so
+        // referencing the same actor twice must reuse the same slot —
+        // otherwise the model would expect two separate reference images.
+        // Examples:
+        //   first @小兔子 → [character1:小兔子]
+        //   then @小狗 → [character2:小狗]
+        //   then @小兔子 again → [character1:小兔子]   (reuse, NOT [character3:…])
+        const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const existingTagRe = new RegExp(`\\[character(\\d+):${escapedName}\\]`);
+        const existingMatch = currentPrompt.match(existingTagRe);
 
-        // Find the next available characterN slot
-        const usedNums: number[] = [];
-        const slotRe = /\[character(\d+):/g;
-        let m;
-        while ((m = slotRe.exec(currentPrompt)) !== null) {
-            usedNums.push(parseInt(m[1], 10));
+        let slot: number;
+        if (existingMatch) {
+            slot = parseInt(existingMatch[1], 10);
+        } else {
+            // Map of (slot → name) already in the prompt; first-seen wins
+            // per slot so accidental dup tags don't inflate the count.
+            const usedSlotByName = new Map<number, string>();
+            const slotRe = /\[character(\d+):([^\]]+)\]/g;
+            let m;
+            while ((m = slotRe.exec(currentPrompt)) !== null) {
+                const slotN = parseInt(m[1], 10);
+                if (!usedSlotByName.has(slotN)) {
+                    usedSlotByName.set(slotN, m[2]);
+                }
+            }
+            const usedSlots = Array.from(usedSlotByName.keys());
+            slot = usedSlots.length > 0 ? Math.max(...usedSlots) + 1 : 1;
         }
-        const nextSlot = usedNums.length > 0 ? Math.max(...usedNums) + 1 : 1;
-        const tag = `[character${nextSlot}:${name}]`;
+        const tag = `[character${slot}:${name}]`;
 
         const textarea = textareaRef.current;
         if (textarea) {

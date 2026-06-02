@@ -739,11 +739,19 @@ export default function StoryboardR2V() {
         // HappyHorse uses [characterN:name] as generic reference-image slots.
         // N determines the position in the URL array: character1 → image[0], etc.
         // The "name" can be a character, scene, or prop — we look up all three.
+        // Dedup by slot number (first-seen wins): the same slot referenced
+        // multiple times in the prompt still corresponds to one reference
+        // image, so [character1:小兔子] used twice resolves to one URL slot
+        // not two. Without this, model expectations (characterN → URL[N-1])
+        // would shift right and downstream slots would point to the wrong
+        // images.
+        const seenSlot = new Set<number>();
         const slots: { idx: number; url: string }[] = [];
         const tagPattern = /\[character(\d+):([^\]]+)\]/g;
         let match;
         while ((match = tagPattern.exec(prompt)) !== null) {
             const slotNum = parseInt(match[1], 10);
+            if (seenSlot.has(slotNum)) continue;
             const name = match[2];
             let url: string | undefined;
 
@@ -781,7 +789,10 @@ export default function StoryboardR2V() {
                 }
             }
 
-            if (url) slots.push({ idx: slotNum, url });
+            if (url) {
+                slots.push({ idx: slotNum, url });
+                seenSlot.add(slotNum);
+            }
         }
         // Sort by slot number so URL array matches HappyHorse's positional mapping
         slots.sort((a, b) => a.idx - b.idx);

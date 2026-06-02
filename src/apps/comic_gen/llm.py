@@ -206,6 +206,13 @@ Rewrite the user's input prompt into a structured format strictly following thes
    character names that match a SLOTS entry, convert them to the full
    [characterN:name] form on first reference; subsequent references in
    the same prompt may reuse the full tag.
+   **REUSE the same slot number for every mention of the same actor.**
+   The slot number is fixed per actor by the SLOTS list above —
+   [character1:小兔子] referenced three times stays [character1:小兔子]
+   all three times. Do NOT invent new slot numbers like [character3:小兔子]
+   for an actor that already has a slot. Each slot maps 1:1 to a
+   reference image, so adding a new slot would break the model's
+   expectation of how many references it has.
 2. **STRUCTURE**: Use this format:
    - Scene setup (environment, lighting, mood)
    - Character action (what [characterN:name] is doing, their expressions, movements)
