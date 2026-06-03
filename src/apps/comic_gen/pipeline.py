@@ -1940,20 +1940,22 @@ class ComicGenPipeline:
         
         # If R2V mode is selected, use the appropriate R2V model
         if generation_mode == "r2v":
-            if model and model.startswith("happyhorse-"):
-                model = "happyhorse-1.0-r2v"
-            elif model and model.startswith("wan2.7-"):
-                model = "wan2.7-r2v"
-            elif model and model.startswith("kling"):
-                model = "kling-v3-r2v"
-            elif model and model.startswith("pixverse"):
-                model = "pixverse-c1-r2v"
-            elif model and model.startswith("vidu"):
-                model = "viduq3-pro-r2v"
-            elif model and model.startswith("seedance"):
-                model = "seedance-2.0-r2v"
-            else:
-                model = "wan2.7-r2v"
+            # Skip auto-switch if user already selected an R2V model directly
+            if not (model and model.endswith("-r2v")):
+                if model and model.startswith("happyhorse-"):
+                    model = "happyhorse-1.0-r2v"
+                elif model and model.startswith("wan2.7-"):
+                    model = "wan2.7-r2v"
+                elif model and model.startswith("kling"):
+                    model = "kling-v3-r2v"
+                elif model and model.startswith("pixverse"):
+                    model = "pixverse-c1-r2v"
+                elif model and model.startswith("vidu"):
+                    model = "viduq3-pro-r2v"
+                elif model and model.startswith("seedance"):
+                    model = "seedance-2.0-r2v"
+                else:
+                    model = "wan2.7-r2v"
 
         # Defensive guard against model⇄mode⇄refs mismatch. Every R2V
         # model needs reference inputs; without them the underlying
@@ -3029,7 +3031,7 @@ class ComicGenPipeline:
             prompt=prompt or f"Cinematic shot of {target_asset.name}",
             status="pending",
             duration=duration,
-            model="wan2.6-r2v", # Force R2V model
+            model=script.model_settings.r2v_model if hasattr(script.model_settings, 'r2v_model') and script.model_settings.r2v_model else "wan2.7-r2v",
             created_at=time.time()
         )
         

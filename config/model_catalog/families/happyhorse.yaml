@@ -69,12 +69,23 @@ models:
         legacy_id: happyhorse-1.0-r2v
         display_name: HappyHorse R2V
         description: Reference images to video generation
-        status: hidden
         capabilities: [r2v]
         ui:
-          selection_group: i2v
-          visible_in: []
-          order: 10
+          selection_group: r2v
+          visible_in: [project_settings, series_settings, video_sidebar, global_settings]
+          order: 80
+        duration:
+          type: slider
+          min: 3
+          max: 15
+          step: 1
+          default: 5
+        params:
+          resolution:
+            options: [720p, 1080p]
+            default: 1080p
+          seed: true
+          watermark: true
   # Standalone: T2V (hidden)
   - id: happyhorse-1.0-t2v
     display_name: HappyHorse T2V

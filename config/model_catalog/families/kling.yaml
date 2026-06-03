@@ -91,15 +91,29 @@ models:
         legacy_id: kling-v3-r2v
         display_name: Kling V3 R2V
         description: Reference-based video generation with multi-modal input
-        status: hidden
         capabilities: [r2v]
         runtime:
           dashscope:
             api_model_id: kling/kling-v3-omni-video-generation
         ui:
-          selection_group: i2v
-          visible_in: []
-          order: 10
+          selection_group: r2v
+          visible_in: [project_settings, series_settings, video_sidebar, global_settings]
+          order: 80
+        duration:
+          type: slider
+          min: 3
+          max: 15
+          step: 1
+          default: 5
+        params:
+          negativePrompt: true
+          mode:
+            options: [std, pro]
+            default: std
+          aspectRatio:
+            options: ["16:9", "9:16", "1:1"]
+            default: "16:9"
+          watermark: true
         inputs:
           reference_images:
             max: 9

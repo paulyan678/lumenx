@@ -118,16 +118,23 @@ models:
         legacy_id: wan2.7-r2v
         display_name: Wan 2.7 R2V
         description: Reference images to video generation with multi-image support
-        status: hidden
         capabilities: [r2v]
         ui:
-          selection_group: i2v
-          visible_in: []
-          # Order 20 (above wan2.6-r2v's 10) so the frontend
-          # R2V_ROUTE_MAP[wan] resolves to wan2.7-r2v rather than the
-          # legacy wan2.6 entry, and the R2V picker displays "Wan 2.7
-          # R2V" by default.
-          order: 20
+          selection_group: r2v
+          visible_in: [project_settings, series_settings, video_sidebar, global_settings]
+          order: 80
+        duration:
+          type: slider
+          min: 3
+          max: 15
+          step: 1
+          default: 5
+        params:
+          resolution:
+            options: [720p, 1080p]
+            default: 1080p
+          seed: true
+          watermark: true
         inputs:
           reference_images:
             max: 5

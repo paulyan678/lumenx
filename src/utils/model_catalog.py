@@ -8,13 +8,14 @@ import yaml
 
 SUPPORTED_PROVIDER_BACKENDS = ("dashscope", "vendor", "mulerouter")
 SUPPORTED_MODEL_STATUSES = ("active", "planned", "deprecated", "hidden")
-SUPPORTED_SELECTION_GROUPS = ("t2i", "i2i", "image", "i2v")
+SUPPORTED_SELECTION_GROUPS = ("t2i", "i2i", "image", "i2v", "r2v")
 VISIBLE_MODEL_SURFACES = ("project_settings", "series_settings", "video_sidebar", "global_settings")
 DEFAULT_MODEL_SURFACE_REQUIREMENTS = {
     "t2i_model": ("project_settings", "series_settings", "global_settings"),
     "i2i_model": ("project_settings", "series_settings", "global_settings"),
     "image_model": ("project_settings", "series_settings", "global_settings"),
     "i2v_model": ("project_settings", "series_settings", "video_sidebar", "global_settings"),
+    "r2v_model": ("project_settings", "series_settings", "video_sidebar", "global_settings"),
 }
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -34,6 +35,7 @@ class DefaultModelSettings:
     i2i_model: str
     image_model: str
     i2v_model: str
+    r2v_model: str
 
 
 @dataclass(frozen=True)
@@ -376,6 +378,10 @@ def build_catalog_dict(catalog_root: Optional[Path] = None) -> Dict[str, Any]:
     image_default = _require_non_empty_str(
         default_model_settings.get("image_model"),
         label="defaults.model_settings.image_model",
+    )
+    r2v_default = _require_non_empty_str(
+        default_model_settings.get("r2v_model"),
+        label="defaults.model_settings.r2v_model",
     )
 
     families: Dict[str, Dict[str, Any]] = {}
@@ -860,7 +866,7 @@ def build_catalog_dict(catalog_root: Optional[Path] = None) -> Dict[str, Any]:
                 legacy_model_id=model_id,
             )
 
-    for model_id in (t2i_default, i2i_default, image_default, i2v_default):
+    for model_id in (t2i_default, i2i_default, image_default, i2v_default, r2v_default):
         if model_id not in models:
             raise ValueError(f"Default model '{model_id}' is missing from the catalog")
 
@@ -875,6 +881,7 @@ def build_catalog_dict(catalog_root: Optional[Path] = None) -> Dict[str, Any]:
         "i2i_model": legacy_model_ids[i2i_default],
         "image_model": legacy_model_ids[image_default],
         "i2v_model": legacy_model_ids[i2v_default],
+        "r2v_model": legacy_model_ids[r2v_default],
     }
 
     return {
@@ -885,6 +892,7 @@ def build_catalog_dict(catalog_root: Optional[Path] = None) -> Dict[str, Any]:
                 "i2i_model": i2i_default,
                 "image_model": image_default,
                 "i2v_model": i2v_default,
+                "r2v_model": r2v_default,
             },
             "canonical_model_settings": canonical_defaults,
         },
@@ -1061,6 +1069,7 @@ def get_default_model_settings(catalog_root: Optional[Path] = None) -> DefaultMo
         i2i_model=defaults["i2i_model"],
         image_model=defaults["image_model"],
         i2v_model=defaults["i2v_model"],
+        r2v_model=defaults["r2v_model"],
     )
 
 

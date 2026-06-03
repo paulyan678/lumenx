@@ -89,11 +89,26 @@ models:
         display_name: Seedance 2.0 R2V
         description: Reference-to-video with multi-image input
         capabilities: [r2v]
-        status: hidden
         ui:
-          selection_group: i2v
-          visible_in: []
-          order: 10
+          selection_group: r2v
+          visible_in: [project_settings, series_settings, video_sidebar, global_settings]
+          order: 80
+          badges: [new]
+        duration:
+          type: slider
+          min: 4
+          max: 15
+          step: 1
+          default: 5
+        params:
+          resolution:
+            options: [720p, 1080p]
+            default: 1080p
+          seed: true
+          watermark: true
+        docs:
+          context_hub_doc_ids:
+            - mulerouter/seedance-2.0
         inputs:
           reference_images:
             max: 9

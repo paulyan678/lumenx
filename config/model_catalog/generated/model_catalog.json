@@ -11,7 +11,7 @@
       "pixverse-c1-i2v": "pixverse/pixverse-c1-video#i2v",
       "pixverse-c1-r2v": "pixverse/pixverse-c1-video#r2v",
       "pixverse-v4-i2v": "pixverse/pixverse-v4-i2v#i2v",
-      "pixverse-v5.6-r2v": "pixverse/pixverse-v5.6-r2v#i2v",
+      "pixverse-v5.6-r2v": "pixverse/pixverse-v5.6-r2v#r2v",
       "pixverse/pixverse-v6-video": "pixverse/pixverse/pixverse-v6-video#i2v",
       "qwen-image-2.0": "qwen/qwen-image-2.0#image",
       "qwen-image-2.0-pro": "qwen/qwen-image-2.0-pro#image",
@@ -47,12 +47,14 @@
       "i2i_model": "wan/wan2.7-image-pro#image",
       "i2v_model": "happyhorse/happyhorse-1.0-video#i2v",
       "image_model": "wan/wan2.7-image-pro#image",
+      "r2v_model": "wan/wan2.7-video#r2v",
       "t2i_model": "wan/wan2.7-image-pro#image"
     },
     "model_settings": {
       "i2i_model": "wan2.7-image-pro",
       "i2v_model": "happyhorse-1.0-i2v",
       "image_model": "wan2.7-image-pro",
+      "r2v_model": "wan2.7-r2v",
       "t2i_model": "wan2.7-image-pro"
     }
   },
@@ -875,7 +877,7 @@
         "pixverse-v5.6-r2v"
       ],
       "modes": [
-        "pixverse/pixverse-v5.6-r2v#i2v"
+        "pixverse/pixverse-v5.6-r2v#r2v"
       ],
       "provider": "pixverse",
       "release_stage": "stable",
@@ -889,7 +891,7 @@
           "gateway": "dashscope"
         }
       },
-      "status": "hidden",
+      "status": "active",
       "supported_backends": [
         "dashscope"
       ],
@@ -2294,17 +2296,33 @@
           "aliyun/happyhorse/2026-04-28"
         ]
       },
-      "duration": null,
+      "duration": {
+        "default": 5,
+        "max": 15,
+        "min": 3,
+        "step": 1,
+        "type": "slider"
+      },
       "family": "happyhorse",
       "id": "happyhorse-1.0-r2v",
       "inputs": {},
-      "params": {},
+      "params": {
+        "resolution": {
+          "default": "1080p",
+          "options": [
+            "720p",
+            "1080p"
+          ]
+        },
+        "seed": true,
+        "watermark": true
+      },
       "provider": "aliyun",
       "release_stage": "stable",
       "routing_prefixes": [
         "happyhorse-1.0-"
       ],
-      "status": "hidden",
+      "status": "active",
       "supported_backends": [
         "dashscope"
       ],
@@ -2321,10 +2339,15 @@
       },
       "ui": {
         "badges": [],
-        "order": 10,
+        "order": 80,
         "recommended": false,
-        "selection_group": "i2v",
-        "visible_in": []
+        "selection_group": "r2v",
+        "visible_in": [
+          "project_settings",
+          "series_settings",
+          "video_sidebar",
+          "global_settings"
+        ]
       }
     },
     "happyhorse-1.0-t2v": {
@@ -2588,7 +2611,13 @@
           "kling/2026-04-25"
         ]
       },
-      "duration": null,
+      "duration": {
+        "default": 5,
+        "max": 15,
+        "min": 3,
+        "step": 1,
+        "type": "slider"
+      },
       "family": "kling",
       "id": "kling-v3-r2v",
       "inputs": {
@@ -2597,14 +2626,32 @@
           "reference_type": "image"
         }
       },
-      "params": {},
+      "params": {
+        "aspectRatio": {
+          "default": "16:9",
+          "options": [
+            "16:9",
+            "9:16",
+            "1:1"
+          ]
+        },
+        "mode": {
+          "default": "std",
+          "options": [
+            "std",
+            "pro"
+          ]
+        },
+        "negativePrompt": true,
+        "watermark": true
+      },
       "provider": "kling",
       "release_stage": "stable",
       "routing_prefixes": [
         "kling-",
         "kling/kling-"
       ],
-      "status": "hidden",
+      "status": "active",
       "supported_backends": [
         "dashscope",
         "vendor"
@@ -2625,10 +2672,15 @@
       },
       "ui": {
         "badges": [],
-        "order": 10,
+        "order": 80,
         "recommended": false,
-        "selection_group": "i2v",
-        "visible_in": []
+        "selection_group": "r2v",
+        "visible_in": [
+          "project_settings",
+          "series_settings",
+          "video_sidebar",
+          "global_settings"
+        ]
       }
     },
     "pixverse-c1-i2v": {
@@ -2736,7 +2788,13 @@
           "pixverse/2026-04-25"
         ]
       },
-      "duration": null,
+      "duration": {
+        "default": 5,
+        "max": 8,
+        "min": 3,
+        "step": 1,
+        "type": "slider"
+      },
       "family": "pixverse",
       "id": "pixverse-c1-r2v",
       "inputs": {
@@ -2745,14 +2803,23 @@
           "reference_type": "image"
         }
       },
-      "params": {},
+      "params": {
+        "resolution": {
+          "default": "720p",
+          "options": [
+            "720p",
+            "1080p"
+          ]
+        },
+        "seed": true
+      },
       "provider": "pixverse",
       "release_stage": "stable",
       "routing_prefixes": [
         "pixverse-",
         "pixverse/pixverse-"
       ],
-      "status": "hidden",
+      "status": "active",
       "supported_backends": [
         "dashscope"
       ],
@@ -2769,10 +2836,15 @@
       },
       "ui": {
         "badges": [],
-        "order": 10,
+        "order": 70,
         "recommended": false,
-        "selection_group": "i2v",
-        "visible_in": []
+        "selection_group": "r2v",
+        "visible_in": [
+          "project_settings",
+          "series_settings",
+          "video_sidebar",
+          "global_settings"
+        ]
       }
     },
     "pixverse-v4-i2v": {
@@ -2851,7 +2923,13 @@
           "pixverse/2026-04-25"
         ]
       },
-      "duration": null,
+      "duration": {
+        "default": 5,
+        "max": 8,
+        "min": 3,
+        "step": 1,
+        "type": "slider"
+      },
       "family": "pixverse",
       "id": "pixverse-v5.6-r2v",
       "inputs": {
@@ -2860,14 +2938,23 @@
           "reference_type": "image"
         }
       },
-      "params": {},
+      "params": {
+        "resolution": {
+          "default": "720p",
+          "options": [
+            "720p",
+            "1080p"
+          ]
+        },
+        "seed": true
+      },
       "provider": "pixverse",
       "release_stage": "stable",
       "routing_prefixes": [
         "pixverse-",
         "pixverse/pixverse-"
       ],
-      "status": "hidden",
+      "status": "active",
       "supported_backends": [
         "dashscope"
       ],
@@ -2884,10 +2971,15 @@
       },
       "ui": {
         "badges": [],
-        "order": 5,
+        "order": 70,
         "recommended": false,
-        "selection_group": "i2v",
-        "visible_in": []
+        "selection_group": "r2v",
+        "visible_in": [
+          "project_settings",
+          "series_settings",
+          "video_sidebar",
+          "global_settings"
+        ]
       }
     },
     "pixverse/pixverse-v6-video": {
@@ -3217,7 +3309,13 @@
           "mulerouter/seedance-2.0/2026-06-03"
         ]
       },
-      "duration": null,
+      "duration": {
+        "default": 5,
+        "max": 15,
+        "min": 4,
+        "step": 1,
+        "type": "slider"
+      },
       "family": "seedance",
       "id": "seedance-2.0-r2v",
       "inputs": {
@@ -3226,14 +3324,24 @@
           "reference_type": "image"
         }
       },
-      "params": {},
+      "params": {
+        "resolution": {
+          "default": "1080p",
+          "options": [
+            "720p",
+            "1080p"
+          ]
+        },
+        "seed": true,
+        "watermark": true
+      },
       "provider": "mulerouter",
       "release_stage": "stable",
       "routing_prefixes": [
         "seedance-2.0-",
         "seedance/seedance-"
       ],
-      "status": "hidden",
+      "status": "active",
       "supported_backends": [
         "mulerouter"
       ],
@@ -3249,11 +3357,18 @@
         }
       },
       "ui": {
-        "badges": [],
-        "order": 10,
+        "badges": [
+          "new"
+        ],
+        "order": 80,
         "recommended": false,
-        "selection_group": "i2v",
-        "visible_in": []
+        "selection_group": "r2v",
+        "visible_in": [
+          "project_settings",
+          "series_settings",
+          "video_sidebar",
+          "global_settings"
+        ]
       }
     },
     "seedance-2.0-t2v": {
@@ -3461,7 +3576,13 @@
           "vidu/2026-04-25"
         ]
       },
-      "duration": null,
+      "duration": {
+        "default": 5,
+        "max": 16,
+        "min": 1,
+        "step": 1,
+        "type": "slider"
+      },
       "family": "vidu",
       "id": "viduq3-pro-r2v",
       "inputs": {
@@ -3470,14 +3591,25 @@
           "reference_type": "image"
         }
       },
-      "params": {},
+      "params": {
+        "resolution": {
+          "default": "720p",
+          "options": [
+            "540p",
+            "720p",
+            "1080p"
+          ]
+        },
+        "seed": true,
+        "watermark": true
+      },
       "provider": "vidu",
       "release_stage": "stable",
       "routing_prefixes": [
         "vidu",
         "vidu/vidu"
       ],
-      "status": "hidden",
+      "status": "active",
       "supported_backends": [
         "dashscope",
         "vendor"
@@ -3498,10 +3630,15 @@
       },
       "ui": {
         "badges": [],
-        "order": 10,
+        "order": 75,
         "recommended": false,
-        "selection_group": "i2v",
-        "visible_in": []
+        "selection_group": "r2v",
+        "visible_in": [
+          "project_settings",
+          "series_settings",
+          "video_sidebar",
+          "global_settings"
+        ]
       }
     },
     "viduq3-turbo-i2v": {
@@ -3629,7 +3766,13 @@
           "vidu/2026-04-25"
         ]
       },
-      "duration": null,
+      "duration": {
+        "default": 5,
+        "max": 16,
+        "min": 1,
+        "step": 1,
+        "type": "slider"
+      },
       "family": "vidu",
       "id": "viduq3-turbo-r2v",
       "inputs": {
@@ -3638,14 +3781,25 @@
           "reference_type": "image"
         }
       },
-      "params": {},
+      "params": {
+        "resolution": {
+          "default": "720p",
+          "options": [
+            "540p",
+            "720p",
+            "1080p"
+          ]
+        },
+        "seed": true,
+        "watermark": true
+      },
       "provider": "vidu",
       "release_stage": "stable",
       "routing_prefixes": [
         "vidu",
         "vidu/vidu"
       ],
-      "status": "hidden",
+      "status": "active",
       "supported_backends": [
         "dashscope",
         "vendor"
@@ -3666,10 +3820,15 @@
       },
       "ui": {
         "badges": [],
-        "order": 10,
+        "order": 70,
         "recommended": false,
-        "selection_group": "i2v",
-        "visible_in": []
+        "selection_group": "r2v",
+        "visible_in": [
+          "project_settings",
+          "series_settings",
+          "video_sidebar",
+          "global_settings"
+        ]
       }
     },
     "wan2.2-i2v-flash": {
@@ -4720,7 +4879,13 @@
           "aliyun/wan/2026-04-25"
         ]
       },
-      "duration": null,
+      "duration": {
+        "default": 5,
+        "max": 15,
+        "min": 3,
+        "step": 1,
+        "type": "slider"
+      },
       "family": "wan",
       "id": "wan2.7-r2v",
       "inputs": {
@@ -4729,7 +4894,17 @@
           "reference_type": "image"
         }
       },
-      "params": {},
+      "params": {
+        "resolution": {
+          "default": "1080p",
+          "options": [
+            "720p",
+            "1080p"
+          ]
+        },
+        "seed": true,
+        "watermark": true
+      },
       "provider": "aliyun",
       "release_stage": "stable",
       "routing_prefixes": [
@@ -4738,7 +4913,7 @@
         "wan2.6-",
         "wan2.7-"
       ],
-      "status": "hidden",
+      "status": "active",
       "supported_backends": [
         "dashscope"
       ],
@@ -4755,10 +4930,15 @@
       },
       "ui": {
         "badges": [],
-        "order": 20,
+        "order": 80,
         "recommended": false,
-        "selection_group": "i2v",
-        "visible_in": []
+        "selection_group": "r2v",
+        "visible_in": [
+          "project_settings",
+          "series_settings",
+          "video_sidebar",
+          "global_settings"
+        ]
       }
     },
     "wan2.7-t2v": {
@@ -5127,14 +5307,30 @@
           "aliyun/happyhorse/2026-04-28"
         ]
       },
-      "duration": null,
+      "duration": {
+        "default": 5,
+        "max": 15,
+        "min": 3,
+        "step": 1,
+        "type": "slider"
+      },
       "family": "happyhorse",
       "id": "happyhorse/happyhorse-1.0-video#r2v",
       "inputs": {},
       "legacy_model_id": "happyhorse-1.0-r2v",
       "mode": "r2v",
       "model_line_id": "happyhorse/happyhorse-1.0-video",
-      "params": {},
+      "params": {
+        "resolution": {
+          "default": "1080p",
+          "options": [
+            "720p",
+            "1080p"
+          ]
+        },
+        "seed": true,
+        "watermark": true
+      },
       "provider": "aliyun",
       "release_stage": "stable",
       "routing_prefixes": [
@@ -5145,7 +5341,7 @@
           "gateway": "dashscope"
         }
       },
-      "status": "hidden",
+      "status": "active",
       "supported_backends": [
         "dashscope"
       ],
@@ -5162,10 +5358,15 @@
       },
       "ui": {
         "badges": [],
-        "order": 10,
+        "order": 80,
         "recommended": false,
-        "selection_group": "i2v",
-        "visible_in": []
+        "selection_group": "r2v",
+        "visible_in": [
+          "project_settings",
+          "series_settings",
+          "video_sidebar",
+          "global_settings"
+        ]
       }
     },
     "happyhorse/happyhorse-1.0-video-edit#i2v": {
@@ -5382,7 +5583,13 @@
           "kling/2026-04-25"
         ]
       },
-      "duration": null,
+      "duration": {
+        "default": 5,
+        "max": 15,
+        "min": 3,
+        "step": 1,
+        "type": "slider"
+      },
       "family": "kling",
       "id": "kling/kling-v3-video#r2v",
       "inputs": {
@@ -5394,7 +5601,25 @@
       "legacy_model_id": "kling-v3-r2v",
       "mode": "r2v",
       "model_line_id": "kling/kling-v3-video",
-      "params": {},
+      "params": {
+        "aspectRatio": {
+          "default": "16:9",
+          "options": [
+            "16:9",
+            "9:16",
+            "1:1"
+          ]
+        },
+        "mode": {
+          "default": "std",
+          "options": [
+            "std",
+            "pro"
+          ]
+        },
+        "negativePrompt": true,
+        "watermark": true
+      },
       "provider": "kling",
       "release_stage": "stable",
       "routing_prefixes": [
@@ -5410,7 +5635,7 @@
           "gateway": "kling"
         }
       },
-      "status": "hidden",
+      "status": "active",
       "supported_backends": [
         "dashscope",
         "vendor"
@@ -5431,10 +5656,15 @@
       },
       "ui": {
         "badges": [],
-        "order": 10,
+        "order": 80,
         "recommended": false,
-        "selection_group": "i2v",
-        "visible_in": []
+        "selection_group": "r2v",
+        "visible_in": [
+          "project_settings",
+          "series_settings",
+          "video_sidebar",
+          "global_settings"
+        ]
       }
     },
     "pixverse/pixverse-c1-video#i2v": {
@@ -5551,7 +5781,13 @@
           "pixverse/2026-04-25"
         ]
       },
-      "duration": null,
+      "duration": {
+        "default": 5,
+        "max": 8,
+        "min": 3,
+        "step": 1,
+        "type": "slider"
+      },
       "family": "pixverse",
       "id": "pixverse/pixverse-c1-video#r2v",
       "inputs": {
@@ -5563,7 +5799,16 @@
       "legacy_model_id": "pixverse-c1-r2v",
       "mode": "r2v",
       "model_line_id": "pixverse/pixverse-c1-video",
-      "params": {},
+      "params": {
+        "resolution": {
+          "default": "720p",
+          "options": [
+            "720p",
+            "1080p"
+          ]
+        },
+        "seed": true
+      },
       "provider": "pixverse",
       "release_stage": "stable",
       "routing_prefixes": [
@@ -5576,7 +5821,7 @@
           "gateway": "dashscope"
         }
       },
-      "status": "hidden",
+      "status": "active",
       "supported_backends": [
         "dashscope"
       ],
@@ -5593,10 +5838,15 @@
       },
       "ui": {
         "badges": [],
-        "order": 10,
+        "order": 70,
         "recommended": false,
-        "selection_group": "i2v",
-        "visible_in": []
+        "selection_group": "r2v",
+        "visible_in": [
+          "project_settings",
+          "series_settings",
+          "video_sidebar",
+          "global_settings"
+        ]
       }
     },
     "pixverse/pixverse-v4-i2v#i2v": {
@@ -5658,7 +5908,7 @@
         "visible_in": []
       }
     },
-    "pixverse/pixverse-v5.6-r2v#i2v": {
+    "pixverse/pixverse-v5.6-r2v#r2v": {
       "backend_env_key": null,
       "capabilities": [
         "r2v"
@@ -5679,9 +5929,15 @@
           "pixverse/2026-04-25"
         ]
       },
-      "duration": null,
+      "duration": {
+        "default": 5,
+        "max": 8,
+        "min": 3,
+        "step": 1,
+        "type": "slider"
+      },
       "family": "pixverse",
-      "id": "pixverse/pixverse-v5.6-r2v#i2v",
+      "id": "pixverse/pixverse-v5.6-r2v#r2v",
       "inputs": {
         "reference_images": {
           "max": 7,
@@ -5689,9 +5945,18 @@
         }
       },
       "legacy_model_id": "pixverse-v5.6-r2v",
-      "mode": "i2v",
+      "mode": "r2v",
       "model_line_id": "pixverse/pixverse-v5.6-r2v",
-      "params": {},
+      "params": {
+        "resolution": {
+          "default": "720p",
+          "options": [
+            "720p",
+            "1080p"
+          ]
+        },
+        "seed": true
+      },
       "provider": "pixverse",
       "release_stage": "stable",
       "routing_prefixes": [
@@ -5704,7 +5969,7 @@
           "gateway": "dashscope"
         }
       },
-      "status": "hidden",
+      "status": "active",
       "supported_backends": [
         "dashscope"
       ],
@@ -5721,10 +5986,15 @@
       },
       "ui": {
         "badges": [],
-        "order": 5,
+        "order": 70,
         "recommended": false,
-        "selection_group": "i2v",
-        "visible_in": []
+        "selection_group": "r2v",
+        "visible_in": [
+          "project_settings",
+          "series_settings",
+          "video_sidebar",
+          "global_settings"
+        ]
       }
     },
     "pixverse/pixverse/pixverse-v6-video#i2v": {
@@ -6089,7 +6359,13 @@
           "mulerouter/seedance-2.0/2026-06-03"
         ]
       },
-      "duration": null,
+      "duration": {
+        "default": 5,
+        "max": 15,
+        "min": 4,
+        "step": 1,
+        "type": "slider"
+      },
       "family": "seedance",
       "id": "seedance/seedance-2.0-video#r2v",
       "inputs": {
@@ -6101,7 +6377,17 @@
       "legacy_model_id": "seedance-2.0-r2v",
       "mode": "r2v",
       "model_line_id": "seedance/seedance-2.0-video",
-      "params": {},
+      "params": {
+        "resolution": {
+          "default": "1080p",
+          "options": [
+            "720p",
+            "1080p"
+          ]
+        },
+        "seed": true,
+        "watermark": true
+      },
       "provider": "mulerouter",
       "release_stage": "stable",
       "routing_prefixes": [
@@ -6113,7 +6399,7 @@
           "gateway": "mulerouter"
         }
       },
-      "status": "hidden",
+      "status": "active",
       "supported_backends": [
         "mulerouter"
       ],
@@ -6129,11 +6415,18 @@
         }
       },
       "ui": {
-        "badges": [],
-        "order": 10,
+        "badges": [
+          "new"
+        ],
+        "order": 80,
         "recommended": false,
-        "selection_group": "i2v",
-        "visible_in": []
+        "selection_group": "r2v",
+        "visible_in": [
+          "project_settings",
+          "series_settings",
+          "video_sidebar",
+          "global_settings"
+        ]
       }
     },
     "seedance/seedance-2.0-video#t2v": {
@@ -6361,7 +6654,13 @@
           "vidu/2026-04-25"
         ]
       },
-      "duration": null,
+      "duration": {
+        "default": 5,
+        "max": 16,
+        "min": 1,
+        "step": 1,
+        "type": "slider"
+      },
       "family": "vidu",
       "id": "vidu/viduq3-pro-video#r2v",
       "inputs": {
@@ -6373,7 +6672,18 @@
       "legacy_model_id": "viduq3-pro-r2v",
       "mode": "r2v",
       "model_line_id": "vidu/viduq3-pro-video",
-      "params": {},
+      "params": {
+        "resolution": {
+          "default": "720p",
+          "options": [
+            "540p",
+            "720p",
+            "1080p"
+          ]
+        },
+        "seed": true,
+        "watermark": true
+      },
       "provider": "vidu",
       "release_stage": "stable",
       "routing_prefixes": [
@@ -6389,7 +6699,7 @@
           "gateway": "vidu"
         }
       },
-      "status": "hidden",
+      "status": "active",
       "supported_backends": [
         "dashscope",
         "vendor"
@@ -6410,10 +6720,15 @@
       },
       "ui": {
         "badges": [],
-        "order": 10,
+        "order": 75,
         "recommended": false,
-        "selection_group": "i2v",
-        "visible_in": []
+        "selection_group": "r2v",
+        "visible_in": [
+          "project_settings",
+          "series_settings",
+          "video_sidebar",
+          "global_settings"
+        ]
       }
     },
     "vidu/viduq3-turbo-video#i2v": {
@@ -6553,7 +6868,13 @@
           "vidu/2026-04-25"
         ]
       },
-      "duration": null,
+      "duration": {
+        "default": 5,
+        "max": 16,
+        "min": 1,
+        "step": 1,
+        "type": "slider"
+      },
       "family": "vidu",
       "id": "vidu/viduq3-turbo-video#r2v",
       "inputs": {
@@ -6565,7 +6886,18 @@
       "legacy_model_id": "viduq3-turbo-r2v",
       "mode": "r2v",
       "model_line_id": "vidu/viduq3-turbo-video",
-      "params": {},
+      "params": {
+        "resolution": {
+          "default": "720p",
+          "options": [
+            "540p",
+            "720p",
+            "1080p"
+          ]
+        },
+        "seed": true,
+        "watermark": true
+      },
       "provider": "vidu",
       "release_stage": "stable",
       "routing_prefixes": [
@@ -6581,7 +6913,7 @@
           "gateway": "vidu"
         }
       },
-      "status": "hidden",
+      "status": "active",
       "supported_backends": [
         "dashscope",
         "vendor"
@@ -6602,10 +6934,15 @@
       },
       "ui": {
         "badges": [],
-        "order": 10,
+        "order": 70,
         "recommended": false,
-        "selection_group": "i2v",
-        "visible_in": []
+        "selection_group": "r2v",
+        "visible_in": [
+          "project_settings",
+          "series_settings",
+          "video_sidebar",
+          "global_settings"
+        ]
       }
     },
     "wan/wan2.2-i2v-flash#i2v": {
@@ -7738,7 +8075,13 @@
           "aliyun/wan/2026-04-25"
         ]
       },
-      "duration": null,
+      "duration": {
+        "default": 5,
+        "max": 15,
+        "min": 3,
+        "step": 1,
+        "type": "slider"
+      },
       "family": "wan",
       "id": "wan/wan2.7-video#r2v",
       "inputs": {
@@ -7750,7 +8093,17 @@
       "legacy_model_id": "wan2.7-r2v",
       "mode": "r2v",
       "model_line_id": "wan/wan2.7-video",
-      "params": {},
+      "params": {
+        "resolution": {
+          "default": "1080p",
+          "options": [
+            "720p",
+            "1080p"
+          ]
+        },
+        "seed": true,
+        "watermark": true
+      },
       "provider": "aliyun",
       "release_stage": "stable",
       "routing_prefixes": [
@@ -7764,7 +8117,7 @@
           "gateway": "dashscope"
         }
       },
-      "status": "hidden",
+      "status": "active",
       "supported_backends": [
         "dashscope"
       ],
@@ -7781,10 +8134,15 @@
       },
       "ui": {
         "badges": [],
-        "order": 20,
+        "order": 80,
         "recommended": false,
-        "selection_group": "i2v",
-        "visible_in": []
+        "selection_group": "r2v",
+        "visible_in": [
+          "project_settings",
+          "series_settings",
+          "video_sidebar",
+          "global_settings"
+        ]
       }
     },
     "wan/wan2.7-video#t2v": {

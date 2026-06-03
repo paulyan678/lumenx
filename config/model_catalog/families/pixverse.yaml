@@ -107,15 +107,25 @@ models:
         legacy_id: pixverse-c1-r2v
         display_name: PixVerse C1 R2V
         description: PixVerse C1 reference-to-video with multi-image support
-        status: hidden
         capabilities: [r2v]
         runtime:
           dashscope:
             api_model_id: pixverse/pixverse-c1-r2v
         ui:
-          selection_group: i2v
-          visible_in: []
-          order: 10
+          selection_group: r2v
+          visible_in: [project_settings, series_settings, video_sidebar, global_settings]
+          order: 70
+        duration:
+          type: slider
+          min: 3
+          max: 8
+          step: 1
+          default: 5
+        params:
+          resolution:
+            options: [720p, 1080p]
+            default: 720p
+          seed: true
         inputs:
           reference_images:
             max: 7
@@ -124,7 +134,7 @@ models:
   - id: pixverse-v5.6-r2v
     display_name: PixVerse V5.6 R2V
     description: PixVerse V5.6 reference-to-video
-    status: hidden
+    status: active
     release_stage: stable
     capabilities: [r2v]
     runtime:
@@ -134,9 +144,20 @@ models:
     docs:
       context_hub_doc_ids: [pixverse/dashscope-proxy]
     ui:
-      selection_group: i2v
-      visible_in: []
-      order: 5
+      selection_group: r2v
+      visible_in: [project_settings, series_settings, video_sidebar, global_settings]
+      order: 70
+    duration:
+      type: slider
+      min: 3
+      max: 8
+      step: 1
+      default: 5
+    params:
+      resolution:
+        options: [720p, 1080p]
+        default: 720p
+      seed: true
     inputs:
       reference_images:
         max: 7
