@@ -1,5 +1,5 @@
 family: happyhorse
-display_name: "HappyHorse (快马)"
+display_name: "HappyHorse (快乐马)"
 provider: aliyun
 routing_prefixes:
   - happyhorse-1.0-

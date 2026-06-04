@@ -108,7 +108,7 @@
         ]
       },
       "default_backend": "dashscope",
-      "display_name": "HappyHorse (快马)",
+      "display_name": "HappyHorse (快乐马)",
       "docs": {
         "official_snapshot_ids": [
           "aliyun/happyhorse/2026-04-28"
