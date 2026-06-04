@@ -138,6 +138,7 @@ class AssetGenerator:
 
                 # Batch Generation Loop
                 successful_generations = 0
+                last_error = ""
                 for i in range(batch_size):
                     try:
                         variant_id = str(uuid.uuid4())
@@ -191,11 +192,10 @@ class AssetGenerator:
                         if i < batch_size - 1:
                             time.sleep(1)
                     except Exception as e:
+                        last_error = str(e)
                         logger.error(f"Failed to generate full body variant {i+1}/{batch_size}: {e}")
-                        # Continue with next variant instead of stopping entirely
                         continue
 
-                    # Try uploading to OSS if configured - store Object Key (not full URL)
                     try:
                         from ...utils.oss_utils import OSSImageUploader
                         uploader = OSSImageUploader()
@@ -211,10 +211,9 @@ class AssetGenerator:
 
                 logger.info(f"Full body generation complete: {successful_generations}/{batch_size} variants generated")
                 character.full_body_updated_at = time.time()
-                
-                # Raise exception if all variants failed
+
                 if successful_generations == 0:
-                    raise RuntimeError("生成失败，请检查 API 配置或修改描述内容后重试。")
+                    raise RuntimeError(f"生成失败：{last_error}")
                 
                 # Mark downstream as inconsistent if generating only full body
                 if generation_type == "full_body":
@@ -301,6 +300,7 @@ class AssetGenerator:
                 sheet_negative = negative_prompt + ", background, scenery, landscape, shadows, complex background, text, watermark, messy, distorted, extra limbs"
 
                 successful_generations = 0
+                last_error = ""
                 for i in range(batch_size):
                     try:
                         variant_id = str(uuid.uuid4())
@@ -337,6 +337,7 @@ class AssetGenerator:
                         if i < batch_size - 1:
                             time.sleep(1)
                     except Exception as e:
+                        last_error = str(e)
                         logger.error(f"Failed to generate three view variant {i+1}/{batch_size}: {e}")
                         continue
                     
@@ -360,7 +361,7 @@ class AssetGenerator:
                 
                 # Raise exception if all variants failed
                 if successful_generations == 0:
-                    raise RuntimeError("生成失败，请检查 API 配置或修改描述内容后重试。")
+                    raise RuntimeError(f"生成失败：{last_error}")
 
             # 3. Headshot (Derived)
             if generation_type in ["all", "headshot"]:
@@ -375,8 +376,9 @@ class AssetGenerator:
                 
                 # Generate with style suffix appended
                 generation_prompt = f"{base_prompt}, {style_suffix}" if style_suffix and style_suffix not in base_prompt else base_prompt
-                
+
                 successful_generations = 0
+                last_error = ""
                 for i in range(batch_size):
                     try:
                         variant_id = str(uuid.uuid4())
@@ -413,6 +415,7 @@ class AssetGenerator:
                         if i < batch_size - 1:
                             time.sleep(1)
                     except Exception as e:
+                        last_error = str(e)
                         logger.error(f"Failed to generate headshot variant {i+1}/{batch_size}: {e}")
                         continue
 
@@ -436,7 +439,7 @@ class AssetGenerator:
                 
                 # Raise exception if all variants failed
                 if successful_generations == 0:
-                    raise RuntimeError("生成失败，请检查 API 配置或修改描述内容后重试。")
+                    raise RuntimeError(f"生成失败：{last_error}")
 
             # Update consistency status (Legacy support, but also useful for quick checks)
             if generation_type == "all":

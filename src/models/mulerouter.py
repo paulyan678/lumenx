@@ -41,6 +41,27 @@ GPT_IMAGE_API_PATHS = {
 POLL_INTERVAL = 20
 MAX_WAIT = 900
 
+GPT_IMAGE_VALID_SIZES = {
+    "1024x1024", "1536x1024", "1024x1536",
+    "2048x2048", "2048x1152", "3840x2160", "2160x3840", "auto",
+}
+
+
+def _normalize_gpt_image_size(size: str) -> str:
+    """Convert DashScope-style size (e.g. 1024*768) to GPT-Image-2 format."""
+    normalized = size.replace("*", "x")
+    if normalized in GPT_IMAGE_VALID_SIZES:
+        return normalized
+    try:
+        w, h = [int(d) for d in normalized.split("x")]
+    except (ValueError, AttributeError):
+        return "1024x1024"
+    if w > h:
+        return "1536x1024"
+    elif h > w:
+        return "1024x1536"
+    return "1024x1024"
+
 SITE_BASE_URLS = {
     "mulerouter": "https://api.mulerouter.ai",
     "mulerun": "https://api.mulerun.com",
@@ -489,7 +510,7 @@ class MuleRouterImageModel(ImageGenModel):
     def _generate_via_cli(self, prompt: str, output_path: str, **kwargs) -> Tuple[str, float]:
         """Generate image via mulerun studio run CLI."""
         start_time = time.time()
-        size = kwargs.get("size", "1024x1024")
+        size = _normalize_gpt_image_size(kwargs.get("size", "1024x1024"))
 
         ref_image_path = kwargs.get("ref_image_path")
         ref_image_paths = kwargs.get("ref_image_paths") or []
@@ -521,7 +542,7 @@ class MuleRouterImageModel(ImageGenModel):
         start_time = time.time()
         base_url = _get_base_url_for_model("openai/gpt-image-2")
 
-        size = kwargs.get("size", "1024x1024")
+        size = _normalize_gpt_image_size(kwargs.get("size", "1024x1024"))
         quality = kwargs.get("quality", "high")
         n = kwargs.get("n", 1)
 
