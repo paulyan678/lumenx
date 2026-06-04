@@ -60,7 +60,7 @@ export interface FrontendModelSettings {
     storyboard_aspect_ratio: string;
 }
 
-type SelectionGroup = 't2i' | 'i2i' | 'image' | 'i2v';
+type SelectionGroup = 't2i' | 'i2i' | 'image' | 'i2v' | 'r2v';
 type ModelStatus = 'active' | 'planned' | 'deprecated' | 'hidden';
 type SettingsSurface = 'project_settings' | 'series_settings' | 'global_settings';
 type VisibilitySurface = SettingsSurface | 'video_sidebar';
@@ -218,6 +218,7 @@ const SORTED_MODEL_ENTRIES = [...CATALOG_MODELS].sort((left, right) => {
 function isVisibleModel(model: CatalogModel, surface: VisibilitySurface): boolean {
     return (
         model.status !== 'planned' &&
+        model.status !== 'deprecated' &&
         model.status !== 'hidden' &&
         model.ui.visible_in.includes(surface)
     );
@@ -282,6 +283,10 @@ function getConfiguredDefaultId(group: SelectionGroup): string {
     if (group === 'image') {
         return MODEL_CATALOG.defaults.model_settings.image_model;
     }
+    if (group === 'r2v') {
+        return (MODEL_CATALOG.defaults.model_settings as Record<string, string>).r2v_model
+            ?? MODEL_CATALOG.defaults.model_settings.i2v_model;
+    }
     return MODEL_CATALOG.defaults.model_settings.i2v_model;
 }
 
@@ -345,6 +350,7 @@ export function resolveModelSettings(
         i2i_model: resolveModelId('i2i', settings?.i2i_model, surface),
         image_model: resolveModelId('image', settings?.image_model, surface),
         i2v_model: resolveModelId('i2v', settings?.i2v_model, surface),
+        r2v_model: resolveModelId('r2v', settings?.r2v_model, surface),
         character_aspect_ratio:
             settings?.character_aspect_ratio || DEFAULT_MODEL_SETTINGS.character_aspect_ratio,
         scene_aspect_ratio:
@@ -382,6 +388,7 @@ export const GLOBAL_IMAGE_MODELS = getVisibleModels('image', 'global_settings').
 export const PROJECT_I2V_MODELS = getVisibleModels('i2v', 'project_settings').map(toI2VModel);
 export const SERIES_I2V_MODELS = getVisibleModels('i2v', 'series_settings').map(toI2VModel);
 export const GLOBAL_I2V_MODELS = getVisibleModels('i2v', 'global_settings').map(toI2VModel);
+export const GLOBAL_R2V_MODELS = getVisibleModels('r2v', 'global_settings').map(toI2VModel);
 export const VIDEO_I2V_MODELS = getVisibleModels('i2v', 'video_sidebar').map(toI2VModel);
 
 export const T2I_MODELS = PROJECT_T2I_MODELS;
@@ -390,17 +397,15 @@ export const IMAGE_MODELS = PROJECT_IMAGE_MODELS;
 export const I2V_MODELS = PROJECT_I2V_MODELS;
 export const VIDEO_SIDEBAR_I2V_MODELS = VIDEO_I2V_MODELS;
 
+export const DEFAULT_I2V_MODEL_ID = resolveModelId('i2v', undefined, 'video_sidebar');
+
 const R2V_CANDIDATES = SORTED_MODEL_ENTRIES.filter((model) =>
     model.capabilities.includes('r2v')
 );
-
-export const DEFAULT_I2V_MODEL_ID = resolveModelId('i2v', undefined, 'video_sidebar');
-export const R2V_SELECTION_MODEL_ID =
-    R2V_CANDIDATES.find((model) => isVisibleModel(model, 'video_sidebar'))?.id ??
-    DEFAULT_I2V_MODEL_ID;
-export const R2V_ROUTE_MODEL_ID =
-    R2V_CANDIDATES.find((model) => model.ui.visible_in.length === 0)?.id ??
-    R2V_SELECTION_MODEL_ID;
+export const R2V_SELECTION_MODEL_ID = R2V_CANDIDATES.find(
+    (model) => isVisibleModel(model, 'video_sidebar') && model.ui.selection_group === 'r2v'
+)?.id ?? DEFAULT_I2V_MODEL_ID;
+export const R2V_ROUTE_MODEL_ID = R2V_SELECTION_MODEL_ID;
 
 export function isR2vSelectionModel(modelId: string): boolean {
     return modelId === R2V_SELECTION_MODEL_ID;
@@ -410,73 +415,20 @@ export function isR2vSelectionModel(modelId: string): boolean {
 // Dynamic R2V routing: resolve the hidden R2V model per-family
 // ---------------------------------------------------------------------------
 
-/** Map from family name to hidden R2V route model ID. */
+/** Map from family name to R2V route model ID. */
 const R2V_ROUTE_MAP: Record<string, string> = {};
 for (const model of SORTED_MODEL_ENTRIES) {
-    if (model.capabilities.includes('r2v') && model.ui.visible_in.length === 0) {
+    if (model.capabilities.includes('r2v') && model.ui.selection_group === 'r2v') {
         if (!R2V_ROUTE_MAP[model.family]) {
             R2V_ROUTE_MAP[model.family] = model.id;
         }
     }
 }
 
-// User-facing R2V model picker. The catalog hides individual R2V
-// models in the `video_sidebar` surface and exposes I2V models instead
-// (one per family); R2V is auto-routed from the chosen I2V model. That
-// works for users who think "pick a family, the rest is wired up", but
-// breaks the user who explicitly creates an R2V project and reasonably
-// expects an R2V model dropdown. We surface R2V choices by deriving
-// one selectable entry per family from R2V_ROUTE_MAP, mirroring the
-// VIDEO_I2V_MODELS shape so the UI can render either list with the
-// same component.
-export const VIDEO_R2V_MODELS: I2VModelConfig[] = (() => {
-    const seen = new Set<string>();
-    const out: I2VModelConfig[] = [];
-    // Walk the I2V list in canonical order so the R2V list ends up
-    // family-aligned with what the user already sees on the I2V tab.
-    //
-    // R2V models in the catalog deliberately omit `duration` and
-    // `params` (those live on the I2V mode of the same family because
-    // R2V is treated as a routing variant of I2V at generation time —
-    // the user picks a take's reference inputs but the model's
-    // duration / resolution behavior is shared). Without inheritance
-    // the workbench falls back to `{ type: "fixed", value: 5 }` and
-    // shows "5s (fixed)" even for families that support 3–15s. We
-    // fix that by patching the I2V sibling's duration + params onto
-    // the R2V entry here.
-    for (const i2v of VIDEO_I2V_MODELS) {
-        const family = i2v.family;
-        if (!family) continue;
-        const r2vId = R2V_ROUTE_MAP[family];
-        if (!r2vId || seen.has(r2vId)) continue;
-        const r2vModel = MODEL_CATALOG.models[r2vId];
-        if (!r2vModel) continue;
-        seen.add(r2vId);
-        const base = toI2VModel(r2vModel);
-        // Loose inheritance, not strict:
-        //   - If the R2V model defines its OWN duration/params in
-        //     the catalog yaml, those win — even when the values
-        //     diverge from the I2V sibling (e.g. future Wan R2V
-        //     might support 4–15s while its I2V sibling supports
-        //     2–15s; the R2V's own bound wins).
-        //   - If the R2V entry leaves duration/params null/{} (the
-        //     current case for every R2V model — R2V is treated as
-        //     a routing variant of I2V at generation time), it
-        //     inherits from the I2V sibling so the workbench shows
-        //     a sane slider instead of falling back to fixed 5s.
-        // Future-proof: per-mode catalog override "just works" for
-        // the divergent case without any frontend change.
-        const r2vHasDuration = r2vModel.duration && (r2vModel.duration as { type?: string }).type;
-        const r2vHasParams = r2vModel.params && Object.keys(r2vModel.params).length > 0;
-        out.push({
-            ...base,
-            duration: r2vHasDuration ? base.duration : i2v.duration,
-            params: r2vHasParams ? base.params : i2v.params,
-        });
-    }
-    return out;
-})();
-export const DEFAULT_R2V_MODEL_ID = VIDEO_R2V_MODELS[0]?.id ?? R2V_ROUTE_MODEL_ID;
+export const VIDEO_R2V_MODELS: I2VModelConfig[] = SORTED_MODEL_ENTRIES
+    .filter((model) => model.ui.selection_group === 'r2v' && isVisibleModel(model, 'video_sidebar'))
+    .map(toI2VModel);
+export const DEFAULT_R2V_MODEL_ID = VIDEO_R2V_MODELS[0]?.id ?? R2V_SELECTION_MODEL_ID;
 
 /**
  * Given the currently selected I2V model, resolve the correct R2V route model.
@@ -495,8 +447,7 @@ export function getR2vRouteModelId(selectedI2vModelId: string): string {
 export function isR2vImageBased(modelId: string): boolean {
     const model = MODEL_CATALOG.models[modelId];
     const family = model?.family;
-    // All current R2V models use image references except wan2.6-r2v (legacy video refs)
     if (family === 'wan' && modelId === 'wan2.6-r2v') return false;
     return family === 'happyhorse' || family === 'wan' || family === 'kling'
-        || family === 'pixverse' || family === 'vidu';
+        || family === 'pixverse' || family === 'vidu' || family === 'seedance';
 }

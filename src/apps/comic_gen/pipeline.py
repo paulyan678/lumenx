@@ -73,9 +73,10 @@ class ComicGenPipeline:
         self.video_generation_tasks: Dict[str, Dict[str, Any]] = {}
         # Temporary cache for file import previews (import_id -> text)
         self._import_cache: Dict[str, str] = {}
-        # Cached model instances for Kling/Vidu (lazily initialized)
+        # Cached model instances (lazily initialized)
         self._kling_model = None
         self._vidu_model = None
+        self._mulerouter_video_model = None
 
         # Pre-download Demucs model in background so first dub request is fast
         self._demucs_ready = threading.Event()
@@ -1939,18 +1940,22 @@ class ComicGenPipeline:
         
         # If R2V mode is selected, use the appropriate R2V model
         if generation_mode == "r2v":
-            if model and model.startswith("happyhorse-"):
-                model = "happyhorse-1.0-r2v"
-            elif model and model.startswith("wan2.7-"):
-                model = "wan2.7-r2v"
-            elif model and model.startswith("kling"):
-                model = "kling-v3-r2v"
-            elif model and model.startswith("pixverse"):
-                model = "pixverse-c1-r2v"
-            elif model and model.startswith("vidu"):
-                model = "viduq3-pro-r2v"
-            else:
-                model = "wan2.7-r2v"
+            # Skip auto-switch if user already selected an R2V model directly
+            if not (model and model.endswith("-r2v")):
+                if model and model.startswith("happyhorse-"):
+                    model = "happyhorse-1.0-r2v"
+                elif model and model.startswith("wan2.7-"):
+                    model = "wan2.7-r2v"
+                elif model and model.startswith("kling"):
+                    model = "kling-v3-r2v"
+                elif model and model.startswith("pixverse"):
+                    model = "pixverse-c1-r2v"
+                elif model and model.startswith("vidu"):
+                    model = "viduq3-pro-r2v"
+                elif model and model.startswith("seedance"):
+                    model = "seedance-2.0-r2v"
+                else:
+                    model = "wan2.7-r2v"
 
         # Defensive guard against model⇄mode⇄refs mismatch. Every R2V
         # model needs reference inputs; without them the underlying
@@ -3026,7 +3031,8 @@ class ComicGenPipeline:
             prompt=prompt or f"Cinematic shot of {target_asset.name}",
             status="pending",
             duration=duration,
-            model="wan2.6-r2v", # Force R2V model
+            model=script.model_settings.r2v_model if hasattr(script.model_settings, 'r2v_model') and script.model_settings.r2v_model else "wan2.7-r2v",
+            generation_mode="r2v",
             created_at=time.time()
         )
         
@@ -3108,8 +3114,28 @@ class ComicGenPipeline:
                 or model_name_lower.startswith("viduq3")
                 or model_name_lower.startswith("vidu/vidu")
             )
+            use_mulerouter = backend == "mulerouter" and (
+                model_name_lower.startswith("seedance")
+            )
 
-            if use_vendor_kling:
+            if use_mulerouter:
+                if self._mulerouter_video_model is None:
+                    from ...models.mulerouter import MuleRouterVideoModel
+                    self._mulerouter_video_model = MuleRouterVideoModel({})
+                video_path, _ = self._mulerouter_video_model.generate(
+                    prompt=task.prompt,
+                    output_path=output_path,
+                    img_url=img_url,
+                    img_path=img_path,
+                    duration=task.duration,
+                    resolution=task.resolution,
+                    aspect_ratio=task.ratio or "16:9",
+                    seed=task.seed,
+                    watermark=bool(task.watermark) if task.watermark is not None else False,
+                    generation_mode=task.generation_mode,
+                    ref_image_urls=task.reference_image_urls if task.generation_mode == "r2v" else None,
+                )
+            elif use_vendor_kling:
                 # Use Kling model (cached)
                 if self._kling_model is None:
                     from ...models.kling import KlingModel
@@ -3231,86 +3257,6 @@ class ComicGenPipeline:
             else:
                 # Not found, append it (shouldn't happen if created correctly, but good fallback)
                 target_asset.video_assets.append(task)
-
-    def create_asset_video_task(self, script_id: str, asset_id: str, asset_type: str, prompt: str = None, duration: int = 5, aspect_ratio: str = None) -> Tuple[Script, str]:
-        """Creates a video generation task for an asset (I2V)."""
-        script = self.get_script(script_id)
-        if not script:
-            raise ValueError("Script not found")
-            
-        target_asset = None
-        if asset_type == "character":
-            target_asset = next((c for c in script.characters if c.id == asset_id), None)
-            # Use full body image for character video
-            image_url = target_asset.full_body_image_url or target_asset.image_url
-            if not prompt:
-                prompt = f"A cinematic shot of {target_asset.name}, {target_asset.description}, looking around, breathing, slight movement, high quality, 4k"
-        elif asset_type == "scene":
-            target_asset = next((s for s in script.scenes if s.id == asset_id), None)
-            image_url = target_asset.image_url
-            if not prompt:
-                prompt = f"A cinematic shot of {target_asset.name}, {target_asset.description}, ambient motion, lighting change, high quality, 4k"
-        elif asset_type == "prop":
-            target_asset = next((p for p in script.props if p.id == asset_id), None)
-            image_url = target_asset.image_url
-            if not prompt:
-                prompt = f"A cinematic shot of {target_asset.name}, {target_asset.description}, rotating slowly, high quality, 4k"
-        else:
-            raise ValueError(f"Invalid asset_type: {asset_type}")
-            
-        if not target_asset:
-            raise ValueError(f"Asset {asset_id} not found")
-            
-        if not image_url:
-            raise ValueError(f"Asset {asset_id} has no image to generate video from")
-
-        # Create task using existing method logic but with asset_id
-        task_id = str(uuid.uuid4())
-        
-        # Snapshot logic (duplicated from create_video_task for now, or could refactor)
-        snapshot_url = image_url
-        try:
-            if not image_url.startswith("http"):
-                src_path = os.path.join("output", image_url)
-                if os.path.exists(src_path):
-                    snapshot_dir = os.path.join("output", "video_inputs")
-                    os.makedirs(snapshot_dir, exist_ok=True)
-                    ext = os.path.splitext(image_url)[1] or ".png"
-                    snapshot_filename = f"{task_id}{ext}"
-                    snapshot_path = os.path.join(snapshot_dir, snapshot_filename)
-                    import shutil
-                    shutil.copy2(src_path, snapshot_path)
-                    snapshot_url = f"video_inputs/{snapshot_filename}"
-        except Exception:
-            pass
-
-        # Determine resolution from aspect ratio or default
-        resolution = "720p" # Default
-        # TODO: Map aspect_ratio to resolution if needed
-        
-        task = VideoTask(
-            id=task_id,
-            project_id=script_id,
-            asset_id=asset_id,
-            image_url=snapshot_url,
-            prompt=prompt,
-            status="pending",
-            duration=duration,
-            resolution=resolution,
-            model="wan2.6-i2v", # Asset video uses I2V
-            created_at=time.time()
-        )
-        
-        # Add to global list
-        if not script.video_tasks:
-            script.video_tasks = []
-        script.video_tasks.append(task)
-        
-        # Add to asset list
-        target_asset.video_assets.append(task)
-        
-        self._save_data()
-        return script, task_id
 
     def delete_asset_video(self, script_id: str, asset_id: str, asset_type: str, video_id: str) -> Script:
         """Deletes a video from an asset."""

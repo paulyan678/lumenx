@@ -6,15 +6,16 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 import yaml
 
 
-SUPPORTED_PROVIDER_BACKENDS = ("dashscope", "vendor")
+SUPPORTED_PROVIDER_BACKENDS = ("dashscope", "vendor", "mulerouter")
 SUPPORTED_MODEL_STATUSES = ("active", "planned", "deprecated", "hidden")
-SUPPORTED_SELECTION_GROUPS = ("t2i", "i2i", "image", "i2v")
+SUPPORTED_SELECTION_GROUPS = ("t2i", "i2i", "image", "i2v", "r2v", "t2v")
 VISIBLE_MODEL_SURFACES = ("project_settings", "series_settings", "video_sidebar", "global_settings")
 DEFAULT_MODEL_SURFACE_REQUIREMENTS = {
     "t2i_model": ("project_settings", "series_settings", "global_settings"),
     "i2i_model": ("project_settings", "series_settings", "global_settings"),
     "image_model": ("project_settings", "series_settings", "global_settings"),
     "i2v_model": ("project_settings", "series_settings", "video_sidebar", "global_settings"),
+    "r2v_model": ("project_settings", "series_settings", "video_sidebar", "global_settings"),
 }
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -34,6 +35,7 @@ class DefaultModelSettings:
     i2i_model: str
     image_model: str
     i2v_model: str
+    r2v_model: str = ""
 
 
 @dataclass(frozen=True)
@@ -377,6 +379,7 @@ def build_catalog_dict(catalog_root: Optional[Path] = None) -> Dict[str, Any]:
         default_model_settings.get("image_model"),
         label="defaults.model_settings.image_model",
     )
+    r2v_default = (default_model_settings.get("r2v_model") or "").strip() or None
 
     families: Dict[str, Dict[str, Any]] = {}
     models: Dict[str, Dict[str, Any]] = {}
@@ -387,6 +390,7 @@ def build_catalog_dict(catalog_root: Optional[Path] = None) -> Dict[str, Any]:
     for family_path in _family_source_paths(root):
         raw_family = _read_yaml(family_path)
         family_name = _require_non_empty_str(raw_family.get("family"), label=f"{family_path}: family")
+        display_name = raw_family.get("display_name", "")
         provider = _require_non_empty_str(raw_family.get("provider"), label=f"{family_path}: provider")
         routing_prefixes = _sorted_unique(
             _normalize_string_list(raw_family.get("routing_prefixes"), label=f"{family_path}: routing_prefixes")
@@ -452,6 +456,7 @@ def build_catalog_dict(catalog_root: Optional[Path] = None) -> Dict[str, Any]:
 
         family_payload: Dict[str, Any] = {
             "family": family_name,
+            "display_name": display_name or family_name,
             "provider": provider,
             "routing_prefixes": routing_prefixes,
             "supported_backends": supported_backends,
@@ -863,6 +868,8 @@ def build_catalog_dict(catalog_root: Optional[Path] = None) -> Dict[str, Any]:
     for model_id in (t2i_default, i2i_default, image_default, i2v_default):
         if model_id not in models:
             raise ValueError(f"Default model '{model_id}' is missing from the catalog")
+    if r2v_default and r2v_default not in models:
+        raise ValueError(f"Default model '{r2v_default}' is missing from the catalog")
 
     for family in families.values():
         family["models"] = sorted(family["models"])
@@ -876,16 +883,22 @@ def build_catalog_dict(catalog_root: Optional[Path] = None) -> Dict[str, Any]:
         "image_model": legacy_model_ids[image_default],
         "i2v_model": legacy_model_ids[i2v_default],
     }
+    if r2v_default:
+        canonical_defaults["r2v_model"] = legacy_model_ids[r2v_default]
+
+    default_settings: Dict[str, Any] = {
+        "t2i_model": t2i_default,
+        "i2i_model": i2i_default,
+        "image_model": image_default,
+        "i2v_model": i2v_default,
+    }
+    if r2v_default:
+        default_settings["r2v_model"] = r2v_default
 
     return {
         "version": version,
         "defaults": {
-            "model_settings": {
-                "t2i_model": t2i_default,
-                "i2i_model": i2i_default,
-                "image_model": image_default,
-                "i2v_model": i2v_default,
-            },
+            "model_settings": default_settings,
             "canonical_model_settings": canonical_defaults,
         },
         "families": {key: families[key] for key in sorted(families)},
@@ -1061,6 +1074,7 @@ def get_default_model_settings(catalog_root: Optional[Path] = None) -> DefaultMo
         i2i_model=defaults["i2i_model"],
         image_model=defaults["image_model"],
         i2v_model=defaults["i2v_model"],
+        r2v_model=defaults["r2v_model"],
     )
 
 

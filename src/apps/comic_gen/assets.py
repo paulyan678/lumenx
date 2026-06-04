@@ -4,7 +4,7 @@ import time
 from typing import Dict, Any, List
 from urllib.parse import quote
 from .models import Character, Scene, Prop, GenerationStatus, ImageAsset, ImageVariant, MAX_VARIANTS_PER_ASSET
-from ...models.image import WanxImageModel
+from ...models.image import WanxImageModel, ImageGenModel
 from ...utils import get_logger
 from ...utils.oss_utils import is_object_key
 
@@ -49,9 +49,18 @@ ASPECT_RATIO_TO_SIZE = {
 class AssetGenerator:
     def __init__(self, config: Dict[str, Any] = None):
         self.config = config or {}
-        # Default to Wanx for now, can be swapped based on config
         self.model = WanxImageModel(self.config.get('model', {}))
+        self._mulerouter_image_model = None
         self.output_dir = self.config.get('output_dir', 'output/assets')
+
+    def _get_model_for(self, model_name: str) -> "ImageGenModel":
+        """Route to the correct image adapter based on model name."""
+        if model_name and model_name.startswith("gpt-image"):
+            if self._mulerouter_image_model is None:
+                from ...models.mulerouter import MuleRouterImageModel
+                self._mulerouter_image_model = MuleRouterImageModel({})
+            return self._mulerouter_image_model
+        return self.model
 
     def generate_character(self, character: Character, generation_type: str = "all", prompt: str = "", positive_prompt: str = None, negative_prompt: str = "", batch_size: int = 1, model_name: str = None, i2i_model_name: str = None, size: str = None) -> Character:
         """
@@ -67,6 +76,76 @@ class AssetGenerator:
         effective_size = size or "576*1024"  # Default to portrait for characters
         
         try:
+            # === R2V: Single unified reference sheet (T2I only) ===
+            if generation_type == "reference_sheet":
+                effective_prompt = prompt if prompt else f"Character reference sheet for {character.name}. {character.description}. Multiple views: front, side, back. Clean background, studio lighting."
+                if positive_prompt and positive_prompt not in effective_prompt:
+                    effective_prompt = f"{effective_prompt}, {positive_prompt}"
+
+                effective_size = size or "1024*1024"
+
+                successful_generations = 0
+                last_error = ""
+                for i in range(batch_size):
+                    try:
+                        variant_id = str(uuid.uuid4())
+                        sheet_path = os.path.join(self.output_dir, 'characters', f"{character.id}_refsheet_{variant_id}.png")
+                        os.makedirs(os.path.dirname(sheet_path), exist_ok=True)
+
+                        self._get_model_for(model_name).generate(
+                            effective_prompt, sheet_path,
+                            negative_prompt=negative_prompt,
+                            model_name=model_name,
+                            size=effective_size
+                        )
+
+                        rel_path = os.path.relpath(sheet_path, "output")
+
+                        if not character.reference_sheet:
+                            from .models import AssetUnit
+                            character.reference_sheet = AssetUnit()
+
+                        from .models import ImageVariant
+                        variant = ImageVariant(
+                            id=variant_id,
+                            url=rel_path,
+                            created_at=time.time(),
+                            prompt_used=effective_prompt,
+                        )
+                        character.reference_sheet.image_variants.append(variant)
+
+                        if not character.reference_sheet.selected_image_id:
+                            character.reference_sheet.selected_image_id = variant_id
+                            character.image_url = rel_path
+
+                        successful_generations += 1
+
+                        # Upload to OSS if configured
+                        try:
+                            from ...utils.oss_utils import OSSImageUploader
+                            uploader = OSSImageUploader()
+                            if uploader.is_configured:
+                                object_key = uploader.upload_file(sheet_path, sub_path="assets/characters")
+                                if object_key:
+                                    variant.url = object_key
+                                    if character.reference_sheet.selected_image_id == variant_id:
+                                        character.image_url = object_key
+                        except Exception as e:
+                            logger.error(f"Failed to upload reference sheet to OSS: {e}")
+
+                        if i < batch_size - 1:
+                            time.sleep(1)
+                    except Exception as e:
+                        last_error = str(e)
+                        logger.error(f"Failed to generate reference sheet variant {i+1}/{batch_size}: {e}")
+                        continue
+
+                if successful_generations == 0:
+                    raise RuntimeError(f"生成失败：{last_error}")
+
+                character.status = GenerationStatus.COMPLETED
+                return character
+
             # 1. Full Body (Master)
             if generation_type in ["all", "full_body"]:
                 # Use provided prompt or construct default
@@ -129,6 +208,7 @@ class AssetGenerator:
 
                 # Batch Generation Loop
                 successful_generations = 0
+                last_error = ""
                 for i in range(batch_size):
                     try:
                         variant_id = str(uuid.uuid4())
@@ -149,7 +229,7 @@ class AssetGenerator:
                                 effective_generation_prompt = f"{reverse_enhancement}{generation_prompt}"
                                 logger.debug(f"Reverse generation enhanced prompt: {effective_generation_prompt[:100]}...")
                         
-                        self.model.generate(effective_generation_prompt, fullbody_path, ref_image_path=ref_image_path, negative_prompt=negative_prompt, model_name=effective_model_name, size=effective_size)
+                        self._get_model_for(effective_model_name).generate(effective_generation_prompt, fullbody_path, ref_image_path=ref_image_path, negative_prompt=negative_prompt, model_name=effective_model_name, size=effective_size)
                         
                         rel_fullbody_path = os.path.relpath(fullbody_path, "output")
                         
@@ -182,11 +262,10 @@ class AssetGenerator:
                         if i < batch_size - 1:
                             time.sleep(1)
                     except Exception as e:
+                        last_error = str(e)
                         logger.error(f"Failed to generate full body variant {i+1}/{batch_size}: {e}")
-                        # Continue with next variant instead of stopping entirely
                         continue
 
-                    # Try uploading to OSS if configured - store Object Key (not full URL)
                     try:
                         from ...utils.oss_utils import OSSImageUploader
                         uploader = OSSImageUploader()
@@ -202,10 +281,9 @@ class AssetGenerator:
 
                 logger.info(f"Full body generation complete: {successful_generations}/{batch_size} variants generated")
                 character.full_body_updated_at = time.time()
-                
-                # Raise exception if all variants failed
+
                 if successful_generations == 0:
-                    raise RuntimeError("生成失败，请检查 API 配置或修改描述内容后重试。")
+                    raise RuntimeError(f"生成失败：{last_error}")
                 
                 # Mark downstream as inconsistent if generating only full body
                 if generation_type == "full_body":
@@ -292,12 +370,13 @@ class AssetGenerator:
                 sheet_negative = negative_prompt + ", background, scenery, landscape, shadows, complex background, text, watermark, messy, distorted, extra limbs"
 
                 successful_generations = 0
+                last_error = ""
                 for i in range(batch_size):
                     try:
                         variant_id = str(uuid.uuid4())
                         sheet_path = os.path.join(self.output_dir, 'characters', f"{character.id}_sheet_{variant_id}.png")
                         
-                        self.model.generate(generation_prompt, sheet_path, ref_image_path=fullbody_path, negative_prompt=sheet_negative, ref_strength=0.8, model_name=i2i_model_name)
+                        self._get_model_for(i2i_model_name).generate(generation_prompt, sheet_path, ref_image_path=fullbody_path, negative_prompt=sheet_negative, ref_strength=0.8, model_name=i2i_model_name)
                         
                         rel_sheet_path = os.path.relpath(sheet_path, "output")
                         
@@ -328,6 +407,7 @@ class AssetGenerator:
                         if i < batch_size - 1:
                             time.sleep(1)
                     except Exception as e:
+                        last_error = str(e)
                         logger.error(f"Failed to generate three view variant {i+1}/{batch_size}: {e}")
                         continue
                     
@@ -351,7 +431,7 @@ class AssetGenerator:
                 
                 # Raise exception if all variants failed
                 if successful_generations == 0:
-                    raise RuntimeError("生成失败，请检查 API 配置或修改描述内容后重试。")
+                    raise RuntimeError(f"生成失败：{last_error}")
 
             # 3. Headshot (Derived)
             if generation_type in ["all", "headshot"]:
@@ -366,14 +446,15 @@ class AssetGenerator:
                 
                 # Generate with style suffix appended
                 generation_prompt = f"{base_prompt}, {style_suffix}" if style_suffix and style_suffix not in base_prompt else base_prompt
-                
+
                 successful_generations = 0
+                last_error = ""
                 for i in range(batch_size):
                     try:
                         variant_id = str(uuid.uuid4())
                         avatar_path = os.path.join(self.output_dir, 'characters', f"{character.id}_avatar_{variant_id}.png")
                         
-                        self.model.generate(generation_prompt, avatar_path, ref_image_path=fullbody_path, negative_prompt=negative_prompt, ref_strength=0.8, model_name=i2i_model_name)
+                        self._get_model_for(i2i_model_name).generate(generation_prompt, avatar_path, ref_image_path=fullbody_path, negative_prompt=negative_prompt, ref_strength=0.8, model_name=i2i_model_name)
                         
                         rel_avatar_path = os.path.relpath(avatar_path, "output")
                         
@@ -404,6 +485,7 @@ class AssetGenerator:
                         if i < batch_size - 1:
                             time.sleep(1)
                     except Exception as e:
+                        last_error = str(e)
                         logger.error(f"Failed to generate headshot variant {i+1}/{batch_size}: {e}")
                         continue
 
@@ -427,7 +509,7 @@ class AssetGenerator:
                 
                 # Raise exception if all variants failed
                 if successful_generations == 0:
-                    raise RuntimeError("生成失败，请检查 API 配置或修改描述内容后重试。")
+                    raise RuntimeError(f"生成失败：{last_error}")
 
             # Update consistency status (Legacy support, but also useful for quick checks)
             if generation_type == "all":
@@ -464,7 +546,7 @@ class AssetGenerator:
                 output_path = os.path.join(self.output_dir, 'scenes', f"{scene.id}_{variant_id}.png")
                 os.makedirs(os.path.dirname(output_path), exist_ok=True)
                 
-                image_path, _ = self.model.generate(prompt, output_path, negative_prompt=negative_prompt, model_name=model_name, size=effective_size)
+                image_path, _ = self._get_model_for(model_name).generate(prompt, output_path, negative_prompt=negative_prompt, model_name=model_name, size=effective_size)
                 
                 rel_path = os.path.relpath(output_path, "output")
                 
@@ -526,7 +608,7 @@ class AssetGenerator:
                 output_path = os.path.join(self.output_dir, 'props', f"{prop.id}_{variant_id}.png")
                 os.makedirs(os.path.dirname(output_path), exist_ok=True)
                 
-                image_path, _ = self.model.generate(prompt, output_path, negative_prompt=negative_prompt, model_name=model_name, size=effective_size)
+                image_path, _ = self._get_model_for(model_name).generate(prompt, output_path, negative_prompt=negative_prompt, model_name=model_name, size=effective_size)
                 
                 rel_path = os.path.relpath(output_path, "output")
                 

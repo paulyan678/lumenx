@@ -26,6 +26,7 @@ import { useProjectStore, IMAGE_MODELS } from "@/store/projectStore";
 import { toast } from "@/store/toastStore";
 import { getAssetUrl } from "@/lib/utils";
 import PreviewImage from "@/components/shared/preview/PreviewImage";
+import GroupedModelGrid from "@/components/common/GroupedModelGrid";
 
 export type CastKind = "character" | "scene" | "prop";
 
@@ -66,7 +67,7 @@ function startAssetPoll(
                 if (progressToastId) toast.dismiss(progressToastId);
                 const { removeGeneratingTask } = getStore();
                 removeGeneratingTask(entityId, generationType);
-                toast.error("生成失败", { body: status?.error?.slice(0, 200) || "未知错误" });
+                toast.error("生成失败", { body: status?.error || "未知错误" });
             }
         } catch (err) {
             clearInterval(interval);
@@ -297,7 +298,7 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
             return;
         }
         const effectiveBatchSize = Math.max(1, Math.min(4, batchSize));
-        addGeneratingTask(entity.id, "all", effectiveBatchSize);
+        addGeneratingTask(entity.id, kind === "character" ? "reference_sheet" : "all", effectiveBatchSize);
 
         const progressId = toast.progress(t("toastGenStart", { kind: t(`kind.${kind}`) }), {
             projectId: currentProject.id,
@@ -312,7 +313,7 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                 kind,
                 currentProject.style_preset || "realistic",
                 applyStyle ? stylePositive : "",
-                "all",
+                kind === "character" ? "reference_sheet" : "all",
                 prompt.trim(),
                 applyStyle,
                 [applyStyle ? styleNegative : "", getTemplateNegative(kind, selectedTemplate)].filter(Boolean).join(", "),
@@ -326,21 +327,21 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                 const capturedEntityId = entity.id;
                 const capturedKind = kind;
                 const capturedProjectId = currentProject.id;
-                startAssetPoll(capturedEntityId, taskId, capturedProjectId, capturedKind, "all", () => ({
+                startAssetPoll(capturedEntityId, taskId, capturedProjectId, capturedKind, kind === "character" ? "reference_sheet" : "all", () => ({
                     updateProject: useProjectStore.getState().updateProject,
                     removeGeneratingTask: useProjectStore.getState().removeGeneratingTask,
                 }), progressId);
             } else if (resp) {
                 toast.dismiss(progressId);
                 updateProject(currentProject.id, resp);
-                removeGeneratingTask(entity.id, "all");
+                removeGeneratingTask(entity.id, kind === "character" ? "reference_sheet" : "all");
                 toast.success(t("toastGenDone", { kind: t(`kind.${kind}`) }));
             }
         } catch (err: any) {
             toast.dismiss(progressId);
-            removeGeneratingTask(entity.id, "all");
+            removeGeneratingTask(entity.id, kind === "character" ? "reference_sheet" : "all");
             const detail = err?.response?.data?.detail || err?.message || t("toastGenErrUnknown");
-            toast.error(t("toastGenErr"), { body: String(detail).slice(0, 240) });
+            toast.error(t("toastGenErr"), { body: String(detail) });
         }
     };
 
@@ -363,7 +364,7 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
             toast.error(t("toastSelectErr"), {
                 projectId: currentProject.id,
                 projectTitle: currentProject.title,
-                body: String(detail).slice(0, 200),
+                body: String(detail),
             });
         }
     };
@@ -748,25 +749,11 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                                     <label className="block font-mono text-[10px] uppercase tracking-[0.16em] text-text-muted mb-2">
                                         {t("modelLabel")}
                                     </label>
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        {IMAGE_MODELS.map((m) => {
-                                            const isActive = (modelOverride || currentProject.model_settings?.t2i_model || "wan2.1-t2i") === m.id;
-                                            return (
-                                                <button
-                                                    key={m.id}
-                                                    onClick={() => setModelOverride(m.id === (currentProject.model_settings?.t2i_model || "wan2.1-t2i") ? null : m.id)}
-                                                    disabled={generating}
-                                                    className={`px-3 py-1.5 rounded-md text-[12px] transition-colors disabled:opacity-40 ${
-                                                        isActive
-                                                            ? "bg-white/10 text-foreground font-medium border border-white/20"
-                                                            : "text-text-muted hover:text-text-secondary hover:bg-white/5 border border-transparent"
-                                                    }`}
-                                                >
-                                                    {m.name}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
+                                    <GroupedModelGrid
+                                        models={IMAGE_MODELS}
+                                        selectedId={modelOverride || currentProject.model_settings?.t2i_model || "wan2.1-t2i"}
+                                        onSelect={(id) => setModelOverride(id === (currentProject.model_settings?.t2i_model || "wan2.1-t2i") ? null : id)}
+                                    />
                                 </div>
                             </div>
 
