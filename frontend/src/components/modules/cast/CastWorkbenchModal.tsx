@@ -298,7 +298,7 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
             return;
         }
         const effectiveBatchSize = Math.max(1, Math.min(4, batchSize));
-        addGeneratingTask(entity.id, "all", effectiveBatchSize);
+        addGeneratingTask(entity.id, kind === "character" ? "reference_sheet" : "all", effectiveBatchSize);
 
         const progressId = toast.progress(t("toastGenStart", { kind: t(`kind.${kind}`) }), {
             projectId: currentProject.id,
@@ -313,7 +313,7 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                 kind,
                 currentProject.style_preset || "realistic",
                 applyStyle ? stylePositive : "",
-                "all",
+                kind === "character" ? "reference_sheet" : "all",
                 prompt.trim(),
                 applyStyle,
                 [applyStyle ? styleNegative : "", getTemplateNegative(kind, selectedTemplate)].filter(Boolean).join(", "),
@@ -327,19 +327,19 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                 const capturedEntityId = entity.id;
                 const capturedKind = kind;
                 const capturedProjectId = currentProject.id;
-                startAssetPoll(capturedEntityId, taskId, capturedProjectId, capturedKind, "all", () => ({
+                startAssetPoll(capturedEntityId, taskId, capturedProjectId, capturedKind, kind === "character" ? "reference_sheet" : "all", () => ({
                     updateProject: useProjectStore.getState().updateProject,
                     removeGeneratingTask: useProjectStore.getState().removeGeneratingTask,
                 }), progressId);
             } else if (resp) {
                 toast.dismiss(progressId);
                 updateProject(currentProject.id, resp);
-                removeGeneratingTask(entity.id, "all");
+                removeGeneratingTask(entity.id, kind === "character" ? "reference_sheet" : "all");
                 toast.success(t("toastGenDone", { kind: t(`kind.${kind}`) }));
             }
         } catch (err: any) {
             toast.dismiss(progressId);
-            removeGeneratingTask(entity.id, "all");
+            removeGeneratingTask(entity.id, kind === "character" ? "reference_sheet" : "all");
             const detail = err?.response?.data?.detail || err?.message || t("toastGenErrUnknown");
             toast.error(t("toastGenErr"), { body: String(detail) });
         }

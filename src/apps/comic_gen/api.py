@@ -160,7 +160,7 @@ class GenerateAssetRequest(BaseModel):
     style_preset: str = "Cinematic"
     reference_image_url: Optional[str] = None
     style_prompt: Optional[str] = None
-    generation_type: str = "all"  # 'full_body', 'three_view', 'headshot', 'all'
+    generation_type: str = "all"  # 'full_body', 'three_view', 'headshot', 'all', 'reference_sheet'
     prompt: Optional[str] = None
     apply_style: bool = True
     negative_prompt: Optional[str] = None

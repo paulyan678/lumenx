@@ -76,6 +76,76 @@ class AssetGenerator:
         effective_size = size or "576*1024"  # Default to portrait for characters
         
         try:
+            # === R2V: Single unified reference sheet (T2I only) ===
+            if generation_type == "reference_sheet":
+                effective_prompt = prompt if prompt else f"Character reference sheet for {character.name}. {character.description}. Multiple views: front, side, back. Clean background, studio lighting."
+                if positive_prompt and positive_prompt not in effective_prompt:
+                    effective_prompt = f"{effective_prompt}, {positive_prompt}"
+
+                effective_size = size or "1024*1024"
+
+                successful_generations = 0
+                last_error = ""
+                for i in range(batch_size):
+                    try:
+                        variant_id = str(uuid.uuid4())
+                        sheet_path = os.path.join(self.output_dir, 'characters', f"{character.id}_refsheet_{variant_id}.png")
+                        os.makedirs(os.path.dirname(sheet_path), exist_ok=True)
+
+                        self._get_model_for(model_name).generate(
+                            effective_prompt, sheet_path,
+                            negative_prompt=negative_prompt,
+                            model_name=model_name,
+                            size=effective_size
+                        )
+
+                        rel_path = os.path.relpath(sheet_path, "output")
+
+                        if not character.reference_sheet:
+                            from .models import AssetUnit
+                            character.reference_sheet = AssetUnit()
+
+                        from .models import ImageVariant
+                        variant = ImageVariant(
+                            id=variant_id,
+                            url=rel_path,
+                            created_at=time.time(),
+                            prompt_used=effective_prompt,
+                        )
+                        character.reference_sheet.image_variants.append(variant)
+
+                        if not character.reference_sheet.selected_image_id:
+                            character.reference_sheet.selected_image_id = variant_id
+                            character.image_url = rel_path
+
+                        successful_generations += 1
+
+                        # Upload to OSS if configured
+                        try:
+                            from ...utils.oss_utils import OSSImageUploader
+                            uploader = OSSImageUploader()
+                            if uploader.is_configured:
+                                object_key = uploader.upload_file(sheet_path, sub_path="assets/characters")
+                                if object_key:
+                                    variant.url = object_key
+                                    if character.reference_sheet.selected_image_id == variant_id:
+                                        character.image_url = object_key
+                        except Exception as e:
+                            logger.error(f"Failed to upload reference sheet to OSS: {e}")
+
+                        if i < batch_size - 1:
+                            time.sleep(1)
+                    except Exception as e:
+                        last_error = str(e)
+                        logger.error(f"Failed to generate reference sheet variant {i+1}/{batch_size}: {e}")
+                        continue
+
+                if successful_generations == 0:
+                    raise RuntimeError(f"生成失败：{last_error}")
+
+                character.status = GenerationStatus.COMPLETED
+                return character
+
             # 1. Full Body (Master)
             if generation_type in ["all", "full_body"]:
                 # Use provided prompt or construct default
