@@ -8,6 +8,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+---
+
+## [1.1.0] - 2026-06-05
+
 ### Added
 - **MuleRun/MuleRouter provider** — 通过 MuleRun 平台调用 Seedance 2.0 (T2V/I2V/R2V) 和 GPT-Image-2 (T2I/I2I)，一个账号统一计费
 - **MuleRun CLI 双模式** — 支持 CLI subprocess 模式（`mulerun login` 登录）和 HTTP API 模式（`MULEROUTER_API_KEY`），自动检测优先级
