@@ -21,7 +21,6 @@ import requests
 
 from .base import VideoGenModel
 from .image import ImageGenModel
-from ..utils.endpoints import get_provider_base_url
 
 logger = logging.getLogger(__name__)
 
@@ -42,14 +41,41 @@ GPT_IMAGE_API_PATHS = {
 POLL_INTERVAL = 20
 MAX_WAIT = 900
 
+SITE_BASE_URLS = {
+    "mulerouter": "https://api.mulerouter.ai",
+    "mulerun": "https://api.mulerun.com",
+}
+
+# gpt-image-2 is only available on the mulerouter site
+MULEROUTER_ONLY_MODELS = ("openai/gpt-image-2",)
+
+# ---------------------------------------------------------------------------
+# Site resolution: mulerouter vs mulerun
+# ---------------------------------------------------------------------------
+
+def _get_site() -> str:
+    """Get the configured site. Default: mulerouter (more models available)."""
+    return (os.getenv("MULEROUTER_SITE") or "mulerouter").strip().lower()
+
+
+def _get_base_url_for_model(model_prefix: str) -> str:
+    """Route to the correct site based on model availability."""
+    for prefix in MULEROUTER_ONLY_MODELS:
+        if model_prefix.startswith(prefix):
+            return SITE_BASE_URLS["mulerouter"]
+    site = _get_site()
+    custom = os.getenv("MULEROUTER_BASE_URL")
+    if custom:
+        return custom.rstrip("/")
+    return SITE_BASE_URLS.get(site, SITE_BASE_URLS["mulerouter"])
+
+
 # ---------------------------------------------------------------------------
 # Backend detection: MuleRun CLI vs MuleRouter HTTP API
 # ---------------------------------------------------------------------------
 
 def _is_mulerun_cli_available() -> bool:
     """Check if MuleRun CLI is usable (installed + authenticated)."""
-    if os.getenv("MULERUN_TOKEN"):
-        return shutil.which("mulerun") is not None
     if shutil.which("mulerun") is not None:
         try:
             result = subprocess.run(
@@ -63,8 +89,12 @@ def _is_mulerun_cli_available() -> bool:
 
 
 def _use_cli_backend() -> bool:
-    """Determine whether to use CLI or HTTP API backend."""
-    if os.getenv("MULERUN_TOKEN") or (not os.getenv("MULEROUTER_API_KEY") and _is_mulerun_cli_available()):
+    """Determine whether to use CLI or HTTP API backend.
+
+    Priority: CLI (if available) > HTTP API (MULEROUTER_API_KEY).
+    The muk-... key from MuleRun login works for both modes.
+    """
+    if not os.getenv("MULEROUTER_API_KEY") and _is_mulerun_cli_available():
         return True
     return False
 
@@ -320,7 +350,7 @@ class MuleRouterVideoModel(VideoGenModel):
                            img_path: Optional[str] = None, **kwargs) -> Tuple[str, float]:
         """Generate video via MuleRouter HTTP API (original path)."""
         start_time = time.time()
-        base_url = get_provider_base_url("MULEROUTER")
+        base_url = _get_base_url_for_model("bytedance/seedance")
 
         duration = kwargs.get("duration", 5)
         seed = kwargs.get("seed")
@@ -485,7 +515,7 @@ class MuleRouterImageModel(ImageGenModel):
     def _generate_via_http(self, prompt: str, output_path: str, **kwargs) -> Tuple[str, float]:
         """Generate image via MuleRouter HTTP API (original path)."""
         start_time = time.time()
-        base_url = get_provider_base_url("MULEROUTER")
+        base_url = _get_base_url_for_model("openai/gpt-image-2")
 
         size = kwargs.get("size", "1024x1024")
         quality = kwargs.get("quality", "high")
