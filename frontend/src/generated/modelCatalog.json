@@ -1738,7 +1738,7 @@
         "wan2.7-"
       ],
       "runtime": {},
-      "status": "active",
+      "status": "deprecated",
       "supported_backends": [
         "dashscope"
       ],
@@ -1918,7 +1918,7 @@
           "gateway": "dashscope"
         }
       },
-      "status": "active",
+      "status": "deprecated",
       "supported_backends": [
         "dashscope"
       ],
@@ -4347,7 +4347,7 @@
         "wan2.6-",
         "wan2.7-"
       ],
-      "status": "active",
+      "status": "deprecated",
       "supported_backends": [
         "dashscope"
       ],
@@ -4429,7 +4429,7 @@
         "wan2.6-",
         "wan2.7-"
       ],
-      "status": "active",
+      "status": "deprecated",
       "supported_backends": [
         "dashscope"
       ],
@@ -7494,7 +7494,7 @@
         "wan2.7-"
       ],
       "runtime": {},
-      "status": "active",
+      "status": "deprecated",
       "supported_backends": [
         "dashscope"
       ],
@@ -7711,7 +7711,7 @@
           "gateway": "dashscope"
         }
       },
-      "status": "active",
+      "status": "deprecated",
       "supported_backends": [
         "dashscope"
       ],

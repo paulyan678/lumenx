@@ -218,6 +218,7 @@ const SORTED_MODEL_ENTRIES = [...CATALOG_MODELS].sort((left, right) => {
 function isVisibleModel(model: CatalogModel, surface: VisibilitySurface): boolean {
     return (
         model.status !== 'planned' &&
+        model.status !== 'deprecated' &&
         model.status !== 'hidden' &&
         model.ui.visible_in.includes(surface)
     );

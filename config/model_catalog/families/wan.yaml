@@ -165,7 +165,7 @@ models:
   - id: wan/wan2.6-video
     display_name: Wan 2.6 Video
     description: Wan 2.6 video line
-    status: active
+    status: deprecated
     release_stage: stable
     docs:
       context_hub_doc_ids: [aliyun/wan-i2v-r2v]
@@ -214,7 +214,7 @@ models:
   - id: wan2.6-i2v-flash
     display_name: Wan 2.6 I2V Flash
     description: Fast generation
-    status: active
+    status: deprecated
     release_stage: stable
     capabilities: [i2v]
     docs:
