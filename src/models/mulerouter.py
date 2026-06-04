@@ -419,7 +419,10 @@ class MuleRouterVideoModel(VideoGenModel):
     def _extract_video_url(self, result: Dict[str, Any]) -> str:
         videos = result.get("videos") or []
         if videos:
-            url = videos[0].get("url") or videos[0].get("video_url")
+            v = videos[0]
+            if isinstance(v, str):
+                return v
+            url = v.get("url") or v.get("video_url")
             if url:
                 return url
         task_info = result.get("task_info") or result
@@ -428,6 +431,11 @@ class MuleRouterVideoModel(VideoGenModel):
             url = output.get("video_url") or output.get("url")
             if url:
                 return url
+        data = result.get("data") or {}
+        data_videos = data.get("videos") or []
+        if data_videos:
+            v = data_videos[0]
+            return v if isinstance(v, str) else (v.get("url") or v.get("video_url", ""))
         raise RuntimeError(f"MuleRouter: cannot extract video URL from result: {result}")
 
 
@@ -455,7 +463,7 @@ class MuleRouterImageModel(ImageGenModel):
         if ref_image_paths:
             endpoint = "openai/gpt-image-2/edit"
         else:
-            endpoint = "openai/gpt-image-2"
+            endpoint = "openai/gpt-image-2/generation"
 
         args = ["--prompt", prompt, "--size", size]
 
@@ -521,7 +529,10 @@ class MuleRouterImageModel(ImageGenModel):
     def _extract_image_url(self, result: Dict[str, Any]) -> str:
         images = result.get("images") or []
         if images:
-            url = images[0].get("url") or images[0].get("image_url")
+            v = images[0]
+            if isinstance(v, str):
+                return v
+            url = v.get("url") or v.get("image_url")
             if url:
                 return url
         task_info = result.get("task_info") or result
@@ -530,4 +541,9 @@ class MuleRouterImageModel(ImageGenModel):
             url = output.get("image_url") or output.get("url")
             if url:
                 return url
+        data = result.get("data") or {}
+        data_images = data.get("images") or []
+        if data_images:
+            v = data_images[0]
+            return v if isinstance(v, str) else (v.get("url") or v.get("image_url", ""))
         raise RuntimeError(f"MuleRouter: cannot extract image URL from result: {result}")
