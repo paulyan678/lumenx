@@ -527,7 +527,7 @@ class MuleRouterImageModel(ImageGenModel):
         for path in ref_image_paths:
             resolved = _resolve_local_image_path(path)
             if resolved:
-                args += ["--image", resolved]
+                args += ["--images", resolved]
 
         result = _run_mulerun_studio(endpoint, args, timeout=300)
         image_url = self._extract_image_url(result)
