@@ -25,10 +25,10 @@ LumenX is an **AI-native motion comic & video creation platform**. It transforms
 
 LumenX currently includes two core modules:
 
-| Module | Purpose | Status |
-|--------|---------|--------|
-| **LumenX Studio** | Pipeline-first comic/video production (Script → Storyboard → Assets → Video → Export) | ✅ Available |
-| **LumenX Playground** | Standalone image/video generation workbench (no project context required) | ✅ Available |
+| Module | Purpose |
+|--------|---------|
+| **LumenX Studio** | Pipeline-first comic/video production (Script → Storyboard → Assets → Video → Export) |
+| **LumenX Playground** | Standalone image/video generation workbench (no project context required) |
 
 ---
 
