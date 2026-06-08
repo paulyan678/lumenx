@@ -1,6 +1,6 @@
 <!-- Banner -->
 <div align="center">
-  <img src="docs/images/LumenX Studio Banner.jpeg" alt="LumenX Studio" width="100%" />
+  <img src="docs/images/LumenX-Studio-Banner-cybr.png" alt="LumenX" width="100%" />
 </div>
 
 <div align="center">
@@ -62,6 +62,19 @@ LumenX 目前包含两个核心模块：
 </td>
 </tr>
 </table>
+
+---
+
+## 🎨 v1.2.1 主视觉焕新
+
+<div align="center">
+
+| Before | After |
+|:---:|:---:|
+| <img src="docs/images/LumenX Studio Banner.jpeg" alt="旧版 Banner" width="100%" /> | <img src="docs/images/LumenX-Studio-Banner-cybr.png" alt="新版 Banner" width="100%" /> |
+| 霓虹渐变莲花 · 柔和曲线 | Cyber Brutalism · 棱角几何 · 电路纹理 |
+
+</div>
 
 ---
 

@@ -1,6 +1,6 @@
 <!-- Banner -->
 <div align="center">
-  <img src="docs/images/LumenX Studio Banner.jpeg" alt="LumenX Studio" width="100%" />
+  <img src="docs/images/LumenX-Studio-Banner-cybr.png" alt="LumenX" width="100%" />
 </div>
 
 <div align="center">
@@ -62,6 +62,19 @@ LumenX currently includes two core modules:
 </td>
 </tr>
 </table>
+
+---
+
+## 🎨 v1.2.1 Visual Identity Refresh
+
+<div align="center">
+
+| Before | After |
+|:---:|:---:|
+| <img src="docs/images/LumenX Studio Banner.jpeg" alt="Old Banner" width="100%" /> | <img src="docs/images/LumenX-Studio-Banner-cybr.png" alt="New Banner" width="100%" /> |
+| Neon gradient lotus · Soft curves | Cyber Brutalism · Angular geometry · Circuit textures |
+
+</div>
 
 ---
 

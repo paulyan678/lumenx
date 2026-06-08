@@ -6,6 +6,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [1.2.1] - 2026-06-09
+
+### Changed
+- **主视觉焕新** — Logo 与 Banner 从霓虹莲花渐变风格升级为 Cyber Brutalism 棱角几何风格（白色棱角莲花 + 蓝色水晶核心 + 电路纹理），品牌字标改为 monospace 等宽字体
+- **侧边栏品牌区** — 去掉渐变文字，改为 monospace "LUMENX" + 蓝色 X，Logo 使用无文字版几何 mark
+
+### Fixed
+- **GPT-Image-2 edit 模式参数** — `--images` 改为 JSON 数组格式传递，修复参考图生成报错
+
+---
+
 ## [1.2.0] - 2026-06-08
 
 ### Added
