@@ -148,14 +148,13 @@ export default function PromptConfigModal({ isOpen, onClose }: PromptConfigModal
                                         </p>
                                     </div>
                                     <select
-                                        // 空字符串（旧数据）回落到 qwen3.6-plus —— 这是后端 fallback chain 的首选，
-                                        // 与原"系统默认"完全等价，所以下拉里不再单独列一项。
-                                        value={config.polish_model || "qwen3.6-plus"}
+                                        value={config.polish_model || "qwen3.7-plus"}
                                         onChange={(e) => setConfig(prev => ({ ...prev, polish_model: e.target.value }))}
                                         className="w-full bg-surface border border-glass-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:border-purple-500/50"
                                     >
+                                        <option value="qwen3.7-plus">qwen3.7-plus · 通义千问 3.7 Plus（最新）</option>
                                         <option value="qwen3.6-plus">qwen3.6-plus · 通义千问 3.6 Plus（视觉）</option>
-                                        <option value="qwen3.6-flash">qwen3.6-flash · 通义千问 3.6 Flash（视觉，更快）</option>
+                                        <option value="qwen3.6-flash">qwen3.6-flash · 通义千问 3.6 Flash（更快）</option>
                                         <option value="kimi-k2.6">kimi-k2.6 · Moonshot Kimi K2.6（视觉）</option>
                                     </select>
                                     <div className="border-b border-border-subtle pt-1" />

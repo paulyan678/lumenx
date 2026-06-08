@@ -103,7 +103,7 @@ LumenX currently includes two core modules:
 | **Kling Direct** | Kling V3 | I2V, R2V |
 | **Vidu Direct** | Vidu Q3 Pro / Turbo | I2V, R2V |
 | **DashScope** | CosyVoice, Qwen3-TTS | TTS Dubbing |
-| **DashScope** | Qwen 3.6 Plus | Script Analysis, Prompt Polish |
+| **DashScope** | Qwen 3.7 Plus | Script Analysis, Prompt Polish |
 
 ---
 

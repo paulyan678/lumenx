@@ -103,7 +103,7 @@ LumenX 目前包含两个核心模块：
 | **Kling 原厂** | Kling V3 | I2V, R2V |
 | **Vidu 原厂** | Vidu Q3 Pro / Turbo | I2V, R2V |
 | **DashScope** | CosyVoice, Qwen3-TTS | TTS 配音 |
-| **DashScope** | Qwen 3.6 Plus | 剧本分析、Prompt 润色 |
+| **DashScope** | Qwen 3.7 Plus | 剧本分析、Prompt 润色 |
 
 ---
 

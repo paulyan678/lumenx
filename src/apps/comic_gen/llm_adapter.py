@@ -58,10 +58,10 @@ class LLMAdapter:
                 )
         return self._client
 
-    # DashScope qwen 系列：首选 qwen3.6-plus（最新稳定），不可用时回退到 qwen-plus
-    # alias（始终指向最新稳定通用版）。这里维护 fallback chain 而不是硬写一个名字，
-    # 避免 DashScope 新版本上下线时整条 LLM 链断掉。
-    _DASHSCOPE_MODEL_FALLBACK_CHAIN = ["qwen3.6-plus", "qwen-plus"]
+    # DashScope qwen 系列：首选 qwen3.7-plus（最新），不可用时回退到 qwen3.6-plus，
+    # 最终回退到 qwen-plus alias（始终指向最新稳定通用版）。
+    # 维护 fallback chain 而不是硬写一个名字，避免新版本上下线时整条 LLM 链断掉。
+    _DASHSCOPE_MODEL_FALLBACK_CHAIN = ["qwen3.7-plus", "qwen3.6-plus", "qwen-plus"]
 
     def _get_default_model(self) -> str:
         if self.provider == "openai":
