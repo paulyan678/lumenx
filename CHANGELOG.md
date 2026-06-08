@@ -6,7 +6,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
-## [Unreleased]
+## [1.2.0] - 2026-06-08
 
 ### Added
 - **Playground 创作台** — 全新独立生成模块，无需创建项目即可使用所有图像/视频生成能力
