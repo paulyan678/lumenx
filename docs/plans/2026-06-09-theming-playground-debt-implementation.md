@@ -126,3 +126,34 @@
 - 真因：仅 **`@apply` 指令** 对 var 色 + alpha 更严格（Tailwind 3.4 限制），className 不受影响。
 - 修复：`globals.css` 的 `.glass-input:focus` 改用原生 `color-mix(in srgb, var(--color-primary) 50%, transparent)`，单点修复，零视觉变化。**不需改 token 结构，不需回找设计方。**
 - 结论：376 处 `primary/N` 无需处理；Phase 0 地基干净落地，build 通过。
+
+### 发现 2：CreativeCanvas 的 `theme === "dark"` 回归（已修）
+- Phase 0 把 theme 枚举从 `'dark'|'light'` 升级为 5 preset，但 `CreativeCanvas.tsx` 的 `const isDark = theme === "dark"` 漏改 → 永远 false，所有新主题下 3D 背景走浅色分支。
+- 修复：`theme.endsWith("-dark")`。
+
+### 发现 3：headless 无 GPU → Three.js 崩溃 → 整页白屏（已加容错，用户批准）
+- 截图验证时 headless Chromium 无 WebGL，`CreativeCanvas` 的 R3F `<Canvas>` 创建 WebGL 失败抛错，冒泡使整个 `page.tsx` React tree 崩溃，截不到 UI（也使 Providers 无法设 html class）。
+- 这同时是**真实生产隐患**：用户禁用硬件加速/WebGL 时会整站白屏。
+- 修复：`CreativeCanvas` 加 `detectWebGL()` 检测（`useState(false)` + `useEffect`，SSR/client 首屏一致以避免 hydration mismatch）+ `CanvasErrorBoundary` 兜底。WebGL 不可用时退化为静态主题底色背景（外层 `bg-background` + CSS 渐变层），不崩整页。纯展示层加固，不碰数据流/API/orchestrator。真实用户首屏 3D 背景延迟一帧渐入（底色始终在），可接受。
+
+### Phase 0 验证结论（A+B 的 A：截图巡检）
+- **数值**（headless 手动切 className 读 CSS 变量，绕过 WebGL/React）：5 主题 `--color-primary`/`--color-accent`/`--seed-base`/`--font-display` 全部正确翻转。
+  | 主题 | primary | accent | seed-base | font |
+  |---|---|---|---|---|
+  | atelier-dark | #34d8c4 | #ffa94d | #0c0b0e | Fraunces |
+  | bridge-dark | #646cff | #ffa94d | #0a0a0d | Space Grotesk |
+  | brand-dark | #646cff | #ff0080 | #050508 | Space Grotesk |
+  | atelier-light | #1d9c8d | #e8852b | #f6f1e9 | Fraunces |
+  | brand-light | #646cff | #ff0080 | #f8f9fa | Space Grotesk |
+- **视觉**（加 WebGL 容错后 headless 截图）：5 主题截图巡检通过，底色/主色/字体翻转正确，对比度良好，无白底白字（除下方 logo 待办）。截图存 `/private/tmp/lumenx-theme-shots/`。
+- **测试**：`settings-store.test.ts` 更新到新 ThemePreset + 遍历断言 + preset 列表断言，6 tests passed；typecheck 中 CreativeCanvas/settings-store 干净（仅剩 pre-existing EnvConfig/ModelSettings 错误，与主题无关）。
+
+### 遗留待办（Phase 2 logo 联动，非 Phase 0 阻塞）
+- 浅色主题下 sidebar logo 的 "LUMEN" 文字为 `text-white` 硬编码 → 白底白字隐形；logo 图标/"X" 颜色也未随 preset 切换。
+
+### 验证基建踩坑记录（供 Phase 1 复用）
+- gstack browse 首次需 `~/.claude/skills/gstack/setup` 装 Playwright chromium v1208（与 dist/browse 配套）。
+- 截图路径必须落在 `/private/tmp` 或项目根内（job tmp 目录被拒）。
+- Next dev 跑久了（本次 6 天）会编译产物漂移 + chunk 404，验证前最好重启前端 dev server。
+- `wait --networkidle` 在 Next dev 必卡（HMR websocket 永不 idle），改 `wait --load` + sleep。
+- browse `--headed` 在本后台环境 daemon 配置切换死锁；headless + CreativeCanvas WebGL 容错是更稳的视觉验证路径。
