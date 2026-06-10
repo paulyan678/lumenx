@@ -47,14 +47,14 @@
       "i2i_model": "wan/wan2.7-image-pro#image",
       "i2v_model": "happyhorse/happyhorse-1.0-video#i2v",
       "image_model": "wan/wan2.7-image-pro#image",
-      "r2v_model": "wan/wan2.7-video#r2v",
+      "r2v_model": "happyhorse/happyhorse-1.0-video#r2v",
       "t2i_model": "wan/wan2.7-image-pro#image"
     },
     "model_settings": {
       "i2i_model": "wan2.7-image-pro",
       "i2v_model": "happyhorse-1.0-i2v",
       "image_model": "wan2.7-image-pro",
-      "r2v_model": "wan2.7-r2v",
+      "r2v_model": "happyhorse-1.0-r2v",
       "t2i_model": "wan2.7-image-pro"
     }
   },

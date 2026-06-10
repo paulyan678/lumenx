@@ -399,12 +399,15 @@ export const VIDEO_SIDEBAR_I2V_MODELS = VIDEO_I2V_MODELS;
 
 export const DEFAULT_I2V_MODEL_ID = resolveModelId('i2v', undefined, 'video_sidebar');
 
-const R2V_CANDIDATES = SORTED_MODEL_ENTRIES.filter((model) =>
-    model.capabilities.includes('r2v')
-);
-export const R2V_SELECTION_MODEL_ID = R2V_CANDIDATES.find(
-    (model) => isVisibleModel(model, 'video_sidebar') && model.ui.selection_group === 'r2v'
-)?.id ?? DEFAULT_I2V_MODEL_ID;
+// Default R2V selection/route follow the catalog meta default
+// (defaults.model_settings.r2v_model) via getFallbackVisibleModelId, NOT raw
+// ui.order: several R2V models share order=80, so an order-based pick would
+// tie-break arbitrarily and silently drift when the catalog gains or renames a
+// model. Default routing is a production concern, so anchor it to the explicit
+// meta default (getFallbackVisibleModelId honors the configured default first,
+// falling back to the highest-ordered visible R2V model only if that default is
+// somehow not visible).
+export const R2V_SELECTION_MODEL_ID = getFallbackVisibleModelId('r2v', 'video_sidebar');
 export const R2V_ROUTE_MODEL_ID = R2V_SELECTION_MODEL_ID;
 
 export function isR2vSelectionModel(modelId: string): boolean {
