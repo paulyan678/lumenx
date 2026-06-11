@@ -181,7 +181,7 @@ export default function VoiceCloneModal({ isOpen, onClose, seriesId, characterNa
                                 ? "border-primary bg-primary/10"
                                 : file
                                     ? "border-primary/50 bg-primary/5"
-                                    : "border-glass-border hover:border-foreground/20 bg-black/30"
+                                    : "border-glass-border hover:border-foreground/30 bg-black/30"
                         } ${inFlight ? "opacity-60 cursor-not-allowed" : ""}`}
                     >
                         <input

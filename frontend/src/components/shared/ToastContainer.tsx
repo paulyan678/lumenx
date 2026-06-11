@@ -82,7 +82,7 @@ function ToastCard({ toast }: { toast: Toast }) {
                             toast.action!.onClick();
                             dismiss(toast.id);
                         }}
-                        className="mt-1.5 inline-flex items-center px-2 py-0.5 rounded-md bg-foreground/5 border border-glass-border text-[11px] font-medium text-foreground hover:bg-foreground/10 transition-colors"
+                        className="mt-1.5 inline-flex items-center px-2 py-0.5 rounded-md bg-elevated border border-glass-border text-[11px] font-medium text-foreground hover:bg-hover-bg transition-colors"
                     >
                         {toast.action.label}
                     </button>

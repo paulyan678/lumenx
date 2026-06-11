@@ -440,14 +440,14 @@ function BilingualColumn({
             </div>
             {isLoading ? (
                 <div className="space-y-1 rounded bg-black/30 px-2.5 py-2">
-                    <div className="h-3 w-full animate-pulse rounded bg-foreground/8" />
-                    <div className="h-3 w-[88%] animate-pulse rounded bg-foreground/8" />
-                    <div className="h-3 w-[72%] animate-pulse rounded bg-foreground/8" />
+                    <div className="h-3 w-full animate-pulse rounded bg-elevated" />
+                    <div className="h-3 w-[88%] animate-pulse rounded bg-elevated" />
+                    <div className="h-3 w-[72%] animate-pulse rounded bg-elevated" />
                 </div>
             ) : (
                 <p
                     className={clsx(
-                        "rounded bg-black/30 px-2.5 py-2 text-body-sm leading-relaxed text-foreground/95 whitespace-pre-wrap",
+                        "rounded bg-black/30 px-2.5 py-2 text-body-sm leading-relaxed text-foreground whitespace-pre-wrap",
                         isMono ? "font-mono" : "font-sans",
                     )}
                 >

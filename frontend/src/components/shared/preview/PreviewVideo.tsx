@@ -172,7 +172,7 @@ export default function PreviewVideo({
                             className="pointer-events-none absolute inset-0 grid place-items-center opacity-70 transition-opacity duration-fast ease-out-quart group-hover/preview:opacity-0"
                         >
                             <div className="grid h-9 w-9 place-items-center rounded-full bg-black/55 backdrop-blur">
-                                <Play size={14} className="text-foreground/90" fill="currentColor" />
+                                <Play size={14} className="text-foreground" fill="currentColor" />
                             </div>
                         </div>
                     ) : null}
@@ -183,7 +183,7 @@ export default function PreviewVideo({
                             aria-label="放大查看"
                             title="放大查看"
                             className={clsx(
-                                "absolute right-1 top-1 grid h-6 w-6 place-items-center rounded bg-black/55 text-foreground/90 backdrop-blur transition-opacity duration-fast ease-out-quart hover:bg-black/75 focus-visible:outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-primary/55",
+                                "absolute right-1 top-1 grid h-6 w-6 place-items-center rounded bg-black/55 text-foreground backdrop-blur transition-opacity duration-fast ease-out-quart hover:bg-black/75 focus-visible:outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-primary/55",
                                 alwaysShowMagnify
                                     ? "opacity-100"
                                     : "opacity-0 group-hover/preview:opacity-100",

@@ -452,7 +452,7 @@ function MixPhase({
                         className={`rounded-lg border p-3 text-left transition-colors ${
                             !bgmUrl
                                 ? "border-primary bg-[rgba(100,108,255,0.10)]"
-                                : "border-glass-border bg-glass hover:border-foreground/15"
+                                : "border-glass-border bg-glass hover:border-foreground/30"
                         }`}
                     >
                         <p className="text-[13px] font-medium text-foreground">{ta("mixBgmNone")}</p>
@@ -472,7 +472,7 @@ function MixPhase({
                                     className={`rounded-lg border p-3 text-left transition-colors ${
                                         selected
                                             ? "border-primary bg-[rgba(100,108,255,0.10)]"
-                                            : "border-glass-border bg-glass hover:border-foreground/15"
+                                            : "border-glass-border bg-glass hover:border-foreground/30"
                                     }`}
                                 >
                                     <p className="text-[13px] font-medium text-foreground truncate">{p.label}</p>

@@ -495,7 +495,7 @@ function VoiceCard({
             className={`relative cursor-pointer rounded-lg border p-3 transition-colors ${
                 selected
                     ? "border-primary bg-[rgba(100,108,255,0.10)]"
-                    : "border-glass-border bg-glass hover:border-foreground/15"
+                    : "border-glass-border bg-glass hover:border-foreground/30"
             }`}
         >
             <div className="flex items-start justify-between gap-2">
@@ -516,7 +516,7 @@ function VoiceCard({
                     className={`shrink-0 inline-flex h-7 w-7 items-center justify-center rounded-md border transition-colors ${
                         playing
                             ? "border-primary bg-primary/15 text-primary"
-                            : "border-glass-border bg-black/30 text-text-secondary hover:border-foreground/20 hover:text-foreground"
+                            : "border-glass-border bg-black/30 text-text-secondary hover:border-foreground/30 hover:text-foreground"
                     }`}
                 >
                     {previewing ? (
@@ -603,7 +603,7 @@ function CustomVoiceList({
                                 className={`relative cursor-pointer rounded-lg border p-3 transition-colors ${
                                     isSelected
                                         ? "border-primary bg-[rgba(100,108,255,0.10)]"
-                                        : "border-glass-border bg-glass hover:border-foreground/15"
+                                        : "border-glass-border bg-glass hover:border-foreground/30"
                                 }`}
                             >
                                 <div className="flex items-start justify-between gap-2">
@@ -624,7 +624,7 @@ function CustomVoiceList({
                                             className={`inline-flex h-7 w-7 items-center justify-center rounded-md border transition-colors ${
                                                 isPlaying
                                                     ? "border-primary bg-primary/15 text-primary"
-                                                    : "border-glass-border bg-black/30 text-text-secondary hover:border-foreground/20 hover:text-foreground"
+                                                    : "border-glass-border bg-black/30 text-text-secondary hover:border-foreground/30 hover:text-foreground"
                                             }`}
                                         >
                                             {isPreviewing ? <Loader2 size={12} className="animate-spin" /> : isPlaying ? <Pause size={12} /> : <Play size={12} />}

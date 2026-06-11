@@ -187,23 +187,23 @@ export default function VideoConfigModal({ isOpen, onClose, config, onConfigChan
                         animate={{ scale: 1, opacity: 1, y: 0 }}
                         exit={{ scale: 0.9, opacity: 0, y: 24 }}
                         transition={springMed}
-                        className="relative bg-surface border border-foreground/[0.08] shadow-[0_0_80px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.04)] rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden"
+                        className="relative bg-surface border border-glass-border shadow-[0_0_80px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.04)] rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Header — Cinematic glass bar with accent */}
-                        <div className="relative flex items-center justify-between px-7 py-5 border-b border-foreground/[0.06] shrink-0 bg-foreground/[0.015]">
+                        <div className="relative flex items-center justify-between px-7 py-5 border-b border-glass-border shrink-0 bg-glass">
                             {/* Accent gradient line at top */}
                             <div className={`absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r ${activeAccent} opacity-40`} />
                             <div className="flex items-center gap-3.5">
-                                <div className="relative w-9 h-9 rounded-xl bg-foreground/[0.04] border border-foreground/[0.08] flex items-center justify-center">
-                                    <Settings2 size={16} className="text-foreground/70" strokeWidth={1.5} />
+                                <div className="relative w-9 h-9 rounded-xl bg-glass border border-glass-border flex items-center justify-center">
+                                    <Settings2 size={16} className="text-foreground/80" strokeWidth={1.5} />
                                     <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-gradient-to-br ${activeAccent} border border-surface`} />
                                 </div>
                                 <div>
                                     <h2 className="text-[15px] font-semibold text-foreground tracking-tight">
                                         {t("videoSettings")}
                                     </h2>
-                                    <p className="text-[11px] text-foreground/30 mt-0.5 tracking-wide font-medium">
+                                    <p className="text-[11px] text-text-muted mt-0.5 tracking-wide font-medium">
                                         {currentModelConfig?.name}
                                     </p>
                                 </div>
@@ -213,7 +213,7 @@ export default function VideoConfigModal({ isOpen, onClose, config, onConfigChan
                                 whileTap={{ scale: 0.9 }}
                                 onClick={onClose}
                                 transition={springFast}
-                                className="p-2 rounded-xl hover:bg-foreground/[0.06] text-foreground/30 hover:text-foreground/60 transition-colors"
+                                className="p-2 rounded-xl hover:bg-hover-bg text-text-muted hover:text-foreground transition-colors"
                             >
                                 <X size={18} strokeWidth={1.5} />
                             </motion.button>
@@ -230,8 +230,8 @@ export default function VideoConfigModal({ isOpen, onClose, config, onConfigChan
                                 className="space-y-4"
                             >
                                 <div className="flex items-center gap-2.5">
-                                    <Wand2 size={13} className="text-foreground/25" strokeWidth={1.5} />
-                                    <h3 className="text-[10px] font-bold text-foreground/30 uppercase tracking-[0.2em]">
+                                    <Wand2 size={13} className="text-text-muted" strokeWidth={1.5} />
+                                    <h3 className="text-[10px] font-bold text-text-muted uppercase tracking-[0.2em]">
                                         {t("modelSelection")}
                                     </h3>
                                 </div>
@@ -251,8 +251,8 @@ export default function VideoConfigModal({ isOpen, onClose, config, onConfigChan
                                 className="space-y-4"
                             >
                                 <div className="flex items-center gap-2.5">
-                                    <Timer size={13} className="text-foreground/25" strokeWidth={1.5} />
-                                    <h3 className="text-[10px] font-bold text-foreground/30 uppercase tracking-[0.2em]">
+                                    <Timer size={13} className="text-text-muted" strokeWidth={1.5} />
+                                    <h3 className="text-[10px] font-bold text-text-muted uppercase tracking-[0.2em]">
                                         {t("durationLabel")}
                                     </h3>
                                 </div>
@@ -264,11 +264,11 @@ export default function VideoConfigModal({ isOpen, onClose, config, onConfigChan
                                     };
                                     if (dc.type === "fixed") {
                                         return (
-                                            <div className="flex items-baseline gap-2 px-5 py-4 rounded-xl bg-foreground/[0.02] border border-foreground/[0.06]">
+                                            <div className="flex items-baseline gap-2 px-5 py-4 rounded-xl bg-glass border border-glass-border">
                                                 <span className="text-3xl font-bold text-foreground tabular-nums tracking-tight">
                                                     {dc.value}
                                                 </span>
-                                                <span className="text-sm text-foreground/30 font-medium">sec</span>
+                                                <span className="text-sm text-text-muted font-medium">sec</span>
                                             </div>
                                         );
                                     }
@@ -277,14 +277,14 @@ export default function VideoConfigModal({ isOpen, onClose, config, onConfigChan
                                         return (
                                             <div className="space-y-3 px-1">
                                                 <div className="flex items-center justify-between">
-                                                    <span className="text-[11px] text-foreground/25 font-medium tracking-wide">
+                                                    <span className="text-[11px] text-text-muted font-medium tracking-wide">
                                                         {t("durationLabel")}
                                                     </span>
                                                     <span className="text-sm font-bold text-foreground tabular-nums">
-                                                        {draft.duration}<span className="text-foreground/25 text-xs font-medium ml-0.5">s</span>
+                                                        {draft.duration}<span className="text-text-muted text-xs font-medium ml-0.5">s</span>
                                                     </span>
                                                 </div>
-                                                <div className="relative h-[6px] bg-foreground/[0.04] rounded-full">
+                                                <div className="relative h-[6px] bg-glass rounded-full">
                                                     {/* Gradient fill track */}
                                                     <div
                                                         className={`absolute top-0 left-0 h-full rounded-full bg-gradient-to-r ${activeAccent} opacity-60 transition-all duration-150`}
@@ -315,7 +315,7 @@ export default function VideoConfigModal({ isOpen, onClose, config, onConfigChan
                                                         transition={{ type: "spring", stiffness: 300, damping: 25 }}
                                                     />
                                                 </div>
-                                                <div className="flex justify-between text-[10px] text-foreground/15 font-semibold tabular-nums">
+                                                <div className="flex justify-between text-[10px] text-text-muted font-semibold tabular-nums">
                                                     <span>{dc.min}s</span>
                                                     <span>{dc.max}s</span>
                                                 </div>
@@ -335,8 +335,8 @@ export default function VideoConfigModal({ isOpen, onClose, config, onConfigChan
                                                         onClick={() => updateDraft("duration", dur)}
                                                         className={`relative flex-1 py-3 text-sm font-bold rounded-xl border transition-all duration-200 overflow-hidden ${
                                                             isActive
-                                                                ? "bg-foreground/[0.06] border-foreground/[0.12] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
-                                                                : "bg-foreground/[0.015] border-foreground/[0.05] text-foreground/30 hover:border-foreground/[0.10] hover:text-foreground/50"
+                                                                ? "bg-elevated border-foreground/[0.12] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+                                                                : "bg-glass border-border-subtle text-text-muted hover:border-foreground/30 hover:text-foreground"
                                                         }`}
                                                     >
                                                         {isActive && (
@@ -359,7 +359,7 @@ export default function VideoConfigModal({ isOpen, onClose, config, onConfigChan
                                         variants={sectionVariants}
                                         initial="hidden"
                                         animate="visible"
-                                        className="w-full h-px bg-gradient-to-r from-transparent via-foreground/[0.06] to-transparent"
+                                        className="w-full h-px bg-gradient-to-r from-transparent via-glass-border to-transparent"
                                     />
                                     <motion.section
                                         custom={2}
@@ -369,8 +369,8 @@ export default function VideoConfigModal({ isOpen, onClose, config, onConfigChan
                                         className="space-y-5"
                                     >
                                         <div className="flex items-center gap-2.5">
-                                            <SlidersHorizontal size={13} className="text-foreground/25" strokeWidth={1.5} />
-                                            <h3 className="text-[10px] font-bold text-foreground/30 uppercase tracking-[0.2em]">
+                                            <SlidersHorizontal size={13} className="text-text-muted" strokeWidth={1.5} />
+                                            <h3 className="text-[10px] font-bold text-text-muted uppercase tracking-[0.2em]">
                                                 {t("advancedParams")}
                                             </h3>
                                         </div>
@@ -379,7 +379,7 @@ export default function VideoConfigModal({ isOpen, onClose, config, onConfigChan
                                             {/* Resolution */}
                                             {modelParams.resolution && (
                                                 <div className="space-y-2.5">
-                                                    <label className="block text-[11px] text-foreground/30 font-semibold tracking-wide">
+                                                    <label className="block text-[11px] text-text-muted font-semibold tracking-wide">
                                                         {tm("resolutionLabel")}
                                                     </label>
                                                     <div className="flex flex-wrap gap-1.5">
@@ -394,7 +394,7 @@ export default function VideoConfigModal({ isOpen, onClose, config, onConfigChan
                                                                     className={`px-3 py-1.5 text-[11px] font-bold rounded-lg border transition-all duration-200 ${
                                                                         isActive
                                                                             ? `bg-gradient-to-r ${activeAccent} bg-opacity-10 border-foreground/[0.12] text-foreground`
-                                                                            : "bg-foreground/[0.015] border-foreground/[0.05] text-foreground/30 hover:border-foreground/[0.10] hover:text-foreground/50"
+                                                                            : "bg-glass border-border-subtle text-text-muted hover:border-foreground/30 hover:text-foreground"
                                                                     }`}
                                                                     style={isActive ? { background: `linear-gradient(to right, var(--tw-gradient-stops))`, opacity: 0.9 } : {}}
                                                                 >
@@ -409,7 +409,7 @@ export default function VideoConfigModal({ isOpen, onClose, config, onConfigChan
                                             {/* Prompt Extend */}
                                             {modelParams.promptExtend && (
                                                 <div className="flex items-center justify-between py-1">
-                                                    <label className="text-[11px] text-foreground/30 font-semibold tracking-wide">
+                                                    <label className="text-[11px] text-text-muted font-semibold tracking-wide">
                                                         {tm("promptEnhancer")}
                                                     </label>
                                                     <button
@@ -417,7 +417,7 @@ export default function VideoConfigModal({ isOpen, onClose, config, onConfigChan
                                                         className={`relative w-11 h-[22px] rounded-full transition-colors duration-300 ${
                                                             draft.promptExtend
                                                                 ? `bg-gradient-to-r ${activeAccent}`
-                                                                : "bg-foreground/[0.06]"
+                                                                : "bg-elevated"
                                                         }`}
                                                     >
                                                         <motion.div
@@ -434,7 +434,7 @@ export default function VideoConfigModal({ isOpen, onClose, config, onConfigChan
                                             {/* Negative Prompt */}
                                             {modelParams.negativePrompt && (
                                                 <div className="md:col-span-2 space-y-2.5">
-                                                    <label className="block text-[11px] text-foreground/30 font-semibold tracking-wide">
+                                                    <label className="block text-[11px] text-text-muted font-semibold tracking-wide">
                                                         {tm("negativePrompt")}
                                                     </label>
                                                     <input
@@ -442,7 +442,7 @@ export default function VideoConfigModal({ isOpen, onClose, config, onConfigChan
                                                         value={draft.negativePrompt}
                                                         onChange={(e) => updateDraft("negativePrompt", e.target.value)}
                                                         placeholder={tm("negativePromptPlaceholder")}
-                                                        className="w-full text-sm bg-foreground/[0.02] border border-foreground/[0.06] rounded-xl px-4 py-3 text-foreground placeholder:text-foreground/15 focus:outline-none focus:border-foreground/[0.14] focus:bg-foreground/[0.03] transition-all duration-200"
+                                                        className="w-full text-sm bg-glass border border-glass-border rounded-xl px-4 py-3 text-foreground placeholder:text-text-muted focus:outline-none focus:border-foreground/[0.14] focus:bg-glass transition-all duration-200"
                                                     />
                                                 </div>
                                             )}
@@ -450,7 +450,7 @@ export default function VideoConfigModal({ isOpen, onClose, config, onConfigChan
                                             {/* Kling: Mode */}
                                             {modelParams.mode && (
                                                 <div className="space-y-2.5">
-                                                    <label className="block text-[11px] text-foreground/30 font-semibold tracking-wide">
+                                                    <label className="block text-[11px] text-text-muted font-semibold tracking-wide">
                                                         {tm("modeLabel")}
                                                     </label>
                                                     <div className="flex gap-1.5">
@@ -464,8 +464,8 @@ export default function VideoConfigModal({ isOpen, onClose, config, onConfigChan
                                                                     onClick={() => updateDraft("mode", opt)}
                                                                     className={`flex-1 py-2.5 text-[11px] font-bold rounded-lg border transition-all duration-200 uppercase tracking-wider ${
                                                                         isActive
-                                                                            ? "bg-foreground/[0.06] border-foreground/[0.12] text-foreground"
-                                                                            : "bg-foreground/[0.015] border-foreground/[0.05] text-foreground/30 hover:border-foreground/[0.10] hover:text-foreground/50"
+                                                                            ? "bg-elevated border-foreground/[0.12] text-foreground"
+                                                                            : "bg-glass border-border-subtle text-text-muted hover:border-foreground/30 hover:text-foreground"
                                                                     }`}
                                                                 >
                                                                     {opt}
@@ -480,14 +480,14 @@ export default function VideoConfigModal({ isOpen, onClose, config, onConfigChan
                                             {modelParams.cfgScale && (
                                                 <div className="space-y-2.5">
                                                     <div className="flex items-center justify-between">
-                                                        <label className="text-[11px] text-foreground/30 font-semibold tracking-wide">
+                                                        <label className="text-[11px] text-text-muted font-semibold tracking-wide">
                                                             {tm("cfgScale")}
                                                         </label>
-                                                        <span className="text-[11px] font-bold text-foreground/60 tabular-nums">
+                                                        <span className="text-[11px] font-bold text-text-secondary tabular-nums">
                                                             {(draft.cfgScale ?? 0.5).toFixed(1)}
                                                         </span>
                                                     </div>
-                                                    <div className="relative h-[6px] bg-foreground/[0.04] rounded-full">
+                                                    <div className="relative h-[6px] bg-glass rounded-full">
                                                         {(() => {
                                                             const cfgVal = draft.cfgScale ?? 0.5;
                                                             const cfgMin = modelParams.cfgScale.min ?? 0;
@@ -523,7 +523,7 @@ export default function VideoConfigModal({ isOpen, onClose, config, onConfigChan
                                             {/* Vidu: Movement Amplitude */}
                                             {modelParams.movementAmplitude && (
                                                 <div className="space-y-2.5">
-                                                    <label className="block text-[11px] text-foreground/30 font-semibold tracking-wide">
+                                                    <label className="block text-[11px] text-text-muted font-semibold tracking-wide">
                                                         {tm("movementAmplitude")}
                                                     </label>
                                                     <div className="flex gap-1.5">
@@ -537,8 +537,8 @@ export default function VideoConfigModal({ isOpen, onClose, config, onConfigChan
                                                                     onClick={() => updateDraft("movementAmplitude", opt)}
                                                                     className={`flex-1 py-2 text-[11px] font-bold rounded-lg border transition-all duration-200 capitalize ${
                                                                         isActive
-                                                                            ? "bg-foreground/[0.06] border-foreground/[0.12] text-foreground"
-                                                                            : "bg-foreground/[0.015] border-foreground/[0.05] text-foreground/30 hover:border-foreground/[0.10] hover:text-foreground/50"
+                                                                            ? "bg-elevated border-foreground/[0.12] text-foreground"
+                                                                            : "bg-glass border-border-subtle text-text-muted hover:border-foreground/30 hover:text-foreground"
                                                                     }`}
                                                                 >
                                                                     {opt === "auto" ? "Auto" : opt === "small" ? "S" : opt === "medium" ? "M" : "L"}
@@ -555,12 +555,12 @@ export default function VideoConfigModal({ isOpen, onClose, config, onConfigChan
                         </div>
 
                         {/* Footer — Glass bar with accent glow CTA */}
-                        <div className="flex gap-3 px-7 py-5 border-t border-foreground/[0.06] shrink-0 bg-foreground/[0.015]">
+                        <div className="flex gap-3 px-7 py-5 border-t border-glass-border shrink-0 bg-glass">
                             <motion.button
                                 whileHover={{ scale: 1.02 }}
                                 whileTap={{ scale: 0.98 }}
                                 onClick={onClose}
-                                className="flex-1 px-4 py-3 rounded-xl bg-foreground/[0.03] hover:bg-foreground/[0.06] border border-foreground/[0.06] text-foreground/40 hover:text-foreground/60 text-sm font-semibold tracking-wide transition-all duration-200"
+                                className="flex-1 px-4 py-3 rounded-xl bg-glass hover:bg-hover-bg border border-glass-border text-text-muted hover:text-foreground text-sm font-semibold tracking-wide transition-all duration-200"
                             >
                                 Cancel
                             </motion.button>

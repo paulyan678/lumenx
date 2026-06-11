@@ -216,7 +216,7 @@ export default function CandidatesSection({
                 // saying "nothing here" (P2-9). Three numbered steps
                 // teach the panel without taking over.
                 <div className="flex flex-col items-center gap-2 px-3 py-5">
-                    <div className="font-display text-display-sm font-semibold tracking-tight text-foreground/85">
+                    <div className="font-display text-display-sm font-semibold tracking-tight text-foreground">
                         No candidates yet
                     </div>
                     <ol className="flex flex-col gap-1 text-center font-mono text-chrome-sm tracking-tight text-text-muted">
@@ -297,7 +297,7 @@ function FilterChip({
             className={`inline-flex min-h-[24px] items-center gap-1 rounded-full border px-2 py-[2px] font-mono text-chrome-sm font-medium uppercase transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 ${
                 active
                     ? "border-primary/55 bg-primary/15 text-primary"
-                    : "border-glass-border bg-black/20 text-text-muted hover:border-foreground/20 hover:text-foreground"
+                    : "border-glass-border bg-black/20 text-text-muted hover:border-foreground/30 hover:text-foreground"
             }`}
         >
             {children}

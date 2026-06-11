@@ -782,7 +782,7 @@ function ImageWithRetry({ src, alt, className, onClick }: { src: string, alt: st
         <div className={`relative ${className}`}>
             {isLoading && (
                 <div className="absolute inset-0 flex items-center justify-center bg-surface z-10">
-                    <RefreshCw className="animate-spin text-foreground/50" size={24} />
+                    <RefreshCw className="animate-spin text-text-secondary" size={24} />
                 </div>
             )}
             <img

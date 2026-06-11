@@ -280,7 +280,7 @@ function TaskRow({
 
     return (
         <div
-            className="group/row space-y-1.5 rounded-md border border-glass-border bg-glass px-2.5 py-2 transition-colors duration-fast ease-out-quart hover:border-foreground/15"
+            className="group/row space-y-1.5 rounded-md border border-glass-border bg-glass px-2.5 py-2 transition-colors duration-fast ease-out-quart hover:border-foreground/30"
             title={`Task id: ${task.id}`}
         >
             {/* Header row — chevron + status + shot label + actions */}
@@ -343,7 +343,7 @@ function TaskRow({
                         )}
                     </div>
                     <div className="min-w-0 flex-1 space-y-0.5">
-                        <p className="line-clamp-2 font-sans text-body-sm leading-snug text-foreground/90" title={fullPrompt}>
+                        <p className="line-clamp-2 font-sans text-body-sm leading-snug text-foreground" title={fullPrompt}>
                             {promptPreview}
                         </p>
                         <p className="truncate font-mono text-chrome-sm tracking-tight text-text-muted">
@@ -383,7 +383,7 @@ function TaskRow({
                     {fullPrompt ? (
                         <div className="space-y-0.5">
                             <p className="font-mono text-[9px] uppercase tracking-wider text-text-muted">prompt</p>
-                            <p className="whitespace-pre-wrap rounded border border-glass-border/60 bg-black/30 px-2 py-1.5 font-sans text-body-sm leading-snug text-foreground/90">
+                            <p className="whitespace-pre-wrap rounded border border-glass-border/60 bg-black/30 px-2 py-1.5 font-sans text-body-sm leading-snug text-foreground">
                                 {fullPrompt}
                             </p>
                         </div>
@@ -416,7 +416,7 @@ function TaskRow({
                             {task.provider_task_id ? (
                                 <div className="flex items-center gap-1.5">
                                     <span className="font-mono text-chrome-sm text-text-muted">task:</span>
-                                    <code className="min-w-0 flex-1 truncate font-mono text-chrome-sm text-foreground/90" title={task.provider_task_id}>
+                                    <code className="min-w-0 flex-1 truncate font-mono text-chrome-sm text-foreground" title={task.provider_task_id}>
                                         {task.provider_task_id}
                                     </code>
                                     <button
@@ -433,7 +433,7 @@ function TaskRow({
                             {task.provider_request_id ? (
                                 <div className="flex items-center gap-1.5">
                                     <span className="font-mono text-chrome-sm text-text-muted">req:</span>
-                                    <code className="min-w-0 flex-1 truncate font-mono text-chrome-sm text-foreground/90" title={task.provider_request_id}>
+                                    <code className="min-w-0 flex-1 truncate font-mono text-chrome-sm text-foreground" title={task.provider_request_id}>
                                         {task.provider_request_id}
                                     </code>
                                     <button

@@ -230,7 +230,7 @@ function LightboxPortal({
                         type="button"
                         onClick={onCopyUrl}
                         title="复制 URL"
-                        className="inline-flex h-9 items-center gap-1.5 rounded-md border border-foreground/15 bg-black/55 px-3 font-mono text-chrome-sm font-medium text-foreground/85 backdrop-blur transition-colors duration-fast ease-out-quart hover:bg-black/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                        className="inline-flex h-9 items-center gap-1.5 rounded-md border border-foreground/15 bg-black/55 px-3 font-mono text-chrome-sm font-medium text-foreground backdrop-blur transition-colors duration-fast ease-out-quart hover:bg-black/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                     >
                         {copied ? <Check size={13} /> : <Copy size={13} />}
                         {copied ? "已复制" : "复制 URL"}
@@ -240,7 +240,7 @@ function LightboxPortal({
                         target="_blank"
                         rel="noreferrer"
                         title="在新标签打开"
-                        className="grid h-9 w-9 place-items-center rounded-md border border-foreground/15 bg-black/55 text-foreground/85 backdrop-blur transition-colors duration-fast ease-out-quart hover:bg-black/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                        className="grid h-9 w-9 place-items-center rounded-md border border-foreground/15 bg-black/55 text-foreground backdrop-blur transition-colors duration-fast ease-out-quart hover:bg-black/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                     >
                         <ExternalLink size={14} />
                     </a>
@@ -249,7 +249,7 @@ function LightboxPortal({
                         onClick={onClose}
                         title="关闭 (Esc)"
                         aria-label="关闭"
-                        className="grid h-9 w-9 place-items-center rounded-md border border-foreground/15 bg-black/55 text-foreground/85 backdrop-blur transition-colors duration-fast ease-out-quart hover:bg-black/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                        className="grid h-9 w-9 place-items-center rounded-md border border-foreground/15 bg-black/55 text-foreground backdrop-blur transition-colors duration-fast ease-out-quart hover:bg-black/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                     >
                         <X size={16} />
                     </button>
@@ -262,7 +262,7 @@ function LightboxPortal({
                         onClick={onPrev}
                         aria-label="上一张"
                         title="← 上一张"
-                        className="absolute left-4 top-1/2 z-[62] grid h-12 w-12 -translate-y-1/2 place-items-center rounded-full border border-foreground/15 bg-black/55 text-foreground/90 backdrop-blur transition-colors duration-fast ease-out-quart hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                        className="absolute left-4 top-1/2 z-[62] grid h-12 w-12 -translate-y-1/2 place-items-center rounded-full border border-foreground/15 bg-black/55 text-foreground backdrop-blur transition-colors duration-fast ease-out-quart hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                     >
                         <ChevronLeft size={20} />
                     </button>
@@ -273,7 +273,7 @@ function LightboxPortal({
                         onClick={onNext}
                         aria-label="下一张"
                         title="→ 下一张"
-                        className="absolute right-4 top-1/2 z-[62] grid h-12 w-12 -translate-y-1/2 place-items-center rounded-full border border-foreground/15 bg-black/55 text-foreground/90 backdrop-blur transition-colors duration-fast ease-out-quart hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                        className="absolute right-4 top-1/2 z-[62] grid h-12 w-12 -translate-y-1/2 place-items-center rounded-full border border-foreground/15 bg-black/55 text-foreground backdrop-blur transition-colors duration-fast ease-out-quart hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                     >
                         <ChevronRight size={20} />
                     </button>
@@ -281,7 +281,7 @@ function LightboxPortal({
 
                 {/* Group counter */}
                 {groupCount > 1 ? (
-                    <div className="absolute bottom-4 left-1/2 z-[62] -translate-x-1/2 rounded-full border border-foreground/15 bg-black/55 px-3 py-1 font-mono text-chrome-sm text-foreground/85 backdrop-blur">
+                    <div className="absolute bottom-4 left-1/2 z-[62] -translate-x-1/2 rounded-full border border-foreground/15 bg-black/55 px-3 py-1 font-mono text-chrome-sm text-foreground backdrop-blur">
                         {groupIndex + 1} / {groupCount}
                     </div>
                 ) : null}

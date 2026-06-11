@@ -176,7 +176,7 @@ export default function ParamsSection({
                                     className={`min-h-[28px] rounded-full border px-2.5 py-1 font-mono text-chrome-sm font-medium transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 ${
                                         active
                                             ? "border-primary/55 bg-primary/15 text-primary"
-                                            : "border-glass-border bg-black/20 text-text-secondary hover:border-foreground/20 hover:text-foreground"
+                                            : "border-glass-border bg-black/20 text-text-secondary hover:border-foreground/30 hover:text-foreground"
                                     }`}
                                 >
                                     {m.name}
@@ -456,7 +456,7 @@ function PillCluster({
                         className={`min-h-[28px] rounded-md border px-2.5 py-1 font-mono text-chrome-sm font-medium transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 ${
                             active
                                 ? "border-primary/55 bg-primary/15 text-primary"
-                                : "border-glass-border bg-black/20 text-text-secondary hover:border-foreground/20 hover:text-foreground"
+                                : "border-glass-border bg-black/20 text-text-secondary hover:border-foreground/30 hover:text-foreground"
                         }`}
                     >
                         {opt}
@@ -510,7 +510,7 @@ function DurationControl({
                 value={value}
                 onChange={(e) => onChange(parseInt(e.target.value, 10))}
                 aria-label="Duration in seconds (drag to adjust)"
-                className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-foreground/10 accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-elevated accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
             />
             <div className="flex shrink-0 items-center gap-0.5">
                 <input
@@ -565,7 +565,7 @@ function SliderControl({
                 step={step}
                 value={value}
                 onChange={(e) => onChange(parseFloat(e.target.value))}
-                className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-foreground/10 accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-elevated accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
             />
             <span className="w-10 shrink-0 text-right font-mono text-body-sm tabular-nums text-foreground">
                 {value}
@@ -592,7 +592,7 @@ function ToggleControl({
             <span
                 aria-hidden="true"
                 className={`relative h-5 w-9 rounded-full transition-colors duration-fast ease-out-quart ${
-                    value ? "bg-primary" : "bg-foreground/10"
+                    value ? "bg-primary" : "bg-elevated"
                 }`}
             >
                 <span

@@ -1779,13 +1779,13 @@ export default function StoryboardR2V() {
                                 className="btn-tip hidden md:inline-flex items-center gap-1.5 rounded-md border border-glass-border bg-black/20 px-2.5 py-1.5 font-mono text-[10.5px] font-medium text-text-secondary transition-colors duration-fast ease-out-quart hover:border-accent/50 hover:bg-accent/10 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/55"
                             >
                                 <Palette size={11} aria-hidden="true" />
-                                <span className="text-foreground/95">{currentProject.art_direction.style_config.name}</span>
+                                <span className="text-foreground">{currentProject.art_direction.style_config.name}</span>
                             </button>
                         ) : null}
                         {/* Current model name —— 简化的 mono chrome label */}
                         <span className="hidden lg:inline font-mono text-[10px] uppercase tracking-[0.16em] text-text-muted">
                             <span>{t("currentModel")}:</span>
-                            <span className="ml-1 text-foreground/95">{currentModelName}</span>
+                            <span className="ml-1 text-foreground">{currentModelName}</span>
                         </span>
                         {/* Open task queue */}
                         <TaskQueueButton
@@ -1798,7 +1798,7 @@ export default function StoryboardR2V() {
             />
             {/* Top Toolbar — 简化版：只保留 shot 计数 / + shot / 全展开-全折叠
                 model name + queue button + 画风 已上移到 StepHeader trailing. */}
-            <div className="flex flex-wrap items-center gap-3 px-4 py-2.5 border-b border-foreground/[0.06] bg-foreground/[0.015] shrink-0 sm:px-6">
+            <div className="flex flex-wrap items-center gap-3 px-4 py-2.5 border-b border-glass-border bg-glass shrink-0 sm:px-6">
                 <span className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-text-muted">
                     <span className="text-foreground font-medium">{shots.length}</span>
                     <span className="ml-1.5">{shots.length === 1 ? "shot" : "shots"}</span>
@@ -2244,7 +2244,7 @@ export default function StoryboardR2V() {
                     whileHover={{ scale: 1.005 }}
                     whileTap={{ scale: 0.995 }}
                     onClick={() => addShot(shots.length - 1)}
-                    className="w-full py-3.5 border border-dashed border-foreground/[0.08] hover:border-primary/40 rounded-xl text-text-secondary hover:text-primary text-sm font-medium transition-all duration-300 flex items-center justify-center gap-2 bg-foreground/[0.01] hover:bg-foreground/[0.03]"
+                    className="w-full py-3.5 border border-dashed border-glass-border hover:border-primary/40 rounded-xl text-text-secondary hover:text-primary text-sm font-medium transition-all duration-300 flex items-center justify-center gap-2 bg-glass hover:bg-hover-bg"
                 >
                     <Plus size={16} strokeWidth={1.5} />
                     {t("addShot")}

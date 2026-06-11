@@ -825,7 +825,7 @@ function ImageWithRetry({ src, alt, className }: { src: string, alt: string, cla
         <div className={`relative ${className}`}>
             {isLoading && (
                 <div className="absolute inset-0 flex items-center justify-center bg-surface z-10">
-                    <RefreshCw className="animate-spin text-foreground/50" size={24} />
+                    <RefreshCw className="animate-spin text-text-secondary" size={24} />
                 </div>
             )}
             <img
@@ -895,7 +895,7 @@ function AssetCard({ asset, type, isGenerating, onGenerate, onToggleLock, onClic
                 />
             ) : (
                 <div className="w-full h-full flex items-center justify-center bg-glass">
-                    <ImageIcon className="text-foreground/20" size={48} />
+                    <ImageIcon className="text-text-muted" size={48} />
                 </div>
             )}
 
@@ -936,7 +936,7 @@ function AssetCard({ asset, type, isGenerating, onGenerate, onToggleLock, onClic
             {/* Bottom Info */}
             <div className="absolute bottom-0 left-0 right-0 p-4 z-30">
                 <h3 className="text-lg font-bold text-foreground mb-1 truncate">{asset.name}</h3>
-                <p className="text-xs text-foreground/70 line-clamp-2 mb-3 h-8">
+                <p className="text-xs text-foreground/80 line-clamp-2 mb-3 h-8">
                     {asset.description || "No description"}
                 </p>
 

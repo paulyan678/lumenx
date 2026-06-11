@@ -89,8 +89,8 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                         {/* Zoom hint */}
                         <div className="absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             <div className="flex items-center gap-1 px-2 py-1 bg-overlay rounded-md backdrop-blur-sm">
-                                <Maximize2 size={12} className="text-foreground/70" />
-                                <span className="text-xs text-foreground/70">{t("clickToZoom")}</span>
+                                <Maximize2 size={12} className="text-foreground/80" />
+                                <span className="text-xs text-foreground/80">{t("clickToZoom")}</span>
                             </div>
                         </div>
                     </>

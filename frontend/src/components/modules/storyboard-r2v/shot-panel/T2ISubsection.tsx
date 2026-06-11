@@ -226,7 +226,7 @@ function Hero({
                         {t("t2iHeroEyebrow")}
                     </div>
                     {/* Title — display tier，是 hero 的视觉焦点 */}
-                    <div className="font-display text-display-sm font-semibold text-foreground/95">
+                    <div className="font-display text-display-sm font-semibold text-foreground">
                         {t("t2iHeroTitle")}
                     </div>
                     <p className="max-w-[58ch] font-sans text-body-sm leading-relaxed text-text-secondary">
@@ -612,7 +612,7 @@ function StepBadge({
             >
                 {done ? <Check size={10} strokeWidth={3} /> : num}
             </span>
-            <span className="font-mono text-chrome-sm font-medium uppercase tracking-tight text-foreground/85">
+            <span className="font-mono text-chrome-sm font-medium uppercase tracking-tight text-foreground">
                 {label}
             </span>
         </span>
@@ -698,7 +698,7 @@ function ThumbButton({
                             onRemove();
                         }
                     }}
-                    className="absolute left-0 top-0 grid h-6 w-6 cursor-pointer place-items-center rounded-full text-foreground/95 transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-failed-border"
+                    className="absolute left-0 top-0 grid h-6 w-6 cursor-pointer place-items-center rounded-full text-foreground transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-failed-border"
                 >
                     <span className="grid h-4 w-4 place-items-center rounded-full bg-black/75 transition-colors duration-fast ease-out-quart hover:bg-status-failed-fg">
                         <X size={9} aria-hidden="true" />
@@ -747,7 +747,7 @@ function SinglePreview({ url, isStoryboard, onRemove, storyboardBadgeText }: Sin
                     onClick={(e) => { e.stopPropagation(); onRemove(); }}
                     aria-label="Delete candidate"
                     title="Delete"
-                    className="absolute left-1 top-1 grid h-6 w-6 cursor-pointer place-items-center rounded-full bg-black/75 text-foreground/95 transition-colors duration-fast ease-out-quart hover:bg-status-failed-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-failed-border"
+                    className="absolute left-1 top-1 grid h-6 w-6 cursor-pointer place-items-center rounded-full bg-black/75 text-foreground transition-colors duration-fast ease-out-quart hover:bg-status-failed-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-failed-border"
                 >
                     <X size={11} aria-hidden="true" />
                 </button>
