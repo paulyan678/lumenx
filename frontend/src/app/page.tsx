@@ -678,7 +678,7 @@ export default function Home() {
             className="flex flex-col items-center justify-center py-20"
           >
             <FolderOpen size={64} className="text-text-muted mb-4" />
-            <h3 className="text-xl font-medium text-text-secondary mb-2">{t("empty")}</h3>
+            <h3 className="text-2xl font-display atelier-display font-semibold text-text-secondary mb-2">{t("empty")}</h3>
             <p className="text-text-muted mb-8">{t("emptyHint")}</p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-3xl w-full">
               <button

@@ -199,11 +199,17 @@ export default function SettingsPage() {
     `px-3 py-1.5 text-xs rounded-md border transition-colors font-medium ${active ? "bg-amber-500 text-white border-amber-500 shadow-sm" : "border-glass-border bg-surface text-text-secondary hover:text-foreground"}`;
 
   return (
-    <div className="container mx-auto px-6 py-8 max-w-4xl space-y-8">
-      <h1 className="text-2xl font-display font-bold text-foreground">{t("title")}</h1>
+    <div className="relative">
+      {/* Atelier signature layers — inert on non-atelier themes (display:none).
+          Rendered as siblings of the content so they cover the page background
+          without affecting layout or pointer events. */}
+      <div className="atelier-page-bloom" aria-hidden="true" />
+      <div className="atelier-page-grain" aria-hidden="true" />
+      <div className="container mx-auto px-6 py-8 max-w-4xl space-y-8 relative z-10">
+      <h1 className="text-2xl font-display atelier-display font-bold text-foreground">{t("title")}</h1>
 
       {/* ── Section 0: Appearance ── */}
-      <section className="glass-panel rounded-xl p-6 space-y-6">
+      <section className="glass-panel atelier-card rounded-xl p-6 space-y-6">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 rounded-lg">
             <Palette size={20} className="text-violet-400" />
@@ -283,7 +289,7 @@ export default function SettingsPage() {
       </section>
 
       {/* ── Section 1: API Configuration ── */}
-      <section className="glass-panel rounded-xl p-6 space-y-6">
+      <section className="glass-panel atelier-card rounded-xl p-6 space-y-6">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-gradient-to-br from-amber-500/20 to-orange-500/20 rounded-lg">
             <Key size={20} className="text-amber-400" />
@@ -530,7 +536,7 @@ export default function SettingsPage() {
       </section>
 
       {/* ── Section 2: Default Model Settings ── */}
-      <section className="glass-panel rounded-xl p-6 space-y-6">
+      <section className="glass-panel atelier-card rounded-xl p-6 space-y-6">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-lg">
             <Settings size={20} className="text-blue-400" />
@@ -632,7 +638,7 @@ export default function SettingsPage() {
       </section>
 
       {/* ── Section 3: Default Prompt Config ── */}
-      <section className="glass-panel rounded-xl p-6 space-y-6">
+      <section className="glass-panel atelier-card rounded-xl p-6 space-y-6">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-purple-500/20 rounded-lg">
             <MessageSquareCode size={20} className="text-purple-400" />
@@ -671,6 +677,7 @@ export default function SettingsPage() {
       </section>
 
       <div className="pb-8" />
+      </div>
     </div>
   );
 }

@@ -533,3 +533,96 @@ body {
     transition-duration: 0.001ms !important;
   }
 }
+
+/* ════════════════════════════════════════════════════════════════════
+   Atelier signature utilities — Tasty Sam / Line B
+   ────────────────────────────────────────────────────────────────────
+   Opt-in classes that components apply alongside their existing
+   glass-panel / container styles. They are INERT by default; only
+   `html.atelier-dark` and `html.atelier-light` activate the visual
+   signature (frameless float, halation, film grain, bloom, serif).
+   bridge-dark / brand-dark / brand-light see ZERO change.
+   Variables used (--halation, --bloom, --grain-op, --color-border-*,
+   --card-radius, --font-display) are already defined per-theme above.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* .atelier-card — opt-in "frameless float" override.
+   Pair with existing glass-panel: <div class="glass-panel atelier-card">.
+   On non-atelier themes this rule is a no-op. On atelier themes the
+   card softens its border and gains halation + a soft drop-shadow,
+   so the chrome recedes and content reads as floating. */
+html.atelier-dark .atelier-card,
+html.atelier-light .atelier-card {
+  border-color: var(--color-border-subtle);
+  box-shadow:
+    var(--halation),
+    0 1px 0 0 rgba(255, 255, 255, 0.025) inset,
+    0 22px 48px -28px rgba(0, 0, 0, 0.55);
+  border-radius: var(--card-radius);
+}
+html.atelier-light .atelier-card {
+  /* lighter shadow on warm-paper background */
+  box-shadow:
+    var(--halation),
+    0 1px 0 0 rgba(255, 255, 255, 0.6) inset,
+    0 18px 40px -22px rgba(60, 40, 20, 0.18);
+}
+
+/* .atelier-page-bloom — fixed double-corner bloom layer. Render once
+   near the top of a page (a sibling div with this class). Pointer-events
+   none so it never intercepts clicks. Inert outside atelier themes. */
+.atelier-page-bloom { display: none; }
+html.atelier-dark .atelier-page-bloom,
+html.atelier-light .atelier-page-bloom {
+  display: block;
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: var(--bloom);
+}
+
+/* .atelier-page-grain — fixed film-grain overlay. Inline SVG so no
+   extra binary asset. Opacity tracks --grain-op per theme. */
+.atelier-page-grain { display: none; }
+html.atelier-dark .atelier-page-grain,
+html.atelier-light .atelier-page-grain {
+  display: block;
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: var(--grain-op, 0.04);
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.55 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  background-size: 180px 180px;
+}
+html.atelier-light .atelier-page-grain {
+  mix-blend-mode: multiply;
+}
+
+/* .atelier-display — opt-in serif accent for "author voice" moments
+   (empty-state titles, hero subtitles, signature copy). var(--font-display)
+   resolves to Fraunces on atelier and Space Grotesk on others, so this
+   class is the explicit knob to mark a moment as editorial. The extra
+   tracking + ss features only apply on atelier so non-atelier renders
+   stay identical to current Space Grotesk styling. */
+html.atelier-dark .atelier-display,
+html.atelier-light .atelier-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.015em;
+  font-feature-settings: "ss01", "ss02";
+  text-transform: none;
+}
+
+/* Slogan-style overlay: when font-mono + atelier-display sit together
+   (LumenXBranding's "Render Noise into Narrative"), bump the size and
+   slightly relax tracking so Fraunces stays legible at small mass.
+   This rule is doubly-scoped (both class names + atelier theme) so it
+   only fires on the brand slogan and only on atelier. */
+html.atelier-dark .font-mono.atelier-display,
+html.atelier-light .font-mono.atelier-display {
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  font-style: italic;
+}
