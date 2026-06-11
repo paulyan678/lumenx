@@ -47,7 +47,7 @@
 - gstack 截图：默认主题（atelier-dark）下 storyboard/workspace/library/settings 四页正常
 - 切 5 主题，模范生页面（非 playground）正确翻转底色/主色/字体
 
-> ⚠️ **关键决策点 A（需你知情）**：handoff 默认 = `atelier-dark`（暖石墨+teal），这会**改变现有产品基线 dark 外观**（原 brand-dark 冷黑+蓝 → 暖石墨+teal）。这是 handoff 的明确设计意图（"Line B 原生皮肤为默认"），用户已说"听 handoff"，故照办。但首次启动时老用户会看到观感变化——已通过 migrate 把旧 `'dark'` 持久化值映射到 `brand-dark`（保留他们原来的冷黑+蓝），**仅全新用户/清缓存才看到 atelier-dark 默认**。
+> ⚠️ **关键决策点 A（需你知情）**：handoff 默认 = `atelier-dark`（暖石墨+teal），这会**改变现有产品基线 dark 外观**（原 brand-dark 冷黑+蓝 → 暖石墨+teal）。这是 handoff 的明确设计意图（"Line B 原生皮肤为默认"），用户已说"默认所有人到 atelier-dark"，故照办。**实际 migrate 行为**：`version < 1` 或 theme 不在 5-preset 白名单的持久化值，**一律回落 `atelier-dark`（DEFAULT_THEME）——含老用户的旧 `'dark'`**。即老用户首次启动会从冷黑+蓝切到暖石墨+teal（**观感切换，已确认可接受**），之后可在设置页自由切回任一主题（含 brand-dark 还原原观感）。
 
 ### Phase 1 · Playground 还债（我的技术债，优先级最高）
 
@@ -110,7 +110,7 @@
 
 | # | 决策 | 我的处置 | 状态 |
 |---|---|---|---|
-| A | 默认主题改为 atelier-dark（改变基线观感）| 照 handoff；migrate 保护老用户（旧 dark→brand-dark）| 已定（你说听 handoff）|
+| A | 默认主题改为 atelier-dark（改变基线观感）| 照 handoff；migrate 把任何旧/非法值（含老用户旧 'dark'）统一回落 atelier-dark；老用户首次启动观感切换，可接受，可在设置页切回 | 已定（你说"默认所有人到 atelier-dark"）|
 | B | tailwind 缺 `--color-secondary` | 补 `--color-secondary: var(--seed-primary-2)` | 待你确认或我自定 |
 | C | body 渐变用的 `--foreground-rgb` 等 tokens.css 没有 | 保留现有定义，不被覆盖 | 我自处理 |
 | D | Phase 2+ 是否本轮做 | 先交付 Phase 0+1，你看效果再定 | 待定 |
