@@ -280,7 +280,7 @@ function TaskRow({
 
     return (
         <div
-            className="group/row space-y-1.5 rounded-md border border-glass-border bg-glass px-2.5 py-2 transition-colors duration-fast ease-out-quart hover:border-white/15"
+            className="group/row space-y-1.5 rounded-md border border-glass-border bg-glass px-2.5 py-2 transition-colors duration-fast ease-out-quart hover:border-foreground/15"
             title={`Task id: ${task.id}`}
         >
             {/* Header row — chevron + status + shot label + actions */}

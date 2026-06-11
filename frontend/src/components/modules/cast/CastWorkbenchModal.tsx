@@ -482,7 +482,7 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                                         </p>
                                         <div className="flex flex-wrap gap-1">
                                             {appearsIn.slice(0, 6).map((ep: any) => (
-                                                <span key={ep.id} className="px-1.5 py-0.5 rounded bg-white/5 border border-glass-border text-[10px] text-text-secondary truncate max-w-[110px]">
+                                                <span key={ep.id} className="px-1.5 py-0.5 rounded bg-foreground/5 border border-glass-border text-[10px] text-text-secondary truncate max-w-[110px]">
                                                     {ep.title}
                                                 </span>
                                             ))}
@@ -500,7 +500,7 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                                     {styleName && (
                                         <button
                                             onClick={() => setApplyStyle(!applyStyle)}
-                                            className={`relative w-7 h-4 rounded-full transition-colors ${applyStyle ? "bg-primary/60" : "bg-white/10"}`}
+                                            className={`relative w-7 h-4 rounded-full transition-colors ${applyStyle ? "bg-primary/60" : "bg-foreground/10"}`}
                                         >
                                             <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${applyStyle ? "left-3.5" : "left-0.5"}`} />
                                         </button>
@@ -572,7 +572,7 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                                                             ? "border-primary/60 ring-1 ring-primary/30 bg-primary/5"
                                                             : isLocked
                                                                 ? "border-glass-border bg-black/20 opacity-50 cursor-not-allowed"
-                                                                : "border-glass-border bg-black/20 hover:border-white/25 hover:bg-white/[0.03]"
+                                                                : "border-glass-border bg-black/20 hover:border-foreground/25 hover:bg-foreground/[0.03]"
                                                     }`}
                                                 >
                                                     {/* Example thumbnail area — 4:3 ratio */}
@@ -597,7 +597,7 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                                                     {/* Active indicator */}
                                                     {isActive && (
                                                         <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-primary grid place-items-center">
-                                                            <Check size={9} className="text-white" strokeWidth={3} />
+                                                            <Check size={9} className="text-foreground" strokeWidth={3} />
                                                         </span>
                                                     )}
                                                     {isLocked && (
@@ -662,7 +662,7 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                                         key={tag}
                                         onClick={() => setPrompt((p) => p.trimEnd() + (p.endsWith(",") || p.endsWith("，") || !p.trim() ? " " : ", ") + tag)}
                                         disabled={generating}
-                                        className="px-2.5 py-1 rounded border border-glass-border bg-white/[0.03] text-[11px] text-text-muted hover:text-text-secondary hover:border-white/20 hover:bg-white/[0.06] transition-colors disabled:opacity-30"
+                                        className="px-2.5 py-1 rounded border border-glass-border bg-foreground/[0.03] text-[11px] text-text-muted hover:text-text-secondary hover:border-foreground/20 hover:bg-foreground/[0.06] transition-colors disabled:opacity-30"
                                     >
                                         + {tag}
                                     </button>
@@ -675,7 +675,7 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                                     <button
                                         type="button"
                                         onClick={() => setFinalPreviewExpanded(!finalPreviewExpanded)}
-                                        className="w-full flex items-center justify-between px-3.5 py-2 hover:bg-white/[0.02] transition-colors rounded-t-md"
+                                        className="w-full flex items-center justify-between px-3.5 py-2 hover:bg-foreground/[0.02] transition-colors rounded-t-md"
                                     >
                                         <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-text-muted">{t("finalPromptPreview")}</p>
                                         <span className="text-[10px] text-text-muted">{finalPreviewExpanded ? t("collapse") : t("expand")}</span>
@@ -712,7 +712,7 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                                                 className={`px-3 py-1.5 rounded-md border font-mono text-[12px] transition-colors ${
                                                     batchSize === n
                                                         ? accent.batchActive
-                                                        : "border-glass-border bg-glass text-text-muted hover:border-white/20 hover:text-text-secondary"
+                                                        : "border-glass-border bg-glass text-text-muted hover:border-foreground/20 hover:text-text-secondary"
                                                 } disabled:opacity-40`}
                                             >
                                                 ×{n}
@@ -735,7 +735,7 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                                                 className={`px-3 py-1.5 rounded-md border font-mono text-[12px] transition-colors ${
                                                     effectiveAspectRatio === ratio
                                                         ? accent.batchActive
-                                                        : "border-glass-border bg-glass text-text-muted hover:border-white/20 hover:text-text-secondary"
+                                                        : "border-glass-border bg-glass text-text-muted hover:border-foreground/20 hover:text-text-secondary"
                                                 } disabled:opacity-40`}
                                             >
                                                 {ratio}
@@ -761,7 +761,7 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                             <button
                                 onClick={handleGenerate}
                                 disabled={generating || !prompt.trim()}
-                                className="mt-5 self-center inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-md bg-primary text-white border border-[rgba(100,108,255,0.65)] shadow-[inset_0_1.5px_0_rgba(255,255,255,0.14)] hover:bg-[#7a82ff] disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-[14px] font-semibold"
+                                className="mt-5 self-center inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-md bg-primary text-white border border-[rgba(100,108,255,0.65)] shadow-[inset_0_1.5px_0_rgba(255,255,255,0.14)] hover:bg-primary-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-[14px] font-semibold"
                             >
                                 {generating ? <Loader2 size={15} className="animate-spin" /> : <Wand2 size={15} />}
                                 {generating
@@ -786,7 +786,7 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                                             onClick={() => setGalleryFilter("all")}
                                             className={`px-2.5 py-1 rounded text-[11px] transition-colors ${
                                                 galleryFilter === "all"
-                                                    ? "bg-white/10 text-foreground"
+                                                    ? "bg-foreground/10 text-foreground"
                                                     : "text-text-muted hover:text-text-secondary"
                                             }`}
                                         >
@@ -830,7 +830,7 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                                                 className={`relative rounded-lg overflow-hidden border-2 transition-all break-inside-avoid group ${
                                                     isSelected
                                                         ? accent.variantSelected
-                                                        : "border-glass-border hover:border-white/30"
+                                                        : "border-glass-border hover:border-foreground/30"
                                                 }`}
                                             >
                                                 <div className="cursor-pointer" onClick={() => !isSelected && handleSelectVariant(v.id)}>
@@ -847,14 +847,14 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                                                     className={`absolute top-1.5 left-1.5 p-1 rounded-full transition-all ${
                                                         v.is_favorited
                                                             ? "bg-amber-500/30 text-amber-300"
-                                                            : "bg-black/40 text-white/50 opacity-0 group-hover:opacity-100"
+                                                            : "bg-black/40 text-foreground/50 opacity-0 group-hover:opacity-100"
                                                     }`}
                                                 >
                                                     <Star size={12} className={v.is_favorited ? "fill-amber-300" : ""} />
                                                 </button>
                                                 {/* Selected badge */}
                                                 {isSelected && (
-                                                    <div className={`absolute top-1.5 right-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full text-white shadow-md ${accent.selectBadge}`}>
+                                                    <div className={`absolute top-1.5 right-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full text-foreground shadow-md ${accent.selectBadge}`}>
                                                         <Check size={12} strokeWidth={2.6} />
                                                     </div>
                                                 )}
@@ -864,7 +864,7 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                                                         onClick={() => handleSelectVariant(v.id)}
                                                         className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer pt-6 pb-1.5"
                                                     >
-                                                        <p className="w-full text-center text-[10px] uppercase tracking-[0.16em] text-white font-mono">
+                                                        <p className="w-full text-center text-[10px] uppercase tracking-[0.16em] text-foreground font-mono">
                                                             {t("clickToSelect")}
                                                         </p>
                                                     </div>

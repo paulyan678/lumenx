@@ -387,7 +387,7 @@ export default function ShotCard({
             // act (Issue 15).
             return (
                 <div className="w-full aspect-video flex flex-col items-center justify-center gap-2 text-text-secondary/60">
-                    <div className="w-10 h-10 rounded-xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-xl bg-foreground/[0.03] border border-foreground/[0.06] flex items-center justify-center">
                         <ImageIcon size={18} strokeWidth={1.5} />
                     </div>
                     <span className="text-[11px] font-medium">{t("generateImageOrUpload")}</span>
@@ -432,7 +432,7 @@ export default function ShotCard({
         }
         return (
             <div className="w-full aspect-video flex flex-col items-center justify-center gap-2 text-text-secondary/60">
-                <div className="w-10 h-10 rounded-xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl bg-foreground/[0.03] border border-foreground/[0.06] flex items-center justify-center">
                     <Video size={18} strokeWidth={1.5} />
                 </div>
                 <span className="text-[11px] font-medium">{t("noVideoYet")}</span>
@@ -518,13 +518,13 @@ export default function ShotCard({
             />
 
             {/* Liquid Glass card body */}
-            <div className="relative backdrop-blur-xl bg-white/[0.02] border border-white/[0.06] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] rounded-xl overflow-hidden z-10">
+            <div className="relative backdrop-blur-xl bg-foreground/[0.02] border border-foreground/[0.06] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] rounded-xl overflow-hidden z-10">
                 {/* Header row: Tab switcher + Shot number */}
                 <div className="flex items-center justify-between px-3 pt-3 pb-2">
                     {/* Pill Tab Switcher */}
                     <div className="relative inline-flex items-center p-[3px] bg-black/40 rounded-lg backdrop-blur-sm">
                         <motion.div
-                            className="absolute top-[3px] bottom-[3px] rounded-md bg-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]"
+                            className="absolute top-[3px] bottom-[3px] rounded-md bg-foreground/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]"
                             initial={false}
                             animate={{
                                 left: isActiveT2I ? 3 : "calc(50% + 1.5px)",
@@ -558,7 +558,7 @@ export default function ShotCard({
                         <div className="text-[10px] font-mono text-text-muted tabular-nums">
                             #{String(index + 1).padStart(2, "0")}
                         </div>
-                        <div className="w-5 h-5 rounded-full bg-white/[0.06] border border-white/[0.08] flex items-center justify-center">
+                        <div className="w-5 h-5 rounded-full bg-foreground/[0.06] border border-foreground/[0.08] flex items-center justify-center">
                             <span className="text-[9px] font-bold text-foreground">{index + 1}</span>
                         </div>
                     </div>
@@ -567,7 +567,7 @@ export default function ShotCard({
                 {/* Main content: Preview + Editor */}
                 <div className="flex">
                     {/* Left: Preview */}
-                    <div className="w-44 shrink-0 bg-black/20 flex flex-col items-center justify-center relative border-r border-white/[0.04]">
+                    <div className="w-44 shrink-0 bg-black/20 flex flex-col items-center justify-center relative border-r border-foreground/[0.04]">
                         {renderPreview()}
                         {/* Pinned chip — overlays the hero when the user has
                             manually pinned an active take. Group/peer makes
@@ -589,7 +589,7 @@ export default function ShotCard({
                                     onClick={(e) => { e.stopPropagation(); onUnpinVideo(); }}
                                     title={t("unpinActiveTakeTooltip")}
                                     aria-label={t("unpinActiveTake")}
-                                    className="opacity-0 transition-opacity duration-fast ease-out-quart group-hover/pin:opacity-100 focus-visible:opacity-100 inline-flex items-center gap-1 rounded-full border border-white/15 bg-black/55 backdrop-blur-sm px-1.5 py-[2px] font-mono text-[9.5px] uppercase tracking-[0.14em] text-white/80 hover:text-foreground hover:border-white/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                                    className="opacity-0 transition-opacity duration-fast ease-out-quart group-hover/pin:opacity-100 focus-visible:opacity-100 inline-flex items-center gap-1 rounded-full border border-foreground/15 bg-black/55 backdrop-blur-sm px-1.5 py-[2px] font-mono text-[9.5px] uppercase tracking-[0.14em] text-foreground/80 hover:text-foreground hover:border-foreground/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                                 >
                                     <PinOff size={9} aria-hidden="true" strokeWidth={2.2} />
                                     {t("unpinActiveTakeShort")}
@@ -674,7 +674,7 @@ export default function ShotCard({
                                 // to max-h-[260px] (≈10 lines, B2).
                                 // pr-8 reserves space for the expand
                                 // icon so it never overlays text.
-                                className="w-full text-sm resize-none leading-relaxed bg-transparent border border-white/[0.06] rounded-lg pl-3 pr-8 py-2.5 text-foreground placeholder:text-text-muted focus:outline-none focus:border-primary/30 focus:bg-white/[0.02] transition-all duration-200 min-h-[110px] max-h-[260px] overflow-y-auto"
+                                className="w-full text-sm resize-none leading-relaxed bg-transparent border border-foreground/[0.06] rounded-lg pl-3 pr-8 py-2.5 text-foreground placeholder:text-text-muted focus:outline-none focus:border-primary/30 focus:bg-foreground/[0.02] transition-all duration-200 min-h-[110px] max-h-[260px] overflow-y-auto"
                                 rows={5}
                             />
                             {/* Expand-to-modal icon — top-right,
@@ -801,14 +801,14 @@ export default function ShotCard({
                                             transition={{ duration: 0.2 }}
                                             className="overflow-hidden"
                                         >
-                                            <div className="mt-1.5 rounded-md border border-white/[0.06] bg-black/20 px-3 py-2 text-[11.5px] leading-relaxed font-mono space-y-2">
+                                            <div className="mt-1.5 rounded-md border border-foreground/[0.06] bg-black/20 px-3 py-2 text-[11.5px] leading-relaxed font-mono space-y-2">
                                                 {/* Final prompt as model receives it (computed real-time) */}
                                                 <p className="text-text-secondary whitespace-pre-wrap">
                                                     {assembledPromptPreview}
                                                 </p>
                                                 {/* Duration is the only field NOT in prompt — show as API param note */}
                                                 {shot.duration && (
-                                                    <p className="text-text-muted border-t border-white/[0.04] pt-1.5">
+                                                    <p className="text-text-muted border-t border-foreground/[0.04] pt-1.5">
                                                         <span className="text-emerald-300/70">时长:</span> {shot.duration}s (API参数，不入提示词)
                                                     </p>
                                                 )}
@@ -839,18 +839,18 @@ export default function ShotCard({
                                     whileHover={{ scale: 1.08 }}
                                     whileTap={{ scale: 0.92 }}
                                     onClick={onOpenDrawer}
-                                    className="p-1.5 rounded-lg hover:bg-white/[0.06] text-text-secondary hover:text-foreground transition-colors"
+                                    className="p-1.5 rounded-lg hover:bg-foreground/[0.06] text-text-secondary hover:text-foreground transition-colors"
                                     title={t("browseAssets")}
                                 >
                                     <AtSign size={14} strokeWidth={2} />
                                 </motion.button>
-                                <div className="w-px h-3.5 bg-white/[0.06] mx-0.5" />
+                                <div className="w-px h-3.5 bg-foreground/[0.06] mx-0.5" />
                                 <motion.button
                                     whileHover={{ scale: 1.08 }}
                                     whileTap={{ scale: 0.92 }}
                                     onClick={onMoveUp}
                                     disabled={index === 0}
-                                    className="p-1.5 rounded-lg hover:bg-white/[0.06] text-text-secondary hover:text-foreground transition-colors disabled:opacity-20 disabled:hover:bg-transparent"
+                                    className="p-1.5 rounded-lg hover:bg-foreground/[0.06] text-text-secondary hover:text-foreground transition-colors disabled:opacity-20 disabled:hover:bg-transparent"
                                     title="上移"
                                 >
                                     <ChevronUp size={14} strokeWidth={1.5} />
@@ -860,7 +860,7 @@ export default function ShotCard({
                                     whileTap={{ scale: 0.92 }}
                                     onClick={onMoveDown}
                                     disabled={index === totalShots - 1}
-                                    className="p-1.5 rounded-lg hover:bg-white/[0.06] text-text-secondary hover:text-foreground transition-colors disabled:opacity-20 disabled:hover:bg-transparent"
+                                    className="p-1.5 rounded-lg hover:bg-foreground/[0.06] text-text-secondary hover:text-foreground transition-colors disabled:opacity-20 disabled:hover:bg-transparent"
                                     title="下移"
                                 >
                                     <ChevronDown size={14} strokeWidth={1.5} />
@@ -869,7 +869,7 @@ export default function ShotCard({
                                     whileHover={{ scale: 1.08 }}
                                     whileTap={{ scale: 0.92 }}
                                     onClick={onDuplicate}
-                                    className="p-1.5 rounded-lg hover:bg-white/[0.06] text-text-secondary hover:text-foreground transition-colors"
+                                    className="p-1.5 rounded-lg hover:bg-foreground/[0.06] text-text-secondary hover:text-foreground transition-colors"
                                     title={t("duplicateShot")}
                                 >
                                     <Copy size={13} strokeWidth={1.5} />
@@ -878,19 +878,19 @@ export default function ShotCard({
                                     whileHover={{ scale: 1.08 }}
                                     whileTap={{ scale: 0.92 }}
                                     onClick={onDelete}
-                                    className="p-1.5 rounded-lg hover:bg-white/[0.06] text-text-secondary hover:text-rose-400 transition-colors"
+                                    className="p-1.5 rounded-lg hover:bg-foreground/[0.06] text-text-secondary hover:text-rose-400 transition-colors"
                                     title={t("deleteShot")}
                                 >
                                     <Trash2 size={13} strokeWidth={1.5} />
                                 </motion.button>
                                 {onRefineFrame && (
                                     <>
-                                        <div className="w-px h-3.5 bg-white/[0.06] mx-0.5" />
+                                        <div className="w-px h-3.5 bg-foreground/[0.06] mx-0.5" />
                                         <motion.button
                                             whileHover={{ scale: 1.08 }}
                                             whileTap={{ scale: 0.92 }}
                                             onClick={onRefineFrame}
-                                            className="p-1.5 rounded-lg hover:bg-white/[0.06] text-text-secondary hover:text-amber-400 transition-colors"
+                                            className="p-1.5 rounded-lg hover:bg-foreground/[0.06] text-text-secondary hover:text-amber-400 transition-colors"
                                             title="精修此帧"
                                         >
                                             <Sparkles size={13} strokeWidth={1.5} />
@@ -914,7 +914,7 @@ export default function ShotCard({
                                             className={`grid h-9 w-9 place-items-center rounded-md border font-mono text-[11px] font-medium transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 ${
                                                 active
                                                     ? "border-primary/55 bg-primary/15 text-primary"
-                                                    : "border-glass-border bg-black/20 text-text-secondary hover:border-white/20 hover:text-foreground"
+                                                    : "border-glass-border bg-black/20 text-text-secondary hover:border-foreground/20 hover:text-foreground"
                                             }`}
                                         >
                                             ×{n}
@@ -933,7 +933,7 @@ export default function ShotCard({
                                         ? "请先在上方生成或上传首帧"
                                         : "请先输入提示词")
                                     : `生成 ${generateCount} 条视频候选`}
-                                className="inline-flex items-center justify-center gap-1.5 rounded-md px-5 py-2 min-w-[140px] font-sans text-[13px] font-semibold tracking-tight transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 disabled:cursor-not-allowed disabled:opacity-40 bg-primary text-white border border-[rgba(100,108,255,0.65)] shadow-[inset_0_1.5px_0_rgba(255,255,255,0.14),inset_0_-1px_0_rgba(60,68,200,0.45),0_4px_14px_-2px_rgba(100,108,255,0.45)] hover:bg-[#7a82ff] hover:border-[rgba(100,108,255,0.85)] disabled:hover:bg-primary disabled:hover:border-[rgba(100,108,255,0.65)]"
+                                className="inline-flex items-center justify-center gap-1.5 rounded-md px-5 py-2 min-w-[140px] font-sans text-[13px] font-semibold tracking-tight transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 disabled:cursor-not-allowed disabled:opacity-40 bg-primary text-white border border-[rgba(100,108,255,0.65)] shadow-[inset_0_1.5px_0_rgba(255,255,255,0.14),inset_0_-1px_0_rgba(60,68,200,0.45),0_4px_14px_-2px_rgba(100,108,255,0.45)] hover:bg-primary-hover hover:border-[rgba(100,108,255,0.85)] disabled:hover:bg-primary disabled:hover:border-[rgba(100,108,255,0.65)]"
                             >
                                 {inFlightCount > 0 ? (
                                     <>
@@ -964,7 +964,7 @@ export default function ShotCard({
                                 className={`inline-flex items-center gap-2 rounded-md border px-3 py-2 font-mono text-[11px] font-medium uppercase tracking-[0.14em] transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 ${
                                     expanded
                                         ? "border-primary/40 bg-primary/12 text-primary hover:bg-primary/20"
-                                        : "border-glass-border bg-black/30 text-text-secondary hover:border-white/20 hover:bg-white/[0.06] hover:text-foreground"
+                                        : "border-glass-border bg-black/30 text-text-secondary hover:border-foreground/20 hover:bg-foreground/[0.06] hover:text-foreground"
                                 }`}
                             >
                                 {expanded ? (

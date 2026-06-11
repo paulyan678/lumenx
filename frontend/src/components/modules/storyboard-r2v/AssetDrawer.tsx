@@ -57,10 +57,10 @@ export default function AssetDrawer({ isOpen, onClose, characters, scenes, props
                         animate={{ x: 0 }}
                         exit={{ x: "100%" }}
                         transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                        className="fixed inset-y-0 right-0 w-80 z-50 bg-[#0f0f14] border-l border-white/[0.06] shadow-2xl flex flex-col"
+                        className="fixed inset-y-0 right-0 w-80 z-50 bg-surface border-l border-foreground/[0.06] shadow-2xl flex flex-col"
                     >
                         {/* Header */}
-                        <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06] bg-white/[0.02] backdrop-blur-xl shrink-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                        <div className="flex items-center justify-between px-4 py-3 border-b border-foreground/[0.06] bg-foreground/[0.02] backdrop-blur-xl shrink-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                             <h3 className="text-sm font-semibold text-foreground">{t("assetLibrary")}</h3>
                             <button
                                 onClick={onClose}
@@ -96,9 +96,9 @@ export default function AssetDrawer({ isOpen, onClose, characters, scenes, props
                                                                 onSelectAsset(`character${i + 1}`, c.name);
                                                                 onClose();
                                                             }}
-                                                            className="flex flex-col items-center gap-1.5 p-2 rounded-xl border border-white/[0.06] bg-white/[0.02] hover:border-white/[0.12] hover:bg-white/[0.04] transition-all duration-200 group"
+                                                            className="flex flex-col items-center gap-1.5 p-2 rounded-xl border border-foreground/[0.06] bg-foreground/[0.02] hover:border-foreground/[0.12] hover:bg-foreground/[0.04] transition-all duration-200 group"
                                                         >
-                                                            <div className="w-12 h-12 rounded-lg bg-white/[0.03] overflow-hidden flex items-center justify-center">
+                                                            <div className="w-12 h-12 rounded-lg bg-foreground/[0.03] overflow-hidden flex items-center justify-center">
                                                                 {thumb ? (
                                                                     <PreviewImage src={thumb} alt={c.name} className="w-full h-full" noLightbox />
                                                                 ) : (
@@ -130,9 +130,9 @@ export default function AssetDrawer({ isOpen, onClose, characters, scenes, props
                                                                 onSelectAsset("scene", s.name);
                                                                 onClose();
                                                             }}
-                                                            className="flex flex-col items-center gap-1.5 p-2 rounded-xl border border-white/[0.06] bg-white/[0.02] hover:border-white/[0.12] hover:bg-white/[0.04] transition-all duration-200 group"
+                                                            className="flex flex-col items-center gap-1.5 p-2 rounded-xl border border-foreground/[0.06] bg-foreground/[0.02] hover:border-foreground/[0.12] hover:bg-foreground/[0.04] transition-all duration-200 group"
                                                         >
-                                                            <div className="w-12 h-12 rounded-lg bg-white/[0.03] overflow-hidden flex items-center justify-center">
+                                                            <div className="w-12 h-12 rounded-lg bg-foreground/[0.03] overflow-hidden flex items-center justify-center">
                                                                 {thumb ? (
                                                                     <PreviewImage src={thumb} alt={s.name} className="w-full h-full" noLightbox />
                                                                 ) : (
@@ -164,9 +164,9 @@ export default function AssetDrawer({ isOpen, onClose, characters, scenes, props
                                                                 onSelectAsset("prop", p.name);
                                                                 onClose();
                                                             }}
-                                                            className="flex flex-col items-center gap-1.5 p-2 rounded-xl border border-white/[0.06] bg-white/[0.02] hover:border-white/[0.12] hover:bg-white/[0.04] transition-all duration-200 group"
+                                                            className="flex flex-col items-center gap-1.5 p-2 rounded-xl border border-foreground/[0.06] bg-foreground/[0.02] hover:border-foreground/[0.12] hover:bg-foreground/[0.04] transition-all duration-200 group"
                                                         >
-                                                            <div className="w-12 h-12 rounded-lg bg-white/[0.03] overflow-hidden flex items-center justify-center">
+                                                            <div className="w-12 h-12 rounded-lg bg-foreground/[0.03] overflow-hidden flex items-center justify-center">
                                                                 {thumb ? (
                                                                     <PreviewImage src={thumb} alt={p.name} className="w-full h-full" noLightbox />
                                                                 ) : (

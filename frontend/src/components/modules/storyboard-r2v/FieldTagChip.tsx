@@ -113,7 +113,7 @@ export default function FieldTagChip({ field, value, editorConfig, onChange }: F
                 onClick={() => setOpen(v => !v)}
                 className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[12px] font-medium cursor-pointer transition-all duration-150 ease-out group/chip ${
                     isEmpty
-                        ? `border border-dashed border-white/20 bg-white/[0.02] text-text-muted hover:border-white/40 hover:text-text-secondary`
+                        ? `border border-dashed border-foreground/20 bg-foreground/[0.02] text-text-muted hover:border-foreground/40 hover:text-text-secondary`
                         : `border ${colors.border} ${colors.bg} ${colors.text} ${colors.hoverBorder} hover:scale-[1.02]`
                 }`}
             >
@@ -133,7 +133,7 @@ export default function FieldTagChip({ field, value, editorConfig, onChange }: F
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: -4, scale: 0.96 }}
                         transition={{ duration: 0.15 }}
-                        className="absolute top-full left-0 mt-1.5 z-50 min-w-[180px] rounded-lg border border-white/[0.08] bg-[#0a0a0f]/95 backdrop-blur-xl shadow-xl p-2"
+                        className="absolute top-full left-0 mt-1.5 z-50 min-w-[180px] rounded-lg border border-foreground/[0.08] bg-surface/95 backdrop-blur-xl shadow-xl p-2"
                     >
                         {editorConfig.type === "duration" ? (
                             <DurationEditor
@@ -182,7 +182,7 @@ function DurationEditor({ min, max, step, value, onChange }: {
                         className={`rounded-md px-2 py-1.5 text-[12px] font-mono font-medium transition-colors ${
                             n === value
                                 ? "bg-emerald-500/20 border border-emerald-400/40 text-emerald-200"
-                                : "bg-white/[0.04] border border-white/[0.06] text-text-secondary hover:bg-white/[0.08] hover:text-foreground"
+                                : "bg-foreground/[0.04] border border-foreground/[0.06] text-text-secondary hover:bg-foreground/[0.08] hover:text-foreground"
                         }`}
                     >
                         {n}s
@@ -238,7 +238,7 @@ function PresetEditor({ presets, allowCustom, value, onChange }: {
                         className={`rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
                             p === value
                                 ? "bg-primary/20 border border-primary/40 text-primary"
-                                : "bg-white/[0.04] border border-white/[0.06] text-text-secondary hover:bg-white/[0.08] hover:text-foreground"
+                                : "bg-foreground/[0.04] border border-foreground/[0.06] text-text-secondary hover:bg-foreground/[0.08] hover:text-foreground"
                         }`}
                     >
                         {p}
@@ -253,7 +253,7 @@ function PresetEditor({ presets, allowCustom, value, onChange }: {
                     onChange={(e) => setCustom(e.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder="自定义…"
-                    className="w-full rounded-md border border-white/[0.08] bg-black/30 px-2.5 py-1.5 text-[11px] text-foreground placeholder:text-text-muted outline-none focus:border-primary/40 transition-colors"
+                    className="w-full rounded-md border border-foreground/[0.08] bg-black/30 px-2.5 py-1.5 text-[11px] text-foreground placeholder:text-text-muted outline-none focus:border-primary/40 transition-colors"
                 />
             )}
         </div>
@@ -292,7 +292,7 @@ export function AddFieldButton({ onAdd }: { onAdd: (field: FieldType) => void })
                 ref={btnRef}
                 type="button"
                 onClick={() => setOpen(v => !v)}
-                className="inline-flex items-center gap-0.5 rounded-md border border-dashed border-white/15 px-1.5 py-1 text-[11px] text-text-muted hover:border-white/30 hover:text-text-secondary transition-colors cursor-pointer"
+                className="inline-flex items-center gap-0.5 rounded-md border border-dashed border-foreground/15 px-1.5 py-1 text-[11px] text-text-muted hover:border-foreground/30 hover:text-text-secondary transition-colors cursor-pointer"
             >
                 <Plus size={10} strokeWidth={2.5} />
             </button>
@@ -304,14 +304,14 @@ export function AddFieldButton({ onAdd }: { onAdd: (field: FieldType) => void })
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: -4, scale: 0.96 }}
                         transition={{ duration: 0.12 }}
-                        className="absolute top-full left-0 mt-1 z-50 min-w-[100px] rounded-lg border border-white/[0.08] bg-[#0a0a0f]/95 backdrop-blur-xl shadow-xl p-1"
+                        className="absolute top-full left-0 mt-1 z-50 min-w-[100px] rounded-lg border border-foreground/[0.08] bg-surface/95 backdrop-blur-xl shadow-xl p-1"
                     >
                         {fields.map(f => (
                             <button
                                 key={f.key}
                                 type="button"
                                 onClick={() => { onAdd(f.key); setOpen(false); }}
-                                className="w-full text-left rounded-md px-2.5 py-1.5 text-[11px] text-text-secondary hover:bg-white/[0.06] hover:text-foreground transition-colors"
+                                className="w-full text-left rounded-md px-2.5 py-1.5 text-[11px] text-text-secondary hover:bg-foreground/[0.06] hover:text-foreground transition-colors"
                             >
                                 {f.label}
                             </button>

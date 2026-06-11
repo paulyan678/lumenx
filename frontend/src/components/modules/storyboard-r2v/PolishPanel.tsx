@@ -440,9 +440,9 @@ function BilingualColumn({
             </div>
             {isLoading ? (
                 <div className="space-y-1 rounded bg-black/30 px-2.5 py-2">
-                    <div className="h-3 w-full animate-pulse rounded bg-white/8" />
-                    <div className="h-3 w-[88%] animate-pulse rounded bg-white/8" />
-                    <div className="h-3 w-[72%] animate-pulse rounded bg-white/8" />
+                    <div className="h-3 w-full animate-pulse rounded bg-foreground/8" />
+                    <div className="h-3 w-[88%] animate-pulse rounded bg-foreground/8" />
+                    <div className="h-3 w-[72%] animate-pulse rounded bg-foreground/8" />
                 </div>
             ) : (
                 <p

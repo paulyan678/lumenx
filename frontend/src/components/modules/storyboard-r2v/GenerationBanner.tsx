@@ -107,7 +107,7 @@ function BannerShell({ children }: { children: React.ReactNode }) {
             transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
             className="overflow-hidden shrink-0"
         >
-            <div className="flex items-center gap-2.5 h-10 px-6 border-b border-white/[0.06] bg-white/[0.02]">
+            <div className="flex items-center gap-2.5 h-10 px-6 border-b border-foreground/[0.06] bg-foreground/[0.02]">
                 {children}
             </div>
         </motion.div>
@@ -131,7 +131,7 @@ function SummaryBar({
             transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
             className="overflow-hidden shrink-0"
         >
-            <div className="flex items-center gap-2.5 h-9 px-6 border-b border-white/[0.04] bg-white/[0.01]">
+            <div className="flex items-center gap-2.5 h-9 px-6 border-b border-foreground/[0.04] bg-foreground/[0.01]">
                 <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
                 <span className="text-[13px] text-text-secondary">
                     {summary.frameCount} 帧

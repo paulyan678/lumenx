@@ -49,7 +49,7 @@ export default function SidePanelHeader({
         >
             {icon ? (
                 <div
-                    className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-[#b9bdff]"
+                    className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-primary"
                     style={{
                         background: "rgba(100, 108, 255, 0.06)",
                         border: "1px solid rgba(100, 108, 255, 0.32)",

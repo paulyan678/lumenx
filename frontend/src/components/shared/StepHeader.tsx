@@ -78,7 +78,7 @@ export default function StepHeader({
             <div className="relative z-[1] flex h-[calc(100%-18px)] items-center gap-4 px-6">
                 {/* Icon chip — 32×32 圆形，flat dark + 紫 1px border + 内顶部 1px 高光 */}
                 <div
-                    className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[#b9bdff]"
+                    className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-primary"
                     style={{
                         background: "rgba(100, 108, 255, 0.06)",
                         border: "1px solid rgba(100, 108, 255, 0.32)",
@@ -157,7 +157,7 @@ export default function StepHeader({
                                     ? "h-[5px] w-[5px] border border-primary bg-primary opacity-70"
                                     : kind === "current"
                                         ? "h-[7px] w-[7px] border border-primary bg-primary"
-                                        : "h-[5px] w-[5px] border border-white/[0.18] bg-transparent opacity-50",
+                                        : "h-[5px] w-[5px] border border-foreground/[0.18] bg-transparent opacity-50",
                             )}
                             style={
                                 kind === "current"

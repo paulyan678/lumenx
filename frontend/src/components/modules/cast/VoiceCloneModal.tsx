@@ -181,7 +181,7 @@ export default function VoiceCloneModal({ isOpen, onClose, seriesId, characterNa
                                 ? "border-primary bg-primary/10"
                                 : file
                                     ? "border-primary/50 bg-primary/5"
-                                    : "border-glass-border hover:border-white/20 bg-black/30"
+                                    : "border-glass-border hover:border-foreground/20 bg-black/30"
                         } ${inFlight ? "opacity-60 cursor-not-allowed" : ""}`}
                     >
                         <input
@@ -260,7 +260,7 @@ export default function VoiceCloneModal({ isOpen, onClose, seriesId, characterNa
                     <button
                         onClick={handleSubmit}
                         disabled={!file || !label.trim() || inFlight || phase === "done"}
-                        className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-md bg-primary text-white border border-[rgba(100,108,255,0.65)] shadow-[inset_0_1.5px_0_rgba(255,255,255,0.14)] hover:bg-[#7a82ff] disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-[12px] font-semibold"
+                        className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-md bg-primary text-white border border-[rgba(100,108,255,0.65)] shadow-[inset_0_1.5px_0_rgba(255,255,255,0.14)] hover:bg-primary-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-[12px] font-semibold"
                     >
                         {phase === "done" ? <Check size={12} /> : null}
                         {phase === "done" ? t("done") : t("submit")}

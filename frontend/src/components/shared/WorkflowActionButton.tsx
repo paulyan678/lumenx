@@ -51,11 +51,11 @@ const variantStyles: Record<Variant, string> = {
        让对比度足够（在 #050508 dark bg 上白字读得清），仅顶部 1.5px 白色 14%
        inset 高光模拟"玻璃球反射"。底部加 inset 紫暗边 + outer 紫 glow。 */
     primary: clsx(
-        "text-white",
+        "text-foreground",
         "bg-primary",
         "border border-[rgba(100,108,255,0.65)]",
         "shadow-[inset_0_1.5px_0_rgba(255,255,255,0.14),inset_0_-1px_0_rgba(60,68,200,0.45),0_4px_14px_-2px_rgba(100,108,255,0.45)]",
-        "hover:bg-[#7a82ff]",
+        "hover:bg-primary-hover",
         "hover:border-[rgba(100,108,255,0.85)]",
         "hover:shadow-[inset_0_1.5px_0_rgba(255,255,255,0.20),inset_0_-1px_0_rgba(60,68,200,0.55),0_6px_18px_-2px_rgba(100,108,255,0.60)]",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 focus-visible:ring-offset-2 focus-visible:ring-offset-black",
@@ -64,12 +64,12 @@ const variantStyles: Record<Variant, string> = {
        身体仍是 frosted（10% 紫 + backdrop-blur），border 紫 40%。
        hover 加深到接近 primary 但更轻。 */
     secondary: clsx(
-        "text-[#c2c6ff]",
+        "text-primary",
         "bg-[rgba(100,108,255,0.10)]",
         "border border-[rgba(100,108,255,0.40)]",
         "shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]",
         "backdrop-blur-md",
-        "hover:bg-[rgba(100,108,255,0.22)] hover:border-[rgba(100,108,255,0.60)] hover:text-white",
+        "hover:bg-[rgba(100,108,255,0.22)] hover:border-[rgba(100,108,255,0.60)] hover:text-foreground",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55",
     ),
     /* Ghost — 透明，hover 才显玻璃。最低权重的导航 / 取消按钮。 */

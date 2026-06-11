@@ -180,7 +180,7 @@ export default function CandidateThumb({
                             className={`grid h-[22px] w-[22px] place-items-center rounded-full border transition-all duration-fast ease-out-quart active:scale-90 ${
                                 isActive
                                     ? "border-primary bg-primary/85 text-white shadow-[0_0_10px_-2px_rgba(100,108,255,0.7)]"
-                                    : "border-white/15 bg-black/55 text-white/70 opacity-0 group-hover:opacity-100 hover:text-primary"
+                                    : "border-foreground/15 bg-black/55 text-foreground/70 opacity-0 group-hover:opacity-100 hover:text-primary"
                             }`}
                         >
                             <Pin
@@ -212,7 +212,7 @@ export default function CandidateThumb({
                         className={`grid h-[22px] w-[22px] place-items-center rounded-full border transition-all duration-fast ease-out-quart active:scale-90 ${
                             task.is_starred
                                 ? "border-status-starred-border bg-status-starred-bg text-status-starred-fg shadow-[0_0_10px_-2px_var(--color-status-starred-bg)]"
-                                : "border-white/15 bg-black/55 text-white/70 hover:text-status-starred-fg"
+                                : "border-foreground/15 bg-black/55 text-foreground/70 hover:text-status-starred-fg"
                         }`}
                     >
                         <Star

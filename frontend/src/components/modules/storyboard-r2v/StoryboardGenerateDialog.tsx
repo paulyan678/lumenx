@@ -150,7 +150,7 @@ export default function StoryboardGenerateDialog({
                                 {!allPass && onJumpToScript && (
                                     <button
                                         onClick={onJumpToScript}
-                                        className="mt-2 inline-flex items-center gap-1 text-[11px] text-primary hover:text-[#7a82ff] transition-colors"
+                                        className="mt-2 inline-flex items-center gap-1 text-[11px] text-primary hover:text-primary-hover transition-colors"
                                     >
                                         {t("goFixInScript")}
                                         <ArrowRight size={11} />

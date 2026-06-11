@@ -297,7 +297,7 @@ function FilterChip({
             className={`inline-flex min-h-[24px] items-center gap-1 rounded-full border px-2 py-[2px] font-mono text-chrome-sm font-medium uppercase transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 ${
                 active
                     ? "border-primary/55 bg-primary/15 text-primary"
-                    : "border-glass-border bg-black/20 text-text-muted hover:border-white/20 hover:text-foreground"
+                    : "border-glass-border bg-black/20 text-text-muted hover:border-foreground/20 hover:text-foreground"
             }`}
         >
             {children}

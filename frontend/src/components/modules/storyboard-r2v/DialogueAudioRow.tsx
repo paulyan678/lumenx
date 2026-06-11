@@ -71,7 +71,7 @@ export default function DialogueAudioRow({
             <button
                 type="button"
                 onClick={() => setModalOpen(true)}
-                className="w-full rounded-lg border border-glass-border bg-glass/50 px-3 py-2 text-left hover:border-white/15 hover:bg-glass/70 transition-colors group"
+                className="w-full rounded-lg border border-glass-border bg-glass/50 px-3 py-2 text-left hover:border-foreground/15 hover:bg-glass/70 transition-colors group"
             >
                 <div className="flex items-center gap-2">
                     <Mic size={12} className="text-text-muted shrink-0" />
@@ -312,7 +312,7 @@ function DialogueWorkbenchModal({
                     <motion.div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
 
                     <motion.div
-                        className="relative w-full max-w-xl mx-4 rounded-xl border border-glass-border bg-[#0a0a0f]/95 backdrop-blur-xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+                        className="relative w-full max-w-xl mx-4 rounded-xl border border-glass-border bg-surface/95 backdrop-blur-xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
                         initial={{ scale: 0.95, opacity: 0, y: 10 }}
                         animate={{ scale: 1, opacity: 1, y: 0 }}
                         exit={{ scale: 0.95, opacity: 0, y: 10 }}
@@ -332,7 +332,7 @@ function DialogueWorkbenchModal({
                             <button
                                 type="button"
                                 onClick={onClose}
-                                className="inline-flex items-center justify-center w-7 h-7 rounded-md text-text-muted hover:text-foreground hover:bg-white/5 transition-colors"
+                                className="inline-flex items-center justify-center w-7 h-7 rounded-md text-text-muted hover:text-foreground hover:bg-foreground/5 transition-colors"
                             >
                                 ×
                             </button>
@@ -371,7 +371,7 @@ function DialogueWorkbenchModal({
                                             className={`px-2 py-0.5 rounded-full border font-mono text-[9.5px] uppercase tracking-[0.12em] transition-colors ${
                                                 emotion === chip
                                                     ? "border-primary bg-primary/15 text-primary"
-                                                    : "border-glass-border bg-black/30 text-text-muted hover:border-white/20 hover:text-text-secondary"
+                                                    : "border-glass-border bg-black/30 text-text-muted hover:border-foreground/20 hover:text-text-secondary"
                                             }`}
                                         >
                                             {t(`emotion.${chip}`)}
@@ -397,7 +397,7 @@ function DialogueWorkbenchModal({
                                     {audioUrl && (
                                         <button
                                             onClick={handlePlayAudio}
-                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-glass-border bg-black/30 text-[12px] text-text-secondary hover:border-white/20 hover:text-foreground transition-colors"
+                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-glass-border bg-black/30 text-[12px] text-text-secondary hover:border-foreground/20 hover:text-foreground transition-colors"
                                         >
                                             {playing ? <Pause size={12} /> : <Play size={12} />}
                                             {playing ? "暂停" : "试听TTS"}
@@ -471,7 +471,7 @@ function DialogueWorkbenchModal({
                                             <button
                                                 type="button"
                                                 onClick={() => setOffsetMs(Math.max(0, offsetMs - 50))}
-                                                className="w-6 h-6 flex items-center justify-center rounded border border-glass-border bg-black/30 text-text-muted hover:text-foreground hover:border-white/20 transition-colors"
+                                                className="w-6 h-6 flex items-center justify-center rounded border border-glass-border bg-black/30 text-text-muted hover:text-foreground hover:border-foreground/20 transition-colors"
                                             >
                                                 <ChevronLeft size={12} />
                                             </button>
@@ -484,7 +484,7 @@ function DialogueWorkbenchModal({
                                             <button
                                                 type="button"
                                                 onClick={() => setOffsetMs(Math.min(videoDurationMs, offsetMs + 50))}
-                                                className="w-6 h-6 flex items-center justify-center rounded border border-glass-border bg-black/30 text-text-muted hover:text-foreground hover:border-white/20 transition-colors"
+                                                className="w-6 h-6 flex items-center justify-center rounded border border-glass-border bg-black/30 text-text-muted hover:text-foreground hover:border-foreground/20 transition-colors"
                                             >
                                                 <ChevronRight size={12} />
                                             </button>

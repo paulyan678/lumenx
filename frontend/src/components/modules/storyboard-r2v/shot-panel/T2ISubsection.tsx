@@ -464,7 +464,7 @@ function Compact({
                         {menuOpen ? (
                             <div
                                 role="menu"
-                                className="absolute right-0 top-full z-10 mt-1 w-44 overflow-hidden rounded-md border border-glass-border bg-[#0a0a14]/96 shadow-[0_8px_28px_-6px_rgba(0,0,0,0.7)] backdrop-blur-md motion-safe:animate-[shotPanelIn_180ms_cubic-bezier(0.22,1,0.36,1)_both]"
+                                className="absolute right-0 top-full z-10 mt-1 w-44 overflow-hidden rounded-md border border-glass-border bg-surface/96 shadow-[0_8px_28px_-6px_rgba(0,0,0,0.7)] backdrop-blur-md motion-safe:animate-[shotPanelIn_180ms_cubic-bezier(0.22,1,0.36,1)_both]"
                             >
                                 <button
                                     type="button"
@@ -657,7 +657,7 @@ function ThumbButton({
                 "group relative h-[54px] w-[96px] shrink-0 overflow-hidden rounded-md border transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-1 focus-visible:ring-offset-black",
                 active
                     ? "border-primary/70 ring-1 ring-primary/40"
-                    : "border-glass-border hover:border-white/30",
+                    : "border-glass-border hover:border-foreground/30",
             )}
         >
             <PreviewImage
@@ -698,7 +698,7 @@ function ThumbButton({
                             onRemove();
                         }
                     }}
-                    className="absolute left-0 top-0 grid h-6 w-6 cursor-pointer place-items-center rounded-full text-white/95 transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-failed-border"
+                    className="absolute left-0 top-0 grid h-6 w-6 cursor-pointer place-items-center rounded-full text-foreground/95 transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-failed-border"
                 >
                     <span className="grid h-4 w-4 place-items-center rounded-full bg-black/75 transition-colors duration-fast ease-out-quart hover:bg-status-failed-fg">
                         <X size={9} aria-hidden="true" />
@@ -747,7 +747,7 @@ function SinglePreview({ url, isStoryboard, onRemove, storyboardBadgeText }: Sin
                     onClick={(e) => { e.stopPropagation(); onRemove(); }}
                     aria-label="Delete candidate"
                     title="Delete"
-                    className="absolute left-1 top-1 grid h-6 w-6 cursor-pointer place-items-center rounded-full bg-black/75 text-white/95 transition-colors duration-fast ease-out-quart hover:bg-status-failed-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-failed-border"
+                    className="absolute left-1 top-1 grid h-6 w-6 cursor-pointer place-items-center rounded-full bg-black/75 text-foreground/95 transition-colors duration-fast ease-out-quart hover:bg-status-failed-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-failed-border"
                 >
                     <X size={11} aria-hidden="true" />
                 </button>
