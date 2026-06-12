@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Save, Loader2, Key, ChevronDown, ChevronRight, Settings, MessageSquareCode, Palette, Globe } from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Save, Loader2, ChevronDown, ChevronRight, FolderOpen, WifiOff, Copy, Check } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { api, type EnvConfigPayload, type ProviderMode } from "@/lib/api";
+import { api, type EnvConfigPayload, type ProviderMode, API_URL } from "@/lib/api";
 import { ASPECT_RATIOS } from "@/store/projectStore";
 import {
   DEFAULT_MODEL_SETTINGS,
@@ -16,6 +16,18 @@ import {
 import { useSettingsStore, type Locale, type ThemePreset } from "@/store/settingsStore";
 import { Image, Video, Layout, User, Building, Box } from "lucide-react";
 import GroupedModelGrid from "@/components/common/GroupedModelGrid";
+import SettingsSidebar, { type SettingsCategory } from "./SettingsSidebar";
+import {
+  SectionCard,
+  FormRow,
+  FieldLabel,
+  KeyField,
+  Toggle,
+  ModeSegment,
+  settingsInputClass,
+} from "./SettingsControls";
+
+const APP_VERSION = "v0.2.0";
 
 type EnvConfig = EnvConfigPayload & {
   DASHSCOPE_API_KEY: string;
@@ -72,22 +84,14 @@ const normalizeEnvConfig = (existing: EnvConfig, data?: EnvConfigPayload): EnvCo
 
 const getValidationErrors = (env: EnvConfig): string[] => {
   const errors: string[] = [];
-
-  if (!env.DASHSCOPE_API_KEY?.trim()) {
-    errors.push("DashScope API Key");
-  }
+  if (!env.DASHSCOPE_API_KEY?.trim()) errors.push("DashScope API Key");
   if (env.KLING_PROVIDER_MODE === "vendor") {
-    if (!env.KLING_ACCESS_KEY?.trim()) {
-      errors.push("Kling Access Key (vendor mode)");
-    }
-    if (!env.KLING_SECRET_KEY?.trim()) {
-      errors.push("Kling Secret Key (vendor mode)");
-    }
+    if (!env.KLING_ACCESS_KEY?.trim()) errors.push("Kling Access Key (vendor mode)");
+    if (!env.KLING_SECRET_KEY?.trim()) errors.push("Kling Secret Key (vendor mode)");
   }
   if (env.VIDU_PROVIDER_MODE === "vendor" && !env.VIDU_API_KEY?.trim()) {
     errors.push("Vidu API Key (vendor mode)");
   }
-
   return errors;
 };
 
@@ -98,21 +102,46 @@ interface DefaultPromptConfig {
   storyboard_polish: string;
   video_polish: string;
   r2v_polish: string;
+  entity_extraction: string;
+  style_analysis: string;
 }
+
+const EMPTY_PROMPT_CONFIG: DefaultPromptConfig = {
+  storyboard_polish: "",
+  video_polish: "",
+  r2v_polish: "",
+  entity_extraction: "",
+  style_analysis: "",
+};
 
 function loadFromLS<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
   try {
     const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
+    return raw ? { ...fallback, ...JSON.parse(raw) } : fallback;
   } catch {
     return fallback;
   }
 }
 
+const THEME_OPTIONS: { id: ThemePreset; name: string; desc: string; base: string; primary: string; accent: string }[] = [
+  { id: "atelier-dark",  name: "Atelier 暗",  desc: "暖石墨 · teal",   base: "#0c0b0e", primary: "#34d8c4", accent: "#ffa94d" },
+  { id: "bridge-dark",   name: "Warm Bridge", desc: "暖中性 · 品牌蓝", base: "#0a0a0d", primary: "#646cff", accent: "#ffa94d" },
+  { id: "brand-dark",    name: "Brand 暗",    desc: "冷黑 · 品牌蓝",   base: "#050508", primary: "#646cff", accent: "#ff0080" },
+  { id: "atelier-light", name: "Atelier 亮",  desc: "暖陶白 · teal",   base: "#f6f1e9", primary: "#1d9c8d", accent: "#e8852b" },
+  { id: "brand-light",   name: "品牌亮",      desc: "冷白 · 品牌蓝",   base: "#f8f9fa", primary: "#646cff", accent: "#ff0080" },
+];
+
+interface SystemReport {
+  ffmpeg?: { available: boolean; message: string; path: string | null };
+  status?: string;
+}
+
 export default function SettingsPage() {
   const t = useTranslations("settings");
-  const { locale, theme, setLocale, setTheme } = useSettingsStore();
+  const { locale, theme, animations, setLocale, setTheme, setAnimations } = useSettingsStore();
+
+  const [active, setActive] = useState<SettingsCategory>("general");
 
   // ── API Config ──
   const [config, setConfig] = useState<EnvConfig>(DEFAULT_CONFIG);
@@ -123,47 +152,110 @@ export default function SettingsPage() {
 
   // ── Default Model Settings ──
   const [modelSettings, setModelSettings] = useState<FrontendModelSettings>(() =>
-    normalizeModelSettings(
-      loadFromLS(LS_KEY_MODEL, DEFAULT_MODEL_SETTINGS),
-      "global_settings"
-    )
+    normalizeModelSettings(loadFromLS(LS_KEY_MODEL, DEFAULT_MODEL_SETTINGS), "global_settings")
   );
 
   // ── Default Prompt Config ──
   const [promptConfig, setPromptConfig] = useState<DefaultPromptConfig>(() =>
-    loadFromLS(LS_KEY_PROMPT, { storyboard_polish: "", video_polish: "", r2v_polish: "" })
+    loadFromLS(LS_KEY_PROMPT, EMPTY_PROMPT_CONFIG)
   );
 
-  useEffect(() => {
-    loadConfig();
-  }, []);
+  // ── About / system ──
+  const [online, setOnline] = useState(true);
+  const [dataDir, setDataDir] = useState<string>("");
+  const [logDir, setLogDir] = useState<string>("");
+  const [system, setSystem] = useState<SystemReport | null>(null);
+  const [systemLoading, setSystemLoading] = useState(false);
+  const [systemChecked, setSystemChecked] = useState(false);
+  const [copiedPath, setCopiedPath] = useState<string | null>(null);
 
-  const loadConfig = async () => {
+  const loadConfig = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
     try {
       const data = await api.getEnvConfig();
       setConfig((prev) => normalizeEnvConfig(prev, data));
     } catch {
-      setLoadError("Failed to load configuration. Is the backend running?");
+      setLoadError("无法加载配置。后端是否已启动？");
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadConfig();
+  }, [loadConfig]);
+
+  // Online/offline detection for the banner.
+  useEffect(() => {
+    const update = () => setOnline(typeof navigator === "undefined" ? true : navigator.onLine);
+    update();
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
+
+  // Pull health (data/log dir) once on mount so About + Storage can show paths.
+  useEffect(() => {
+    (async () => {
+      try {
+        const h = await api.healthCheck();
+        if (h.log_dir) setLogDir(h.log_dir);
+        if (h.log_file) {
+          // data dir = parent of logs dir (logs lives under <data>/logs)
+          const dir = h.log_dir.replace(/\/logs\/?$/, "");
+          setDataDir(dir || h.log_dir);
+        }
+      } catch {
+        /* backend offline — About shows fallback */
+      }
+    })();
+  }, []);
+
+  const loadSystem = useCallback(async () => {
+    setSystemLoading(true);
+    try {
+      const r = await api.checkSystem();
+      setSystem({ ffmpeg: r.dependencies?.ffmpeg, status: r.status });
+      // Lock only on success so a recovered backend is reflected without
+      // forcing a manual retry, while a successful read won't re-run.
+      setSystemChecked(true);
+    } catch {
+      setSystem(null);
+      // Leave systemChecked=false: re-entering the About tab retries once.
+    } finally {
+      setSystemLoading(false);
+    }
+  }, []);
+
+  // Self-healing lazy load: auto-run the system check when the About tab
+  // becomes active and we don't yet have a successful result. Driven off a
+  // tab-transition ref so it fires once per entry (no render thrash) and is
+  // not retried endlessly while the result is missing.
+  const prevActiveRef = useRef<SettingsCategory | null>(null);
+  useEffect(() => {
+    const enteredAbout = active === "about" && prevActiveRef.current !== "about";
+    prevActiveRef.current = active;
+    if (active === "about" && !systemChecked && !systemLoading && enteredAbout) {
+      loadSystem();
+    }
+  }, [active, systemChecked, systemLoading, loadSystem]);
 
   const handleSaveApiConfig = async () => {
     const errors = getValidationErrors(config);
     if (errors.length > 0) {
-      alert(`Please fill in required fields:\n- ${errors.join("\n- ")}`);
+      alert(`请填写必填项：\n- ${errors.join("\n- ")}`);
       return;
     }
-
     setSaving(true);
     try {
       await api.saveEnvConfig(config);
-      alert("Configuration saved successfully!");
+      alert(t("saveSuccess"));
     } catch {
-      alert("Failed to save configuration.");
+      alert("保存配置失败。");
     } finally {
       setSaving(false);
     }
@@ -181,502 +273,703 @@ export default function SettingsPage() {
   };
 
   const handleSaveModelDefaults = () => {
-    localStorage.setItem(
-      LS_KEY_MODEL,
-      JSON.stringify(normalizeModelSettings(modelSettings, "global_settings"))
-    );
-    alert("Default model settings saved!");
+    const normalized = normalizeModelSettings(modelSettings, "global_settings");
+    // T2I and I2I share one image model in the UI; persist both backend
+    // fields plus image_model so per-project backfill stays consistent.
+    const merged: FrontendModelSettings = {
+      ...normalized,
+      i2i_model: normalized.t2i_model,
+      image_model: normalized.t2i_model,
+    };
+    localStorage.setItem(LS_KEY_MODEL, JSON.stringify(merged));
+    setModelSettings(merged);
+    alert(t("saved"));
   };
 
   const handleSavePromptDefaults = () => {
     localStorage.setItem(LS_KEY_PROMPT, JSON.stringify(promptConfig));
-    alert("Default prompt configuration saved!");
+    alert(t("saved"));
   };
 
-  const inputClass =
-    "w-full bg-input-bg border border-glass-border rounded-lg px-4 py-2 text-foreground placeholder-text-muted focus:outline-none focus:border-primary/50 transition-colors";
-  const modeButtonClass = (active: boolean) =>
-    `px-3 py-1.5 text-xs rounded-md border transition-colors font-medium ${active ? "bg-amber-500 text-white border-amber-500 shadow-sm" : "border-glass-border bg-surface text-text-secondary hover:text-foreground"}`;
+  const copyPath = async (p: string) => {
+    if (!p) return;
+    try {
+      await navigator.clipboard.writeText(p);
+      setCopiedPath(p);
+      setTimeout(() => setCopiedPath(null), 1200);
+    } catch {
+      /* clipboard blocked */
+    }
+  };
 
-  return (
-    <div className="relative">
-      {/* Atelier signature layers — inert on non-atelier themes (display:none).
-          Rendered as siblings of the content so they cover the page background
-          without affecting layout or pointer events. */}
-      <div className="atelier-page-bloom" aria-hidden="true" />
-      <div className="atelier-page-grain" aria-hidden="true" />
-      <div className="container mx-auto px-6 py-8 max-w-4xl space-y-8 relative z-10">
-      <h1 className="text-2xl font-display atelier-display font-bold text-foreground">{t("title")}</h1>
+  const PathField = ({ value, label }: { value: string; label: string }) => (
+    <div>
+      <FieldLabel>{label}</FieldLabel>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={value || "—"}
+          disabled
+          className={settingsInputClass + " font-mono text-[11.5px] opacity-70 cursor-not-allowed"}
+        />
+        <button
+          type="button"
+          onClick={() => copyPath(value)}
+          disabled={!value}
+          title="复制路径"
+          className="flex-shrink-0 px-3 rounded-md border border-glass-border bg-surface text-text-secondary hover:text-foreground transition-colors disabled:opacity-40 flex items-center gap-1.5 text-xs"
+        >
+          {copiedPath === value ? <Check size={13} className="text-emerald-400" /> : <FolderOpen size={13} />}
+          {copiedPath === value ? "已复制" : "复制"}
+        </button>
+      </div>
+    </div>
+  );
 
-      {/* ── Section 0: Appearance ── */}
-      <section className="glass-panel atelier-card rounded-xl p-6 space-y-6">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 rounded-lg">
-            <Palette size={20} className="text-violet-400" />
-          </div>
-          <div>
-            <h2 className="text-lg font-bold text-foreground">{t("appearance")}</h2>
-          </div>
-        </div>
+  /* ── Section renderers ──────────────────────────────────────── */
 
-        {/* Language */}
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <Globe size={14} className="text-text-secondary" />
-            <label className="text-sm font-medium text-foreground">{t("language")}</label>
-          </div>
-          <p className="text-xs text-text-secondary">{t("languageDesc")}</p>
-          <div className="flex gap-2 mt-2">
-            {([["zh", t("chinese")], ["en", t("english")]] as [Locale, string][]).map(([loc, label]) => (
-              <button
-                key={loc}
-                onClick={() => setLocale(loc)}
-                className={`px-4 py-2 text-sm rounded-lg border transition-colors ${
-                  locale === loc
-                    ? "border-primary/60 bg-primary/15 text-foreground"
-                    : "border-glass-border bg-hover-bg text-text-secondary hover:text-foreground"
-                }`}
+  const renderGeneral = () => (
+    <SectionCard id="general" eyebrow="SECTION · GENERAL & THEME" index="01" title="通用与主题">
+      <FormRow label={t("language")} hint={t("languageDesc")}>
+        <FieldLabel>LANGUAGE</FieldLabel>
+        <ModeSegment
+          value={locale}
+          onChange={(v) => setLocale(v as Locale)}
+          options={[
+            { id: "zh", label: t("chinese") },
+            { id: "en", label: t("english") },
+          ]}
+        />
+      </FormRow>
+
+      <FormRow label={t("theme")} hint={t("themeDesc")}>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {THEME_OPTIONS.map((preset) => (
+            <button
+              key={preset.id}
+              type="button"
+              onClick={() => setTheme(preset.id)}
+              className={`group relative flex flex-col gap-2 p-3 rounded-xl border text-left transition-all ${
+                theme === preset.id
+                  ? "border-primary/60 bg-primary/10 ring-1 ring-primary/30"
+                  : "border-glass-border bg-hover-bg hover:border-text-muted"
+              }`}
+            >
+              <div
+                className="h-10 w-full rounded-lg border border-glass-border overflow-hidden flex items-end p-1.5 gap-1"
+                style={{ background: preset.base }}
               >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Theme */}
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <Palette size={14} className="text-text-secondary" />
-            <label className="text-sm font-medium text-foreground">{t("theme")}</label>
-          </div>
-          <p className="text-xs text-text-secondary">{t("themeDesc")}</p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
-            {([
-              { id: "atelier-dark",  name: t("themeAtelierDark"),  desc: t("themeAtelierDarkDesc"),  base: "#0c0b0e", primary: "#34d8c4", accent: "#ffa94d" },
-              { id: "bridge-dark",   name: t("themeBridgeDark"),   desc: t("themeBridgeDarkDesc"),   base: "#0a0a0d", primary: "#646cff", accent: "#ffa94d" },
-              { id: "brand-dark",    name: t("themeBrandDark"),    desc: t("themeBrandDarkDesc"),    base: "#050508", primary: "#646cff", accent: "#ff0080" },
-              { id: "atelier-light", name: t("themeAtelierLight"), desc: t("themeAtelierLightDesc"), base: "#f6f1e9", primary: "#1d9c8d", accent: "#e8852b" },
-              { id: "brand-light",   name: t("themeBrandLight"),   desc: t("themeBrandLightDesc"),   base: "#f8f9fa", primary: "#646cff", accent: "#ff0080" },
-            ] as { id: ThemePreset; name: string; desc: string; base: string; primary: string; accent: string }[]).map((preset) => (
-              <button
-                key={preset.id}
-                onClick={() => setTheme(preset.id)}
-                className={`group relative flex flex-col gap-2 p-3 rounded-xl border text-left transition-all ${
-                  theme === preset.id
-                    ? "border-primary/60 bg-primary/10 ring-1 ring-primary/30"
-                    : "border-glass-border bg-hover-bg hover:border-text-muted"
-                }`}
-              >
-                {/* color preview swatch */}
-                <div
-                  className="h-10 w-full rounded-lg border border-glass-border overflow-hidden flex items-end p-1.5 gap-1"
-                  style={{ background: preset.base }}
-                >
-                  <span className="h-3 w-3 rounded-full" style={{ background: preset.primary }} />
-                  <span className="h-3 w-3 rounded-full" style={{ background: preset.accent }} />
-                </div>
-                <div className="min-w-0">
-                  <div className="text-xs font-medium text-foreground truncate">{preset.name}</div>
-                  <div className="text-[10px] text-text-muted truncate">{preset.desc}</div>
-                </div>
-                {theme === preset.id && (
-                  <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-primary" />
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Section 1: API Configuration ── */}
-      <section className="glass-panel atelier-card rounded-xl p-6 space-y-6">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-gradient-to-br from-amber-500/20 to-orange-500/20 rounded-lg">
-            <Key size={20} className="text-amber-400" />
-          </div>
-          <div>
-            <h2 className="text-lg font-bold text-foreground">{t("apiConfig")}</h2>
-            <p className="text-xs text-text-secondary">DashScope-first setup with optional OSS mirror and provider-direct routing</p>
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 size={24} className="animate-spin text-amber-400" />
-            <span className="ml-2 text-text-secondary">Loading configuration...</span>
-          </div>
-        ) : loadError ? (
-          <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 text-sm text-red-300">
-            {loadError}
-          </div>
-        ) : (
-          <>
-            <div>
-              <label className="flex items-center justify-between text-sm font-medium text-text-secondary mb-2">
-                <span>DashScope API Key <span className="text-red-500">*</span></span>
-                <span className="text-text-muted font-normal text-xs">e.g. sk-xxx</span>
-              </label>
-              <input type="password" value={config.DASHSCOPE_API_KEY} onChange={(e) => handleChange("DASHSCOPE_API_KEY", e.target.value)} placeholder="Required for DashScope-first model routing" className={inputClass} />
-            </div>
-
-            <div className="bg-input-bg border border-glass-border rounded-lg p-4 space-y-4">
-              <p className="text-xs text-text-secondary">Storage is local-first by default. These credentials are only needed when enabling OSS mirror.</p>
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-2">Alibaba Cloud Access Key ID</label>
-                <input type="password" value={config.ALIBABA_CLOUD_ACCESS_KEY_ID} onChange={(e) => handleChange("ALIBABA_CLOUD_ACCESS_KEY_ID", e.target.value)} placeholder="Optional, for OSS mirror" className={inputClass} />
+                <span className="h-3 w-3 rounded-full" style={{ background: preset.primary }} />
+                <span className="h-3 w-3 rounded-full" style={{ background: preset.accent }} />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-2">Alibaba Cloud Access Key Secret</label>
-                <input type="password" value={config.ALIBABA_CLOUD_ACCESS_KEY_SECRET} onChange={(e) => handleChange("ALIBABA_CLOUD_ACCESS_KEY_SECRET", e.target.value)} placeholder="Optional, for OSS mirror" className={inputClass} />
+              <div className="min-w-0">
+                <div className="text-xs font-medium text-foreground truncate">{preset.name}</div>
+                <div className="text-[10px] text-text-muted truncate">{preset.desc}</div>
               </div>
-            </div>
-
-            <div className="pt-4 border-t border-glass-border">
-              <h3 className="text-sm font-bold text-foreground mb-2">OSS Mirror (Optional)</h3>
-              <p className="text-[10px] text-text-muted mb-4">Generated assets always save locally first. Configure OSS to keep an optional cloud mirror.</p>
-              <div className="space-y-4">
-                <div>
-                  <label className="flex items-center justify-between text-sm font-medium text-text-secondary mb-2">
-                    <span>OSS Bucket Name</span>
-                  </label>
-                  <input type="text" value={config.OSS_BUCKET_NAME} onChange={(e) => handleChange("OSS_BUCKET_NAME", e.target.value)} placeholder="your_bucket_name (optional)" className={inputClass} />
-                </div>
-                <div>
-                  <label className="flex items-center justify-between text-sm font-medium text-text-secondary mb-2">
-                    <span>OSS Endpoint</span>
-                  </label>
-                  <input type="text" value={config.OSS_ENDPOINT} onChange={(e) => handleChange("OSS_ENDPOINT", e.target.value)} placeholder="oss-cn-beijing.aliyuncs.com (optional)" className={inputClass} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-2">OSS Base Path</label>
-                  <input type="text" value={config.OSS_BASE_PATH} onChange={(e) => handleChange("OSS_BASE_PATH", e.target.value)} placeholder="lumenx" className={inputClass} />
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-glass-border">
-              <h3 className="text-sm font-bold text-foreground mb-4">Kling Provider</h3>
-              <div className="bg-surface border border-glass-border rounded-lg p-4 space-y-4">
-                <div className="flex flex-wrap gap-2">
-                  <button type="button" onClick={() => handleChange("KLING_PROVIDER_MODE", "dashscope")} className={modeButtonClass(config.KLING_PROVIDER_MODE === "dashscope")}>
-                    DashScope
-                  </button>
-                  <button type="button" onClick={() => handleChange("KLING_PROVIDER_MODE", "vendor")} className={modeButtonClass(config.KLING_PROVIDER_MODE === "vendor")}>
-                    Vendor Direct
-                  </button>
-                </div>
-                <p className="text-xs text-text-muted">
-                  DashScope mode uses your DashScope API key. Vendor-direct mode requires Kling Access Key and Secret Key.
-                </p>
-                {config.KLING_PROVIDER_MODE === "vendor" && (
-                  <>
-                    <div>
-                      <label className="block text-sm font-medium text-text-secondary mb-2">Kling Access Key <span className="text-red-500">*</span></label>
-                      <input type="password" value={config.KLING_ACCESS_KEY} onChange={(e) => handleChange("KLING_ACCESS_KEY", e.target.value)} placeholder="Kling API Access Key" className={inputClass} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-text-secondary mb-2">Kling Secret Key <span className="text-red-500">*</span></label>
-                      <input type="password" value={config.KLING_SECRET_KEY} onChange={(e) => handleChange("KLING_SECRET_KEY", e.target.value)} placeholder="Kling API Secret Key" className={inputClass} />
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-glass-border">
-              <h3 className="text-sm font-bold text-foreground mb-4">Vidu Provider</h3>
-              <div className="bg-input-bg border border-glass-border rounded-lg p-4 space-y-4">
-                <div className="flex flex-wrap gap-2">
-                  <button type="button" onClick={() => handleChange("VIDU_PROVIDER_MODE", "dashscope")} className={modeButtonClass(config.VIDU_PROVIDER_MODE === "dashscope")}>
-                    DashScope
-                  </button>
-                  <button type="button" onClick={() => handleChange("VIDU_PROVIDER_MODE", "vendor")} className={modeButtonClass(config.VIDU_PROVIDER_MODE === "vendor")}>
-                    Vendor Direct
-                  </button>
-                </div>
-                <p className="text-xs text-text-muted">
-                  DashScope mode uses your DashScope API key. Vendor-direct mode requires a Vidu API key.
-                </p>
-                {config.VIDU_PROVIDER_MODE === "vendor" && (
-                  <div>
-                    <label className="block text-sm font-medium text-text-secondary mb-2">Vidu API Key <span className="text-red-500">*</span></label>
-                    <input type="password" value={config.VIDU_API_KEY} onChange={(e) => handleChange("VIDU_API_KEY", e.target.value)} placeholder="Vidu API Key" className={inputClass} />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* MuleRun / MuleRouter */}
-            <div className="pt-4 border-t border-glass-border">
-              <h3 className="text-sm font-bold text-foreground mb-4">MuleRun / MuleRouter</h3>
-              <div className="bg-input-bg border border-glass-border rounded-lg p-4 space-y-4">
-                <div className="space-y-3">
-                  <h4 className="text-sm font-medium text-text-secondary">MuleRun / MuleRouter</h4>
-                  <p className="text-xs text-text-secondary/60">用于 Seedance 2.0 视频生成和 GPT-Image-2 图片生成</p>
-
-                  {/* One-click login button */}
-                  {!config.MULEROUTER_API_KEY && !config.MULERUN_CLI_LOGGED_IN && (
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        try {
-                          await api.triggerMulerunLogin();
-                          const poll = setInterval(async () => {
-                            try {
-                              const env = await api.getEnvConfig();
-                              if (env.MULERUN_CLI_LOGGED_IN) {
-                                clearInterval(poll);
-                                setConfig((c) => ({ ...c, MULERUN_CLI_LOGGED_IN: true }));
-                              }
-                            } catch { /* silent */ }
-                          }, 3000);
-                          setTimeout(() => clearInterval(poll), 120000);
-                        } catch (err: any) {
-                          alert(err?.response?.data?.detail || '登录失败');
-                        }
-                      }}
-                      className="w-full py-2.5 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors"
-                    >
-                      一键登录 MuleRun
-                    </button>
-                  )}
-                  {!config.MULEROUTER_API_KEY && config.MULERUN_CLI_LOGGED_IN && (
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-2 text-sm text-green-400">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                        MuleRun 已登录
-                      </div>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          try {
-                            await api.triggerMulerunLogin();
-                          } catch (err: any) {
-                            alert(err?.response?.data?.detail || '登录失败');
-                          }
-                        }}
-                        className="text-xs text-text-secondary hover:text-foreground transition-colors underline underline-offset-2"
-                      >
-                        重新登录
-                      </button>
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="block text-xs text-text-secondary mb-1">API Key</label>
-                    <input
-                      type="password"
-                      value={config.MULEROUTER_API_KEY}
-                      onChange={(e) => setConfig((c) => ({ ...c, MULEROUTER_API_KEY: e.target.value }))}
-                      placeholder="muk-..."
-                      className="glass-input w-full"
-                    />
-                  </div>
-                  <details className="group">
-                    <summary className="text-xs text-primary cursor-pointer hover:underline flex items-center gap-1">
-                      <svg className="w-3 h-3 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                      手动获取 Key
-                    </summary>
-                    <div className="mt-2 space-y-2 pl-4 border-l border-glass-border">
-                      <div className="flex items-center gap-2 text-xs text-text-secondary">
-                        <span className="shrink-0 w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[10px] font-bold">1</span>
-                        <span>安装 CLI</span>
-                        <code className="ml-auto px-2 py-0.5 bg-glass rounded text-[11px] font-mono select-all cursor-pointer" onClick={(e) => { navigator.clipboard.writeText('npm i -g @mulerunai/cli'); const el = e.currentTarget; el.style.outline = '1px solid var(--color-primary)'; setTimeout(() => el.style.outline = '', 800); }}>npm i -g @mulerunai/cli</code>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-text-secondary">
-                        <span className="shrink-0 w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[10px] font-bold">2</span>
-                        <span>浏览器登录</span>
-                        <code className="ml-auto px-2 py-0.5 bg-glass rounded text-[11px] font-mono select-all cursor-pointer" onClick={(e) => { navigator.clipboard.writeText('mulerun login'); const el = e.currentTarget; el.style.outline = '1px solid var(--color-primary)'; setTimeout(() => el.style.outline = '', 800); }}>mulerun login</code>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-text-secondary">
-                        <span className="shrink-0 w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[10px] font-bold">3</span>
-                        <span>复制 Key</span>
-                        <code className="ml-auto px-2 py-0.5 bg-glass rounded text-[11px] font-mono select-all cursor-pointer" onClick={(e) => { navigator.clipboard.writeText('mulerun studio config'); const el = e.currentTarget; el.style.outline = '1px solid var(--color-primary)'; setTimeout(() => el.style.outline = '', 800); }}>mulerun studio config</code>
-                      </div>
-                      <p className="text-[11px] text-text-secondary/50 mt-1">Key 格式为 muk-...，粘贴到上方输入框即可。本地开发如已登录 CLI，无需填写。</p>
-                    </div>
-                  </details>
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-glass-border">
-              <button type="button" onClick={() => setEndpointsOpen(!endpointsOpen)} className="flex items-center gap-2 text-sm font-medium text-text-secondary hover:text-foreground transition-colors">
-                {endpointsOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                Advanced: API Endpoints
-              </button>
-              {endpointsOpen && (
-                <div className="mt-4 space-y-4">
-                  <p className="text-xs text-text-muted">Custom API endpoint URLs. Leave empty to use defaults. Overrides are preserved regardless of provider mode.</p>
-                  {ENDPOINT_PROVIDERS.map(({ key, label, placeholder }) => (
-                    <div key={key}>
-                      <label className="flex items-center justify-between text-sm font-medium text-text-secondary mb-2">
-                        <span>{label} Base URL</span>
-                        <span className="text-text-muted font-normal text-xs">{placeholder}</span>
-                      </label>
-                      <input type="text" value={config.endpoint_overrides[key] || ""} onChange={(e) => handleEndpointChange(key, e.target.value)} placeholder={placeholder} className={inputClass + " text-sm"} />
-                    </div>
-                  ))}
-                </div>
+              {theme === preset.id && (
+                <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-primary" />
               )}
-            </div>
-
-            <div className="flex justify-end">
-              <button
-                onClick={handleSaveApiConfig}
-                disabled={saving || loading}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-foreground text-sm font-medium rounded-lg transition-all disabled:opacity-50"
-              >
-                {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                {saving ? "Saving..." : "Save Configuration"}
-              </button>
-            </div>
-          </>
-        )}
-      </section>
-
-      {/* ── Section 2: Default Model Settings ── */}
-      <section className="glass-panel atelier-card rounded-xl p-6 space-y-6">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-lg">
-            <Settings size={20} className="text-blue-400" />
-          </div>
-          <div>
-            <h2 className="text-lg font-bold text-foreground">{t("defaultModels")}</h2>
-            <p className="text-xs text-text-secondary">Default models and aspect ratios for new projects</p>
-          </div>
+            </button>
+          ))}
         </div>
+      </FormRow>
 
-        <div className="space-y-5">
-          <div className="flex items-center gap-2 text-sm font-bold text-foreground">
-            <Image size={16} className="text-green-400" />
-            <span>Text-to-Image Model</span>
-          </div>
-          <GroupedModelGrid
-            models={GLOBAL_IMAGE_MODELS}
-            selectedId={modelSettings.t2i_model}
-            onSelect={(id) => setModelSettings((s) => ({ ...s, t2i_model: id }))}
-          />
+      <FormRow label="动效" hint="关闭后将降低过渡动画，并尊重系统的减少动态偏好。">
+        <Toggle
+          checked={animations}
+          onChange={setAnimations}
+          label={animations ? "已启用过渡动效" : "已降低动效"}
+          sub="包含面板进出、签名动效等"
+          ariaLabel="界面动效开关"
+        />
+      </FormRow>
+    </SectionCard>
+  );
 
-          <div className="grid grid-cols-3 gap-4">
-            {(
-              [
-                { key: "character_aspect_ratio" as const, label: "Character", icon: User },
-                { key: "scene_aspect_ratio" as const, label: "Scene", icon: Building },
-                { key: "prop_aspect_ratio" as const, label: "Prop", icon: Box },
-              ] as const
-            ).map(({ key, label, icon: Icon }) => (
-              <div key={key} className="space-y-2">
-                <div className="flex items-center gap-1 text-xs text-text-secondary"><Icon size={12} /><label>{label}</label></div>
-                <div className="space-y-1">
-                  {ASPECT_RATIOS.map((ratio) => (
-                    <button key={ratio.id} onClick={() => setModelSettings((s) => ({ ...s, [key]: ratio.id }))} className={`w-full flex flex-col items-center py-2 px-2 rounded border transition-all ${modelSettings[key] === ratio.id ? "border-green-500/50 bg-green-500/10" : "border-glass-border hover:border-glass-border bg-glass"}`}>
-                      <span className="text-xs font-medium text-foreground">{ratio.name}</span>
-                    </button>
-                  ))}
-                </div>
+  const aspectButtons = (key: keyof FrontendModelSettings) => (
+    <div className="grid grid-cols-3 gap-2">
+      {ASPECT_RATIOS.map((ratio) => (
+        <button
+          key={ratio.id}
+          type="button"
+          onClick={() => setModelSettings((s) => ({ ...s, [key]: ratio.id }))}
+          className={`flex flex-col items-center py-2 px-2 rounded-lg border transition-all ${
+            modelSettings[key] === ratio.id
+              ? "border-primary/50 bg-primary/10"
+              : "border-glass-border hover:border-text-muted bg-glass"
+          }`}
+        >
+          <span className="text-xs font-medium text-foreground">{ratio.name}</span>
+        </button>
+      ))}
+    </div>
+  );
+
+  const renderModels = () => (
+    <SectionCard
+      id="models"
+      eyebrow="SECTION · MODEL SELECTION"
+      index="02"
+      title="默认模型"
+      desc="新建项目时套用的默认模型与画幅。可在项目内单独覆盖。"
+    >
+      {/* Image model (T2I + I2I unified) */}
+      <FormRow label="图像模型" hint="文生图与图生图（分镜首帧）使用同一模型。">
+        <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
+          <Image size={15} className="text-emerald-400" />
+          <span>Image Model · 文生图 / 图生图</span>
+        </div>
+        <GroupedModelGrid
+          models={GLOBAL_IMAGE_MODELS}
+          selectedId={modelSettings.t2i_model}
+          onSelect={(id) => setModelSettings((s) => ({ ...s, t2i_model: id, i2i_model: id, image_model: id }))}
+        />
+      </FormRow>
+
+      {/* Asset aspect ratios */}
+      <FormRow label="资产画幅" hint="角色 / 场景 / 道具的默认生成比例。">
+        <div className="grid grid-cols-3 gap-4">
+          {(
+            [
+              { key: "character_aspect_ratio" as const, label: "角色", icon: User },
+              { key: "scene_aspect_ratio" as const, label: "场景", icon: Building },
+              { key: "prop_aspect_ratio" as const, label: "道具", icon: Box },
+            ] as const
+          ).map(({ key, label, icon: Icon }) => (
+            <div key={key} className="space-y-2">
+              <div className="flex items-center gap-1 text-xs text-text-secondary">
+                <Icon size={12} />
+                <label>{label}</label>
               </div>
-            ))}
-          </div>
-
-          <div className="border-t border-glass-border pt-4">
-            <div className="flex items-center gap-2 text-sm font-bold text-foreground">
-              <Layout size={16} className="text-blue-400" />
-              <span>Storyboard (Image-to-Image)</span>
-            </div>
-            <GroupedModelGrid
-              models={GLOBAL_IMAGE_MODELS}
-              selectedId={modelSettings.i2i_model}
-              onSelect={(id) => setModelSettings((s) => ({ ...s, i2i_model: id }))}
-              className="mt-3"
-            />
-            <div className="mt-3 space-y-2">
-              <label className="text-xs text-text-secondary">Storyboard Aspect Ratio</label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-1">
                 {ASPECT_RATIOS.map((ratio) => (
-                  <button key={ratio.id} onClick={() => setModelSettings((s) => ({ ...s, storyboard_aspect_ratio: ratio.id }))} className={`flex flex-col items-center p-3 rounded-lg border transition-all ${modelSettings.storyboard_aspect_ratio === ratio.id ? "border-blue-500/50 bg-blue-500/10" : "border-glass-border hover:border-glass-border bg-glass"}`}>
-                    <span className="text-sm font-medium text-foreground">{ratio.name}</span>
+                  <button
+                    key={ratio.id}
+                    type="button"
+                    onClick={() => setModelSettings((s) => ({ ...s, [key]: ratio.id }))}
+                    className={`w-full flex flex-col items-center py-2 px-2 rounded border transition-all ${
+                      modelSettings[key] === ratio.id
+                        ? "border-emerald-500/50 bg-emerald-500/10"
+                        : "border-glass-border hover:border-text-muted bg-glass"
+                    }`}
+                  >
+                    <span className="text-xs font-medium text-foreground">{ratio.name}</span>
                   </button>
                 ))}
               </div>
             </div>
-          </div>
-
-          <div className="border-t border-glass-border pt-4">
-            <div className="flex items-center gap-2 text-sm font-bold text-foreground">
-              <Video size={16} className="text-purple-400" />
-              <span>Motion (Image-to-Video)</span>
-            </div>
-            <GroupedModelGrid
-              models={GLOBAL_I2V_MODELS}
-              selectedId={modelSettings.i2v_model}
-              onSelect={(id) => setModelSettings((s) => ({ ...s, i2v_model: id }))}
-              className="mt-3"
-            />
-          </div>
-
-          <div className="border-t border-glass-border pt-4">
-            <div className="flex items-center gap-2 text-sm font-bold text-foreground">
-              <Video size={16} className="text-purple-400" />
-              <span>R2V · 参考生视频</span>
-            </div>
-            <GroupedModelGrid
-              models={GLOBAL_R2V_MODELS}
-              selectedId={modelSettings.r2v_model ?? ""}
-              onSelect={(id) => setModelSettings((s) => ({ ...s, r2v_model: id }))}
-              className="mt-3"
-            />
-          </div>
+          ))}
         </div>
+      </FormRow>
 
-        <div className="flex justify-end">
-          <button onClick={handleSaveModelDefaults} className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-foreground text-sm font-medium rounded-lg transition-all">
-            <Save size={16} />
-            Save Defaults
-          </button>
+      {/* Storyboard aspect ratio */}
+      <FormRow label="分镜画幅" hint="分镜（图生图）首帧的默认比例。">
+        <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
+          <Layout size={15} className="text-primary" />
+          <span>Storyboard Aspect Ratio</span>
         </div>
-      </section>
+        {aspectButtons("storyboard_aspect_ratio")}
+      </FormRow>
 
-      {/* ── Section 3: Default Prompt Config ── */}
-      <section className="glass-panel atelier-card rounded-xl p-6 space-y-6">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-purple-500/20 rounded-lg">
-            <MessageSquareCode size={20} className="text-purple-400" />
-          </div>
-          <div>
-            <h2 className="text-lg font-bold text-foreground">{t("defaultPrompts")}</h2>
-            <p className="text-xs text-text-secondary">Default system prompts for new projects (leave empty for built-in defaults)</p>
-          </div>
+      {/* I2V */}
+      <FormRow label="运动模型 (I2V)" hint="图生视频 · 分镜动态化。">
+        <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
+          <Video size={15} className="text-purple-400" />
+          <span>Image-to-Video</span>
         </div>
+        <GroupedModelGrid
+          models={GLOBAL_I2V_MODELS}
+          selectedId={modelSettings.i2v_model}
+          onSelect={(id) => setModelSettings((s) => ({ ...s, i2v_model: id }))}
+        />
+      </FormRow>
 
-        {(
-          [
-            { key: "storyboard_polish" as const, label: "Storyboard Polish", desc: "System prompt for storyboard/image prompt polishing" },
-            { key: "video_polish" as const, label: "Video I2V Polish", desc: "System prompt for Image-to-Video prompt polishing" },
-            { key: "r2v_polish" as const, label: "Video R2V Polish", desc: "System prompt for Reference-to-Video prompt polishing" },
-          ] as const
-        ).map((section) => (
-          <div key={section.key} className="space-y-2">
-            <h3 className="text-sm font-bold text-foreground">{section.label}</h3>
-            <p className="text-[10px] text-text-muted">{section.desc}</p>
+      {/* R2V */}
+      <FormRow label="参考生视频 (R2V)" hint="参考图驱动的视频生成默认模型。">
+        <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
+          <Video size={15} className="text-purple-400" />
+          <span>Reference-to-Video</span>
+        </div>
+        <GroupedModelGrid
+          models={GLOBAL_R2V_MODELS}
+          selectedId={modelSettings.r2v_model ?? ""}
+          onSelect={(id) => setModelSettings((s) => ({ ...s, r2v_model: id }))}
+        />
+      </FormRow>
+
+      <div className="flex justify-end pt-4">
+        <button
+          type="button"
+          onClick={handleSaveModelDefaults}
+          className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover text-white text-sm font-medium rounded-lg transition-all"
+        >
+          <Save size={16} />
+          保存默认
+        </button>
+      </div>
+    </SectionCard>
+  );
+
+  const PROMPT_FIELDS: { key: keyof DefaultPromptConfig; label: string; desc: string }[] = [
+    { key: "entity_extraction", label: "角色/场景/道具提取", desc: "从剧本/小说提取实体的系统提示词。留空使用内置默认。" },
+    { key: "style_analysis", label: "视觉风格分析", desc: "从剧本推荐美术风格的系统提示词。留空使用内置默认。" },
+    { key: "storyboard_polish", label: "分镜润色", desc: "分镜 / 图像提示词润色的系统提示词。" },
+    { key: "video_polish", label: "I2V 视频润色", desc: "图生视频提示词润色的系统提示词。" },
+    { key: "r2v_polish", label: "R2V 视频润色", desc: "参考生视频提示词润色的系统提示词。" },
+  ];
+
+  const renderPrompts = () => (
+    <SectionCard
+      id="prompts"
+      eyebrow="SECTION · DEFAULT PROMPTS"
+      index="03"
+      title="默认 Prompt"
+      desc="新建项目的默认系统提示词（留空使用内置默认）。"
+    >
+      <div className="space-y-5">
+        {PROMPT_FIELDS.map((f) => (
+          <div key={f.key} className="space-y-2">
+            <h3 className="text-sm font-semibold text-foreground">{f.label}</h3>
+            <p className="text-[11px] text-text-muted">{f.desc}</p>
             <textarea
-              value={promptConfig[section.key]}
-              onChange={(e) => setPromptConfig((prev) => ({ ...prev, [section.key]: e.target.value }))}
-              placeholder="Leave empty to use system default..."
-              className="w-full h-32 bg-input-bg border border-glass-border rounded-lg p-3 text-xs text-text-secondary resize-y focus:outline-none focus:border-purple-500/50 font-mono placeholder-text-muted"
+              value={promptConfig[f.key]}
+              onChange={(e) => setPromptConfig((prev) => ({ ...prev, [f.key]: e.target.value }))}
+              placeholder="留空使用系统默认…"
+              className="w-full h-32 bg-input-bg border border-glass-border rounded-lg p-3 text-xs text-text-secondary resize-y focus:outline-none focus:border-primary/50 font-mono placeholder-text-muted"
             />
           </div>
         ))}
+      </div>
+      <div className="flex justify-end pt-4">
+        <button
+          type="button"
+          onClick={handleSavePromptDefaults}
+          className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover text-white text-sm font-medium rounded-lg transition-colors"
+        >
+          <Save size={16} />
+          保存默认
+        </button>
+      </div>
+    </SectionCard>
+  );
 
-        <div className="flex justify-end">
-          <button onClick={handleSavePromptDefaults} className="px-6 py-2 text-sm font-medium bg-purple-600 hover:bg-purple-500 text-foreground rounded-lg transition-colors flex items-center gap-2">
-            <Save size={16} />
-            Save Defaults
+  const renderApiKeys = () => (
+    <SectionCard
+      id="apikeys"
+      eyebrow="SECTION · API KEYS"
+      index="04"
+      title="API 密钥"
+      desc="DashScope 优先；按需开启供应商直连。"
+    >
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 size={24} className="animate-spin text-primary" />
+          <span className="ml-2 text-text-secondary">加载配置中…</span>
+        </div>
+      ) : loadError ? (
+        <div className="bg-status-failed-bg border border-status-failed-border rounded-lg p-4 text-sm text-status-failed-fg">
+          {loadError}
+        </div>
+      ) : (
+        <div className="space-y-1">
+          <FormRow label="DashScope 密钥" hint="阿里云百炼 / 通义系列服务凭证（必填）。">
+            <FieldLabel>DASHSCOPE_API_KEY *</FieldLabel>
+            <KeyField
+              value={config.DASHSCOPE_API_KEY}
+              onChange={(v) => handleChange("DASHSCOPE_API_KEY", v)}
+              placeholder="sk-..."
+              status={
+                config.DASHSCOPE_API_KEY?.trim()
+                  ? { kind: "ok", text: "已填写" }
+                  : { kind: "warn", text: "未配置 · 模型不可用" }
+              }
+            />
+          </FormRow>
+
+          <FormRow label="可灵 Kling" hint="DashScope 模式用主密钥；供应商直连需 AK/SK。">
+            <ModeSegment
+              value={config.KLING_PROVIDER_MODE}
+              onChange={(v) => handleChange("KLING_PROVIDER_MODE", v)}
+              options={[
+                { id: "dashscope", label: "DashScope" },
+                { id: "vendor", label: "供应商直连" },
+              ]}
+            />
+            {config.KLING_PROVIDER_MODE === "vendor" && (
+              <div className="space-y-3 mt-3">
+                <div>
+                  <FieldLabel>KLING_ACCESS_KEY *</FieldLabel>
+                  <KeyField value={config.KLING_ACCESS_KEY} onChange={(v) => handleChange("KLING_ACCESS_KEY", v)} placeholder="Kling Access Key" />
+                </div>
+                <div>
+                  <FieldLabel>KLING_SECRET_KEY *</FieldLabel>
+                  <KeyField value={config.KLING_SECRET_KEY} onChange={(v) => handleChange("KLING_SECRET_KEY", v)} placeholder="Kling Secret Key" />
+                </div>
+              </div>
+            )}
+          </FormRow>
+
+          <FormRow label="Vidu" hint="DashScope 模式用主密钥；供应商直连需 API Key。">
+            <ModeSegment
+              value={config.VIDU_PROVIDER_MODE}
+              onChange={(v) => handleChange("VIDU_PROVIDER_MODE", v)}
+              options={[
+                { id: "dashscope", label: "DashScope" },
+                { id: "vendor", label: "供应商直连" },
+              ]}
+            />
+            {config.VIDU_PROVIDER_MODE === "vendor" && (
+              <div className="mt-3">
+                <FieldLabel>VIDU_API_KEY *</FieldLabel>
+                <KeyField value={config.VIDU_API_KEY} onChange={(v) => handleChange("VIDU_API_KEY", v)} placeholder="Vidu API Key" />
+              </div>
+            )}
+          </FormRow>
+
+          <FormRow label="MuleRun / MuleRouter" hint="用于 Seedance 2.0 视频与 GPT-Image-2 图片生成。">
+            {!config.MULEROUTER_API_KEY && !config.MULERUN_CLI_LOGGED_IN && (
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await api.triggerMulerunLogin();
+                    const poll = setInterval(async () => {
+                      try {
+                        const env = await api.getEnvConfig();
+                        if (env.MULERUN_CLI_LOGGED_IN) {
+                          clearInterval(poll);
+                          setConfig((c) => ({ ...c, MULERUN_CLI_LOGGED_IN: true }));
+                        }
+                      } catch {
+                        /* silent */
+                      }
+                    }, 3000);
+                    setTimeout(() => clearInterval(poll), 120000);
+                  } catch (err: any) {
+                    alert(err?.response?.data?.detail || "登录失败");
+                  }
+                }}
+                className="w-full py-2.5 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-hover transition-colors mb-3"
+              >
+                一键登录 MuleRun
+              </button>
+            )}
+            {!config.MULEROUTER_API_KEY && config.MULERUN_CLI_LOGGED_IN && (
+              <div className="flex items-center gap-3 mb-3">
+                <div className="flex items-center gap-2 text-sm text-emerald-400">
+                  <Check size={16} />
+                  MuleRun 已登录
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await api.triggerMulerunLogin();
+                    } catch (err: any) {
+                      alert(err?.response?.data?.detail || "登录失败");
+                    }
+                  }}
+                  className="text-xs text-text-secondary hover:text-foreground transition-colors underline underline-offset-2"
+                >
+                  重新登录
+                </button>
+              </div>
+            )}
+            <FieldLabel>MULEROUTER_API_KEY</FieldLabel>
+            <KeyField
+              value={config.MULEROUTER_API_KEY}
+              onChange={(v) => setConfig((c) => ({ ...c, MULEROUTER_API_KEY: v }))}
+              placeholder="muk-..."
+            />
+            <details className="group mt-3">
+              <summary className="text-xs text-primary cursor-pointer hover:underline flex items-center gap-1">
+                <ChevronRight size={12} className="transition-transform group-open:rotate-90" />
+                手动获取 Key
+              </summary>
+              <div className="mt-2 space-y-2 pl-4 border-l border-glass-border">
+                {[
+                  { n: "1", label: "安装 CLI", cmd: "npm i -g @mulerunai/cli" },
+                  { n: "2", label: "浏览器登录", cmd: "mulerun login" },
+                  { n: "3", label: "复制 Key", cmd: "mulerun studio config" },
+                ].map((step) => (
+                  <div key={step.n} className="flex items-center gap-2 text-xs text-text-secondary">
+                    <span className="shrink-0 w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[10px] font-bold">
+                      {step.n}
+                    </span>
+                    <span>{step.label}</span>
+                    <code
+                      className="ml-auto px-2 py-0.5 bg-glass rounded text-[11px] font-mono select-all cursor-pointer"
+                      onClick={(e) => {
+                        navigator.clipboard.writeText(step.cmd);
+                        const el = e.currentTarget;
+                        el.style.outline = "1px solid var(--color-primary)";
+                        setTimeout(() => (el.style.outline = ""), 800);
+                      }}
+                    >
+                      {step.cmd}
+                    </code>
+                  </div>
+                ))}
+                <p className="text-[11px] text-text-muted mt-1">Key 格式为 muk-...，粘贴到上方输入框即可。本地开发如已登录 CLI，无需填写。</p>
+              </div>
+            </details>
+          </FormRow>
+
+          <FormRow label="高级 · API 端点" hint="自定义各供应商 Base URL，留空使用默认。">
+            <button
+              type="button"
+              onClick={() => setEndpointsOpen(!endpointsOpen)}
+              className="flex items-center gap-2 text-sm font-medium text-text-secondary hover:text-foreground transition-colors"
+            >
+              {endpointsOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+              {endpointsOpen ? "收起端点配置" : "展开端点配置"}
+            </button>
+            {endpointsOpen && (
+              <div className="mt-3 space-y-3">
+                {ENDPOINT_PROVIDERS.map(({ key, label, placeholder }) => (
+                  <div key={key}>
+                    <FieldLabel>{label} BASE URL</FieldLabel>
+                    <input
+                      type="text"
+                      value={config.endpoint_overrides[key] || ""}
+                      onChange={(e) => handleEndpointChange(key, e.target.value)}
+                      placeholder={placeholder}
+                      className={settingsInputClass + " font-mono text-[11.5px]"}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </FormRow>
+
+          <div className="flex justify-end pt-4">
+            <button
+              type="button"
+              onClick={handleSaveApiConfig}
+              disabled={saving || loading}
+              className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover text-white text-sm font-medium rounded-lg transition-all disabled:opacity-50"
+            >
+              {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+              {saving ? "保存中…" : "保存配置"}
+            </button>
+          </div>
+        </div>
+      )}
+    </SectionCard>
+  );
+
+  const renderStorage = () => (
+    <SectionCard
+      id="storage"
+      eyebrow="SECTION · STORAGE"
+      index="05"
+      title="存储 OSS"
+      desc="生成结果默认本地优先；OSS 仅用于可选云端镜像。"
+    >
+      <FormRow label="阿里云 AK / SK" hint="仅在启用 OSS 镜像时需要填写。">
+        <div className="space-y-3">
+          <div>
+            <FieldLabel>ALIBABA_CLOUD_ACCESS_KEY_ID</FieldLabel>
+            <KeyField
+              value={config.ALIBABA_CLOUD_ACCESS_KEY_ID}
+              onChange={(v) => handleChange("ALIBABA_CLOUD_ACCESS_KEY_ID", v)}
+              placeholder="可选，用于 OSS 镜像"
+            />
+          </div>
+          <div>
+            <FieldLabel>ALIBABA_CLOUD_ACCESS_KEY_SECRET</FieldLabel>
+            <KeyField
+              value={config.ALIBABA_CLOUD_ACCESS_KEY_SECRET}
+              onChange={(v) => handleChange("ALIBABA_CLOUD_ACCESS_KEY_SECRET", v)}
+              placeholder="可选，用于 OSS 镜像"
+            />
+          </div>
+        </div>
+      </FormRow>
+
+      <FormRow label="Bucket 名称" hint="存储桶标识。">
+        <FieldLabel>OSS_BUCKET</FieldLabel>
+        <input
+          type="text"
+          value={config.OSS_BUCKET_NAME}
+          onChange={(e) => handleChange("OSS_BUCKET_NAME", e.target.value)}
+          placeholder="your_bucket_name（可选）"
+          className={settingsInputClass + " font-mono text-[11.5px]"}
+        />
+      </FormRow>
+
+      <FormRow label="Endpoint" hint="区域访问端点。">
+        <FieldLabel>OSS_ENDPOINT</FieldLabel>
+        <input
+          type="text"
+          value={config.OSS_ENDPOINT}
+          onChange={(e) => handleChange("OSS_ENDPOINT", e.target.value)}
+          placeholder="oss-cn-beijing.aliyuncs.com（可选）"
+          className={settingsInputClass + " font-mono text-[11.5px]"}
+        />
+      </FormRow>
+
+      <FormRow label="Base Path" hint="对象前缀路径。">
+        <FieldLabel>OSS_BASE_PATH</FieldLabel>
+        <input
+          type="text"
+          value={config.OSS_BASE_PATH}
+          onChange={(e) => handleChange("OSS_BASE_PATH", e.target.value)}
+          placeholder="lumenx"
+          className={settingsInputClass + " font-mono text-[11.5px]"}
+        />
+      </FormRow>
+
+      <FormRow label="本地数据目录" hint="只读 · 由系统管理（可设 LUMENX_DATA_DIR 环境变量覆盖）。">
+        <PathField value={dataDir} label="DATA_DIR · MANAGED" />
+      </FormRow>
+
+      <FormRow label="日志目录" hint="只读 · 由系统管理（可设 LUMENX_LOG_DIR 环境变量覆盖）。">
+        <PathField value={logDir} label="LOG_DIR · MANAGED" />
+      </FormRow>
+
+      <div className="flex justify-end pt-4">
+        <button
+          type="button"
+          onClick={handleSaveApiConfig}
+          disabled={saving || loading}
+          className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover text-white text-sm font-medium rounded-lg transition-all disabled:opacity-50"
+        >
+          {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+          {saving ? "保存中…" : "保存配置"}
+        </button>
+      </div>
+    </SectionCard>
+  );
+
+  const renderAbout = () => {
+    const ff = system?.ffmpeg;
+    const aboutRows: { k: string; v: string; tone?: "ok" | "warn" }[] = [
+      { k: "应用版本", v: `LumenX Studio ${APP_VERSION}` },
+      { k: "设计方向", v: "Line A · Cyber Refined + Atelier" },
+      { k: "后端 API", v: API_URL },
+      { k: "数据目录", v: dataDir || "—" },
+      { k: "日志目录", v: logDir || "—" },
+    ];
+    return (
+      <SectionCard id="about" eyebrow="SECTION · ABOUT" index="06" title="关于">
+        <div className="space-y-0">
+          {aboutRows.map((r) => (
+            <div key={r.k} className="flex justify-between items-center py-2.5 border-b border-glass-border last:border-b-0 text-[12.5px] gap-3">
+              <span className="text-text-secondary shrink-0">{r.k}</span>
+              <span className="font-mono text-[11.5px] text-foreground truncate text-right">{r.v}</span>
+            </div>
+          ))}
+          {/* FFmpeg row with live detection */}
+          <div className="flex justify-between items-center py-2.5 border-b border-glass-border last:border-b-0 text-[12.5px] gap-3">
+            <span className="text-text-secondary shrink-0">FFmpeg</span>
+            <span className="font-mono text-[11.5px] text-right truncate">
+              {systemLoading ? (
+                <span className="inline-flex items-center gap-1.5 text-text-muted">
+                  <Loader2 size={12} className="animate-spin" /> 检测中…
+                </span>
+              ) : ff ? (
+                ff.available ? (
+                  <span className="text-emerald-400" title={ff.message}>已检测 · 可用</span>
+                ) : (
+                  <span className="text-amber-400" title={ff.message}>未检测到</span>
+                )
+              ) : (
+                <span className="text-text-muted">无法获取（后端离线？）</span>
+              )}
+            </span>
+          </div>
+        </div>
+        <div className="flex justify-end pt-4">
+          <button
+            type="button"
+            onClick={loadSystem}
+            disabled={systemLoading}
+            className="flex items-center gap-2 px-3 py-1.5 text-xs rounded-md border border-glass-border bg-surface text-text-secondary hover:text-foreground transition-colors disabled:opacity-50"
+          >
+            {systemLoading ? <Loader2 size={13} className="animate-spin" /> : <Copy size={13} />}
+            重新检测
           </button>
         </div>
-      </section>
+      </SectionCard>
+    );
+  };
 
-      <div className="pb-8" />
+  const renderActive = () => {
+    switch (active) {
+      case "general":
+        return renderGeneral();
+      case "models":
+        return renderModels();
+      case "prompts":
+        return renderPrompts();
+      case "apikeys":
+        return renderApiKeys();
+      case "storage":
+        return renderStorage();
+      case "about":
+        return renderAbout();
+      default:
+        return null;
+    }
+  };
+
+  const TOPBAR: Record<SettingsCategory, { title: string; sub: string }> = {
+    general: { title: "通用与主题", sub: "LANGUAGE · THEME · MOTION" },
+    models: { title: "默认模型", sub: "IMAGE · I2V · R2V · ASPECT" },
+    prompts: { title: "默认 Prompt", sub: "EXTRACTION · STYLE · POLISH" },
+    apikeys: { title: "API 密钥", sub: "DASHSCOPE · KLING · VIDU · MULERUN" },
+    storage: { title: "存储 OSS", sub: "OSS MIRROR · LOCAL DIRS" },
+    about: { title: "关于", sub: "VERSION · BACKEND · FFMPEG" },
+  };
+
+  return (
+    <div className="relative h-full flex">
+      {/* Atelier signature layers — inert on non-atelier themes. */}
+      <div className="atelier-page-bloom" aria-hidden="true" />
+      <div className="atelier-page-grain" aria-hidden="true" />
+
+      <SettingsSidebar
+        active={active}
+        onSelect={setActive}
+        footer={`LUMENX STUDIO · ${APP_VERSION}\nLINE A · CYBER REFINED`}
+      />
+
+      <div className="flex-1 flex flex-col min-w-0 relative z-10">
+        {/* Topbar */}
+        <header className="h-14 flex-shrink-0 border-b border-glass-border flex items-center px-6 bg-surface">
+          <div>
+            <div className="font-display atelier-display text-base font-semibold text-foreground">
+              {TOPBAR[active].title}
+            </div>
+            <div className="font-mono text-[9.5px] tracking-wide text-text-muted mt-0.5">
+              {TOPBAR[active].sub}
+            </div>
+          </div>
+        </header>
+
+        {/* Scroll area */}
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="max-w-3xl mx-auto flex flex-col gap-5">
+            {!online && (
+              <div
+                role="status"
+                className="flex items-center gap-3 px-4 py-3 rounded-lg bg-status-processing-bg border border-status-processing-border"
+              >
+                <WifiOff size={18} className="text-status-processing-fg flex-shrink-0" />
+                <div className="flex-1">
+                  <div className="text-[12.5px] font-semibold text-foreground">当前处于离线模式</div>
+                  <div className="text-[11px] text-text-secondary mt-0.5">
+                    未检测到网络连接。已缓存的资产仍可浏览，生成与导出将在恢复网络后执行。
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {renderActive()}
+            <div className="pb-8" />
+          </div>
+        </div>
       </div>
     </div>
   );

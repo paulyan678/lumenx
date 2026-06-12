@@ -248,7 +248,7 @@ def diagnose_log_tail(lines: int = 200):
 @app.get("/system/check")
 def check_system():
     """Check system dependencies (ffmpeg, etc.) and configuration."""
-    from utils.system_check import run_system_checks
+    from ...utils.system_check import run_system_checks
     return run_system_checks()
 
 
@@ -1037,6 +1037,14 @@ def update_env_config(config: EnvConfig):
                 config_dict[key] = value.value
             else:
                 config_dict[key] = value
+
+        # Secret masking guard: GET /config/env returns secrets masked with the
+        # bullet sentinel. If the frontend re-submits an unchanged secret it will
+        # still contain bullets — skip it so we don't overwrite the real stored
+        # key with the mask. Only genuinely edited (bullet-free) values persist.
+        for field in list(config_dict.keys()):
+            if field in SECRET_FIELDS and _MASK_CHAR in str(config_dict[field]):
+                config_dict.pop(field, None)
 
         # Process endpoint overrides: validate keys against known providers
         from ...utils.endpoints import PROVIDER_DEFAULTS
@@ -2352,6 +2360,8 @@ class UpdatePromptConfigRequest(BaseModel):
     storyboard_polish: str = ""
     video_polish: str = ""
     r2v_polish: str = ""
+    entity_extraction: str = ""
+    style_analysis: str = ""
 
 
 @app.get("/projects/{script_id}/prompt_config")
@@ -2383,10 +2393,15 @@ def update_prompt_config(script_id: str, request: UpdatePromptConfigRequest):
         script = pipeline.get_script(script_id)
         if not script:
             raise HTTPException(status_code=404, detail="Project not found")
+        existing = getattr(script, "prompt_config", None)
+        preserved_polish_model = getattr(existing, "polish_model", "") if existing else ""
         script.prompt_config = PromptConfig(
             storyboard_polish=request.storyboard_polish,
             video_polish=request.video_polish,
             r2v_polish=request.r2v_polish,
+            entity_extraction=request.entity_extraction,
+            style_analysis=request.style_analysis,
+            polish_model=preserved_polish_model,
         )
         pipeline._save_data()
         return {"prompt_config": script.prompt_config.model_dump()}
@@ -3249,10 +3264,11 @@ async def analyze_script_for_styles(script_id: str, request: AnalyzeStyleRequest
             raise HTTPException(status_code=404, detail="Script not found")
 
         # Use LLM to analyze and recommend styles (run in thread pool to avoid blocking, Python 3.8 compatible)
+        custom_style = getattr(getattr(script, "prompt_config", None), "style_analysis", "")
         loop = asyncio.get_event_loop()
         recommendations = await loop.run_in_executor(
             None,  # Use default executor
-            partial(pipeline.script_processor.analyze_script_for_styles, request.script_text)
+            partial(pipeline.script_processor.analyze_script_for_styles, request.script_text, custom_style)
         )
 
         return {"recommendations": recommendations}
@@ -3556,9 +3572,42 @@ def trigger_mulerun_login():
         raise HTTPException(status_code=500, detail=f"启动登录失败: {e}")
 
 
+# Credential-like env fields that must never be returned in plaintext.
+SECRET_FIELDS = {
+    "DASHSCOPE_API_KEY",
+    "ALIBABA_CLOUD_ACCESS_KEY_ID",
+    "ALIBABA_CLOUD_ACCESS_KEY_SECRET",
+    "KLING_ACCESS_KEY",
+    "KLING_SECRET_KEY",
+    "VIDU_API_KEY",
+    "MULEROUTER_API_KEY",
+}
+
+# Bullet sentinel: never appears in a real key, so the save path can detect an
+# unchanged (still-masked) field and avoid overwriting the stored secret.
+_MASK_CHAR = "\u2022"
+
+
+def _mask_secret(value: Optional[str]) -> str:
+    """Return a masked representation (bullets + last 4 chars) for a configured
+    secret, or an empty string when it is unset. Never reveals the full value."""
+    v = (value or "").strip()
+    if not v:
+        return ""
+    if len(v) <= 4:
+        return _MASK_CHAR * len(v)
+    return _MASK_CHAR * 8 + v[-4:]
+
+
 @app.get("/config/env")
 def get_env_config():
-    """Get current environment configuration."""
+    """Get current environment configuration.
+
+    Secrets are masked (bullets + last 4 chars) and never returned in
+    plaintext. `secrets_configured` reports which credential fields are set so
+    the frontend can drive required-field / validation logic without the raw
+    value. Non-secret config (OSS bucket/endpoint/base path, provider modes,
+    endpoint overrides) is returned as-is."""
     try:
         from ...utils.endpoints import PROVIDER_DEFAULTS
         endpoint_overrides = {}
@@ -3568,22 +3617,30 @@ def get_env_config():
             if value:
                 endpoint_overrides[env_key] = value
 
+        secrets_configured = {
+            field: bool((os.getenv(field, "") or "").strip())
+            for field in SECRET_FIELDS
+        }
+
         return {
-            "DASHSCOPE_API_KEY": os.getenv("DASHSCOPE_API_KEY", ""),
-            "ALIBABA_CLOUD_ACCESS_KEY_ID": os.getenv("ALIBABA_CLOUD_ACCESS_KEY_ID", ""),
-            "ALIBABA_CLOUD_ACCESS_KEY_SECRET": os.getenv("ALIBABA_CLOUD_ACCESS_KEY_SECRET", ""),
+            # Masked secrets — never plaintext.
+            "DASHSCOPE_API_KEY": _mask_secret(os.getenv("DASHSCOPE_API_KEY")),
+            "ALIBABA_CLOUD_ACCESS_KEY_ID": _mask_secret(os.getenv("ALIBABA_CLOUD_ACCESS_KEY_ID")),
+            "ALIBABA_CLOUD_ACCESS_KEY_SECRET": _mask_secret(os.getenv("ALIBABA_CLOUD_ACCESS_KEY_SECRET")),
+            "KLING_ACCESS_KEY": _mask_secret(os.getenv("KLING_ACCESS_KEY")),
+            "KLING_SECRET_KEY": _mask_secret(os.getenv("KLING_SECRET_KEY")),
+            "VIDU_API_KEY": _mask_secret(os.getenv("VIDU_API_KEY")),
+            "MULEROUTER_API_KEY": _mask_secret(os.getenv("MULEROUTER_API_KEY")),
+            # Non-secret config.
             "OSS_BUCKET_NAME": os.getenv("OSS_BUCKET_NAME", ""),
             "OSS_ENDPOINT": os.getenv("OSS_ENDPOINT", ""),
             "OSS_BASE_PATH": os.getenv("OSS_BASE_PATH", ""),
-            "KLING_ACCESS_KEY": os.getenv("KLING_ACCESS_KEY", ""),
-            "KLING_SECRET_KEY": os.getenv("KLING_SECRET_KEY", ""),
-            "VIDU_API_KEY": os.getenv("VIDU_API_KEY", ""),
-            "MULEROUTER_API_KEY": os.getenv("MULEROUTER_API_KEY", ""),
             "MULERUN_CLI_LOGGED_IN": _check_mulerun_cli_status(),
             "KLING_PROVIDER_MODE": _normalize_provider_mode(os.getenv("KLING_PROVIDER_MODE")),
             "VIDU_PROVIDER_MODE": _normalize_provider_mode(os.getenv("VIDU_PROVIDER_MODE")),
             "PIXVERSE_PROVIDER_MODE": _normalize_provider_mode(os.getenv("PIXVERSE_PROVIDER_MODE")),
             "endpoint_overrides": endpoint_overrides,
+            "secrets_configured": secrets_configured,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

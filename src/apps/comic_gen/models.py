@@ -507,6 +507,8 @@ class PromptConfig(BaseModel):
     storyboard_polish: str = Field("", description="Custom system prompt for storyboard polish (Prompt C)")
     video_polish: str = Field("", description="Custom system prompt for video I2V polish (Prompt D)")
     r2v_polish: str = Field("", description="Custom system prompt for video R2V polish (Prompt E)")
+    entity_extraction: str = Field("", description="Custom system prompt for novel→character/scene/prop extraction (Prompt A)")
+    style_analysis: str = Field("", description="Custom system prompt for novel→visual style recommendations")
     # Polish 调用使用的 LLM 模型。空 = 用 LLMAdapter 默认（qwen3.6-plus）。
     # 显式覆盖时用于切到 vision-capable 或更便宜的模型（qwen3.6-flash、kimi-k2.6 等）。
     polish_model: str = Field("", description="Override LLM model id used for polish calls; empty = use system default")

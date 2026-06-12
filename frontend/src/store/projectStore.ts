@@ -325,6 +325,64 @@ interface ProjectStore {
     setCurrentSeries: (series: Series | null) => void;
 }
 
+// localStorage keys mirrored from SettingsPage. These hold the user's
+// global default model settings / prompt config. Kept here so newly
+// created projects can be backfilled with those defaults.
+const LS_KEY_DEFAULT_MODEL = 'lumenx_default_model_settings';
+const LS_KEY_DEFAULT_PROMPT = 'lumenx_default_prompt_config';
+
+function readLS<T>(key: string): T | null {
+    if (typeof window === 'undefined') return null;
+    try {
+        const raw = localStorage.getItem(key);
+        return raw ? (JSON.parse(raw) as T) : null;
+    } catch {
+        return null;
+    }
+}
+
+// Backfill the SettingsPage defaults onto a freshly created project.
+// Returns the re-fetched project when any default was applied, else null.
+async function injectDefaultsIntoProject(projectId: string): Promise<Project | null> {
+    const ms = readLS<Partial<FrontendModelSettings>>(LS_KEY_DEFAULT_MODEL);
+    const pc = readLS<{
+        storyboard_polish?: string;
+        video_polish?: string;
+        r2v_polish?: string;
+        entity_extraction?: string;
+        style_analysis?: string;
+    }>(LS_KEY_DEFAULT_PROMPT);
+
+    let applied = false;
+
+    if (ms) {
+        await api.updateModelSettings(
+            projectId,
+            ms.t2i_model,
+            ms.i2i_model,
+            ms.i2v_model,
+            ms.character_aspect_ratio,
+            ms.scene_aspect_ratio,
+            ms.prop_aspect_ratio,
+            ms.storyboard_aspect_ratio,
+            ms.image_model,
+            ms.r2v_model,
+        );
+        applied = true;
+    }
+
+    if (pc) {
+        const hasAny = Object.values(pc).some((v) => typeof v === 'string' && v.trim());
+        if (hasAny) {
+            await api.updatePromptConfig(projectId, pc);
+            applied = true;
+        }
+    }
+
+    if (!applied) return null;
+    return api.getProject(projectId);
+}
+
 export const useProjectStore = create<ProjectStore>()(
     persist(
         (set, get) => ({
@@ -368,7 +426,18 @@ export const useProjectStore = create<ProjectStore>()(
             createProject: async (title: string, text: string, skipAnalysis: boolean = false, workflowMode: string = "r2v") => {
                 set({ isLoading: true });
                 try {
-                    const project = await api.createProject(title, text, skipAnalysis, workflowMode);
+                    let project = await api.createProject(title, text, skipAnalysis, workflowMode);
+                    // Inject SettingsPage defaults into the new project. These
+                    // are persisted to localStorage by SettingsPage but were
+                    // never wired into creation — so changing defaults had no
+                    // effect. Backfill via the existing per-project endpoints.
+                    try {
+                        const updated = await injectDefaultsIntoProject(project.id);
+                        if (updated) project = { ...project, ...updated, originalText: project.originalText };
+                    } catch (backfillError) {
+                        // Non-fatal: a failed backfill must not block creation.
+                        console.warn('Failed to inject default settings into new project:', backfillError);
+                    }
                     set((state) => ({
                         projects: [...state.projects, project],
                         currentProject: project,

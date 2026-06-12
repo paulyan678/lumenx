@@ -28,8 +28,12 @@ export const DEFAULT_THEME: ThemePreset = 'atelier-dark';
 interface SettingsStore {
     locale: Locale;
     theme: ThemePreset;
+    // 全局动效开关。true = 启用 motion（默认）；false = 降低动效，
+    // 由 Providers 挂载 html.no-motion 类来落地（无障碍/性能偏好）。
+    animations: boolean;
     setLocale: (locale: Locale) => void;
     setTheme: (theme: ThemePreset) => void;
+    setAnimations: (animations: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -37,8 +41,10 @@ export const useSettingsStore = create<SettingsStore>()(
         (set) => ({
             locale: 'zh',
             theme: DEFAULT_THEME,
+            animations: true,
             setLocale: (locale: Locale) => set({ locale }),
             setTheme: (theme: ThemePreset) => set({ theme }),
+            setAnimations: (animations: boolean) => set({ animations }),
         }),
         {
             name: 'lumenx-settings',
@@ -47,10 +53,11 @@ export const useSettingsStore = create<SettingsStore>()(
             // atelier-dark（不保留旧观感）。非法/缺失值同样回落默认。
             migrate: (persisted: unknown, version: number) => {
                 const state = (persisted ?? {}) as Partial<SettingsStore>;
+                const animations = typeof state.animations === 'boolean' ? state.animations : true;
                 if (version < 1 || !THEME_PRESETS.includes(state.theme as ThemePreset)) {
-                    return { ...state, theme: DEFAULT_THEME } as SettingsStore;
+                    return { ...state, theme: DEFAULT_THEME, animations } as SettingsStore;
                 }
-                return state as SettingsStore;
+                return { ...state, animations } as SettingsStore;
             },
         }
     )

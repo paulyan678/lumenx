@@ -1,27 +1,36 @@
 import axios from "axios";
 import { DEFAULT_I2V_MODEL_ID } from "@/lib/modelCatalog";
 
-// Dynamic API URL detection:
-// 1. In packaged app (Electron): Frontend is served by backend, use same origin
-// 2. In development (port 3008/3009, legacy 3000/3001): Use backend port 17177
+// Dynamic API URL detection (no port enumeration):
+// 1. Explicit override: NEXT_PUBLIC_API_URL (any env / proxy setup).
+// 2. Dev mode (`next dev`, NODE_ENV==='development'): backend runs on a separate
+//    port, so target the same host on the backend port — works for ANY dev port.
+// 3. Production / packaged (Electron): frontend is served by the backend, so use
+//    the same origin.
+const BACKEND_PORT = process.env.NEXT_PUBLIC_BACKEND_PORT || "17177";
+
 const getApiUrl = (): string => {
-    // If running in browser
+    // Explicit override always wins (strip any trailing slash).
+    const override = process.env.NEXT_PUBLIC_API_URL;
+    if (override && override.trim()) {
+        return override.trim().replace(/\/+$/, "");
+    }
+
     if (typeof window !== 'undefined') {
         const { protocol, hostname, port } = window.location;
 
-        // In development mode (port 3008/3009, legacy 3000/3001 = Next.js dev server)
-        // Backend is on a different port
-        if (port === '3008' || port === '3009' || port === '3000' || port === '3001') {
-            return `${protocol}//${hostname}:17177`;
+        // Dev server: backend lives on a different port regardless of which
+        // dev port Next.js picked (3008/3009/3018/...).
+        if (process.env.NODE_ENV === 'development') {
+            return `${protocol}//${hostname}:${BACKEND_PORT}`;
         }
 
-        // In production/packaged mode: Frontend is served by backend
-        // Use same origin
+        // Production / packaged: frontend is served by the backend → same origin.
         return `${protocol}//${hostname}${port ? ':' + port : ''}`;
     }
 
     // SSR fallback
-    return 'http://localhost:17177';
+    return `http://localhost:${BACKEND_PORT}`;
 };
 
 export const API_URL = getApiUrl();
@@ -79,7 +88,10 @@ export interface EnvConfigPayload {
     KLING_SECRET_KEY?: string;
     VIDU_API_KEY?: string;
     endpoint_overrides?: Record<string, string>;
-    [key: string]: string | Record<string, string> | boolean | undefined;
+    // Secrets from GET are masked (bullets + last 4 chars). This map reports
+    // which credential fields are actually configured on the backend.
+    secrets_configured?: Record<string, boolean>;
+    [key: string]: string | Record<string, string> | Record<string, boolean> | boolean | undefined;
 }
 
 // R2V v2 Phase 4 — Cross-episode reconcile types
@@ -387,6 +399,20 @@ export const api = {
         return res.data;
     },
 
+    /** System dependency report (ffmpeg detection + version) used by
+     *  Settings → About. ffmpeg -version can be slightly slow, so a
+     *  more generous timeout than healthCheck. */
+    checkSystem: async (): Promise<{
+        system_info?: Record<string, unknown>;
+        dependencies?: {
+            ffmpeg?: { available: boolean; message: string; path: string | null };
+        };
+        status?: string;
+    }> => {
+        const res = await axios.get(`${API_URL}/system/check`, { timeout: 10000 });
+        return res.data;
+    },
+
     /** Return last N lines of the backend log + any ERROR-flavored
      *  lines, for the Diagnose UI on stuck tasks. Backend caps at
      *  1000 lines so a runaway client can't drag the server. */
@@ -603,7 +629,7 @@ export const api = {
         return res.data;
     },
 
-    updatePromptConfig: async (scriptId: string, config: { storyboard_polish?: string; video_polish?: string; r2v_polish?: string }) => {
+    updatePromptConfig: async (scriptId: string, config: { storyboard_polish?: string; video_polish?: string; r2v_polish?: string; entity_extraction?: string; style_analysis?: string }) => {
         const res = await axios.put(`${API_URL}/projects/${scriptId}/prompt_config`, config);
         return res.data;
     },

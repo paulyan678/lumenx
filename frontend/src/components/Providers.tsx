@@ -10,6 +10,7 @@ import ToastContainer from '@/components/shared/ToastContainer';
 export function Providers({ children }: { children: React.ReactNode }) {
     const locale = useSettingsStore((s) => s.locale);
     const theme = useSettingsStore((s) => s.theme);
+    const animations = useSettingsStore((s) => s.animations);
     const messages = getMessages(locale);
 
     useEffect(() => {
@@ -18,6 +19,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
         html.classList.remove(...THEME_PRESETS, 'dark', 'light');
         html.classList.add(theme);
     }, [theme]);
+
+    useEffect(() => {
+        // animations=false → 挂 html.no-motion，CSS 据此降低/禁用过渡动画
+        document.documentElement.classList.toggle('no-motion', !animations);
+    }, [animations]);
 
     useEffect(() => {
         document.documentElement.lang = locale;

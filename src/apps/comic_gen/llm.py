@@ -249,9 +249,13 @@ class ScriptProcessor:
     def is_configured(self):
         return self.llm.is_configured
 
-    def parse_novel(self, title: str, text: str) -> Script:
+    def parse_novel(self, title: str, text: str, custom_extraction_prompt: str = "") -> Script:
         """
         Parses the raw novel text into a structured Script object using an LLM.
+
+        custom_extraction_prompt: optional per-project override for the entity
+        extraction system prompt (PromptConfig.entity_extraction). Empty =
+        use the built-in _construct_prompt template.
         """
         logger.info(f"Parsing novel: {title}...")
         
@@ -259,7 +263,7 @@ class ScriptProcessor:
              logger.error("LLM API key not configured.")
              raise ValueError("LLM API Key 未配置。请在 API 配置中设置对应的 API Key 后重试。")
 
-        prompt = self._construct_prompt(text)
+        prompt = self._construct_prompt(text, custom_extraction_prompt)
 
         try:
             content = self.llm.chat(
@@ -580,12 +584,21 @@ class ScriptProcessor:
         
         return script
 
-    def _construct_prompt(self, text: str) -> str:
+    def _construct_prompt(self, text: str, custom_prompt: str = "") -> str:
         """
         Prompt A: Entity Extractor
         Constructs the system prompt for extracting characters, scenes, and props ONLY.
         Frames are generated separately via analyze_to_storyboard (Prompt B).
+
+        custom_prompt: optional override (PromptConfig.entity_extraction). When
+        provided, '{text}' is replaced by the novel content (via str.replace so
+        JSON braces in the template are not parsed); if no placeholder exists the
+        novel content is appended. Empty = use the built-in template below.
         """
+        if custom_prompt and custom_prompt.strip():
+            if "{text}" in custom_prompt:
+                return custom_prompt.replace("{text}", text)
+            return f"{custom_prompt}\n\nText:\n{text}"
         return f"""
         You are a professional storyboard artist and scriptwriter.
         Analyze the following novel text and extract structured data for a comic/video production.
@@ -628,8 +641,12 @@ class ScriptProcessor:
         {text}
         """
 
-    def analyze_script_for_styles(self, script_text: str) -> List[Dict[str, Any]]:
-        """使用 LLM 分析剧本并推荐视觉风格"""
+    def analyze_script_for_styles(self, script_text: str, custom_style_prompt: str = "") -> List[Dict[str, Any]]:
+        """使用 LLM 分析剧本并推荐视觉风格
+
+        custom_style_prompt: optional per-project override
+        (PromptConfig.style_analysis). Empty = use the built-in system prompt.
+        """
         
         logger.info("Analyzing script for visual style recommendations...")
         
@@ -637,7 +654,10 @@ class ScriptProcessor:
             logger.warning("DASHSCOPE_API_KEY not set. Returning default recommendations.")
             return self._mock_style_recommendations()
         
-        system_prompt = """你是一个专业的电影美术指导和视觉风格顾问。
+        if custom_style_prompt and custom_style_prompt.strip():
+            system_prompt = custom_style_prompt
+        else:
+            system_prompt = """你是一个专业的电影美术指导和视觉风格顾问。
 请根据提供的剧本内容，分析其题材、情绪和氛围，推荐3种截然不同但都适合的视觉风格。
 
 对于每种风格，请提供：

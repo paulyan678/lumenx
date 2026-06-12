@@ -413,7 +413,8 @@ class ComicGenPipeline:
         existing_script = self.scripts.get(script_id)
         if not existing_script:
             raise ValueError("Script not found")
-        new_script = self.script_processor.parse_novel(existing_script.title, text)
+        custom_extraction = getattr(getattr(existing_script, "prompt_config", None), "entity_extraction", "")
+        new_script = self.script_processor.parse_novel(existing_script.title, text, custom_extraction)
         self._extraction_cache[script_id] = (time.time(), new_script)
         return new_script
 
@@ -428,7 +429,8 @@ class ComicGenPipeline:
         if cached and (time.time() - cached[0]) < 300:
             new_script = cached[1]
         else:
-            new_script = self.script_processor.parse_novel(existing_script.title, text)
+            custom_extraction = getattr(getattr(existing_script, "prompt_config", None), "entity_extraction", "")
+            new_script = self.script_processor.parse_novel(existing_script.title, text, custom_extraction)
         
         # Preserve the original script ID and timestamps
         new_script.id = existing_script.id
