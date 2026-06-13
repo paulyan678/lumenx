@@ -61,12 +61,20 @@ class CanvasErrorBoundary extends Component<{ children: ReactNode }, { failed: b
 export default function CreativeCanvas() {
     const theme = useSettingsStore((s) => s.theme);
     const isDark = theme.endsWith("-dark");
+    const isAtelier = theme.startsWith("atelier");
     // 仅在客户端挂载后检测 WebGL：SSR 与首次渲染保持一致（都不挂 Canvas），
     // 避免 hydration mismatch；useEffect 跑完才按需挂载 3D 背景。
     const [canRender3D, setCanRender3D] = useState(false);
     useEffect(() => {
         setCanRender3D(detectWebGL());
     }, []);
+
+    // Atelier 主题不需要 3D 透视网格 —— 背景由 --bg-base 纯色 + 页面级 bloom/grain 承担氛围。
+    if (isAtelier) {
+        return (
+            <div className="absolute inset-0 z-0 w-full h-full overflow-hidden bg-background" />
+        );
+    }
 
     return (
         <div className="absolute inset-0 z-0 w-full h-full overflow-hidden bg-background">

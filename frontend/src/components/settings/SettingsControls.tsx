@@ -39,7 +39,7 @@ export function SectionCard({
   );
 }
 
-/* ── Form row (Line A `.frow` 2-col grid) ───────────────────────── */
+/* ── Form row (Line B `.field` — stacked: label/hint on top, control below) ─ */
 export function FormRow({
   label,
   hint,
@@ -50,10 +50,10 @@ export function FormRow({
   children: ReactNode;
 }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-[220px_1fr] gap-3 sm:gap-[18px] mb-[22px] last:mb-0 items-start">
-      <div>
+    <div className="mb-6 last:mb-0">
+      <div className="mb-2.5">
         <div className="text-[14px] font-semibold text-foreground leading-snug">{label}</div>
-        {hint && <div className="text-[12px] text-text-muted mt-1.5 leading-relaxed">{hint}</div>}
+        {hint && <div className="text-[12px] text-text-muted mt-1 leading-relaxed">{hint}</div>}
       </div>
       <div className="atelier-field min-w-0">{children}</div>
     </div>

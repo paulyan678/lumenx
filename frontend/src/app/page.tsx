@@ -817,6 +817,12 @@ export default function Home() {
         <CreativeCanvas />
       </div>
 
+      {/* Atelier atmosphere overlays — inert on non-atelier themes.
+          Mounted at page level so bloom/grain cover workspace, playground, library, etc.
+          SettingsPage also mounts its own copies (harmless duplicates). */}
+      <div className="atelier-page-bloom" aria-hidden="true" />
+      <div className="atelier-page-grain" aria-hidden="true" />
+
       {/* AppShell with GlobalSidebar + content */}
       <div className="relative z-10 flex-1 overflow-hidden">
         <AppShell activeTab={activeTab} onTabChange={handleTabChange}>

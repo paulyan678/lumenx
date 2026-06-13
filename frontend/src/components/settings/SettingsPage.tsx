@@ -16,6 +16,7 @@ import {
 import { useSettingsStore, type Locale, type ThemePreset } from "@/store/settingsStore";
 import { Image, Video, Layout, User, Building, Box } from "lucide-react";
 import GroupedModelGrid from "@/components/common/GroupedModelGrid";
+import LumenXBranding from "@/components/layout/LumenXBranding";
 import SettingsSidebar, { type SettingsCategory } from "./SettingsSidebar";
 import {
   SectionCard,
@@ -838,13 +839,30 @@ export default function SettingsPage() {
     const ff = system?.ffmpeg;
     const aboutRows: { k: string; v: string; tone?: "ok" | "warn" }[] = [
       { k: "应用版本", v: `LumenX Studio ${APP_VERSION}` },
-      { k: "设计方向", v: "Line A · Cyber Refined + Atelier" },
       { k: "后端 API", v: API_URL },
       { k: "数据目录", v: dataDir || "—" },
       { k: "日志目录", v: logDir || "—" },
     ];
     return (
       <SectionCard id="about" title="版本信息与系统状态">
+        {/* Line B brand signature block — teal-glow logo, serif name, amber tagline */}
+        <div className="flex flex-col items-start gap-3 pb-6 mb-6 border-b border-glass-border">
+          <LumenXBranding size="md" showSlogan={false} />
+          <p className="font-display atelier-display text-base italic text-accent leading-snug">
+            “Render Noise into Narrative”
+          </p>
+          <div className="font-mono text-[10px] tracking-[0.08em] text-text-muted uppercase">
+            VERSION {APP_VERSION.replace(/^v/, "")} · {footerThemeLine} · BUILD 20260613
+          </div>
+          <p className="text-[12.5px] text-text-secondary leading-relaxed max-w-md">
+            AI 漫画 / 短片创作平台 · 由 Next.js + FastAPI 驱动，集成阿里云 Qwen / Wanx 服务。
+          </p>
+        </div>
+
+        {/* Technical info table */}
+        <div className="font-mono text-[9.5px] uppercase tracking-[0.1em] text-text-muted mb-3">
+          技术信息 · SYSTEM
+        </div>
         <div className="space-y-0">
           {aboutRows.map((r) => (
             <div key={r.k} className="flex justify-between items-center py-2.5 border-b border-glass-border last:border-b-0 text-[12.5px] gap-3">
@@ -940,14 +958,14 @@ export default function SettingsPage() {
           <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-text-muted">
             偏好设置 · <span className="text-primary">PREFERENCES</span>
           </div>
-          <h1 className="font-display atelier-display text-[26px] leading-none font-semibold text-foreground mt-2 tracking-tight">
+          <h1 className="font-display atelier-display text-[32px] leading-none font-semibold text-foreground mt-2 tracking-tight">
             {CATEGORY_TITLE[active]}
           </h1>
         </header>
 
         {/* Scroll area */}
         <div className="flex-1 overflow-y-auto px-10 py-8">
-          <div className="max-w-5xl mx-auto flex flex-col gap-6">
+          <div className="max-w-4xl mx-auto flex flex-col gap-6">
             {!online && (
               <div
                 role="status"
