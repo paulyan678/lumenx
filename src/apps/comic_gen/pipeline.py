@@ -970,6 +970,22 @@ class ComicGenPipeline:
         self._save_after_asset_mutation(source)
         return script
 
+    def toggle_asset_starred(self, script_id: str, asset_id: str, asset_type: str) -> Script:
+        """Toggle the starred (asset-library shortlist) status of an asset.
+        Mirrors toggle_asset_lock — works on both episode-local and
+        series-shared assets via _find_asset_with_source."""
+        script = self.scripts.get(script_id)
+        if not script:
+            raise ValueError("Script not found")
+
+        target_asset, source = self._find_asset_with_source(script, asset_id, asset_type)
+        if not target_asset:
+            raise ValueError(f"Asset {asset_id} of type {asset_type} not found")
+
+        target_asset.starred = not target_asset.starred
+        self._save_after_asset_mutation(source)
+        return script
+
     def toggle_frame_lock(self, script_id: str, frame_id: str) -> Script:
         """Toggle the locked status of a frame."""
         script = self.scripts.get(script_id)
@@ -4245,6 +4261,14 @@ class ComicGenPipeline:
         with self._save_lock:
             series, target_asset = self._find_series_asset(series_id, asset_id, asset_type)
             target_asset.locked = not target_asset.locked
+            self._save_series_data_unlocked()
+            return series
+
+    def toggle_series_asset_starred(self, series_id: str, asset_id: str, asset_type: str) -> Series:
+        """Toggle the starred (library shortlist) status of a Series asset."""
+        with self._save_lock:
+            series, target_asset = self._find_series_asset(series_id, asset_id, asset_type)
+            target_asset.starred = not target_asset.starred
             self._save_series_data_unlocked()
             return series
 

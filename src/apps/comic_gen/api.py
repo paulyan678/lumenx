@@ -679,6 +679,18 @@ def toggle_series_asset_lock(series_id: str, request: ToggleLockRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/series/{series_id}/assets/toggle_starred")
+def toggle_series_asset_starred(series_id: str, request: ToggleLockRequest):
+    """Toggle the starred (library shortlist) status of a Series asset."""
+    try:
+        series = pipeline.toggle_series_asset_starred(series_id, request.asset_id, request.asset_type)
+        return signed_response(series)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/series/{series_id}/assets/update_image")
 def update_series_asset_image(series_id: str, request: UpdateAssetImageRequest):
     """Update a Series asset's image URL."""
@@ -2191,6 +2203,22 @@ def toggle_asset_lock(script_id: str, request: ToggleLockRequest):
     """Toggles the locked status of an asset."""
     try:
         updated_script = pipeline.toggle_asset_lock(
+            script_id,
+            request.asset_id,
+            request.asset_type
+        )
+        return signed_response(updated_script)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/projects/{script_id}/assets/toggle_starred", response_model=Script)
+def toggle_asset_starred(script_id: str, request: ToggleLockRequest):
+    """Toggles the starred (library shortlist) status of an asset."""
+    try:
+        updated_script = pipeline.toggle_asset_starred(
             script_id,
             request.asset_id,
             request.asset_type

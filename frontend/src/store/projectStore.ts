@@ -71,6 +71,7 @@ export interface Character {
     voice_id?: string;
     voice_name?: string;
     locked?: boolean;
+    starred?: boolean;
     status?: string;
     is_consistent?: boolean;
     full_body_updated_at?: number;
@@ -97,6 +98,7 @@ export interface Scene {
     video_prompt?: string;
     status?: string;
     locked?: boolean;
+    starred?: boolean;
     time_of_day?: string;
     lighting_mood?: string;
     source?: "episode" | "series";
@@ -112,6 +114,7 @@ export interface Prop {
     video_prompt?: string;
     status?: string;
     locked?: boolean;
+    starred?: boolean;
     source?: "episode" | "series";
 }
 

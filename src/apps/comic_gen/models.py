@@ -309,6 +309,7 @@ class Character(BaseModel):
     # Picker modal Tabs filter by this field (Q15.5 B).
     voice_origin: str = Field("system", description="Voice source: 'system' | 'clone' | 'design'")
     locked: bool = Field(False, description="Whether this asset is locked from regeneration")
+    starred: bool = Field(False, description="User-starred flag for the asset library shortlist")
     status: GenerationStatus = GenerationStatus.PENDING
 
 class Scene(BaseModel):
@@ -326,6 +327,7 @@ class Scene(BaseModel):
     video_prompt: Optional[str] = Field(None, description="Prompt used for video generation")
     
     locked: bool = Field(False, description="Whether this asset is locked from regeneration")
+    starred: bool = Field(False, description="User-starred flag for the asset library shortlist")
     status: GenerationStatus = GenerationStatus.PENDING
 
 class Prop(BaseModel):
@@ -344,6 +346,7 @@ class Prop(BaseModel):
     video_prompt: Optional[str] = Field(None, description="Prompt used for video generation")
     
     locked: bool = Field(False, description="Whether this asset is locked from regeneration")
+    starred: bool = Field(False, description="User-starred flag for the asset library shortlist")
     status: GenerationStatus = GenerationStatus.PENDING
 
 class StoryboardFrame(BaseModel):

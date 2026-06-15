@@ -559,6 +559,22 @@ export const api = {
         return res.data;
     },
 
+    toggleAssetStarred: async (scriptId: string, assetId: string, assetType: string) => {
+        const res = await axios.post(`${API_URL}/projects/${scriptId}/assets/toggle_starred`, {
+            asset_id: assetId,
+            asset_type: assetType
+        });
+        return res.data;
+    },
+
+    toggleSeriesAssetStarred: async (seriesId: string, assetId: string, assetType: string) => {
+        const res = await axios.post(`${API_URL}/series/${seriesId}/assets/toggle_starred`, {
+            asset_id: assetId,
+            asset_type: assetType
+        });
+        return res.data;
+    },
+
     updateAssetImage: async (scriptId: string, assetId: string, assetType: string, imageUrl: string) => {
         const res = await axios.post(`${API_URL}/projects/${scriptId}/assets/update_image`, {
             asset_id: assetId,
