@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { LayoutGrid, Layers, Wand2, Settings } from "lucide-react";
 import { useTranslations } from "next-intl";
 import clsx from "clsx";
-import { useSettingsStore, type ThemePreset } from "@/store/settingsStore";
+import LumenXBranding from "./LumenXBranding";
 
 export type GlobalTab = "workspace" | "library" | "playground" | "settings";
 
@@ -13,83 +12,66 @@ interface GlobalSidebarProps {
   onTabChange: (tab: GlobalTab) => void;
 }
 
-// 主导航（顶部）+ settings 单列在底部。图标选用更具表达力的 Line B 风格：
-// 工作区=网格画廊 / 主体库=分层资产 / 创作台=创作魔杖。
+// 主导航（顶部）+ settings 固定底部。图标延续 Line B 风格：
+// 工作区=网格画廊 / 资产库=分层资产 / 创作台=创作魔杖。
 const NAV_ITEMS: { id: GlobalTab; icon: typeof LayoutGrid; hash: string }[] = [
   { id: "workspace", icon: LayoutGrid, hash: "#/" },
   { id: "library", icon: Layers, hash: "#/library" },
   { id: "playground", icon: Wand2, hash: "#/playground" },
 ];
 
-// Logo 变体按主题映射（与 LumenXBranding 同源）。
-const LOGO_SRC: Record<ThemePreset, string> = {
-  "atelier-dark": "/logo-dark.png",
-  "bridge-dark": "/logo-dark.png",
-  "brand-dark": "/logo-dark.png",
-  "atelier-light": "/logo-light-teal.png",
-  "brand-light": "/logo-light.png",
-};
-const ATELIER_DARK_FILTER = "hue-rotate(-64deg) saturate(1.35) brightness(1.08)";
+const APP_VERSION = "v0.2.0";
 
-function RailButton({
+function NavButton({
   active,
   label,
+  icon: Icon,
   onClick,
-  children,
 }: {
   active: boolean;
   label: string;
+  icon: typeof LayoutGrid;
   onClick: () => void;
-  children: React.ReactNode;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-label={label}
       aria-current={active ? "page" : undefined}
-      title={label}
       className={clsx(
-        "group/item relative w-11 h-11 rounded-xl grid place-items-center transition-all duration-200",
+        "group relative flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-left transition-colors",
         active
-          ? "text-primary bg-primary/10"
-          : "text-text-muted hover:text-foreground hover:bg-hover-bg"
+          ? "bg-primary/10 text-foreground font-semibold"
+          : "text-text-secondary hover:bg-hover-bg hover:text-foreground font-medium"
       )}
     >
       {/* Active accent bar */}
       {active && (
-        <span className="absolute left-[-10px] top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-r bg-primary" />
+        <span className="absolute left-0 top-1/2 -translate-y-1/2 h-[18px] w-[3px] rounded-r bg-primary" />
       )}
-      {children}
-      {/* Hover/focus flyout label (VSCode activity-bar style, floats over content) */}
-      <span
-        className="pointer-events-none absolute left-[calc(100%+10px)] top-1/2 -translate-y-1/2 z-50
-                   whitespace-nowrap rounded-lg border border-glass-border bg-elevated px-3 py-1.5
-                   text-[13px] font-medium text-foreground shadow-xl
-                   opacity-0 -translate-x-1 transition-all duration-150
-                   group-hover/item:opacity-100 group-hover/item:translate-x-0
-                   group-focus-visible/item:opacity-100 group-focus-visible/item:translate-x-0"
-      >
-        {label}
-      </span>
+      <Icon
+        size={18}
+        strokeWidth={1.8}
+        className={clsx(
+          "flex-shrink-0 transition-colors",
+          active ? "text-primary" : "text-text-muted group-hover:text-foreground"
+        )}
+      />
+      <span className="text-sm">{label}</span>
     </button>
   );
 }
 
 /**
- * Line B "Luminous Atelier" 全局图标导轨（60px）。
- * 顶部 brand-mark logo + workspace/library/playground 主导航，
- * spacer 把 settings 齿轮压到左下角。悬停/键盘聚焦任意图标浮出全称标签面板，
- * 浮层绝对定位、不挤压主面板布局。结构对所有主题统一，视觉由 token 切换。
+ * 全局导航 —— 带文字标签的品牌侧栏（Line B "Luminous Atelier"）。
+ *
+ * 顶部常驻 Logo + LUMENX 字标 + Slogan；主导航图标+文字（无 hover、无歧义）；
+ * 设置固定底部；底部版本号。早先为给二级筛选栏腾地的 60px 图标轨已废弃——
+ * 资产库/设置改走横向筛选后，竖向只剩这一条栏，故恢复完整品牌呈现。
+ * 结构对所有主题统一，视觉身份由语义 token 切换（zero-leak）。
  */
 export default function GlobalSidebar({ activeTab, onTabChange }: GlobalSidebarProps) {
   const t = useTranslations("nav");
-  const theme = useSettingsStore((s) => s.theme);
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  const activeTheme: ThemePreset = mounted ? theme : "atelier-dark";
-  const logoSrc = LOGO_SRC[activeTheme] ?? "/logo-dark.png";
-  const logoFilter = activeTheme === "atelier-dark" ? ATELIER_DARK_FILTER : undefined;
 
   const handleNav = (id: GlobalTab, hash: string) => {
     onTabChange(id);
@@ -97,61 +79,45 @@ export default function GlobalSidebar({ activeTab, onTabChange }: GlobalSidebarP
   };
 
   return (
-    <aside className="w-[60px] flex-shrink-0 h-full flex flex-col items-center py-[18px] gap-2 border-r border-glass-border bg-surface/60 backdrop-blur-xl">
-      {/* Brand mark — transparent logo on warm background */}
+    <aside className="w-52 flex-shrink-0 h-full flex flex-col border-r border-glass-border bg-surface/60 backdrop-blur-xl">
+      {/* Brand lockup — Logo + LUMENX + Slogan, click → workspace */}
       <button
         type="button"
         onClick={() => handleNav("workspace", "#/")}
-        aria-label="LumenX Studio"
-        title="LumenX Studio"
-        className="group/item relative w-[38px] h-[38px] grid place-items-center mb-3"
+        aria-label="LumenX Studio · 工作区"
+        className="text-left px-4 pt-5 pb-4 border-b border-glass-border hover:opacity-90 transition-opacity"
       >
-        <img
-          src={logoSrc}
-          alt="LumenX"
-          className="w-[34px] h-[34px] object-contain"
-          style={logoFilter ? { filter: logoFilter } : undefined}
-        />
-        <span
-          className="pointer-events-none absolute left-[calc(100%+10px)] top-1/2 -translate-y-1/2 z-50
-                     whitespace-nowrap rounded-lg border border-glass-border bg-elevated px-3 py-1.5
-                     font-mono text-[12px] font-semibold tracking-wide text-foreground shadow-xl
-                     opacity-0 -translate-x-1 transition-all duration-150
-                     group-hover/item:opacity-100 group-hover/item:translate-x-0
-                     group-focus-visible/item:opacity-100 group-focus-visible/item:translate-x-0"
-        >
-          LumenX Studio
-        </span>
+        <LumenXBranding size="md" showSlogan={false} />
+        <p className="font-display atelier-display text-[10px] italic text-text-muted tracking-wide leading-snug mt-2.5">
+          Render Noise into Narrative
+        </p>
       </button>
 
       {/* Primary navigation */}
-      <nav className="flex flex-col items-center gap-1.5" aria-label="主导航">
-        {NAV_ITEMS.map((item) => {
-          const Icon = item.icon;
-          return (
-            <RailButton
-              key={item.id}
-              active={activeTab === item.id}
-              label={t(item.id)}
-              onClick={() => handleNav(item.id, item.hash)}
-            >
-              <Icon size={20} strokeWidth={1.8} />
-            </RailButton>
-          );
-        })}
+      <nav className="flex-1 flex flex-col gap-0.5 p-2.5" aria-label="主导航">
+        {NAV_ITEMS.map((item) => (
+          <NavButton
+            key={item.id}
+            active={activeTab === item.id}
+            label={t(item.id)}
+            icon={item.icon}
+            onClick={() => handleNav(item.id, item.hash)}
+          />
+        ))}
       </nav>
 
-      {/* Spacer pushes settings to bottom-left */}
-      <div className="flex-1" />
-
-      {/* Settings gear — bottom-left, like mockup */}
-      <RailButton
-        active={activeTab === "settings"}
-        label={t("settings")}
-        onClick={() => handleNav("settings", "#/settings")}
-      >
-        <Settings size={20} strokeWidth={1.8} />
-      </RailButton>
+      {/* Settings pinned bottom + version */}
+      <div className="p-2.5 border-t border-glass-border">
+        <NavButton
+          active={activeTab === "settings"}
+          label={t("settings")}
+          icon={Settings}
+          onClick={() => handleNav("settings", "#/settings")}
+        />
+        <div className="px-3 pt-2.5 font-mono text-[10px] tracking-wide text-text-muted">
+          {APP_VERSION}
+        </div>
+      </div>
     </aside>
   );
 }
