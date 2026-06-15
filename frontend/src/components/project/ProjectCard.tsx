@@ -12,7 +12,7 @@ interface ProjectCardProps {
     onDelete: (id: string) => void;
 }
 
-type DerivedStatus = "completed" | "processing" | "pending";
+export type DerivedStatus = "completed" | "processing" | "pending";
 
 // Derive a cover image from the project's frames / scenes. The backend has no
 // dedicated cover field, so we fall back through the richest available source.
@@ -41,7 +41,7 @@ function deriveCover(project: Project): string | undefined {
 
 // Status is absent on the data model, so derive a coarse lifecycle state:
 // a merged video => completed; rendered frames present => processing; else draft.
-function deriveStatus(project: Project): DerivedStatus {
+export function deriveStatus(project: Project): DerivedStatus {
     if (project.merged_video_url) return "completed";
     const frames = (project.frames || []) as Array<Record<string, any>>;
     const rendered = frames.some((f) => f?.rendered_image_url || f?.image_url);

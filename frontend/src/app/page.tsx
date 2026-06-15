@@ -7,7 +7,7 @@ import {
   Zap, Film, Sparkles, Search,
 } from "lucide-react";
 import { useProjectStore, Series, Project } from "@/store/projectStore";
-import ProjectCard from "@/components/project/ProjectCard";
+import ProjectCard, { deriveStatus, type DerivedStatus } from "@/components/project/ProjectCard";
 import CreateProjectDialog from "@/components/project/CreateProjectDialog";
 import EnvConfigDialog from "@/components/project/EnvConfigDialog";
 import CreativeCanvas from "@/components/canvas/CreativeCanvas";
@@ -315,6 +315,8 @@ export default function Home() {
   const [showCreateDropdown, setShowCreateDropdown] = useState(false);
   const [currentView, setCurrentView] = useState<'home' | 'project' | 'series' | 'series-episode' | 'library' | 'settings' | 'playground'>('home');
   const [activeTab, setActiveTab] = useState<GlobalTab>("workspace");
+  const [wsSearch, setWsSearch] = useState("");
+  const [wsStatus, setWsStatus] = useState<DerivedStatus | "all">("all");
   const [projectId, setProjectId] = useState<string | null>(null);
   const [seriesId, setSeriesId] = useState<string | null>(null);
   const [episodeId, setEpisodeId] = useState<string | null>(null);
@@ -503,6 +505,27 @@ export default function Home() {
     }
 
     // Workspace view — Line B skeleton
+    const wsAllProjects: Project[] = [...Object.values(seriesEpisodes).flat(), ...standaloneProjects];
+    const wsStatusCounts: Record<"all" | DerivedStatus, number> = {
+      all: wsAllProjects.length,
+      completed: 0,
+      processing: 0,
+      pending: 0,
+    };
+    for (const p of wsAllProjects) wsStatusCounts[deriveStatus(p)]++;
+    const wsQuery = wsSearch.trim().toLowerCase();
+    const wsFiltering = wsStatus !== "all" || wsQuery.length > 0;
+    const wsMatch = (p: Project) => {
+      if (wsStatus !== "all" && deriveStatus(p) !== wsStatus) return false;
+      if (wsQuery && !p.title.toLowerCase().includes(wsQuery)) return false;
+      return true;
+    };
+    const wsStatusPills: { id: "all" | DerivedStatus; label: string; count: number }[] = [
+      { id: "all", label: "全部", count: wsStatusCounts.all },
+      { id: "completed", label: "已完成", count: wsStatusCounts.completed },
+      { id: "processing", label: "进行中", count: wsStatusCounts.processing },
+      { id: "pending", label: "草稿", count: wsStatusCounts.pending },
+    ];
     return (
       <div className="flex flex-col h-full overflow-hidden">
         {/* Page header — eyebrow + Fraunces title + actions */}
@@ -574,12 +597,33 @@ export default function Home() {
           </div>
         </header>
 
-        {/* Toolbar — search + pill-tab view toggle */}
-        <div className="px-7 pb-2 flex items-center gap-3">
-          <div className="relative flex-1 max-w-[340px] atelier-search-input">
+        {/* Toolbar — 状态横向筛选 + 搜索 + 视图切换 */}
+        <div className="px-7 pb-2 flex flex-wrap items-center gap-3">
+          <div className="inline-flex p-[3px] rounded-full bg-surface-inset atelier-pill-tabs" role="tablist" aria-label="项目状态">
+            {wsStatusPills.map((pill) => {
+              const on = wsStatus === pill.id;
+              return (
+                <button
+                  key={pill.id}
+                  role="tab"
+                  aria-selected={on}
+                  onClick={() => setWsStatus(pill.id)}
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[11px] font-semibold transition-colors ${
+                    on ? "text-foreground atelier-pill-tab-active bg-surface shadow-sm" : "text-text-muted hover:text-foreground"
+                  }`}
+                >
+                  {pill.label}
+                  <span className={`font-mono text-[9.5px] ${on ? "text-text-secondary" : "text-text-muted"}`}>{pill.count}</span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="relative flex-1 min-w-[180px] max-w-[340px] atelier-search-input">
             <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
             <input
               type="search"
+              value={wsSearch}
+              onChange={(e) => setWsSearch(e.target.value)}
               placeholder={t("searchPlaceholder") || "搜索项目 / 系列…"}
               className="w-full bg-transparent border-0 rounded-full py-2 pl-9 pr-4 text-[13px] text-foreground placeholder-text-muted focus:outline-none"
             />
@@ -644,9 +688,10 @@ export default function Home() {
             <div className="flex flex-col gap-2">
               {/* Per-series groups — Line B editorial gallery */}
               {seriesList.map((s) => {
-                const eps = [...(seriesEpisodes[s.id] || [])].sort(
-                  (a, b) => (a.episode_number || 0) - (b.episode_number || 0)
-                );
+                const eps = [...(seriesEpisodes[s.id] || [])]
+                  .sort((a, b) => (a.episode_number || 0) - (b.episode_number || 0))
+                  .filter(wsMatch);
+                if (eps.length === 0 && wsFiltering) return null;
                 return (
                   <section key={`grp-${s.id}`} aria-label={s.title}>
                     <div className="flex items-baseline gap-3 mt-4 mb-4 mx-0.5">
@@ -671,26 +716,30 @@ export default function Home() {
                           <ProjectCard project={ep} onDelete={deleteProject} />
                         </div>
                       ))}
-                      <NewProjectTile onClick={() => { window.location.hash = `#/series/${s.id}`; }} />
+                      {!wsFiltering && <NewProjectTile onClick={() => { window.location.hash = `#/series/${s.id}`; }} />}
                     </div>
                   </section>
                 );
               })}
 
               {/* Standalone projects group */}
-              {standaloneProjects.length > 0 && (
+              {(() => {
+                if (standaloneProjects.length === 0) return null;
+                const sp = standaloneProjects.filter(wsMatch);
+                if (sp.length === 0 && wsFiltering) return null;
+                return (
                 <section aria-label={t("standaloneGroup") || "独立项目"}>
                   <div className="flex items-baseline gap-3 mt-6 mb-4 mx-0.5">
                     <span className="font-display atelier-display text-[22px] font-semibold tracking-tight text-foreground">
                       {t("standaloneGroup") || "独立项目"}
                     </span>
                     <span className="font-mono text-[10px] uppercase tracking-wider text-text-muted">
-                      {t("frames", { count: standaloneProjects.length })}
+                      {t("frames", { count: sp.length })}
                     </span>
                     <span className="atelier-group-line h-px flex-1 bg-glass-border" />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-                    {standaloneProjects.map((p, i) => (
+                    {sp.map((p, i) => (
                       <div
                         key={`p-${p.id}`}
                         className="atelier-reveal"
@@ -699,10 +748,11 @@ export default function Home() {
                         <ProjectCard project={p} onDelete={deleteProject} />
                       </div>
                     ))}
-                    <NewProjectTile onClick={() => setIsDialogOpen(true)} />
+                    {!wsFiltering && <NewProjectTile onClick={() => setIsDialogOpen(true)} />}
                   </div>
                 </section>
-              )}
+                );
+              })()}
             </div>
           )}
         </div>
