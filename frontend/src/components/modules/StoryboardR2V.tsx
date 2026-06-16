@@ -9,6 +9,7 @@ import { useTranslations } from "next-intl";
 import { useProjectStore } from "@/store/projectStore";
 import { api, crudApi, type VideoTask, type RefineSSEEvent } from "@/lib/api";
 import { getAssetUrl } from "@/lib/utils";
+import { selectedVariantUrl } from "@/lib/characterImage";
 import { debugLog } from "@/lib/debugLog";
 import type { BatchSummary } from "./storyboard-r2v/shot-panel/CandidatesSection";
 import { getR2vRouteModelId, isR2vImageBased, VIDEO_I2V_MODELS, VIDEO_R2V_MODELS, DEFAULT_I2V_MODEL_ID, DEFAULT_R2V_MODEL_ID } from "@/lib/modelCatalog";
@@ -758,13 +759,7 @@ export default function StoryboardR2V() {
             // Try character first
             const char = characters.find((c: any) => c.name === name);
             if (char) {
-                const asset = char.full_body_asset;
-                if (asset?.selected_id && asset.variants?.length) {
-                    const selected = asset.variants.find((v: any) => v.id === asset.selected_id);
-                    if (selected) url = selected.url;
-                } else if (asset?.variants?.[0]) {
-                    url = asset.variants[0].url;
-                }
+                url = selectedVariantUrl(char.reference_sheet) || selectedVariantUrl(char.full_body_asset);
             }
             // Try scene
             if (!url) {
@@ -813,7 +808,7 @@ export default function StoryboardR2V() {
             // Check character
             const char = characters.find((c: any) => c.name === name);
             if (char) {
-                hasImage = !!(char.full_body_asset?.variants?.length);
+                hasImage = !!(char.reference_sheet?.image_variants?.length || char.full_body_asset?.variants?.length);
             }
             // Check scene
             if (!hasImage) {

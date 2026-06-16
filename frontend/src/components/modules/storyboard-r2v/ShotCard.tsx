@@ -30,6 +30,7 @@ import { PendingTaskAffordance } from "@/components/shared/PendingTaskAffordance
 import PreviewImage from "@/components/shared/preview/PreviewImage";
 import PreviewVideo from "@/components/shared/preview/PreviewVideo";
 import { useProjectStore } from "@/store/projectStore";
+import { selectedVariantUrl } from "@/lib/characterImage";
 
 export interface ShotNode {
     id: string;
@@ -235,6 +236,7 @@ export default function ShotCard({
                 if (!char || seen.has(char.id)) continue;
                 seen.add(char.id);
                 const url = char.headshot_image_url || char.image_url || char.full_body_image_url
+                    || selectedVariantUrl(char.reference_sheet)
                     || (char.full_body_asset?.variants?.[0]?.url);
                 if (url) out.push(url);
             }
@@ -266,6 +268,7 @@ export default function ShotCard({
                 char.headshot_image_url ||
                 char.image_url ||
                 char.full_body_image_url ||
+                selectedVariantUrl(char.reference_sheet) ||
                 (char.full_body_asset?.variants?.[0]?.url);
             out.push({ id: char.id, name: char.name, avatarUrl });
         }

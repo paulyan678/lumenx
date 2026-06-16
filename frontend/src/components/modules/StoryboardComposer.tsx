@@ -12,6 +12,7 @@ import {
 import { useProjectStore } from "@/store/projectStore";
 import { api, API_URL, crudApi } from "@/lib/api";
 import { getAssetUrl, getAssetUrlWithTimestamp, extractErrorDetail } from "@/lib/utils";
+import { selectedVariantUrl } from "@/lib/characterImage";
 import StepHeader from "@/components/shared/StepHeader";
 import WorkflowActionButton from "@/components/shared/WorkflowActionButton";
 
@@ -263,7 +264,8 @@ export default function StoryboardComposer() {
                     const char = currentProject.characters?.find((c: any) => c.id === charId);
                     if (char) {
                         // Priority: three_view_asset > full_body_asset > headshot_asset > legacy fields
-                        const charUrl = getSelectedVariantUrl(char.three_view_asset)
+                        const charUrl = selectedVariantUrl(char.reference_sheet)
+                            || getSelectedVariantUrl(char.three_view_asset)
                             || getSelectedVariantUrl(char.full_body_asset)
                             || getSelectedVariantUrl(char.headshot_asset)
                             || char.three_view_image_url

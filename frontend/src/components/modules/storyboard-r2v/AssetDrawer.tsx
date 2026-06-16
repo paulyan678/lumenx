@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, User, MapPin, Package } from "lucide-react";
 import { useTranslations } from "next-intl";
 import PreviewImage from "@/components/shared/preview/PreviewImage";
+import { selectedVariantUrl } from "@/lib/characterImage";
 
 interface AssetDrawerProps {
     isOpen: boolean;
@@ -16,6 +17,8 @@ interface AssetDrawerProps {
 
 function getAssetThumbnail(item: any, type: "character" | "scene" | "prop"): string | null {
     if (type === "character") {
+        const refUrl = selectedVariantUrl(item.reference_sheet);
+        if (refUrl) return refUrl;
         const asset = item.full_body_asset || item.headshot_asset;
         if (asset?.selected_id && asset.variants?.length) {
             const selected = asset.variants.find((v: any) => v.id === asset.selected_id);
