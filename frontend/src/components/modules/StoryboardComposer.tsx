@@ -641,7 +641,7 @@ export default function StoryboardComposer() {
     );
 }
 
-function CreateFrameDialog({ onClose, onCreate, scenes }: { onClose: () => void; onCreate: (data: any) => void; scenes: any[] }) {
+function CreateFrameDialog({ onClose, onCreate, scenes }: { onClose: () => void; onCreate: (data: any) => void | Promise<void>; scenes: any[] }) {
     const [action, setAction] = useState("");
     const [dialogue, setDialogue] = useState("");
     const [sceneId, setSceneId] = useState(scenes[0]?.id || "");
