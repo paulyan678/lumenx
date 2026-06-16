@@ -3,10 +3,10 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
-  Plus, FolderOpen, RefreshCw, Library, Calendar, Play, Trash2, FileUp, X, ChevronDown, FileText,
+  Plus, RefreshCw, Library, FileUp, X, ChevronDown, FileText,
   Zap, Film, Sparkles, Search,
 } from "lucide-react";
-import { useProjectStore, Series, Project } from "@/store/projectStore";
+import { useProjectStore, Project } from "@/store/projectStore";
 import ProjectCard, { deriveStatus, type DerivedStatus } from "@/components/project/ProjectCard";
 import CreateProjectDialog from "@/components/project/CreateProjectDialog";
 import EnvConfigDialog from "@/components/project/EnvConfigDialog";
@@ -16,7 +16,6 @@ import type { GlobalTab } from "@/components/layout/GlobalSidebar";
 import dynamic from "next/dynamic";
 import { api } from "@/lib/api";
 import { useTranslations } from "next-intl";
-import { useSettingsStore } from "@/store/settingsStore";
 
 const ProjectClient = dynamic(() => import("@/components/project/ProjectClient"), { ssr: false });
 const SeriesDetailPage = dynamic(() => import("@/components/series/SeriesDetailPage"), { ssr: false });
@@ -321,11 +320,10 @@ export default function Home() {
   const [seriesId, setSeriesId] = useState<string | null>(null);
   const [episodeId, setEpisodeId] = useState<string | null>(null);
   const [seriesEpisodes, setSeriesEpisodes] = useState<Record<string, Project[]>>({});
-  const [episodesLoading, setEpisodesLoading] = useState(false);
+  const [, setEpisodesLoading] = useState(false);
   const projects = useProjectStore((state) => state.projects);
   const seriesList = useProjectStore((state) => state.seriesList);
   const deleteProject = useProjectStore((state) => state.deleteProject);
-  const deleteSeries = useProjectStore((state) => state.deleteSeries);
   const setProjects = useProjectStore((state) => state.setProjects);
   const fetchSeriesList = useProjectStore((state) => state.fetchSeriesList);
   const t = useTranslations("workspace");
@@ -363,15 +361,6 @@ export default function Home() {
       console.error("Failed to load series episodes:", error);
     } finally {
       setEpisodesLoading(false);
-    }
-  };
-
-  const refreshSeriesEpisodes = async (sid: string) => {
-    try {
-      const eps = await api.getSeriesEpisodes(sid);
-      setSeriesEpisodes((prev) => ({ ...prev, [sid]: eps }));
-    } catch (error) {
-      console.error("Failed to refresh series episodes:", error);
     }
   };
 
