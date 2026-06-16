@@ -17,7 +17,7 @@ import { useSettingsStore, type Locale, type ThemePreset } from "@/store/setting
 import { Image, Video, Layout, User, Building, Box } from "lucide-react";
 import GroupedModelGrid from "@/components/common/GroupedModelGrid";
 import LumenXBranding from "@/components/layout/LumenXBranding";
-import { type SettingsCategory } from "./SettingsSidebar";
+type SettingsCategory = "general" | "models" | "prompts" | "apikeys" | "storage" | "about";
 import {
   SectionCard,
   FormRow,
