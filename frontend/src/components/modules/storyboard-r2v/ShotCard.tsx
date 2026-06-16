@@ -288,13 +288,6 @@ export default function ShotCard({
         ta.style.height = `${next}px`;
     }, [shot.prompt]);
 
-    const statusColor: Record<string, string> = {
-        pending: "text-amber-400",
-        processing: "text-sky-400",
-        completed: "text-emerald-400",
-        failed: "text-rose-400",
-    };
-
     const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
         const el = cardRef.current;
         if (!el) return;

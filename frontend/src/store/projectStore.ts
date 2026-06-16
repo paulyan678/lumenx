@@ -465,7 +465,7 @@ export const useProjectStore = create<ProjectStore>()(
             },
 
             analyzeProject: async (script: string) => {
-                const { currentProject, updateProject, createProject } = get();
+                const { currentProject, createProject } = get();
                 set({ isAnalyzing: true });
 
                 try {

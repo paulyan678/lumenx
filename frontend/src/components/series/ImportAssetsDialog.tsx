@@ -230,7 +230,6 @@ export default function ImportAssetsDialog({ isOpen, onClose, seriesId, onImport
                                     </div>
                                 ) : (
                                     allSeries.map((s) => {
-                                        const assetCount = (s.characters?.length || 0) + (s.scenes?.length || 0) + (s.props?.length || 0);
                                         return (
                                             <button
                                                 key={s.id}
