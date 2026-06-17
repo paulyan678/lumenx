@@ -44,10 +44,19 @@ export type GroupableModel = (I2VModelConfig | SelectableModelOption) & {
 
 type AccentColor = 'green' | 'blue' | 'purple';
 
+// Line B「Luminous Atelier」: the `accent` prop is retained for API
+// compatibility, but its green/blue/purple variants are collapsed to a single
+// atelier teal (primary) treatment. Selected cards get a teal border + soft
+// teal glow; the check icon renders in primary.
+const ATELIER_SELECTED = {
+    selected: 'border-primary/50 bg-primary/10 shadow-[var(--glow-primary)]',
+    check: 'text-primary',
+};
+
 const ACCENT_CLASSES: Record<AccentColor, { selected: string; check: string }> = {
-    green: { selected: 'border-green-500/50 bg-green-500/10', check: 'text-green-400' },
-    blue: { selected: 'border-blue-500/50 bg-blue-500/10', check: 'text-blue-400' },
-    purple: { selected: 'border-purple-500/50 bg-purple-500/10', check: 'text-purple-400' },
+    green: ATELIER_SELECTED,
+    blue: ATELIER_SELECTED,
+    purple: ATELIER_SELECTED,
 };
 
 interface GroupedModelGridProps {
@@ -145,7 +154,7 @@ export default function GroupedModelGrid({
                                     className={`relative flex flex-col items-start p-3 rounded-lg border transition-all text-left ${
                                         isSelected
                                             ? accentClasses.selected
-                                            : 'border-glass-border hover:border-glass-border bg-glass'
+                                            : 'border-glass-border bg-glass hover:-translate-y-0.5 hover:border-primary/40'
                                     }`}
                                 >
                                     {isSelected && (

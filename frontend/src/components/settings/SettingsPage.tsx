@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import { Save, Loader2, ChevronDown, ChevronRight, FolderOpen, WifiOff, Copy, Check } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { api, type EnvConfigPayload, type ProviderMode, API_URL } from "@/lib/api";
@@ -19,9 +19,9 @@ import { rovingKeyDown } from "@/lib/a11y";
 import { Image, Video, Layout, User, Building, Box } from "lucide-react";
 import GroupedModelGrid from "@/components/common/GroupedModelGrid";
 import LumenXBranding from "@/components/layout/LumenXBranding";
+import UpdateChecker from "./UpdateChecker";
 type SettingsCategory = "general" | "models" | "prompts" | "apikeys" | "storage" | "about";
 import {
-  SectionCard,
   FormRow,
   FieldLabel,
   KeyField,
@@ -138,6 +138,37 @@ const THEME_OPTIONS: { id: ThemePreset; name: string; desc: string; base: string
 interface SystemReport {
   ffmpeg?: { available: boolean; message: string; path: string | null };
   status?: string;
+}
+
+/* Frameless atelier section wrapper (Phase 2 ①): no glass panel / heavy
+   border — each section blends into the page background. Serif title + a
+   single hairline divider keep structure. Replaces the boxed Section
+   on the settings page (model cards / inputs keep their own surfaces). */
+function Section({
+  id,
+  title,
+  desc,
+  children,
+}: {
+  id?: string;
+  title: string;
+  desc?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section id={id} aria-labelledby={id ? `${id}-title` : undefined}>
+      <div className="mb-5 pb-3.5 border-b border-glass-border">
+        <h2
+          id={id ? `${id}-title` : undefined}
+          className="font-display atelier-display text-xl font-semibold text-foreground tracking-tight"
+        >
+          {title}
+        </h2>
+        {desc && <p className="text-[12px] text-text-secondary mt-1 leading-relaxed">{desc}</p>}
+      </div>
+      <div>{children}</div>
+    </section>
+  );
 }
 
 export default function SettingsPage() {
@@ -351,7 +382,7 @@ export default function SettingsPage() {
   /* ── Section renderers ──────────────────────────────────────── */
 
   const renderGeneral = () => (
-    <SectionCard id="general" title="语言、主题与动效">
+    <Section id="general" title="语言、主题与动效">
       <FormRow label={t("language")} hint={t("languageDesc")}>
         <FieldLabel>LANGUAGE</FieldLabel>
         <ModeSegment
@@ -408,7 +439,7 @@ export default function SettingsPage() {
           ariaLabel="界面动效开关"
         />
       </FormRow>
-    </SectionCard>
+    </Section>
   );
 
   const aspectButtons = (key: keyof FrontendModelSettings) => (
@@ -434,7 +465,7 @@ export default function SettingsPage() {
   );
 
   const renderModels = () => (
-    <SectionCard
+    <Section
       id="models"
       title="模型与画幅选择"
       desc="新建项目时套用的默认模型与画幅。可在项目内单独覆盖。"
@@ -498,7 +529,7 @@ export default function SettingsPage() {
       </FormRow>
 
       {/* I2V */}
-      <FormRow label="运动模型 (I2V)" hint="图生视频 · 分镜动态化。">
+      <FormRow label="首帧生视频(I2V)" hint="图生视频 · 分镜动态化。">
         <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
           <Video size={15} className="text-purple-400" />
           <span>Image-to-Video</span>
@@ -527,13 +558,13 @@ export default function SettingsPage() {
         <button
           type="button"
           onClick={handleSaveModelDefaults}
-          className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover text-white text-sm font-medium rounded-lg transition-all"
+          className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover text-on-accent text-sm font-medium rounded-lg transition-all"
         >
           <Save size={16} />
           保存默认
         </button>
       </div>
-    </SectionCard>
+    </Section>
   );
 
   const PROMPT_FIELDS: { key: keyof DefaultPromptConfig; label: string; desc: string }[] = [
@@ -545,7 +576,7 @@ export default function SettingsPage() {
   ];
 
   const renderPrompts = () => (
-    <SectionCard
+    <Section
       id="prompts"
       title="系统提示词配置"
       desc="新建项目的默认系统提示词（留空使用内置默认）。"
@@ -568,17 +599,17 @@ export default function SettingsPage() {
         <button
           type="button"
           onClick={handleSavePromptDefaults}
-          className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover text-white text-sm font-medium rounded-lg transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover text-on-accent text-sm font-medium rounded-lg transition-colors"
         >
           <Save size={16} />
           保存默认
         </button>
       </div>
-    </SectionCard>
+    </Section>
   );
 
   const renderApiKeys = () => (
-    <SectionCard
+    <Section
       id="apikeys"
       title="供应商凭证"
       desc="DashScope 优先；按需开启供应商直连。"
@@ -678,7 +709,7 @@ export default function SettingsPage() {
                     toast.error(err?.response?.data?.detail || "登录失败");
                   }
                 }}
-                className="w-full py-2.5 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-hover transition-colors mb-3"
+                className="w-full py-2.5 rounded-lg bg-primary text-on-accent text-sm font-medium hover:bg-primary-hover transition-colors mb-3"
               >
                 一键登录 MuleRun
               </button>
@@ -776,7 +807,7 @@ export default function SettingsPage() {
               type="button"
               onClick={handleSaveApiConfig}
               disabled={saving || loading || !online}
-              className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover text-white text-sm font-medium rounded-lg transition-all disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover text-on-accent text-sm font-medium rounded-lg transition-all disabled:opacity-50"
             >
               {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
               {saving ? "保存中…" : "保存配置"}
@@ -784,11 +815,11 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
-    </SectionCard>
+    </Section>
   );
 
   const renderStorage = () => (
-    <SectionCard
+    <Section
       id="storage"
       title="云端镜像与本地路径"
       desc="生成结果默认本地优先；OSS 仅用于可选云端镜像。"
@@ -811,6 +842,14 @@ export default function SettingsPage() {
               placeholder="可选，用于 OSS 镜像"
             />
           </div>
+          <a
+            href="https://help.aliyun.com/zh/ram/user-guide/create-an-accesskey-pair"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-[12px] text-primary hover:underline"
+          >
+            如何获取 AccessKey?
+          </a>
         </div>
       </FormRow>
 
@@ -860,13 +899,13 @@ export default function SettingsPage() {
           type="button"
           onClick={handleSaveStorage}
           disabled={saving || loading || !online}
-          className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover text-white text-sm font-medium rounded-lg transition-all disabled:opacity-50"
+          className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover text-on-accent text-sm font-medium rounded-lg transition-all disabled:opacity-50"
         >
           {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
           {saving ? "保存中…" : "保存配置"}
         </button>
       </div>
-    </SectionCard>
+    </Section>
   );
 
   const renderAbout = () => {
@@ -878,7 +917,7 @@ export default function SettingsPage() {
       { k: "日志目录", v: logDir || "—" },
     ];
     return (
-      <SectionCard id="about" title="版本信息与系统状态">
+      <Section id="about" title="版本信息与系统状态">
         {/* Line B brand signature block — teal-glow logo, serif name, amber tagline */}
         <div className="flex flex-col items-start gap-3 pb-6 mb-6 border-b border-glass-border">
           <LumenXBranding size="md" showSlogan={false} />
@@ -886,11 +925,16 @@ export default function SettingsPage() {
             “Render Noise into Narrative”
           </p>
           <div className="font-mono text-[10px] tracking-[0.08em] text-text-muted uppercase">
-            VERSION {APP_VERSION.replace(/^v/, "")} · {footerThemeLine} · BUILD 20260613
+            VERSION {APP_VERSION.replace(/^v/, "")} · BUILD 20260613
           </div>
           <p className="text-[12.5px] text-text-secondary leading-relaxed max-w-md">
             AI 漫画 / 短片创作平台 · 由 Next.js + FastAPI 驱动，集成阿里云 Qwen / Wanx 服务。
           </p>
+        </div>
+
+        {/* Check for updates — compares APP_VERSION against latest GitHub release */}
+        <div className="mb-6">
+          <UpdateChecker />
         </div>
 
         {/* Technical info table */}
@@ -935,7 +979,7 @@ export default function SettingsPage() {
             重新检测
           </button>
         </div>
-      </SectionCard>
+      </Section>
     );
   };
 
@@ -976,13 +1020,6 @@ export default function SettingsPage() {
     { id: "storage", label: "存储" },
     { id: "about", label: "关于" },
   ];
-
-  const footerThemeLine =
-    theme === "atelier-dark" || theme === "atelier-light"
-      ? "LINE B · LUMINOUS ATELIER"
-      : theme === "bridge-dark"
-      ? "WARM BRIDGE · LINE B/A"
-      : "LINE A · CYBER REFINED";
 
   return (
     <div className="relative h-full flex flex-col">
