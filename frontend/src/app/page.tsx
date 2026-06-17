@@ -593,16 +593,16 @@ export default function Home() {
     return (
       <div className="flex flex-col h-full overflow-hidden">
         {/* Page header — eyebrow + Fraunces title + actions */}
-        <header className="px-7 pt-6 pb-3 flex items-end gap-5">
+        <header className="px-4 md:px-7 pt-5 md:pt-6 pb-3 flex flex-col md:flex-row md:items-end gap-3 md:gap-5">
           <div className="flex-1 min-w-0">
             <div className="font-mono text-[9.5px] uppercase tracking-[0.22em] text-text-muted">
               WORKSPACE · <span className="text-primary font-semibold atelier-eyebrow-accent">{t("gallery") || "画廊"}</span>
             </div>
-            <h1 className="text-[34px] font-display atelier-display font-semibold text-foreground leading-tight tracking-tight mt-1">
+            <h1 className="text-[26px] md:text-[34px] font-display atelier-display font-semibold text-foreground leading-tight tracking-tight mt-1">
               {t("title")}
             </h1>
           </div>
-          <div className="flex items-center gap-2.5 pb-1">
+          <div className="flex items-center flex-wrap gap-2.5 md:pb-1">
             <button
               onClick={syncAll}
               disabled={isSyncing}

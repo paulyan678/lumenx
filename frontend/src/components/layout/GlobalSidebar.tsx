@@ -12,12 +12,13 @@ interface GlobalSidebarProps {
   onTabChange: (tab: GlobalTab) => void;
 }
 
-// 主导航（顶部）+ settings 固定底部。图标延续 Line B 风格：
-// 工作区=网格画廊 / 资产库=分层资产 / 创作台=创作魔杖。
-const NAV_ITEMS: { id: GlobalTab; icon: typeof LayoutGrid; hash: string }[] = [
+// Shared global nav model (workspace/library/playground + settings). Reused by
+// the desktop GlobalSidebar (below) and the mobile BottomTabBar (md:hidden).
+export const GLOBAL_NAV_ITEMS: { id: GlobalTab; icon: typeof LayoutGrid; hash: string }[] = [
   { id: "workspace", icon: LayoutGrid, hash: "#/" },
   { id: "library", icon: Layers, hash: "#/library" },
   { id: "playground", icon: Wand2, hash: "#/playground" },
+  { id: "settings", icon: Settings, hash: "#/settings" },
 ];
 
 const APP_VERSION = "v0.2.0";
@@ -79,7 +80,7 @@ export default function GlobalSidebar({ activeTab, onTabChange }: GlobalSidebarP
   };
 
   return (
-    <aside className="w-52 flex-shrink-0 h-full flex flex-col border-r border-glass-border bg-surface/60 backdrop-blur-xl">
+    <aside className="w-52 flex-shrink-0 h-full hidden md:flex flex-col border-r border-glass-border bg-surface/60 backdrop-blur-xl">
       {/* Brand lockup — Logo + LUMENX + Slogan, click → workspace */}
       <button
         type="button"
@@ -95,7 +96,7 @@ export default function GlobalSidebar({ activeTab, onTabChange }: GlobalSidebarP
 
       {/* Primary navigation */}
       <nav className="flex-1 flex flex-col gap-0.5 p-2.5" aria-label="主导航">
-        {NAV_ITEMS.map((item) => (
+        {GLOBAL_NAV_ITEMS.slice(0, 3).map((item) => (
           <NavButton
             key={item.id}
             active={activeTab === item.id}

@@ -142,7 +142,7 @@ export default function AssetInspector({
     <aside
       ref={asideRef}
       tabIndex={-1}
-      className="w-[340px] flex-shrink-0 h-full flex flex-col overflow-y-auto bg-surface border-l border-glass-border shadow-2xl atelier-reveal focus:outline-none"
+      className="fixed inset-0 z-50 w-full md:static md:inset-auto md:z-auto md:w-[340px] flex-shrink-0 h-full flex flex-col overflow-y-auto bg-surface border-l border-glass-border shadow-2xl atelier-reveal focus:outline-none"
       aria-label="资产详情"
     >
       {/* Hero */}

@@ -2,6 +2,7 @@
 
 import GlobalSidebar, { type GlobalTab } from "./GlobalSidebar";
 import OfflineBanner from "./OfflineBanner";
+import BottomTabBar from "./BottomTabBar";
 
 interface AppShellProps {
   activeTab: GlobalTab;
@@ -17,6 +18,7 @@ export default function AppShell({ activeTab, onTabChange, children }: AppShellP
         <GlobalSidebar activeTab={activeTab} onTabChange={onTabChange} />
         <div className="flex-1 overflow-y-auto">{children}</div>
       </div>
+      <BottomTabBar activeTab={activeTab} onTabChange={onTabChange} />
     </div>
   );
 }
