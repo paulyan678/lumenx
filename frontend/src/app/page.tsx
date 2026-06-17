@@ -689,6 +689,7 @@ export default function Home() {
               value={wsSearch}
               onChange={(e) => setWsSearch(e.target.value)}
               placeholder={t("searchPlaceholder") || "搜索项目 / 系列…"}
+              aria-label={t("searchPlaceholder") || "搜索项目 / 系列…"}
               className="w-full bg-transparent border-0 rounded-full py-2 pl-9 pr-4 text-[13px] text-foreground placeholder-text-muted focus:outline-none"
             />
           </div>

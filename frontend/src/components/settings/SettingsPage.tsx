@@ -263,6 +263,19 @@ export default function SettingsPage() {
     }
   };
 
+  // Storage(OSS) 保存不应被 DashScope / 生成相关必填项挡住——它们与存储无关。
+  const handleSaveStorage = async () => {
+    setSaving(true);
+    try {
+      await api.saveEnvConfig(config);
+      toast.success(t("saveSuccess"));
+    } catch {
+      toast.error("保存配置失败。");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleChange = (key: keyof EnvConfig, value: string) => {
     setConfig((prev) => ({ ...prev, [key]: value }));
   };
@@ -838,7 +851,7 @@ export default function SettingsPage() {
       <div className="flex justify-end pt-4">
         <button
           type="button"
-          onClick={handleSaveApiConfig}
+          onClick={handleSaveStorage}
           disabled={saving || loading}
           className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover text-white text-sm font-medium rounded-lg transition-all disabled:opacity-50"
         >
