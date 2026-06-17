@@ -144,10 +144,11 @@ interface SystemReport {
   status?: string;
 }
 
-/* Frameless atelier section wrapper (Phase 2 ①): no glass panel / heavy
-   border — each section blends into the page background. Serif title + a
-   single hairline divider keep structure. Replaces the boxed Section
-   on the settings page (model cards / inputs keep their own surfaces). */
+/* Atelier section panel — restored per Line B mockup `.panel` (translucent
+   warm-graphite card via glass-panel + atelier-card: surface + blur + soft
+   shadow + hairline border, so sections read as distinct grouped cards).
+   The page <header> stays frameless (mockup .main-head has no bg); only the
+   content sections are carded. Model cards / inputs keep their own surfaces. */
 function Section({
   id,
   title,
@@ -160,17 +161,21 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <section id={id} aria-labelledby={id ? `${id}-title` : undefined}>
-      <div className="mb-5 pb-3.5 border-b border-glass-border">
+    <section
+      id={id}
+      aria-labelledby={id ? `${id}-title` : undefined}
+      className="glass-panel atelier-card rounded-[20px] overflow-hidden"
+    >
+      <div className="atelier-card-head px-[22px] pt-[18px] pb-3.5 border-b border-glass-border">
         <h2
           id={id ? `${id}-title` : undefined}
-          className="font-display atelier-display text-xl font-semibold text-foreground tracking-tight"
+          className="font-display atelier-display text-[19px] font-semibold text-foreground tracking-tight"
         >
           {title}
         </h2>
         {desc && <p className="text-[12px] text-text-secondary mt-1 leading-relaxed">{desc}</p>}
       </div>
-      <div>{children}</div>
+      <div className="px-[22px] pt-[18px] pb-[22px]">{children}</div>
     </section>
   );
 }

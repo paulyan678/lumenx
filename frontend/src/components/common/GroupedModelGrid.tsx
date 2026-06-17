@@ -151,7 +151,7 @@ export default function GroupedModelGrid({
                                 <button
                                     key={model.id}
                                     onClick={() => onSelect(model.id)}
-                                    className={`relative flex flex-col items-start p-3 rounded-lg border transition-all text-left ${
+                                    className={`relative flex flex-col items-start p-3.5 rounded-lg border transition-all text-left ${
                                         isSelected
                                             ? accentClasses.selected
                                             : 'border-glass-border bg-glass hover:-translate-y-0.5 hover:border-primary/40'
@@ -162,10 +162,10 @@ export default function GroupedModelGrid({
                                             <Check size={14} className={accentClasses.check} />
                                         </div>
                                     )}
-                                    <span className="text-sm font-medium text-foreground">
+                                    <span className="text-[15px] font-semibold text-foreground leading-snug">
                                         {model.name}
                                     </span>
-                                    <span className="text-xs text-text-muted">
+                                    <span className="text-[13px] text-text-secondary mt-0.5 leading-relaxed">
                                         {model.description}
                                     </span>
                                     {model.badges && model.badges.length > 0 && (
