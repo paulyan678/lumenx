@@ -7,6 +7,7 @@ import {
   Zap, Film, Sparkles, Search,
 } from "lucide-react";
 import { useProjectStore, Project } from "@/store/projectStore";
+import { toast } from "@/store/toastStore";
 import ProjectCard, { deriveStatus, type DerivedStatus } from "@/components/project/ProjectCard";
 import CreateProjectDialog from "@/components/project/CreateProjectDialog";
 import EnvConfigDialog from "@/components/project/EnvConfigDialog";
@@ -341,6 +342,8 @@ function EpisodeBreadcrumbWrapper({ seriesId, episodeId }: { seriesId: string; e
           setEpisodeNumber(ep.episode_number ?? null);
         }
       } catch (error) {
+        // Breadcrumb series-info is cosmetic (degrades to generic labels);
+        // log only — no user-facing toast to avoid noise on this path.
         console.error("Failed to fetch series info for breadcrumb:", error);
       }
     };
@@ -412,6 +415,9 @@ export default function Home() {
       setSeriesEpisodes(map);
     } catch (error) {
       console.error("Failed to load series episodes:", error);
+      toast.error("剧集加载失败", {
+        body: error instanceof Error ? error.message : String(error),
+      });
     } finally {
       setEpisodesLoading(false);
     }
@@ -426,6 +432,9 @@ export default function Home() {
       }
     } catch (error) {
       console.error("Failed to sync projects from backend:", error);
+      toast.error("项目同步失败", {
+        body: error instanceof Error ? error.message : String(error),
+      });
     } finally {
       setIsSyncing(false);
     }

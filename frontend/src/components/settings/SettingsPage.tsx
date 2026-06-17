@@ -14,6 +14,7 @@ import {
   type FrontendModelSettings,
 } from "@/lib/modelCatalog";
 import { useSettingsStore, type Locale, type ThemePreset } from "@/store/settingsStore";
+import { toast } from "@/store/toastStore";
 import { Image, Video, Layout, User, Building, Box } from "lucide-react";
 import GroupedModelGrid from "@/components/common/GroupedModelGrid";
 import LumenXBranding from "@/components/layout/LumenXBranding";
@@ -248,15 +249,15 @@ export default function SettingsPage() {
   const handleSaveApiConfig = async () => {
     const errors = getValidationErrors(config);
     if (errors.length > 0) {
-      alert(`请填写必填项：\n- ${errors.join("\n- ")}`);
+      toast.error("请填写必填项", { body: `- ${errors.join("\n- ")}` });
       return;
     }
     setSaving(true);
     try {
       await api.saveEnvConfig(config);
-      alert(t("saveSuccess"));
+      toast.success(t("saveSuccess"));
     } catch {
-      alert("保存配置失败。");
+      toast.error("保存配置失败。");
     } finally {
       setSaving(false);
     }
@@ -284,12 +285,12 @@ export default function SettingsPage() {
     };
     localStorage.setItem(LS_KEY_MODEL, JSON.stringify(merged));
     setModelSettings(merged);
-    alert(t("saved"));
+    toast.success(t("saved"));
   };
 
   const handleSavePromptDefaults = () => {
     localStorage.setItem(LS_KEY_PROMPT, JSON.stringify(promptConfig));
-    alert(t("saved"));
+    toast.success(t("saved"));
   };
 
   const copyPath = async (p: string) => {
@@ -641,7 +642,7 @@ export default function SettingsPage() {
                     }, 3000);
                     setTimeout(() => clearInterval(poll), 120000);
                   } catch (err: any) {
-                    alert(err?.response?.data?.detail || "登录失败");
+                    toast.error(err?.response?.data?.detail || "登录失败");
                   }
                 }}
                 className="w-full py-2.5 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-hover transition-colors mb-3"
@@ -661,7 +662,7 @@ export default function SettingsPage() {
                     try {
                       await api.triggerMulerunLogin();
                     } catch (err: any) {
-                      alert(err?.response?.data?.detail || "登录失败");
+                      toast.error(err?.response?.data?.detail || "登录失败");
                     }
                   }}
                   className="text-xs text-text-secondary hover:text-foreground transition-colors underline underline-offset-2"

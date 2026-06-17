@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { Search, Image as ImageIcon, Star, ArrowDownUp } from "lucide-react";
 import { api } from "@/lib/api";
 import type { Series, Project, Character, Scene, Prop } from "@/store/projectStore";
+import { toast } from "@/store/toastStore";
 import { characterImageUrl, characterVariants } from "@/lib/characterImage";
 import AssetInspector from "./AssetInspector";
 
@@ -93,6 +94,7 @@ export default function AssetLibraryPage() {
       setSources(result);
     } catch (error) {
       console.error("Failed to load asset library:", error);
+      toast.error("资产库加载失败", { body: "请检查网络或后端服务后重试。" });
     } finally {
       setLoading(false);
     }
@@ -264,11 +266,32 @@ export default function AssetLibraryPage() {
             <div className="flex items-center justify-center py-20">
               <div className="text-text-secondary text-[13px]">{tc("loading")}</div>
             </div>
+          ) : counts.all === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16">
+              <div className="glass-panel atelier-card p-10 rounded-2xl border border-glass-border text-center max-w-[620px] w-full relative overflow-hidden">
+                <div className="relative z-[1] flex flex-col items-center gap-4">
+                  <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-text-muted">
+                    CAST · SCENES · PROPS
+                  </div>
+                  <p className="text-[34px] font-display atelier-display font-medium italic leading-[1.25] tracking-tight text-foreground">
+                    {"“每一个角色，都在等待属于自己的那一格画面。”"}
+                  </p>
+                  <p className="text-[15px] text-text-secondary max-w-[440px]">{t("noAssetsHint")}</p>
+                </div>
+              </div>
+            </div>
           ) : groups.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-text-muted">
-              <ImageIcon size={48} className="mb-3 opacity-60" />
-              <p className="text-[15px] font-display atelier-display">{t("noAssets")}</p>
-              <p className="text-[12px] text-text-muted mt-1">{t("noAssetsHint")}</p>
+              <Search size={48} className="mb-3 opacity-60" />
+              <p className="text-[15px] font-display atelier-display text-foreground">没有匹配的资产</p>
+              <p className="text-[12px] text-text-muted mt-1">试试调整筛选条件或搜索关键词</p>
+              <button
+                type="button"
+                onClick={() => { setActiveType("all"); setSearchQuery(""); setStarredOnly(false); }}
+                className="mt-4 glass-button text-[13px] font-semibold"
+              >
+                清除筛选
+              </button>
             </div>
           ) : (
             <div className="space-y-6">

@@ -1,0 +1,43 @@
+"use client";
+
+/**
+ * OfflineBanner — global network-connectivity indicator (MVP).
+ *
+ * Renders a thin top banner only while the browser reports offline, so the
+ * user knows queued actions won't reach the backend until reconnection.
+ * Disabling action buttons app-wide is intentionally deferred (out of MVP).
+ */
+import { useEffect, useState } from "react";
+import { WifiOff } from "lucide-react";
+
+export default function OfflineBanner() {
+  // Assume online for the server/initial render to avoid hydration mismatch;
+  // the real navigator.onLine value is read on mount in the effect below.
+  const [isOnline, setIsOnline] = useState(true);
+
+  useEffect(() => {
+    const sync = () => setIsOnline(navigator.onLine);
+    sync(); // initial navigator.onLine read on mount
+    window.addEventListener("online", sync);
+    window.addEventListener("offline", sync);
+    return () => {
+      window.removeEventListener("online", sync);
+      window.removeEventListener("offline", sync);
+    };
+  }, []);
+
+  if (isOnline) return null;
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="flex w-full flex-none items-center justify-center gap-2 border-b border-status-failed-border bg-status-failed-bg px-4 py-1.5 text-status-failed-fg"
+    >
+      <WifiOff size={14} aria-hidden="true" className="flex-shrink-0" />
+      <span className="text-body-sm font-medium">
+        网络已断开 — 重新连接后可继续操作
+      </span>
+    </div>
+  );
+}
