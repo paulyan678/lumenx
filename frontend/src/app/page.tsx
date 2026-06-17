@@ -9,6 +9,7 @@ import {
 import { useProjectStore, Project } from "@/store/projectStore";
 import { toast } from "@/store/toastStore";
 import { useOnline } from "@/lib/useOnline";
+import { rovingKeyDown } from "@/lib/a11y";
 import ProjectCard, { deriveStatus, type DerivedStatus } from "@/components/project/ProjectCard";
 import CreateProjectDialog from "@/components/project/CreateProjectDialog";
 import EnvConfigDialog from "@/components/project/EnvConfigDialog";
@@ -670,7 +671,7 @@ export default function Home() {
 
         {/* Toolbar — 状态横向筛选 + 搜索 + 视图切换 */}
         <div className="px-7 pb-2 flex flex-wrap items-center gap-3">
-          <div className="inline-flex p-[3px] rounded-full bg-surface-inset atelier-pill-tabs" role="tablist" aria-label="项目状态">
+          <div className="inline-flex p-[3px] rounded-full bg-surface-inset atelier-pill-tabs" role="tablist" aria-label="项目状态" onKeyDown={rovingKeyDown}>
             {wsStatusPills.map((pill) => {
               const on = wsStatus === pill.id;
               return (
@@ -678,6 +679,7 @@ export default function Home() {
                   key={pill.id}
                   role="tab"
                   aria-selected={on}
+                  tabIndex={on ? 0 : -1}
                   onClick={() => setWsStatus(pill.id)}
                   className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[11px] font-semibold transition-colors ${
                     on ? "text-foreground atelier-pill-tab-active bg-surface shadow-sm" : "text-text-muted hover:text-foreground"

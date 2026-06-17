@@ -412,11 +412,14 @@ export default function SettingsPage() {
   );
 
   const aspectButtons = (key: keyof FrontendModelSettings) => (
-    <div className="grid grid-cols-3 gap-2">
+    <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="画幅比例" onKeyDown={rovingKeyDown}>
       {ASPECT_RATIOS.map((ratio) => (
         <button
           key={ratio.id}
           type="button"
+          role="radio"
+          aria-checked={modelSettings[key] === ratio.id}
+          tabIndex={modelSettings[key] === ratio.id ? 0 : -1}
           onClick={() => setModelSettings((s) => ({ ...s, [key]: ratio.id }))}
           className={`flex flex-col items-center py-2 px-2 rounded-lg border transition-all ${
             modelSettings[key] === ratio.id
@@ -772,7 +775,7 @@ export default function SettingsPage() {
             <button
               type="button"
               onClick={handleSaveApiConfig}
-              disabled={saving || loading}
+              disabled={saving || loading || !online}
               className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover text-white text-sm font-medium rounded-lg transition-all disabled:opacity-50"
             >
               {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
@@ -856,7 +859,7 @@ export default function SettingsPage() {
         <button
           type="button"
           onClick={handleSaveStorage}
-          disabled={saving || loading}
+          disabled={saving || loading || !online}
           className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover text-white text-sm font-medium rounded-lg transition-all disabled:opacity-50"
         >
           {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
