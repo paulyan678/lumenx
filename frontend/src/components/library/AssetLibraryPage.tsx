@@ -327,7 +327,7 @@ export default function AssetLibraryPage() {
                               setSelected({ sourceId: src.id, assetId: asset.id, type });
                             }
                           }}
-                          aria-pressed={isSel}
+                          aria-current={isSel ? "true" : undefined}
                           className={`atelier-asset-card atelier-reveal group relative text-left rounded-xl overflow-hidden border transition-all cursor-pointer ${
                             isSel ? "border-primary/60 ring-1 ring-primary/40" : "border-glass-border hover:-translate-y-1"
                           }`}

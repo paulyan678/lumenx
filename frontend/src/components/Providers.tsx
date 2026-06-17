@@ -6,6 +6,7 @@ import { useSettingsStore, THEME_PRESETS } from '@/store/settingsStore';
 import { getMessages } from '@/lib/i18n';
 import { LightboxProvider } from '@/components/shared/preview/LightboxProvider';
 import ToastContainer from '@/components/shared/ToastContainer';
+import { MotionConfig } from 'framer-motion';
 
 export function Providers({ children }: { children: React.ReactNode }) {
     const locale = useSettingsStore((s) => s.locale);
@@ -31,13 +32,17 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
     return (
         <NextIntlClientProvider locale={locale} messages={messages} timeZone="Asia/Shanghai">
-            {/* LightboxProvider must wrap any subtree that uses PreviewImage /
-             *  PreviewVideo. Singleton portal — see Issue 14 design notes in
-             *  LightboxProvider.tsx. */}
-            <LightboxProvider>
-                {children}
-                <ToastContainer />
-            </LightboxProvider>
+            {/* MotionConfig: respect OS prefers-reduced-motion ("user"); when the
+             *  in-app 动效 toggle is off, force-reduce Framer animations ("always"). */}
+            <MotionConfig reducedMotion={animations ? "user" : "always"}>
+                {/* LightboxProvider must wrap any subtree that uses PreviewImage /
+                 *  PreviewVideo. Singleton portal — see Issue 14 design notes in
+                 *  LightboxProvider.tsx. */}
+                <LightboxProvider>
+                    {children}
+                    <ToastContainer />
+                </LightboxProvider>
+            </MotionConfig>
         </NextIntlClientProvider>
     );
 }

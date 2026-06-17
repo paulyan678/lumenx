@@ -152,11 +152,13 @@ export default function AssetInspector({
         ) : (
           <div className="w-full h-full grid place-items-center text-text-muted text-sm">无图像</div>
         )}
-        {/* amber halation overlay (atelier signature) */}
-        <div
-          className="pointer-events-none absolute inset-0 shadow-[inset_0_0_60px_-10px_var(--color-status-starred-bg)]"
-          aria-hidden="true"
-        />
+        {/* amber halation overlay — only on starred (atelier signature; amber = starred). */}
+        {starred && (
+          <div
+            className="pointer-events-none absolute inset-0 shadow-[inset_0_0_60px_-10px_var(--color-status-starred-bg)]"
+            aria-hidden="true"
+          />
+        )}
         <button
           type="button"
           onClick={onToggleStar}
@@ -205,7 +207,7 @@ export default function AssetInspector({
                     key={v.id}
                     type="button"
                     onClick={() => setActiveVariantId(v.id)}
-                    aria-pressed={on}
+                    aria-current={on ? "true" : undefined}
                     className={`relative aspect-square rounded-md overflow-hidden transition-transform hover:-translate-y-0.5 ${
                       on ? "ring-2 ring-primary" : "ring-1 ring-glass-border"
                     }`}
