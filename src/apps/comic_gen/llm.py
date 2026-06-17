@@ -117,123 +117,114 @@ logger = get_logger(__name__)
 # Placeholders: {ASSETS} = asset context, {DRAFT} = draft prompt, {SLOTS} = R2V slot context
 
 DEFAULT_STORYBOARD_POLISH_PROMPT = """
-# ROLE
-You are an expert storyboard artist and prompt engineer. Your task is to rewrite a draft prompt into a high-quality image generation prompt, specifically for a multi-reference image workflow.
+# 角色
+你是一名资深分镜师与提示词工程师。你的任务是把一段草稿提示词改写成高质量的图像生成提示词，专用于多参考图（multi-reference）工作流。
 
-# CONTEXT:
-The user has selected specific reference images (assets) to compose a scene.
-You must refer to these assets by their Image ID (e.g., "Image 1", "Image 2") when describing them in the prompt.
+# 背景
+用户已选定若干参考图（素材）来构成一个画面。
+在提示词中描述这些素材时，你必须用它们的 Image ID（如 "Image 1"、"Image 2"）来指代。
 
-# AVAILABLE ASSETS:
+# 可用素材
 {ASSETS}
 
-# RULES:
-1.  **Integrate Assets**: Explicitly mention "Image X" when describing the corresponding character, scene, or prop.
-2.  **Natural Flow**: Do not just concatenate. Write a coherent sentence or paragraph describing the visual scene.
-3.  **Strict Adherence**: DO NOT hallucinate emotions, actions, or plot details not present in the draft. If the draft says "sitting", do NOT add "sadly" or "happily" unless specified. Keep the narrative neutral and accurate.
-4.  **Enhance Detail**: Add visual details (lighting, atmosphere, emotion) based on the draft prompt, but keep the asset references clear.
-5.  **No Explanations**: Return ONLY the polished prompt text.
-6.  **Bilingual Output**:
-    - **Prompt CN**: Fluent Chinese, strictly following the content of the draft.
-    - **Prompt EN**: Natural English description, prioritizing visual atmosphere.
+# 规则
+1.  **整合素材**：描述对应的角色、场景或道具时，显式写出 "Image X"。
+2.  **自然连贯**：不要简单拼接。要写成连贯的句子或段落来描述视觉画面。
+3.  **严格忠实**：不要臆造草稿中不存在的情绪、动作或剧情。若草稿写 "坐着"，不要擅自加 "悲伤地" 或 "开心地"，除非草稿明确写明。保持叙述中性、准确。
+4.  **丰富细节**：可基于草稿补充视觉细节（光线、氛围、情绪），但要保持素材指代清晰。
+5.  **不要解释**：只返回润色后的提示词文本。
+6.  **双语输出**：
+    - **Prompt CN**：流畅中文，严格遵循草稿内容。
+    - **Prompt EN**：自然英文描述，优先体现视觉氛围。
 
-# OUTPUT FORMAT
-Return STRICTLY a JSON object:
+# 输出格式
+严格返回一个 JSON 对象：
 {{
-    "prompt_cn": "Chinese description with Image X references...",
+    "prompt_cn": "含 Image X 指代的中文描述……",
     "prompt_en": "English cinematic description with Image X references..."
 }}
 
-# EXAMPLES
-**Input Draft**: Boy (Image 1) sitting on hospital bed (Image 2).
-**Output**:
+# 示例
+**输入草稿**：男孩（Image 1）坐在病床（Image 2）上。
+**输出**：
 {{
     "prompt_cn": "图像1中的男孩坐在图像2的病床边缘。病房内光线柔和，自然光从侧面照射在男孩身上，勾勒出真实的轮廓。画面构图稳定，质感写实。",
     "prompt_en": "The boy from Image 1 is seated on the edge of the hospital bed in Image 2. Soft natural light illuminates the scene from the side, highlighting the fabric textures of the bedding and the realistic skin tone of the boy. Cinematic composition, high resolution, photorealistic."
 }}
 
-# USER DRAFT PROMPT
+# 用户草稿提示词
 {DRAFT}
 """.strip()
 
-DEFAULT_VIDEO_POLISH_PROMPT = """You are an expert video prompt engineer. Your task is to optimize a draft prompt for an Image-to-Video generation model.
+DEFAULT_VIDEO_POLISH_PROMPT = """你是一名资深视频提示词工程师。你的任务是为「图生视频」（Image-to-Video）模型优化一段草稿提示词。
 
-GUIDELINES:
-1.  **Structure**: Prompt = Motion Description + Camera Movement.
-2.  **Motion Description**: Describe the dynamic action of elements (characters, objects) in the image. Use adjectives to control speed and intensity (e.g., "slowly", "rapidly", "subtle").
-3.  **Camera Movement**: Explicitly state camera moves if needed (e.g., "Zoom in", "Pan left", "Static camera").
-4.  **Clarity**: Be concise but descriptive. Focus on visual movement.
+准则：
+1.  **结构**：提示词 = 运动描述 + 镜头运动。
+2.  **运动描述**：描述图像中各元素（角色、物体）的动态动作。用副词控制速度与强度（如 "缓慢地"、"快速地"、"轻微的"）。
+3.  **镜头运动**：如有需要，显式说明镜头移动（如 "推近"、"向左平移"、"固定镜头"）。
+4.  **清晰**：简洁但具体，聚焦视觉运动。
 
-EXAMPLES:
+示例：
 
-*   **Zoom Out**: "A soft, round animated character with a curious expression wakes up to find their bed is a giant golden corn kernel. Camera zooms out to reveal the room is a massive corn silo, with echoes reverberating, corn kernels piled high like walls, and a beam of warm sunlight streaming from a high window, casting long shadows."
-*   **Pan Left**: "Camera pans left, slowly sweeping across a luxury store window filled with glamorous models and expensive goods. The camera continues panning left, leaving the window to reveal a ragged homeless man shivering in the corner of the adjacent alley."
+*   **拉远（Zoom Out）**："一个柔软圆润的动画角色带着好奇的表情醒来，发现自己的床是一颗巨大的金色玉米粒。镜头拉远，露出整个房间原来是一座巨大的玉米仓，回声四起，玉米粒堆得像墙一样高，一束温暖的阳光从高处的窗户洒入，投下长长的影子。"
+*   **向左平移（Pan Left）**："镜头向左平移，缓缓扫过一扇奢华的橱窗，里面满是光鲜的模特与昂贵商品。镜头继续向左，离开橱窗，露出隔壁巷子角落里一个衣衫褴褛、瑟瑟发抖的流浪汉。"
 
-TASK:
-Rewrite the following draft prompt into a high-quality video generation prompt following the guidelines above.
+任务：
+按上述准则，把下面的草稿提示词改写成高质量的视频生成提示词。
 
-OUTPUT FORMAT:
-Return STRICTLY a JSON object:
+输出格式：
+严格返回一个 JSON 对象：
 {{
     "prompt_cn": "润色后的中文视频提示词，关注运动和镜头",
     "prompt_en": "Polished English video prompt, focusing on motion and camera"
 }}"""
 
-DEFAULT_R2V_POLISH_PROMPT = """# Role
-You are a prompt engineer for the Wan 2.6 Reference-to-Video model.
+DEFAULT_R2V_POLISH_PROMPT = """# 角色
+你是 Wan 2.6 参考生视频（Reference-to-Video）模型的提示词工程师。
 
-# Context
-The R2V (Reference-to-Video) model generates video clips by combining reference character videos with a text prompt.
-The user has uploaded the following reference videos:
+# 背景
+R2V（Reference-to-Video）模型通过把参考角色视频与文本提示词结合来生成视频片段。
+用户已上传以下参考视频：
 {SLOTS}
 
-The user's input prompt may already contain reference tags written as
-[characterN:name] (e.g. [character1:小兔子]). These tags are the canonical
-way to refer to a slot — characterN is the slot id the model needs, and
-:name is a human-readable label that helps both you and the user keep
-track of which actor each slot represents. The model resolves the slot
-by literal match on "characterN" inside the tag, so the :name suffix
-does not interfere — it just adds visible context.
+用户输入的提示词中可能已包含写作 [characterN:name] 的参考标签（例如 [character1:小兔子]）。
+这些标签是指代某个 slot 的规范写法——characterN 是模型需要的 slot 编号，:name 是便于你和
+用户辨认每个 slot 对应哪个角色的可读标签。模型通过对标签内 "characterN" 的字面匹配来解析
+slot，因此 :name 后缀不会干扰——它只是补充可见的上下文。
 
-# Task
-Rewrite the user's input prompt into a structured format strictly following these rules:
+# 任务
+严格遵循以下规则，把用户输入的提示词改写成结构化格式：
 
-1. **PRESERVE [characterN:name] tags exactly as written**. Do NOT strip
-   the brackets, the slot number, or the :name suffix. Whenever you
-   refer to a character that exists in the SLOTS list, write the full
-   tag (e.g. [character1:小兔子]) — never bare "character1" and never
-   the bare name "小兔子" without the tag. If the input has unbracketed
-   character names that match a SLOTS entry, convert them to the full
-   [characterN:name] form on first reference; subsequent references in
-   the same prompt may reuse the full tag.
-   **REUSE the same slot number for every mention of the same actor.**
-   The slot number is fixed per actor by the SLOTS list above —
-   [character1:小兔子] referenced three times stays [character1:小兔子]
-   all three times. Do NOT invent new slot numbers like [character3:小兔子]
-   for an actor that already has a slot. Each slot maps 1:1 to a
-   reference image, so adding a new slot would break the model's
-   expectation of how many references it has.
-2. **STRUCTURE**: Use this format:
-   - Scene setup (environment, lighting, mood)
-   - Character action (what [characterN:name] is doing, their expressions, movements)
-   - Camera movement (if applicable)
-3. **DIALOGUE FORMAT**: If the prompt includes dialogue, format it as:
-   '[character1:name] says: "dialogue content"'
-4. **PRESERVE INTENT**: Keep the original intent and emotional tone.
-5. **ENHANCE**: Add visual details for dramatic effect (lighting, speed descriptors like "slowly", "rapidly").
+1. **原样保留 [characterN:name] 标签**。不要去掉方括号、slot 编号或 :name 后缀。
+   只要指代 SLOTS 列表中存在的角色，就写出完整标签（例如 [character1:小兔子]）——
+   绝不要只写裸的 "character1"，也绝不要只写不带标签的角色名 "小兔子"。如果输入中有
+   未加括号、但能与某个 SLOTS 条目匹配的角色名，首次指代时把它转换为完整的
+   [characterN:name] 形式；同一段提示词中后续指代可复用该完整标签。
+   **同一角色的每次提及都复用同一个 slot 编号。** slot 编号由上面的 SLOTS 列表按角色固定——
+   [character1:小兔子] 被引用三次，三次都保持 [character1:小兔子]。不要为已有 slot 的角色
+   臆造新的 slot 编号（如 [character3:小兔子]）。每个 slot 与一张参考图 1:1 对应，新增 slot
+   会破坏模型对参考图数量的预期。
+2. **结构**：使用如下格式：
+   - 场景设定（环境、光线、氛围）
+   - 角色动作（[characterN:name] 在做什么、表情、动作）
+   - 镜头运动（如适用）
+3. **对白格式**：若提示词包含对白，按如下格式书写：
+   '[character1:name] says: "对白内容"'
+4. **保留意图**：保持原有意图与情绪基调。
+5. **强化**：补充视觉细节以增强戏剧效果（光线、"缓慢地"/"快速地" 等速度副词）。
 
-# Output Format
-Return STRICTLY a JSON object:
+# 输出格式
+严格返回一个 JSON 对象：
 {{
     "prompt_cn": "润色后的中文提示词，保留 [characterN:name] 完整标签",
     "prompt_en": "Polished English prompt, preserving [characterN:name] tags verbatim"
 }}
 
-# Examples
+# 示例
 
-INPUT: 主角从门里跳出来说话
-SLOTS: character1 = "White rabbit / 小兔子", character2 = "Robot dog / 机械狗"
-OUTPUT:
+输入：主角从门里跳出来说话
+SLOTS：character1 = "White rabbit / 小兔子", character2 = "Robot dog / 机械狗"
+输出：
 {{
     "prompt_cn": "[character1:小兔子] 从门里猛然跳出，落地时耳朵竖起，充满活力。房间昏暗，温暖的光线从尘土飞扬的窗户中透入。[character1:小兔子] 兴奋地环顾四周说道：'我正好赶上了！' 镜头随着跳跃略微倾斜。",
     "prompt_en": "[character1:White rabbit] bursts through the door with an exaggerated jump, landing energetically with ears perked up. The room is dimly lit with warm ambient light streaming through dusty windows. [character1:White rabbit] looks around excitedly and says: 'I made it just in time!' Camera follows the jump with a slight tilt."
@@ -241,44 +232,44 @@ OUTPUT:
 
 
 DEFAULT_ENTITY_EXTRACTION_PROMPT = """
-You are a professional storyboard artist and scriptwriter.
-Analyze the following novel text and extract structured data for a comic/video production.
+你是一名专业的分镜师与编剧。
+分析下面的小说文本，为漫画/视频制作提取结构化数据。
 
-IMPORTANT:
-- All descriptive content (names, descriptions) MUST be in CHINESE (Simplified Chinese).
-- Extract ONLY characters, scenes, and props.
+重要：
+- 所有描述性内容（名称、描述）必须使用中文（简体中文）。
+- 只提取角色（characters）、场景（scenes）和道具（props）。
 
-Output strictly in valid JSON format with the following structure:
+严格按以下结构输出合法 JSON：
 {
     "characters": [
         {
             "id": "char_001",
-            "name": "Character Name (e.g. '叶墨', '叶墨 (古装)')",
-            "description": "Visual description (hair, eyes, build, distinct features). DO NOT include specific facial expressions (e.g. sad, angry) or temporary actions (e.g. running, crying). Focus on permanent physical traits.",
-            "age": "Age estimate (e.g. '25')",
-            "gender": "Gender",
-            "clothing": "Default outfit description. If a character changes outfits significantly (e.g. from casual to wedding dress), create a separate character entry for each outfit variant with a distinct name (e.g. 'Name (Outfit)').",
-            "visual_weight": 5  // 1-5 importance
+            "name": "角色名（如 '叶墨'、'叶墨 (古装)'）",
+            "description": "外观描述（发型、眼睛、体型、显著特征）。不要包含具体的面部表情（如 悲伤、愤怒）或临时动作（如 奔跑、哭泣）。聚焦于长期固定的外形特征。",
+            "age": "年龄估计（如 '25'）",
+            "gender": "性别",
+            "clothing": "默认服装描述。若某角色服装有显著变化（如 从便装换成婚纱），为每个服装变体单独创建一个角色条目，并取一个有区分度的名字（如 '名字 (服装)'）。",
+            "visual_weight": 5  // 1-5 重要度
         }
     ],
     "scenes": [
         {
             "id": "scene_001",
-            "name": "Location Name (e.g. '咖啡店', '古代遗迹')",
-            "description": "Visual description (lighting, mood, key elements)",
+            "name": "地点名（如 '咖啡店'、'古代遗迹'）",
+            "description": "外观描述（光线、氛围、关键元素）",
             "visual_weight": 3
         }
     ],
     "props": [
         {
             "id": "prop_001",
-            "name": "Prop Name",
-            "description": "Visual description"
+            "name": "道具名",
+            "description": "外观描述"
         }
     ]
 }
 
-Text:
+文本：
 {text}
 """
 
