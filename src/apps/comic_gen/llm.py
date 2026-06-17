@@ -241,46 +241,46 @@ OUTPUT:
 
 
 DEFAULT_ENTITY_EXTRACTION_PROMPT = """
-        You are a professional storyboard artist and scriptwriter.
-        Analyze the following novel text and extract structured data for a comic/video production.
+You are a professional storyboard artist and scriptwriter.
+Analyze the following novel text and extract structured data for a comic/video production.
 
-        IMPORTANT:
-        - All descriptive content (names, descriptions) MUST be in CHINESE (Simplified Chinese).
-        - Extract ONLY characters, scenes, and props.
+IMPORTANT:
+- All descriptive content (names, descriptions) MUST be in CHINESE (Simplified Chinese).
+- Extract ONLY characters, scenes, and props.
 
-        Output strictly in valid JSON format with the following structure:
+Output strictly in valid JSON format with the following structure:
+{
+    "characters": [
         {
-            "characters": [
-                {
-                    "id": "char_001",
-                    "name": "Character Name (e.g. '叶墨', '叶墨 (古装)')",
-                    "description": "Visual description (hair, eyes, build, distinct features). DO NOT include specific facial expressions (e.g. sad, angry) or temporary actions (e.g. running, crying). Focus on permanent physical traits.",
-                    "age": "Age estimate (e.g. '25')",
-                    "gender": "Gender",
-                    "clothing": "Default outfit description. If a character changes outfits significantly (e.g. from casual to wedding dress), create a separate character entry for each outfit variant with a distinct name (e.g. 'Name (Outfit)').",
-                    "visual_weight": 5  // 1-5 importance
-                }
-            ],
-            "scenes": [
-                {
-                    "id": "scene_001",
-                    "name": "Location Name (e.g. '咖啡店', '古代遗迹')",
-                    "description": "Visual description (lighting, mood, key elements)",
-                    "visual_weight": 3
-                }
-            ],
-            "props": [
-                {
-                    "id": "prop_001",
-                    "name": "Prop Name",
-                    "description": "Visual description"
-                }
-            ]
+            "id": "char_001",
+            "name": "Character Name (e.g. '叶墨', '叶墨 (古装)')",
+            "description": "Visual description (hair, eyes, build, distinct features). DO NOT include specific facial expressions (e.g. sad, angry) or temporary actions (e.g. running, crying). Focus on permanent physical traits.",
+            "age": "Age estimate (e.g. '25')",
+            "gender": "Gender",
+            "clothing": "Default outfit description. If a character changes outfits significantly (e.g. from casual to wedding dress), create a separate character entry for each outfit variant with a distinct name (e.g. 'Name (Outfit)').",
+            "visual_weight": 5  // 1-5 importance
         }
+    ],
+    "scenes": [
+        {
+            "id": "scene_001",
+            "name": "Location Name (e.g. '咖啡店', '古代遗迹')",
+            "description": "Visual description (lighting, mood, key elements)",
+            "visual_weight": 3
+        }
+    ],
+    "props": [
+        {
+            "id": "prop_001",
+            "name": "Prop Name",
+            "description": "Visual description"
+        }
+    ]
+}
 
-        Text:
-        {text}
-        """
+Text:
+{text}
+"""
 
 
 DEFAULT_STYLE_ANALYSIS_PROMPT = """你是一个专业的电影美术指导和视觉风格顾问。

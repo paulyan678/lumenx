@@ -204,7 +204,7 @@ export function ModeSegment({
             onClick={() => onChange(o.id)}
             className={`px-3 py-1.5 text-xs rounded-md border font-medium transition-colors ${
               active
-                ? "bg-primary text-white border-primary"
+                ? "bg-primary text-on-accent border-primary"
                 : "border-glass-border bg-surface text-text-secondary hover:text-foreground"
             }`}
           >
