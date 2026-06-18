@@ -35,7 +35,7 @@ import shutil
 import uuid
 import logging
 import traceback
-from .pipeline import ComicGenPipeline
+from .pipeline import ComicGenPipeline, LibraryAssetInUseError
 from .models import (
     ArtDirection,
     PromptConfig,
@@ -881,6 +881,11 @@ class PromoteAssetRequest(BaseModel):
     asset_id: str
 
 
+class ForkFromLibraryRequest(BaseModel):
+    asset_type: str          # "character" | "scene" | "prop"
+    library_asset_id: str    # id of the source asset in the global library
+
+
 @app.get("/library/assets")
 def get_library_assets():
     """List all assets in the global shared pool."""
@@ -905,6 +910,35 @@ def create_library_asset(request: CreateLibraryAssetRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/library/assets/upload")
+def upload_library_asset_image(file: UploadFile = File(...)):
+    """Upload an image to use as a global library asset's master image.
+
+    Saves the file under output/uploads/ (served via the /files static mount)
+    and returns {"image_url": <path-or-URL the frontend can load>}. When OSS
+    is configured the returned URL is the (signed) OSS URL; otherwise a local
+    relative path "uploads/<name>" resolvable through the frontend's
+    getAssetUrl helper. The caller then passes this image_url to
+    POST /library/assets (image_url=...) or PATCH /library/assets/{type}/{id}
+    to attach it to a library asset. Mirrors the generic /upload endpoint but
+    returns the {image_url} contract the library UI expects.
+    """
+    try:
+        file_ext = os.path.splitext(file.filename or "")[1]
+        filename = f"{uuid.uuid4()}{file_ext}"
+        file_path = os.path.join("output/uploads", filename)
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        # Prefer OSS when configured (signed), else fall back to local path.
+        oss_url = OSSImageUploader().upload_image(file_path)
+        if oss_url:
+            return signed_response({"image_url": oss_url})
+        return {"image_url": f"uploads/{filename}"}
+    except Exception as e:
+        logger.exception("upload_library_asset_image failed")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.api_route("/library/assets/{asset_type}/{asset_id}", methods=["PUT", "PATCH"])
 def update_library_asset(asset_type: str, asset_id: str, request: UpdateLibraryAssetRequest):
     """Patch a global library asset (only the provided fields are applied)."""
@@ -919,11 +953,30 @@ def update_library_asset(asset_type: str, asset_id: str, request: UpdateLibraryA
 
 
 @app.delete("/library/assets/{asset_type}/{asset_id}")
-def delete_library_asset(asset_type: str, asset_id: str):
-    """Delete an asset from the global shared pool."""
+def delete_library_asset(asset_type: str, asset_id: str, force: bool = False):
+    """Delete an asset from the global shared pool.
+
+    Reference-integrity (design Q2): if any storyboard frame in any project or
+    series still references this asset (via scene_id / character_ids /
+    prop_ids), the delete is refused with HTTP 409 and the referrers are
+    listed — unless ``force=true`` is passed, which deletes anyway and leaves
+    those references dangling (the asset resolver simply drops the unknown id).
+    """
     try:
-        pipeline.delete_library_asset(asset_type, asset_id)
+        pipeline.delete_library_asset(asset_type, asset_id, force=force)
         return {"status": "deleted", "asset_type": asset_type, "id": asset_id}
+    except LibraryAssetInUseError as e:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "library_asset_in_use",
+                "message": str(e),
+                "asset_type": e.asset_type,
+                "asset_id": e.asset_id,
+                "references": e.references,
+                "hint": "Pass ?force=true to delete anyway.",
+            },
+        )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -936,6 +989,27 @@ def promote_asset_to_library(request: PromoteAssetRequest):
     try:
         asset = pipeline.promote_asset_to_library(
             request.source_kind, request.source_id, request.asset_type, request.asset_id
+        )
+        return signed_response(asset.model_dump())
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/projects/{script_id}/assets/fork_from_library")
+def fork_asset_from_library(script_id: str, request: ForkFromLibraryRequest):
+    """Fork (deep-copy) a global library asset into this project as an
+    independent, editable local copy with a fresh id (design Q3, 按需 fork).
+
+    Under live-reference (D1 活引用) semantics a project references shared
+    library assets directly; this endpoint materializes a project-owned copy
+    so subsequent edits no longer affect the shared original. Returns the new
+    project-local asset.
+    """
+    try:
+        asset = pipeline.fork_library_asset_to_project(
+            script_id, request.asset_type, request.library_asset_id
         )
         return signed_response(asset.model_dump())
     except ValueError as e:

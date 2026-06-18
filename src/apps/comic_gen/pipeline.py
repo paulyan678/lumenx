@@ -47,6 +47,28 @@ def _safe_resolve_path(base_dir: str, untrusted_rel: str) -> str:
         raise ValueError(f"Path escapes base directory: {untrusted_rel}")
     return resolved
 
+
+class LibraryAssetInUseError(Exception):
+    """Raised when a global library asset cannot be hard-deleted because it is
+    still referenced by one or more storyboard frames (design Q2 reference
+    integrity). Carries the referrers so the API can surface them (HTTP 409).
+
+    ``references`` is a list of dicts, each:
+        {"owner_kind": "project"|"series", "owner_id": str,
+         "owner_title": Optional[str], "frame_id": str}
+    """
+
+    def __init__(self, asset_type: str, asset_id: str, references: List[Dict[str, Any]]):
+        self.asset_type = asset_type
+        self.asset_id = asset_id
+        self.references = references
+        super().__init__(
+            f"Library {asset_type} {asset_id} is referenced by "
+            f"{len(references)} storyboard frame(s); refusing to delete "
+            f"(pass force=True to delete anyway)."
+        )
+
+
 class ComicGenPipeline:
     def __init__(self, config: Dict[str, Any] = None):
         self.config = config or {}
@@ -3918,14 +3940,65 @@ class ComicGenPipeline:
             self._save_library_data_unlocked()
             return asset
 
-    def delete_library_asset(self, asset_type: str, asset_id: str) -> None:
-        """Hard-delete a global library asset. (MVP: no reference-integrity
-        check — that's a documented follow-up, design Q2.) Raises
-        ValueError when the asset is absent."""
+    def _scan_library_asset_references(self, asset_type: str, asset_id: str) -> List[Dict[str, Any]]:
+        """Find every storyboard frame (across all projects and series) that
+        references the given asset id through the type-appropriate field:
+        scene -> frame.scene_id, character -> frame.character_ids,
+        prop -> frame.prop_ids. Returns a list of referrer descriptors
+        (empty when nothing references it). Used by delete_library_asset for
+        design Q2 reference integrity.
+
+        Note: Series currently hold no frames of their own (their frames live
+        in episode Scripts, which are in self.scripts), so the series loop is
+        a defensive no-op today via getattr — kept so the scan stays correct
+        if Series ever gains a frames list."""
+        references: List[Dict[str, Any]] = []
+
+        def _frame_hits(frame) -> bool:
+            if asset_type == "scene":
+                return getattr(frame, "scene_id", None) == asset_id
+            if asset_type == "character":
+                return asset_id in (getattr(frame, "character_ids", None) or [])
+            if asset_type == "prop":
+                return asset_id in (getattr(frame, "prop_ids", None) or [])
+            return False
+
+        def _scan(owner_kind: str, owner_id: str, owner, frames) -> None:
+            for frame in frames or []:
+                if _frame_hits(frame):
+                    references.append({
+                        "owner_kind": owner_kind,
+                        "owner_id": owner_id,
+                        "owner_title": getattr(owner, "title", None),
+                        "frame_id": getattr(frame, "id", None),
+                    })
+
+        for sid, script in (getattr(self, "scripts", {}) or {}).items():
+            _scan("project", sid, script, getattr(script, "frames", None))
+        for sid, series in (getattr(self, "series_store", {}) or {}).items():
+            _scan("series", sid, series, getattr(series, "frames", None))
+        return references
+
+    def delete_library_asset(self, asset_type: str, asset_id: str, force: bool = False) -> None:
+        """Hard-delete a global library asset.
+
+        Design Q2 (reference integrity): unless ``force`` is True, scan all
+        project/series storyboard frames first; if any still reference this
+        asset (scene_id / character_ids / prop_ids) the delete is refused via
+        ``LibraryAssetInUseError`` (API maps to HTTP 409 and lists referrers).
+        With ``force=True`` the asset is removed anyway, leaving those frame
+        references dangling (the asset resolver simply drops the unknown id).
+
+        Raises ValueError when the asset (or asset type) is absent — this is
+        checked BEFORE the reference scan so a missing id still maps to 404."""
         with self._save_lock:
             target_list = self._library_list_for_type(asset_type)
             if not any(a.id == asset_id for a in target_list):
                 raise ValueError(f"Asset {asset_id} of type {asset_type} not found in library")
+            if not force:
+                refs = self._scan_library_asset_references(asset_type, asset_id)
+                if refs:
+                    raise LibraryAssetInUseError(asset_type, asset_id, refs)
             kept = [a for a in target_list if a.id != asset_id]
             if asset_type == "character":
                 self.library_store.characters = kept
@@ -3974,6 +4047,41 @@ class ComicGenPipeline:
             new_asset.id = str(uuid.uuid4())
             self._library_list_for_type(asset_type).append(new_asset)
             self._save_library_data_unlocked()
+            return new_asset
+
+    def fork_library_asset_to_project(self, script_id: str, asset_type: str, library_asset_id: str):
+        """Deep-copy a *global library* asset into a project's local asset list
+        with a fresh id, persist the project, and return the new (now
+        project-owned) asset.
+
+        This is the inverse direction of promote_asset_to_library and the
+        "按需 fork" of design Q3: under D1 活引用 semantics a project references
+        shared library assets live; forking materializes an independent,
+        editable local copy so subsequent edits no longer touch the shared
+        original. The source library asset is left intact (additive).
+
+        Raises ValueError when the project, asset type, or library asset is
+        absent. ``asset_type`` ∈ {"character", "scene", "prop"}."""
+        import copy
+        if asset_type not in ("character", "scene", "prop"):
+            raise ValueError(f"Invalid asset type: {asset_type}")
+        with self._save_lock:
+            script = self.scripts.get(script_id)
+            if not script:
+                raise ValueError(f"Project not found: {script_id}")
+            # _find_library_asset raises ValueError when the id/type is absent.
+            source_asset = self._find_library_asset(asset_type, library_asset_id)
+            new_asset = copy.deepcopy(source_asset)
+            prefix = {"character": "char", "scene": "scene", "prop": "prop"}[asset_type]
+            new_asset.id = f"{prefix}_{uuid.uuid4().hex[:12]}"
+            if asset_type == "character":
+                script.characters.append(new_asset)
+            elif asset_type == "scene":
+                script.scenes.append(new_asset)
+            else:  # prop
+                script.props.append(new_asset)
+            script.updated_at = time.time()
+            self._save_data()
             return new_asset
 
     def create_series(self, title: str, description: str = "", workflow_mode: str = "i2v_legacy", content_mode: str = "scripted", default_generation_mode: str = "r2v") -> Series:
