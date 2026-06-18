@@ -58,20 +58,20 @@ function ToastCard({ toast }: { toast: Toast }) {
             <span className={`mt-0.5 shrink-0 ${style.iconClass}`}>{style.icon}</span>
             <div className="min-w-0 flex-1">
                 {toast.projectTitle && (
-                    <p className="font-mono text-[9.5px] uppercase tracking-[0.16em] text-text-muted mb-0.5 truncate">
+                    <p className="font-mono text-[0.59375rem] uppercase tracking-[0.16em] text-text-muted mb-0.5 truncate">
                         {toast.projectTitle}
                     </p>
                 )}
-                <p className="text-[13px] font-medium text-foreground leading-snug">{toast.title}</p>
+                <p className="text-[0.8125rem] font-medium text-foreground leading-snug">{toast.title}</p>
                 {toast.body && (
                     <div className="mt-0.5">
-                        <p className={`text-[11.5px] text-text-secondary leading-snug ${toast.body.length > 120 ? "line-clamp-3" : ""}`}>
+                        <p className={`text-[0.71875rem] text-text-secondary leading-snug ${toast.body.length > 120 ? "line-clamp-3" : ""}`}>
                             {toast.body}
                         </p>
                         {(toast.kind === "error" && toast.body.length > 40) && (
                             <button
                                 onClick={() => { navigator.clipboard.writeText(toast.body!); }}
-                                className="mt-1 text-[10px] text-text-muted hover:text-foreground transition-colors"
+                                className="mt-1 text-[0.625rem] text-text-muted hover:text-foreground transition-colors"
                             >
                                 {tc("copyErrorDetails")}
                             </button>
@@ -84,7 +84,7 @@ function ToastCard({ toast }: { toast: Toast }) {
                             toast.action!.onClick();
                             dismiss(toast.id);
                         }}
-                        className="mt-1.5 inline-flex items-center px-2 py-0.5 rounded-md bg-elevated border border-glass-border text-[11px] font-medium text-foreground hover:bg-hover-bg transition-colors"
+                        className="mt-1.5 inline-flex items-center px-2 py-0.5 rounded-md bg-elevated border border-glass-border text-[0.6875rem] font-medium text-foreground hover:bg-hover-bg transition-colors"
                     >
                         {toast.action.label}
                     </button>

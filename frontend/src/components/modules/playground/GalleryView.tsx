@@ -130,7 +130,7 @@ export default function GalleryView({
             <AlertCircle className="w-10 h-10" />
             <p className="font-mono text-xs">Generation failed</p>
             {current.error && (
-              <p className="text-[10px] text-text-muted max-w-xs text-center line-clamp-3">
+              <p className="text-[0.625rem] text-text-muted max-w-xs text-center line-clamp-3">
                 {current.error}
               </p>
             )}
@@ -159,20 +159,20 @@ export default function GalleryView({
           {current.prompt || '(no prompt)'}
         </p>
         <div className="flex items-center gap-2">
-          <span className="font-mono text-[9px] bg-elevated text-text-muted rounded px-[6px] py-[2px]">
+          <span className="font-mono text-[0.5625rem] bg-elevated text-text-muted rounded px-[6px] py-[2px]">
             {current.model_id || current.mode}
           </span>
           {current.parameters.size && (
-            <span className="font-mono text-[9px] bg-glass text-text-muted rounded px-[6px] py-[2px]">
+            <span className="font-mono text-[0.5625rem] bg-glass text-text-muted rounded px-[6px] py-[2px]">
               {(current.parameters.size as string).replace('*', '×').replace('x', '×')}
             </span>
           )}
           {current.parameters.resolution && !current.parameters.size && (
-            <span className="font-mono text-[9px] bg-glass text-text-muted rounded px-[6px] py-[2px]">
+            <span className="font-mono text-[0.5625rem] bg-glass text-text-muted rounded px-[6px] py-[2px]">
               {current.parameters.resolution as string}
             </span>
           )}
-          <span className="font-mono text-[9px] text-text-muted ml-auto">
+          <span className="font-mono text-[0.5625rem] text-text-muted ml-auto">
             {formatTime(current.created_at)}
           </span>
         </div>

@@ -255,7 +255,7 @@ export default function MediaInput() {
             {uploading ? '上传中...' : '拖拽或点击上传'}
           </span>
 
-          <span className="text-[11px] text-text-muted">{config.hint}</span>
+          <span className="text-[0.6875rem] text-text-muted">{config.hint}</span>
         </div>
 
         {/* Action buttons */}
@@ -348,7 +348,7 @@ export default function MediaInput() {
               </button>
 
               {/* File name tooltip */}
-              <div className="absolute bottom-0 left-0 right-0 px-1 py-0.5 bg-black/60 text-[9px] text-foreground/80 truncate">
+              <div className="absolute bottom-0 left-0 right-0 px-1 py-0.5 bg-black/60 text-[0.5625rem] text-foreground/80 truncate">
                 {getFileName(path)}
               </div>
             </div>
@@ -375,7 +375,7 @@ export default function MediaInput() {
 
         {/* File count for r2v */}
         {config.multiple && (
-          <div className="text-[11px] text-text-muted">
+          <div className="text-[0.6875rem] text-text-muted">
             {inputMedia.length} / {config.maxFiles} 张
           </div>
         )}

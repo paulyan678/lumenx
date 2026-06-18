@@ -169,7 +169,7 @@ function CreateSeriesDialog({ isOpen, onClose }: { isOpen: boolean; onClose: () 
                 </div>
                 <p className="text-xs text-text-secondary leading-relaxed">{tp("workflowR2VDesc")}</p>
                 {workflowMode === "r2v" && (
-                  <span className="absolute top-2 right-2 text-[10px] font-medium text-primary bg-primary/20 px-1.5 py-0.5 rounded">
+                  <span className="absolute top-2 right-2 text-[0.625rem] font-medium text-primary bg-primary/20 px-1.5 py-0.5 rounded">
                     {tc("recommended")}
                   </span>
                 )}
@@ -210,7 +210,7 @@ function CreateSeriesDialog({ isOpen, onClose }: { isOpen: boolean; onClose: () 
                 </div>
                 <p className="text-xs text-text-secondary leading-relaxed">{tp("contentScriptedDesc")}</p>
                 {contentMode === "scripted" && (
-                  <span className="absolute top-2 right-2 text-[10px] font-medium text-primary bg-primary/20 px-1.5 py-0.5 rounded">
+                  <span className="absolute top-2 right-2 text-[0.625rem] font-medium text-primary bg-primary/20 px-1.5 py-0.5 rounded">
                     {tc("recommended")}
                   </span>
                 )}
@@ -253,7 +253,7 @@ function CreateSeriesDialog({ isOpen, onClose }: { isOpen: boolean; onClose: () 
                 </div>
                 <p className="text-xs text-text-secondary leading-relaxed">{tp("visualControlR2VDesc")}</p>
                 {defaultGenerationMode === "r2v" && (
-                  <span className="absolute top-2 right-2 text-[10px] font-medium text-primary bg-primary/20 px-1.5 py-0.5 rounded">
+                  <span className="absolute top-2 right-2 text-[0.625rem] font-medium text-primary bg-primary/20 px-1.5 py-0.5 rounded">
                     {tc("recommended")}
                   </span>
                 )}
@@ -319,8 +319,8 @@ function NewProjectTile({ onClick }: { onClick: () => void }) {
       <span className="w-[54px] h-[54px] rounded-full grid place-items-center bg-surface shadow-sm group-hover:text-primary transition-all">
         <Plus size={24} />
       </span>
-      <span className="text-[15px] font-semibold">{t("newProject")}</span>
-      <span className="font-mono text-[9.5px] uppercase tracking-wider text-text-muted">
+      <span className="text-[0.9375rem] font-semibold">{t("newProject")}</span>
+      <span className="font-mono text-[0.59375rem] uppercase tracking-wider text-text-muted">
         {t("fromScript") || "从脚本开始"}
       </span>
     </button>
@@ -376,24 +376,24 @@ function ProjectRow({ project, crumb }: { project: Project; crumb: string }) {
 
       {/* Name + series/episode crumb */}
       <div className="flex-1 min-w-0">
-        <h3 className="font-display atelier-display text-[16px] font-semibold leading-tight tracking-tight text-foreground truncate">
+        <h3 className="font-display atelier-display text-[1rem] font-semibold leading-tight tracking-tight text-foreground truncate">
           {project.title}
         </h3>
         {crumb && (
-          <div className="font-mono text-[9.5px] uppercase tracking-wider text-text-muted mt-0.5 truncate">
+          <div className="font-mono text-[0.59375rem] uppercase tracking-wider text-text-muted mt-0.5 truncate">
             {crumb}
           </div>
         )}
       </div>
 
       {/* Status badge */}
-      <span className={`atelier-badge hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[9.5px] font-mono font-semibold uppercase tracking-wider flex-shrink-0 ${badge.cls}`}>
+      <span className={`atelier-badge hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[0.59375rem] font-mono font-semibold uppercase tracking-wider flex-shrink-0 ${badge.cls}`}>
         <span className="w-[5px] h-[5px] rounded-full bg-current" />
         {badge.label}
       </span>
 
       {/* Shot count / duration */}
-      <div className="hidden md:flex items-center gap-3 font-mono text-[10px] text-text-secondary flex-shrink-0">
+      <div className="hidden md:flex items-center gap-3 font-mono text-[0.625rem] text-text-secondary flex-shrink-0">
         <span className="inline-flex items-center gap-1">
           <Film size={11} className="text-text-muted" />
           {t("shotCount", { count: frameCount })}
@@ -706,10 +706,10 @@ export default function Home() {
         {/* Page header — eyebrow + Fraunces title + actions */}
         <header className="px-4 md:px-7 pt-5 md:pt-6 pb-3 flex flex-col md:flex-row md:items-end gap-3 md:gap-5">
           <div className="flex-1 min-w-0">
-            <div className="font-mono text-[9.5px] uppercase tracking-[0.22em] text-text-muted">
+            <div className="font-mono text-[0.59375rem] uppercase tracking-[0.22em] text-text-muted">
               WORKSPACE · <span className="text-primary font-semibold atelier-eyebrow-accent">{t("gallery") || "画廊"}</span>
             </div>
-            <h1 className="text-[26px] md:text-[34px] font-display atelier-display font-semibold text-foreground leading-tight tracking-tight mt-1">
+            <h1 className="text-[1.625rem] md:text-[2.125rem] font-display atelier-display font-semibold text-foreground leading-tight tracking-tight mt-1">
               {t("title")}
             </h1>
           </div>
@@ -718,7 +718,7 @@ export default function Home() {
               onClick={syncAll}
               disabled={isSyncing || !online}
               title={!online ? tc("offlineTooltip") : undefined}
-              className="glass-button flex items-center gap-2 text-[13px] font-semibold disabled:opacity-50"
+              className="glass-button flex items-center gap-2 text-[0.8125rem] font-semibold disabled:opacity-50"
             >
               <RefreshCw size={14} className={isSyncing ? "animate-spin" : ""} />
               {tc("sync")}
@@ -727,7 +727,7 @@ export default function Home() {
               onClick={() => setIsImportDialogOpen(true)}
               disabled={!online}
               title={!online ? tc("offlineTooltip") : undefined}
-              className="glass-button flex items-center gap-2 text-[13px] font-semibold disabled:opacity-50"
+              className="glass-button flex items-center gap-2 text-[0.8125rem] font-semibold disabled:opacity-50"
             >
               <FileUp size={14} />
               {t("importFile")}
@@ -737,7 +737,7 @@ export default function Home() {
                 onClick={(e) => { e.stopPropagation(); setShowCreateDropdown((v) => !v); }}
                 disabled={!online}
                 title={!online ? tc("offlineTooltip") : undefined}
-                className="bg-primary hover:bg-primary/90 text-on-accent px-4 py-2 rounded-[10px] font-semibold flex items-center gap-2 transition-all text-[13px] shadow-[var(--glow-primary)] disabled:opacity-50"
+                className="bg-primary hover:bg-primary/90 text-on-accent px-4 py-2 rounded-[10px] font-semibold flex items-center gap-2 transition-all text-[0.8125rem] shadow-[var(--glow-primary)] disabled:opacity-50"
               >
                 <Plus size={14} />
                 {t("new")}
@@ -789,12 +789,12 @@ export default function Home() {
                   aria-selected={on}
                   tabIndex={on ? 0 : -1}
                   onClick={() => setWsStatus(pill.id)}
-                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[11px] font-semibold transition-colors ${
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[0.6875rem] font-semibold transition-colors ${
                     on ? "text-foreground atelier-pill-tab-active bg-surface shadow-sm" : "text-text-muted hover:text-foreground"
                   }`}
                 >
                   {pill.label}
-                  <span className={`font-mono text-[9.5px] ${on ? "text-text-secondary" : "text-text-muted"}`}>{pill.count}</span>
+                  <span className={`font-mono text-[0.59375rem] ${on ? "text-text-secondary" : "text-text-muted"}`}>{pill.count}</span>
                 </button>
               );
             })}
@@ -807,7 +807,7 @@ export default function Home() {
               onChange={(e) => setWsSearch(e.target.value)}
               placeholder={t("searchPlaceholder") || "搜索项目 / 系列…"}
               aria-label={t("searchPlaceholder") || "搜索项目 / 系列…"}
-              className="w-full bg-transparent border-0 rounded-full py-2 pl-9 pr-4 text-[13px] text-foreground placeholder-text-muted focus:outline-none"
+              className="w-full bg-transparent border-0 rounded-full py-2 pl-9 pr-4 text-[0.8125rem] text-foreground placeholder-text-muted focus:outline-none"
             />
           </div>
           <div className="inline-flex p-[3px] rounded-full bg-surface-inset atelier-pill-tabs ml-auto" role="group" aria-label={`${t("gallery") || "画廊"} / ${t("list") || "列表"}`}>
@@ -815,7 +815,7 @@ export default function Home() {
               type="button"
               onClick={() => changeViewMode("gallery")}
               aria-pressed={viewMode === "gallery"}
-              className={`inline-flex items-center px-3.5 py-1.5 rounded-full text-[11px] font-semibold transition-colors ${
+              className={`inline-flex items-center px-3.5 py-1.5 rounded-full text-[0.6875rem] font-semibold transition-colors ${
                 viewMode === "gallery" ? "text-foreground atelier-pill-tab-active bg-surface shadow-sm" : "text-text-muted hover:text-foreground"
               }`}
             >
@@ -825,7 +825,7 @@ export default function Home() {
               type="button"
               onClick={() => changeViewMode("list")}
               aria-pressed={viewMode === "list"}
-              className={`inline-flex items-center px-3.5 py-1.5 rounded-full text-[11px] font-semibold transition-colors ${
+              className={`inline-flex items-center px-3.5 py-1.5 rounded-full text-[0.6875rem] font-semibold transition-colors ${
                 viewMode === "list" ? "text-foreground atelier-pill-tab-active bg-surface shadow-sm" : "text-text-muted hover:text-foreground"
               }`}
             >
@@ -844,26 +844,26 @@ export default function Home() {
             >
               <div className="glass-panel atelier-card p-10 rounded-2xl border border-glass-border text-center max-w-[620px] w-full relative overflow-hidden">
                 <div className="relative z-[1] flex flex-col items-center gap-4">
-                  <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-text-muted">
+                  <div className="font-mono text-[0.625rem] uppercase tracking-[0.22em] text-text-muted">
                     RENDER NOISE INTO NARRATIVE
                   </div>
-                  <p className="text-[34px] font-display atelier-display font-medium italic leading-[1.25] tracking-tight text-foreground">
+                  <p className="text-[2.125rem] font-display atelier-display font-medium italic leading-[1.25] tracking-tight text-foreground">
                     {t("emptyQuote") || "\u201c每一座城市，都藏着一个还没被讲出来的故事。\u201d"}
                   </p>
-                  <p className="text-[15px] text-text-secondary max-w-[440px]">
+                  <p className="text-[0.9375rem] text-text-secondary max-w-[440px]">
                     {t("emptyHint")}
                   </p>
                   <div className="flex gap-3 mt-2">
                     <button
                       onClick={() => setIsSeriesDialogOpen(true)}
-                      className="bg-primary hover:bg-primary/90 text-on-accent px-5 py-2.5 rounded-[10px] font-semibold flex items-center gap-2 transition-all text-[13px] shadow-[var(--glow-primary)]"
+                      className="bg-primary hover:bg-primary/90 text-on-accent px-5 py-2.5 rounded-[10px] font-semibold flex items-center gap-2 transition-all text-[0.8125rem] shadow-[var(--glow-primary)]"
                     >
                       <Plus size={14} />
                       {t("createSeries")}
                     </button>
                     <button
                       onClick={() => setIsDialogOpen(true)}
-                      className="glass-button flex items-center gap-2 text-[13px] font-semibold"
+                      className="glass-button flex items-center gap-2 text-[0.8125rem] font-semibold"
                     >
                       <FileText size={14} />
                       {t("createProject")}
@@ -874,7 +874,7 @@ export default function Home() {
               <button
                 onClick={syncAll}
                 disabled={isSyncing}
-                className="mt-5 glass-button flex items-center gap-2 text-[13px] font-semibold disabled:opacity-50"
+                className="mt-5 glass-button flex items-center gap-2 text-[0.8125rem] font-semibold disabled:opacity-50"
               >
                 <RefreshCw size={14} className={isSyncing ? "animate-spin" : ""} />
                 {t("syncFromBackend")}
@@ -887,11 +887,11 @@ export default function Home() {
               className="flex flex-col items-center justify-center py-20 text-text-muted"
             >
               <Search size={48} className="mb-3 opacity-60" />
-              <p className="text-[15px] font-display atelier-display text-foreground">{t("noMatchTitle")}</p>
-              <p className="text-[12px] text-text-muted mt-1">{tc("noMatchHint")}</p>
+              <p className="text-[0.9375rem] font-display atelier-display text-foreground">{t("noMatchTitle")}</p>
+              <p className="text-[0.75rem] text-text-muted mt-1">{tc("noMatchHint")}</p>
               <button
                 onClick={() => { setWsStatus("all"); setWsSearch(""); }}
-                className="mt-4 glass-button text-[13px] font-semibold"
+                className="mt-4 glass-button text-[0.8125rem] font-semibold"
               >
                 {tc("clearFilters")}
               </button>
@@ -906,11 +906,11 @@ export default function Home() {
                     <div className="flex items-baseline gap-3 mt-4 mb-4 mx-0.5">
                       <button
                         onClick={() => { window.location.hash = `#/series/${s.id}`; }}
-                        className="font-display atelier-display text-[24px] font-semibold tracking-tight text-foreground hover:text-primary transition-colors"
+                        className="font-display atelier-display text-[1.5rem] font-semibold tracking-tight text-foreground hover:text-primary transition-colors"
                       >
                         {s.title}
                       </button>
-                      <span className="font-mono text-[10px] uppercase tracking-wider text-text-muted">
+                      <span className="font-mono text-[0.625rem] uppercase tracking-wider text-text-muted">
                         {t("series")} · {t("frames", { count: eps.length })}
                       </span>
                       <span className="atelier-group-line h-px flex-1 bg-glass-border" />
@@ -937,7 +937,7 @@ export default function Home() {
                             <span className="w-8 h-8 rounded-lg grid place-items-center bg-surface group-hover:text-primary transition-colors flex-shrink-0">
                               <Plus size={15} />
                             </span>
-                            <span className="text-[13px] font-semibold">{t("newProject")}</span>
+                            <span className="text-[0.8125rem] font-semibold">{t("newProject")}</span>
                           </button>
                         )}
                       </div>
@@ -967,10 +967,10 @@ export default function Home() {
                 return (
                 <section aria-label={t("standaloneGroup") || "独立项目"}>
                   <div className="flex items-baseline gap-3 mt-6 mb-4 mx-0.5">
-                    <span className="font-display atelier-display text-[24px] font-semibold tracking-tight text-foreground">
+                    <span className="font-display atelier-display text-[1.5rem] font-semibold tracking-tight text-foreground">
                       {t("standaloneGroup") || "独立项目"}
                     </span>
-                    <span className="font-mono text-[10px] uppercase tracking-wider text-text-muted">
+                    <span className="font-mono text-[0.625rem] uppercase tracking-wider text-text-muted">
                       {t("frames", { count: sp.length })}
                     </span>
                     <span className="atelier-group-line h-px flex-1 bg-glass-border" />
@@ -994,7 +994,7 @@ export default function Home() {
                           <span className="w-8 h-8 rounded-lg grid place-items-center bg-surface group-hover:text-primary transition-colors flex-shrink-0">
                             <Plus size={15} />
                           </span>
-                          <span className="text-[13px] font-semibold">{t("newProject")}</span>
+                          <span className="text-[0.8125rem] font-semibold">{t("newProject")}</span>
                         </button>
                       )}
                     </div>

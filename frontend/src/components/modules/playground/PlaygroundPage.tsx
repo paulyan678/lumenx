@@ -197,12 +197,12 @@ export default function PlaygroundPage() {
           <h1 className="font-['Space_Grotesk',sans-serif] text-xl font-semibold tracking-tight text-foreground">
             创作台
           </h1>
-          <span className="ml-[10px] font-mono text-[11px] uppercase tracking-[0.1em] text-text-muted">
+          <span className="ml-[10px] font-mono text-[0.6875rem] uppercase tracking-[0.1em] text-text-muted">
             {resultCount} results
           </span>
         </div>
         <div className="flex items-center gap-3">
-          <span className="rounded border border-glass-border px-2 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">
+          <span className="rounded border border-glass-border px-2 py-1 font-mono text-[0.625rem] uppercase tracking-[0.18em] text-text-muted">
             {MODE_LABELS[mode]}
           </span>
         </div>
@@ -214,7 +214,7 @@ export default function PlaygroundPage() {
         <aside className="flex w-[420px] shrink-0 flex-col overflow-y-auto border-r border-glass-border bg-glass scrollbar-thin">
           {/* Mode */}
           <section className="px-6 py-5">
-            <div className="mb-3 font-mono text-[10px] font-medium uppercase tracking-[0.18em] text-text-muted">
+            <div className="mb-3 font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-text-muted">
               生成模式
             </div>
             <ModeSelector />
@@ -222,7 +222,7 @@ export default function PlaygroundPage() {
 
           {/* Model */}
           <section className="border-t border-border-subtle px-6 py-5">
-            <div className="mb-3 font-mono text-[10px] font-medium uppercase tracking-[0.18em] text-text-muted">
+            <div className="mb-3 font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-text-muted">
               模型
             </div>
             <ModelSelector />
@@ -231,7 +231,7 @@ export default function PlaygroundPage() {
           {/* Media Input (conditional) */}
           {showMediaInput && (
             <section className="border-t border-border-subtle px-6 py-5">
-              <div className="mb-3 font-mono text-[10px] font-medium uppercase tracking-[0.18em] text-text-muted">
+              <div className="mb-3 font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-text-muted">
                 {mode === 'v2v' ? '源视频' : mode === 'r2v' ? '参考素材' : '首帧图片'}
               </div>
               <MediaInput />
@@ -240,7 +240,7 @@ export default function PlaygroundPage() {
 
           {/* Prompt */}
           <section className="border-t border-border-subtle px-6 py-5">
-            <div className="mb-3 font-mono text-[10px] font-medium uppercase tracking-[0.18em] text-text-muted">
+            <div className="mb-3 font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-text-muted">
               Prompt
             </div>
             <PromptInput />
@@ -248,7 +248,7 @@ export default function PlaygroundPage() {
 
           {/* Parameters */}
           <section className="border-t border-border-subtle px-6 py-5">
-            <div className="mb-3 font-mono text-[10px] font-medium uppercase tracking-[0.18em] text-text-muted">
+            <div className="mb-3 font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-text-muted">
               参数
             </div>
             <ParameterBar />

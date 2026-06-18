@@ -233,7 +233,7 @@ export default function ModelSettingsModal({ isOpen, onClose }: ModelSettingsMod
                                                 }`}
                                         >
                                             <span className="text-sm font-medium text-foreground">{ratio.name}</span>
-                                            <span className="text-[10px] text-text-muted">{ratio.description}</span>
+                                            <span className="text-[0.625rem] text-text-muted">{ratio.description}</span>
                                         </button>
                                     ))}
                                 </div>

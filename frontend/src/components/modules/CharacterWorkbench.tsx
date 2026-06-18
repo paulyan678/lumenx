@@ -669,7 +669,7 @@ function WorkbenchPanel({
                                         </div>
                                         <div className="flex flex-col items-center">
                                             <span className="text-sm font-bold text-foreground uppercase tracking-widest animate-pulse">Generating Video</span>
-                                            <span className="text-[10px] text-purple-300/60 mt-1">AI is processing motion...</span>
+                                            <span className="text-[0.625rem] text-purple-300/60 mt-1">AI is processing motion...</span>
                                         </div>
                                     </div>
                                 ) : isVideoLoading && motionRefVideos?.length > 0 ? (
@@ -746,7 +746,7 @@ function WorkbenchPanel({
                                             e.stopPropagation();
                                             onResetPrompt?.();
                                         }}
-                                        className="text-[10px] text-primary hover:text-primary/80 transition-colors flex items-center gap-1"
+                                        className="text-[0.625rem] text-primary hover:text-primary/80 transition-colors flex items-center gap-1"
                                         title="Reset to recommended prompt"
                                     >
                                         <RefreshCw size={10} />

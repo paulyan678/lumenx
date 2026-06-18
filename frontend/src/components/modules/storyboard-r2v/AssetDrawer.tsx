@@ -87,7 +87,7 @@ export default function AssetDrawer({ isOpen, onClose, characters, scenes, props
                                         <div>
                                             <div className="flex items-center gap-1.5 mb-2">
                                                 <User size={12} className="text-blue-400" />
-                                                <span className="text-[11px] font-medium text-text-secondary uppercase tracking-wide">{t("characters")}</span>
+                                                <span className="text-[0.6875rem] font-medium text-text-secondary uppercase tracking-wide">{t("characters")}</span>
                                             </div>
                                             <div className="grid grid-cols-2 gap-2">
                                                 {characters.map((c: any, i: number) => {
@@ -108,7 +108,7 @@ export default function AssetDrawer({ isOpen, onClose, characters, scenes, props
                                                                     <User size={16} className="text-text-secondary/40" />
                                                                 )}
                                                             </div>
-                                                            <span className="text-[11px] text-foreground group-hover:text-primary truncate w-full text-center">{c.name}</span>
+                                                            <span className="text-[0.6875rem] text-foreground group-hover:text-primary truncate w-full text-center">{c.name}</span>
                                                         </button>
                                                     );
                                                 })}
@@ -121,7 +121,7 @@ export default function AssetDrawer({ isOpen, onClose, characters, scenes, props
                                         <div>
                                             <div className="flex items-center gap-1.5 mb-2">
                                                 <MapPin size={12} className="text-green-400" />
-                                                <span className="text-[11px] font-medium text-text-secondary uppercase tracking-wide">{t("scenes")}</span>
+                                                <span className="text-[0.6875rem] font-medium text-text-secondary uppercase tracking-wide">{t("scenes")}</span>
                                             </div>
                                             <div className="grid grid-cols-2 gap-2">
                                                 {scenes.map((s: any) => {
@@ -142,7 +142,7 @@ export default function AssetDrawer({ isOpen, onClose, characters, scenes, props
                                                                     <MapPin size={16} className="text-text-secondary/40" />
                                                                 )}
                                                             </div>
-                                                            <span className="text-[11px] text-foreground group-hover:text-primary truncate w-full text-center">{s.name}</span>
+                                                            <span className="text-[0.6875rem] text-foreground group-hover:text-primary truncate w-full text-center">{s.name}</span>
                                                         </button>
                                                     );
                                                 })}
@@ -155,7 +155,7 @@ export default function AssetDrawer({ isOpen, onClose, characters, scenes, props
                                         <div>
                                             <div className="flex items-center gap-1.5 mb-2">
                                                 <Package size={12} className="text-orange-400" />
-                                                <span className="text-[11px] font-medium text-text-secondary uppercase tracking-wide">{t("props")}</span>
+                                                <span className="text-[0.6875rem] font-medium text-text-secondary uppercase tracking-wide">{t("props")}</span>
                                             </div>
                                             <div className="grid grid-cols-2 gap-2">
                                                 {props.map((p: any) => {
@@ -176,7 +176,7 @@ export default function AssetDrawer({ isOpen, onClose, characters, scenes, props
                                                                     <Package size={16} className="text-text-secondary/40" />
                                                                 )}
                                                             </div>
-                                                            <span className="text-[11px] text-foreground group-hover:text-primary truncate w-full text-center">{p.name}</span>
+                                                            <span className="text-[0.6875rem] text-foreground group-hover:text-primary truncate w-full text-center">{p.name}</span>
                                                         </button>
                                                     );
                                                 })}

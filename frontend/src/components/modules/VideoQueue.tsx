@@ -108,7 +108,7 @@ function TaskCard({ task, onRemix }: { task: VideoTask; onRemix: (t: VideoTask) 
                                 className="w-full h-full object-cover opacity-60"
                             />
                         ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-purple-900/30 text-purple-400 text-[10px] font-bold">
+                            <div className="w-full h-full flex items-center justify-center bg-purple-900/30 text-purple-400 text-[0.625rem] font-bold">
                                 R2V
                             </div>
                         )}
@@ -162,7 +162,7 @@ function TaskCard({ task, onRemix }: { task: VideoTask; onRemix: (t: VideoTask) 
                                                 muted
                                                 preload="metadata"
                                             />
-                                            <div className="absolute bottom-0.5 left-0.5 bg-purple-600/80 px-1 rounded text-[8px] text-foreground font-bold">
+                                            <div className="absolute bottom-0.5 left-0.5 bg-purple-600/80 px-1 rounded text-[0.5rem] text-foreground font-bold">
                                                 @{String.fromCharCode(65 + idx)}
                                             </div>
                                         </div>
@@ -173,7 +173,7 @@ function TaskCard({ task, onRemix }: { task: VideoTask; onRemix: (t: VideoTask) 
                                     R2V Input
                                 </div>
                             )}
-                            <div className="absolute top-2 left-2 bg-surface px-1.5 py-0.5 rounded text-[10px] text-text-secondary">Input</div>
+                            <div className="absolute top-2 left-2 bg-surface px-1.5 py-0.5 rounded text-[0.625rem] text-text-secondary">Input</div>
                         </div>
 
                         {/* Output Video (Right) */}
@@ -189,7 +189,7 @@ function TaskCard({ task, onRemix }: { task: VideoTask; onRemix: (t: VideoTask) 
                                     Error
                                 </div>
                             )}
-                            <div className="absolute top-2 right-2 bg-primary/80 px-1.5 py-0.5 rounded text-[10px] text-foreground">Result</div>
+                            <div className="absolute top-2 right-2 bg-primary/80 px-1.5 py-0.5 rounded text-[0.625rem] text-foreground">Result</div>
                         </div>
                     </div>
 

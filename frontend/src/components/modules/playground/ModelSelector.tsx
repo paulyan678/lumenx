@@ -65,10 +65,10 @@ export default function ModelSelector() {
         className="flex items-center gap-[10px] px-[14px] py-[10px] border border-glass-border rounded-lg bg-input-bg cursor-pointer w-full text-left transition-colors hover:border-foreground/30"
       >
         <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
-        <span className="flex-1 text-[13px] font-medium text-foreground truncate">
+        <span className="flex-1 text-[0.8125rem] font-medium text-foreground truncate">
           {selected?.displayName ?? 'Select model'}
         </span>
-        <span className="font-mono text-[10px] text-text-muted uppercase tracking-wider shrink-0">
+        <span className="font-mono text-[0.625rem] text-text-muted uppercase tracking-wider shrink-0">
           {selected?.family ?? ''}
         </span>
         <span className="text-text-muted text-xs shrink-0">&#9662;</span>
@@ -77,14 +77,14 @@ export default function ModelSelector() {
       {open && (
         <div className="absolute top-full mt-1 w-full bg-elevated border border-glass-border rounded-lg shadow-xl z-20 max-h-60 overflow-y-auto">
           {availableModels.length === 0 && (
-            <div className="px-3 py-2 text-[12px] text-text-muted">当前模式无可用模型</div>
+            <div className="px-3 py-2 text-[0.75rem] text-text-muted">当前模式无可用模型</div>
           )}
           {groupedModels.map((group, gi) => (
             <div key={group.family}>
               {gi > 0 && <div className="border-t border-border-subtle mx-2" />}
               {groupedModels.length > 1 && (
                 <div className="px-3 pt-2 pb-1">
-                  <span className="font-mono text-[9px] text-text-muted uppercase tracking-[0.15em]">
+                  <span className="font-mono text-[0.5625rem] text-text-muted uppercase tracking-[0.15em]">
                     {group.family}
                   </span>
                 </div>
@@ -98,11 +98,11 @@ export default function ModelSelector() {
                     m.id === modelId ? 'bg-elevated text-foreground' : 'text-foreground/80'
                   }`}
                 >
-                  <span className="flex-1 text-[13px] font-medium truncate">
+                  <span className="flex-1 text-[0.8125rem] font-medium truncate">
                     {m.displayName}
                   </span>
                   {m.recommended && (
-                    <span className="text-[8px] font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0">
+                    <span className="text-[0.5rem] font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0">
                       推荐
                     </span>
                   )}

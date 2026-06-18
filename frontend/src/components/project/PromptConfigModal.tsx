@@ -143,7 +143,7 @@ export default function PromptConfigModal({ isOpen, onClose }: PromptConfigModal
                                 <div className="space-y-2">
                                     <div>
                                         <h3 className="text-sm font-bold text-foreground">Polish 模型</h3>
-                                        <p className="text-[10px] text-text-muted mt-0.5">
+                                        <p className="text-[0.625rem] text-text-muted mt-0.5">
                                             选择 AI 润色调用的 LLM 模型。三个选项都支持视觉理解，能在润色时参考首帧/参考图。
                                         </p>
                                     </div>
@@ -165,12 +165,12 @@ export default function PromptConfigModal({ isOpen, onClose }: PromptConfigModal
                                         <div className="flex items-center justify-between">
                                             <div>
                                                 <h3 className="text-sm font-bold text-foreground">{section.label}</h3>
-                                                <p className="text-[10px] text-text-muted mt-0.5">{section.description}</p>
+                                                <p className="text-[0.625rem] text-text-muted mt-0.5">{section.description}</p>
                                             </div>
                                             <button
                                                 onClick={() => handleReset(section.key)}
                                                 disabled={!config[section.key]}
-                                                className="text-[10px] text-text-secondary hover:text-foreground flex items-center gap-1 px-2 py-1 rounded hover:bg-hover-bg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                                className="text-[0.625rem] text-text-secondary hover:text-foreground flex items-center gap-1 px-2 py-1 rounded hover:bg-hover-bg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                                             >
                                                 <RotateCcw size={10} /> {t("resetToDefault")}
                                             </button>
@@ -188,13 +188,13 @@ export default function PromptConfigModal({ isOpen, onClose }: PromptConfigModal
                                             <div>
                                                 <button
                                                     onClick={() => setExpandedDefault(expandedDefault === section.key ? null : section.key)}
-                                                    className="text-[10px] text-text-muted hover:text-foreground flex items-center gap-1 transition-colors"
+                                                    className="text-[0.625rem] text-text-muted hover:text-foreground flex items-center gap-1 transition-colors"
                                                 >
                                                     {expandedDefault === section.key ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
                                                     {t("viewDefault")}
                                                 </button>
                                                 {expandedDefault === section.key && (
-                                                    <pre className="mt-2 bg-surface border border-border-subtle rounded-lg p-3 text-[10px] text-text-muted overflow-x-auto max-h-48 overflow-y-auto whitespace-pre-wrap font-mono">{defaults[section.key]}</pre>
+                                                    <pre className="mt-2 bg-surface border border-border-subtle rounded-lg p-3 text-[0.625rem] text-text-muted overflow-x-auto max-h-48 overflow-y-auto whitespace-pre-wrap font-mono">{defaults[section.key]}</pre>
                                                 )}
                                             </div>
                                         )}

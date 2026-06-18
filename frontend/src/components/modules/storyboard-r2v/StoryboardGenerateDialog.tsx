@@ -118,7 +118,7 @@ export default function StoryboardGenerateDialog({
 
                             {/* Pre-flight checks */}
                             <section>
-                                <h3 className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">
+                                <h3 className="mb-2 font-mono text-[0.625rem] uppercase tracking-[0.18em] text-text-muted">
                                     {t("preflightTitle")}
                                 </h3>
                                 <ul className="space-y-2">
@@ -132,16 +132,16 @@ export default function StoryboardGenerateDialog({
                                             }`}
                                         >
                                             <span
-                                                className={`mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold ${
+                                                className={`mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full text-[0.625rem] font-bold ${
                                                     c.pass ? "bg-green-500/20 text-green-400" : "bg-amber-400/20 text-amber-300"
                                                 }`}
                                             >
                                                 {c.pass ? "✓" : "!"}
                                             </span>
                                             <div className="min-w-0 flex-1">
-                                                <p className="text-[12.5px] text-foreground">{c.label}</p>
+                                                <p className="text-[0.78125rem] text-foreground">{c.label}</p>
                                                 {!c.pass && (
-                                                    <p className="text-[11px] text-text-muted mt-0.5">{c.hint}</p>
+                                                    <p className="text-[0.6875rem] text-text-muted mt-0.5">{c.hint}</p>
                                                 )}
                                             </div>
                                         </li>
@@ -150,7 +150,7 @@ export default function StoryboardGenerateDialog({
                                 {!allPass && onJumpToScript && (
                                     <button
                                         onClick={onJumpToScript}
-                                        className="mt-2 inline-flex items-center gap-1 text-[11px] text-primary hover:text-primary-hover transition-colors"
+                                        className="mt-2 inline-flex items-center gap-1 text-[0.6875rem] text-primary hover:text-primary-hover transition-colors"
                                     >
                                         {t("goFixInScript")}
                                         <ArrowRight size={11} />
@@ -162,7 +162,7 @@ export default function StoryboardGenerateDialog({
                             {allPass && existingShotCount > 0 && (
                                 <div className="flex items-start gap-2 rounded-md border border-amber-400/40 bg-amber-400/10 px-3 py-2">
                                     <AlertTriangle size={13} className="text-amber-300 mt-0.5 shrink-0" />
-                                    <p className="text-[12px] text-amber-100">
+                                    <p className="text-[0.75rem] text-amber-100">
                                         {t("willReplaceWarning", { count: existingShotCount })}
                                     </p>
                                 </div>
@@ -170,7 +170,7 @@ export default function StoryboardGenerateDialog({
 
                             {/* Healthy CTA hint */}
                             {allPass && existingShotCount === 0 && (
-                                <p className="text-[12px] text-text-muted flex items-center gap-1.5">
+                                <p className="text-[0.75rem] text-text-muted flex items-center gap-1.5">
                                     <Film size={12} />
                                     {t("freshHint")}
                                 </p>

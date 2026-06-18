@@ -72,16 +72,16 @@ export default function PreviousEpisodeFramesRail({ scriptId, seriesId }: Previo
                     {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
                 </span>
                 <Film size={12} className="text-text-muted" />
-                <span className="font-mono text-[10px] font-medium uppercase tracking-[0.18em] text-text-secondary">
+                <span className="font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-text-secondary">
                     {t("title")}
                 </span>
                 {prevTitle && (
-                    <span className="font-mono text-[10px] tracking-tight text-text-muted truncate max-w-[200px]">
+                    <span className="font-mono text-[0.625rem] tracking-tight text-text-muted truncate max-w-[200px]">
                         · {prevTitle}
                     </span>
                 )}
                 {!open && frames.length > 0 && (
-                    <span className="ml-auto font-mono text-[10px] uppercase tracking-[0.14em] text-text-muted">
+                    <span className="ml-auto font-mono text-[0.625rem] uppercase tracking-[0.14em] text-text-muted">
                         {t("framesCount", { count: frames.length })}
                     </span>
                 )}
@@ -95,7 +95,7 @@ export default function PreviousEpisodeFramesRail({ scriptId, seriesId }: Previo
                             <FrameThumb key={f.id} frame={f} indexFromEnd={frames.length - idx} />
                         ))}
                     </div>
-                    <p className="mt-2 text-[11px] text-text-muted italic px-1">
+                    <p className="mt-2 text-[0.6875rem] text-text-muted italic px-1">
                         {t("hint")}
                     </p>
                 </div>
@@ -119,11 +119,11 @@ function FrameThumb({ frame, indexFromEnd }: { frame: FrameLite; indexFromEnd: n
                     </div>
                 )}
             </div>
-            <p className="mt-1 font-mono text-[9.5px] uppercase tracking-[0.14em] text-text-muted">
+            <p className="mt-1 font-mono text-[0.59375rem] uppercase tracking-[0.14em] text-text-muted">
                 {t("frameLabel", { offset: indexFromEnd })}
             </p>
             {frame.action_description && (
-                <p className="mt-0.5 text-[11px] text-text-secondary line-clamp-2 leading-snug">
+                <p className="mt-0.5 text-[0.6875rem] text-text-secondary line-clamp-2 leading-snug">
                     {frame.action_description}
                 </p>
             )}

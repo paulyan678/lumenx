@@ -137,7 +137,7 @@ export default function GroupedModelGrid({
                 <div key={group.family}>
                     {/* Section header */}
                     <div className="flex items-center gap-2 mb-2">
-                        <span className="text-[11px] font-medium uppercase tracking-wider text-text-muted">
+                        <span className="text-[0.6875rem] font-medium uppercase tracking-wider text-text-muted">
                             {group.displayName}
                         </span>
                         <div className="flex-1 h-px bg-glass-border" />
@@ -162,10 +162,10 @@ export default function GroupedModelGrid({
                                             <Check size={14} className={accentClasses.check} />
                                         </div>
                                     )}
-                                    <span className="text-[15px] font-semibold text-foreground leading-snug">
+                                    <span className="text-[0.9375rem] font-semibold text-foreground leading-snug">
                                         {model.name}
                                     </span>
-                                    <span className="text-[13px] text-text-secondary mt-0.5 leading-relaxed">
+                                    <span className="text-[0.8125rem] text-text-secondary mt-0.5 leading-relaxed">
                                         {model.description}
                                     </span>
                                     {model.badges && model.badges.length > 0 && (
@@ -173,7 +173,7 @@ export default function GroupedModelGrid({
                                             {model.badges.map((badge) => (
                                                 <span
                                                     key={badge}
-                                                    className="text-[10px] px-1.5 py-0.5 rounded bg-elevated text-text-secondary"
+                                                    className="text-[0.625rem] px-1.5 py-0.5 rounded bg-elevated text-text-secondary"
                                                 >
                                                     {badge}
                                                 </span>

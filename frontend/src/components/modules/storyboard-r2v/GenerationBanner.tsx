@@ -133,7 +133,7 @@ function SummaryBar({
         >
             <div className="flex items-center gap-2.5 h-9 px-6 border-b border-border-subtle bg-glass">
                 <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
-                <span className="text-[13px] text-text-secondary">
+                <span className="text-[0.8125rem] text-text-secondary">
                     {summary.frameCount} 帧
                     {summary.dialogueReady > 0 && (
                         <span className="ml-1.5">· {summary.dialogueReady} 帧对白待生成</span>
@@ -147,7 +147,7 @@ function SummaryBar({
                         type="button"
                         onClick={onGenerateDialogue}
                         title="用绑定的角色声音合成对白音频（在 Assembly 步骤中与视频合并）"
-                        className="ml-2 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[12px] font-medium text-primary bg-primary/10 hover:bg-primary/15 transition-colors"
+                        className="ml-2 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[0.75rem] font-medium text-primary bg-primary/10 hover:bg-primary/15 transition-colors"
                     >
                         🎙 合成对白语音
                     </button>

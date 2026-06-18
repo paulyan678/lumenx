@@ -224,7 +224,7 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                                         {/* Favorited protection indicator */}
                                         {isFavorited && (
                                             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-yellow-900/80 to-transparent py-1 px-1">
-                                                <span className="text-[8px] text-yellow-200 font-medium">{t("protected")}</span>
+                                                <span className="text-[0.5rem] text-yellow-200 font-medium">{t("protected")}</span>
                                             </div>
                                         )}
                                     </div>

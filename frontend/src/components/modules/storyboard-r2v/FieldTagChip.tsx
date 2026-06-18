@@ -111,7 +111,7 @@ export default function FieldTagChip({ field, value, editorConfig, onChange }: F
                 ref={chipRef}
                 type="button"
                 onClick={() => setOpen(v => !v)}
-                className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[12px] font-medium cursor-pointer transition-all duration-150 ease-out group/chip ${
+                className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[0.75rem] font-medium cursor-pointer transition-all duration-150 ease-out group/chip ${
                     isEmpty
                         ? `border border-dashed border-foreground/20 bg-glass text-text-muted hover:border-foreground/30 hover:text-text-secondary`
                         : `border ${colors.border} ${colors.bg} ${colors.text} ${colors.hoverBorder} hover:scale-[1.02]`
@@ -179,7 +179,7 @@ function DurationEditor({ min, max, step, value, onChange }: {
                         key={n}
                         type="button"
                         onClick={() => onChange(n)}
-                        className={`rounded-md px-2 py-1.5 text-[12px] font-mono font-medium transition-colors ${
+                        className={`rounded-md px-2 py-1.5 text-[0.75rem] font-mono font-medium transition-colors ${
                             n === value
                                 ? "bg-emerald-500/20 border border-emerald-400/40 text-emerald-200"
                                 : "bg-glass border border-glass-border text-text-secondary hover:bg-hover-bg hover:text-foreground"
@@ -205,7 +205,7 @@ function DurationEditor({ min, max, step, value, onChange }: {
                 onTouchEnd={() => onChange(local)}
                 className="w-full accent-emerald-400"
             />
-            <div className="flex items-center justify-between text-[11px] font-mono text-text-muted">
+            <div className="flex items-center justify-between text-[0.6875rem] font-mono text-text-muted">
                 <span>{min}s</span>
                 <span className="text-emerald-200 font-medium">{local}s</span>
                 <span>{max}s</span>
@@ -235,7 +235,7 @@ function PresetEditor({ presets, allowCustom, value, onChange }: {
                         key={p}
                         type="button"
                         onClick={() => onChange(p)}
-                        className={`rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
+                        className={`rounded-md px-2 py-1 text-[0.6875rem] font-medium transition-colors ${
                             p === value
                                 ? "bg-primary/20 border border-primary/40 text-primary"
                                 : "bg-glass border border-glass-border text-text-secondary hover:bg-hover-bg hover:text-foreground"
@@ -253,7 +253,7 @@ function PresetEditor({ presets, allowCustom, value, onChange }: {
                     onChange={(e) => setCustom(e.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder="自定义…"
-                    className="w-full rounded-md border border-glass-border bg-black/30 px-2.5 py-1.5 text-[11px] text-foreground placeholder:text-text-muted outline-none focus:border-primary/40 transition-colors"
+                    className="w-full rounded-md border border-glass-border bg-black/30 px-2.5 py-1.5 text-[0.6875rem] text-foreground placeholder:text-text-muted outline-none focus:border-primary/40 transition-colors"
                 />
             )}
         </div>
@@ -292,7 +292,7 @@ export function AddFieldButton({ onAdd }: { onAdd: (field: FieldType) => void })
                 ref={btnRef}
                 type="button"
                 onClick={() => setOpen(v => !v)}
-                className="inline-flex items-center gap-0.5 rounded-md border border-dashed border-foreground/15 px-1.5 py-1 text-[11px] text-text-muted hover:border-foreground/30 hover:text-text-secondary transition-colors cursor-pointer"
+                className="inline-flex items-center gap-0.5 rounded-md border border-dashed border-foreground/15 px-1.5 py-1 text-[0.6875rem] text-text-muted hover:border-foreground/30 hover:text-text-secondary transition-colors cursor-pointer"
             >
                 <Plus size={10} strokeWidth={2.5} />
             </button>
@@ -311,7 +311,7 @@ export function AddFieldButton({ onAdd }: { onAdd: (field: FieldType) => void })
                                 key={f.key}
                                 type="button"
                                 onClick={() => { onAdd(f.key); setOpen(false); }}
-                                className="w-full text-left rounded-md px-2.5 py-1.5 text-[11px] text-text-secondary hover:bg-hover-bg hover:text-foreground transition-colors"
+                                className="w-full text-left rounded-md px-2.5 py-1.5 text-[0.6875rem] text-text-secondary hover:bg-hover-bg hover:text-foreground transition-colors"
                             >
                                 {f.label}
                             </button>

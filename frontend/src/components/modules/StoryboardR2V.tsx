@@ -1771,14 +1771,14 @@ export default function StoryboardR2V() {
                                     );
                                 }}
                                 title={t("artStyleHint")}
-                                className="btn-tip hidden md:inline-flex items-center gap-1.5 rounded-md border border-glass-border bg-black/20 px-2.5 py-1.5 font-mono text-[10.5px] font-medium text-text-secondary transition-colors duration-fast ease-out-quart hover:border-accent/50 hover:bg-accent/10 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/55"
+                                className="btn-tip hidden md:inline-flex items-center gap-1.5 rounded-md border border-glass-border bg-black/20 px-2.5 py-1.5 font-mono text-[0.65625rem] font-medium text-text-secondary transition-colors duration-fast ease-out-quart hover:border-accent/50 hover:bg-accent/10 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/55"
                             >
                                 <Palette size={11} aria-hidden="true" />
                                 <span className="text-foreground">{currentProject.art_direction.style_config.name}</span>
                             </button>
                         ) : null}
                         {/* Current model name —— 简化的 mono chrome label */}
-                        <span className="hidden lg:inline font-mono text-[10px] uppercase tracking-[0.16em] text-text-muted">
+                        <span className="hidden lg:inline font-mono text-[0.625rem] uppercase tracking-[0.16em] text-text-muted">
                             <span>{t("currentModel")}:</span>
                             <span className="ml-1 text-foreground">{currentModelName}</span>
                         </span>
@@ -1794,7 +1794,7 @@ export default function StoryboardR2V() {
             {/* Top Toolbar — 简化版：只保留 shot 计数 / + shot / 全展开-全折叠
                 model name + queue button + 画风 已上移到 StepHeader trailing. */}
             <div className="flex flex-wrap items-center gap-3 px-4 py-2.5 border-b border-glass-border bg-glass shrink-0 sm:px-6">
-                <span className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-text-muted">
+                <span className="font-mono text-[0.65625rem] uppercase tracking-[0.16em] text-text-muted">
                     <span className="text-foreground font-medium">{shots.length}</span>
                     <span className="ml-1.5">{shots.length === 1 ? "shot" : "shots"}</span>
                     {totalInFlight > 0 ? <span className="ml-2 text-primary">· {totalInFlight} in flight</span> : null}
@@ -1812,7 +1812,7 @@ export default function StoryboardR2V() {
                     type="button"
                     onClick={() => setGenDialogOpen(true)}
                     disabled={generating}
-                    className="inline-flex h-7 items-center gap-1.5 rounded px-2.5 font-mono text-[10.5px] uppercase tracking-[0.14em] font-medium text-primary border border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors disabled:opacity-40"
+                    className="inline-flex h-7 items-center gap-1.5 rounded px-2.5 font-mono text-[0.65625rem] uppercase tracking-[0.14em] font-medium text-primary border border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors disabled:opacity-40"
                 >
                     {generating
                         ? <Loader2 size={11} className="animate-spin" />
@@ -1873,7 +1873,7 @@ export default function StoryboardR2V() {
                                     type="button"
                                     onClick={() => setGenDialogOpen(true)}
                                     disabled={generating}
-                                    className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-md bg-primary text-white border border-[rgba(100,108,255,0.65)] shadow-[inset_0_1.5px_0_rgba(255,255,255,0.14)] hover:bg-primary-hover disabled:opacity-40 transition-colors text-[13px] font-semibold"
+                                    className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-md bg-primary text-white border border-[rgba(100,108,255,0.65)] shadow-[inset_0_1.5px_0_rgba(255,255,255,0.14)] hover:bg-primary-hover disabled:opacity-40 transition-colors text-[0.8125rem] font-semibold"
                                 >
                                     {generating ? <Loader2 size={13} className="animate-spin" /> : <Wand2 size={13} />}
                                     {generating ? t("genInFlight") : t("emptyCTA")}
@@ -1881,7 +1881,7 @@ export default function StoryboardR2V() {
                                 <button
                                     type="button"
                                     onClick={() => addShot(-1)}
-                                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-md bg-glass border border-glass-border text-text-secondary hover:text-foreground hover:bg-hover-bg transition-colors text-[12px]"
+                                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-md bg-glass border border-glass-border text-text-secondary hover:text-foreground hover:bg-hover-bg transition-colors text-[0.75rem]"
                                 >
                                     <Plus size={12} />
                                     {t("emptyManualAdd")}

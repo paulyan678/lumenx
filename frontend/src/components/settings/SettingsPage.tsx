@@ -169,11 +169,11 @@ function Section({
       <div className="atelier-card-head px-[22px] pt-[18px] pb-3.5 border-b border-glass-border">
         <h2
           id={id ? `${id}-title` : undefined}
-          className="font-display atelier-display text-[19px] font-semibold text-foreground tracking-tight"
+          className="font-display atelier-display text-[1.1875rem] font-semibold text-foreground tracking-tight"
         >
           {title}
         </h2>
-        {desc && <p className="text-[12px] text-text-secondary mt-1 leading-relaxed">{desc}</p>}
+        {desc && <p className="text-[0.75rem] text-text-secondary mt-1 leading-relaxed">{desc}</p>}
       </div>
       <div className="px-[22px] pt-[18px] pb-[22px]">{children}</div>
     </section>
@@ -412,7 +412,7 @@ export default function SettingsPage() {
           type="text"
           value={value || "—"}
           disabled
-          className={settingsInputClass + " font-mono text-[11.5px] opacity-70 cursor-not-allowed"}
+          className={settingsInputClass + " font-mono text-[0.71875rem] opacity-70 cursor-not-allowed"}
         />
         <button
           type="button"
@@ -469,7 +469,7 @@ export default function SettingsPage() {
               </div>
               <div className="min-w-0">
                 <div className="text-xs font-medium text-foreground truncate">{preset.name}</div>
-                <div className="text-[10px] text-text-muted truncate">{preset.desc}</div>
+                <div className="text-[0.625rem] text-text-muted truncate">{preset.desc}</div>
               </div>
               {theme === preset.id && (
                 <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-primary" />
@@ -635,7 +635,7 @@ export default function SettingsPage() {
         {PROMPT_FIELDS.map((f) => (
           <div key={f.key} className="space-y-2">
             <h3 className="text-sm font-semibold text-foreground">{f.label}</h3>
-            <p className="text-[11px] text-text-muted">{f.desc}</p>
+            <p className="text-[0.6875rem] text-text-muted">{f.desc}</p>
             <textarea
               value={promptConfig[f.key]}
               onChange={(e) => setPromptConfig((prev) => ({ ...prev, [f.key]: e.target.value }))}
@@ -803,12 +803,12 @@ export default function SettingsPage() {
                   { n: "3", label: "复制 Key", cmd: "mulerun studio config" },
                 ].map((step) => (
                   <div key={step.n} className="flex items-center gap-2 text-xs text-text-secondary">
-                    <span className="shrink-0 w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[10px] font-bold">
+                    <span className="shrink-0 w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[0.625rem] font-bold">
                       {step.n}
                     </span>
                     <span>{step.label}</span>
                     <code
-                      className="ml-auto px-2 py-0.5 bg-glass rounded text-[11px] font-mono select-all cursor-pointer"
+                      className="ml-auto px-2 py-0.5 bg-glass rounded text-[0.6875rem] font-mono select-all cursor-pointer"
                       onClick={(e) => {
                         navigator.clipboard.writeText(step.cmd);
                         const el = e.currentTarget;
@@ -820,7 +820,7 @@ export default function SettingsPage() {
                     </code>
                   </div>
                 ))}
-                <p className="text-[11px] text-text-muted mt-1">Key 格式为 muk-...，粘贴到上方输入框即可。本地开发如已登录 CLI，无需填写。</p>
+                <p className="text-[0.6875rem] text-text-muted mt-1">Key 格式为 muk-...，粘贴到上方输入框即可。本地开发如已登录 CLI，无需填写。</p>
               </div>
             </details>
           </FormRow>
@@ -844,7 +844,7 @@ export default function SettingsPage() {
                       value={config.endpoint_overrides[key] || ""}
                       onChange={(e) => handleEndpointChange(key, e.target.value)}
                       placeholder={placeholder}
-                      className={settingsInputClass + " font-mono text-[11.5px]"}
+                      className={settingsInputClass + " font-mono text-[0.71875rem]"}
                     />
                   </div>
                 ))}
@@ -906,7 +906,7 @@ export default function SettingsPage() {
             href="https://help.aliyun.com/zh/ram/user-guide/create-an-accesskey-pair"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-[12px] text-primary hover:underline"
+            className="inline-flex items-center gap-1 text-[0.75rem] text-primary hover:underline"
           >
             如何获取 AccessKey?
           </a>
@@ -920,7 +920,7 @@ export default function SettingsPage() {
           value={config.OSS_BUCKET_NAME}
           onChange={(e) => handleChange("OSS_BUCKET_NAME", e.target.value)}
           placeholder="your_bucket_name（可选）"
-          className={settingsInputClass + " font-mono text-[11.5px]"}
+          className={settingsInputClass + " font-mono text-[0.71875rem]"}
         />
       </FormRow>
 
@@ -931,7 +931,7 @@ export default function SettingsPage() {
           value={config.OSS_ENDPOINT}
           onChange={(e) => handleChange("OSS_ENDPOINT", e.target.value)}
           placeholder="oss-cn-beijing.aliyuncs.com（可选）"
-          className={settingsInputClass + " font-mono text-[11.5px]"}
+          className={settingsInputClass + " font-mono text-[0.71875rem]"}
         />
       </FormRow>
 
@@ -942,7 +942,7 @@ export default function SettingsPage() {
           value={config.OSS_BASE_PATH}
           onChange={(e) => handleChange("OSS_BASE_PATH", e.target.value)}
           placeholder="lumenx"
-          className={settingsInputClass + " font-mono text-[11.5px]"}
+          className={settingsInputClass + " font-mono text-[0.71875rem]"}
         />
       </FormRow>
 
@@ -984,10 +984,10 @@ export default function SettingsPage() {
           <p className="font-display atelier-display text-base italic text-accent leading-snug">
             “Render Noise into Narrative”
           </p>
-          <div className="font-mono text-[10px] tracking-[0.08em] text-text-muted uppercase">
+          <div className="font-mono text-[0.625rem] tracking-[0.08em] text-text-muted uppercase">
             VERSION {APP_VERSION.replace(/^v/, "")} · BUILD 20260613
           </div>
-          <p className="text-[12.5px] text-text-secondary leading-relaxed max-w-md">
+          <p className="text-[0.78125rem] text-text-secondary leading-relaxed max-w-md">
             AI 漫画 / 短片创作平台 · 由 Next.js + FastAPI 驱动，集成阿里云 Qwen / Wanx 服务。
           </p>
         </div>
@@ -998,20 +998,20 @@ export default function SettingsPage() {
         </div>
 
         {/* Technical info table */}
-        <div className="font-mono text-[9.5px] uppercase tracking-[0.1em] text-text-muted mb-3">
+        <div className="font-mono text-[0.59375rem] uppercase tracking-[0.1em] text-text-muted mb-3">
           技术信息 · SYSTEM
         </div>
         <div className="space-y-0">
           {aboutRows.map((r) => (
-            <div key={r.k} className="flex justify-between items-center py-2.5 border-b border-glass-border last:border-b-0 text-[12.5px] gap-3">
+            <div key={r.k} className="flex justify-between items-center py-2.5 border-b border-glass-border last:border-b-0 text-[0.78125rem] gap-3">
               <span className="text-text-secondary shrink-0">{r.k}</span>
-              <span className="font-mono text-[11.5px] text-foreground truncate text-right">{r.v}</span>
+              <span className="font-mono text-[0.71875rem] text-foreground truncate text-right">{r.v}</span>
             </div>
           ))}
           {/* FFmpeg row with live detection */}
-          <div className="flex justify-between items-center py-2.5 border-b border-glass-border last:border-b-0 text-[12.5px] gap-3">
+          <div className="flex justify-between items-center py-2.5 border-b border-glass-border last:border-b-0 text-[0.78125rem] gap-3">
             <span className="text-text-secondary shrink-0">FFmpeg</span>
-            <span className="font-mono text-[11.5px] text-right truncate">
+            <span className="font-mono text-[0.71875rem] text-right truncate">
               {systemLoading ? (
                 <span className="inline-flex items-center gap-1.5 text-text-muted">
                   <Loader2 size={12} className="animate-spin" /> 检测中…
@@ -1090,10 +1090,10 @@ export default function SettingsPage() {
       {/* Head: eyebrow(当前分类) + 「设置」标题 + 横向 Tab —— 取代竖向子栏 */}
       <header className="flex-shrink-0 border-b border-glass-border px-5 md:px-10 pt-6 pb-4 relative z-10">
         <div className="max-w-6xl mx-auto w-full">
-        <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-text-muted">
+        <div className="font-mono text-[0.625rem] uppercase tracking-[0.2em] text-text-muted">
           SETTINGS · <span className="text-primary">{CATEGORY_TITLE[active]}</span>
         </div>
-        <h1 className="font-display atelier-display text-[24px] md:text-[32px] leading-none font-semibold text-foreground mt-2 tracking-tight">
+        <h1 className="font-display atelier-display text-[1.5rem] md:text-[2rem] leading-none font-semibold text-foreground mt-2 tracking-tight">
           设置
         </h1>
         <nav className="flex flex-wrap gap-1 mt-5" role="tablist" aria-label="设置分类" onKeyDown={rovingKeyDown}>
@@ -1107,7 +1107,7 @@ export default function SettingsPage() {
                 aria-selected={isActive}
                 tabIndex={isActive ? 0 : -1}
                 onClick={() => setActive(tab.id)}
-                className={`px-3.5 py-1.5 rounded-full text-[13px] transition-colors ${
+                className={`px-3.5 py-1.5 rounded-full text-[0.8125rem] transition-colors ${
                   isActive
                     ? "bg-primary/10 text-foreground font-semibold"
                     : "text-text-muted hover:text-foreground hover:bg-hover-bg font-medium"
@@ -1131,8 +1131,8 @@ export default function SettingsPage() {
             >
               <WifiOff size={18} className="text-status-processing-fg flex-shrink-0" />
               <div className="flex-1">
-                <div className="text-[12.5px] font-semibold text-foreground">当前处于离线模式</div>
-                <div className="text-[11px] text-text-secondary mt-0.5">
+                <div className="text-[0.78125rem] font-semibold text-foreground">当前处于离线模式</div>
+                <div className="text-[0.6875rem] text-text-secondary mt-0.5">
                   未检测到网络连接。已缓存的资产仍可浏览，生成与导出将在恢复网络后执行。
                 </div>
               </div>

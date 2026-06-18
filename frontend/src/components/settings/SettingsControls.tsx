@@ -32,7 +32,7 @@ export function SectionCard({
         >
           {title}
         </h2>
-        {desc && <p className="text-[12px] text-text-secondary mt-1 leading-relaxed">{desc}</p>}
+        {desc && <p className="text-[0.75rem] text-text-secondary mt-1 leading-relaxed">{desc}</p>}
       </div>
       <div className="px-[22px] pt-[18px] pb-[22px]">{children}</div>
     </section>
@@ -52,8 +52,8 @@ export function FormRow({
   return (
     <div className="mb-6 last:mb-0">
       <div className="mb-2.5">
-        <div className="text-[14px] font-semibold text-foreground leading-snug">{label}</div>
-        {hint && <div className="text-[12px] text-text-muted mt-1 leading-relaxed">{hint}</div>}
+        <div className="text-[0.875rem] font-semibold text-foreground leading-snug">{label}</div>
+        {hint && <div className="text-[0.75rem] text-text-muted mt-1 leading-relaxed">{hint}</div>}
       </div>
       <div className="atelier-field min-w-0">{children}</div>
     </div>
@@ -63,14 +63,14 @@ export function FormRow({
 /* ── Mono uppercase field label (Line B `.field label`) ─────────── */
 export function FieldLabel({ children }: { children: ReactNode }) {
   return (
-    <label className="block font-mono text-[9.5px] uppercase tracking-[0.1em] text-text-muted mb-2">
+    <label className="block font-mono text-[0.59375rem] uppercase tracking-[0.1em] text-text-muted mb-2">
       {children}
     </label>
   );
 }
 
 export const settingsInputClass =
-  "w-full bg-input-bg border border-glass-border rounded-md px-3.5 py-2.5 text-[13px] text-foreground placeholder-text-muted focus:outline-none focus:border-primary/50 transition-colors";
+  "w-full bg-input-bg border border-glass-border rounded-md px-3.5 py-2.5 text-[0.8125rem] text-foreground placeholder-text-muted focus:outline-none focus:border-primary/50 transition-colors";
 
 /* ── Masked key field (Line A `.key-field`) ─────────────────────── */
 export function KeyField({
@@ -106,7 +106,7 @@ export function KeyField({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className={settingsInputClass + " pr-[78px] font-mono text-[12px] tracking-wide"}
+          className={settingsInputClass + " pr-[78px] font-mono text-[0.75rem] tracking-wide"}
         />
         <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex gap-0.5">
           <button
@@ -131,7 +131,7 @@ export function KeyField({
       </div>
       {status && (
         <span
-          className={`inline-flex items-center gap-1.5 font-mono text-[9.5px] tracking-wide mt-1.5 ${
+          className={`inline-flex items-center gap-1.5 font-mono text-[0.59375rem] tracking-wide mt-1.5 ${
             status.kind === "ok" ? "text-emerald-400" : "text-amber-400"
           }`}
         >
@@ -176,8 +176,8 @@ export function Toggle({
         />
       </button>
       <div className="flex-1">
-        <div className="text-[15px] font-semibold text-foreground">{label}</div>
-        {sub && <div className="text-[12px] text-text-muted mt-1 leading-relaxed">{sub}</div>}
+        <div className="text-[0.9375rem] font-semibold text-foreground">{label}</div>
+        {sub && <div className="text-[0.75rem] text-text-muted mt-1 leading-relaxed">{sub}</div>}
       </div>
     </div>
   );

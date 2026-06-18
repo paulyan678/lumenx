@@ -69,7 +69,7 @@ export default function CreateProjectDialog({ isOpen, onClose, seriesId, seriesT
                             <div>
                                 <h2 className="text-2xl font-display font-bold text-foreground">{t("createTitle")}</h2>
                                 {seriesId && (
-                                    <div className="mt-1 font-mono text-[11px] uppercase tracking-wider text-primary">
+                                    <div className="mt-1 font-mono text-[0.6875rem] uppercase tracking-wider text-primary">
                                         {t("series")} · {seriesTitle}
                                     </div>
                                 )}
@@ -119,7 +119,7 @@ export default function CreateProjectDialog({ isOpen, onClose, seriesId, seriesT
                                             {t("workflowR2VDesc")}
                                         </p>
                                         {workflowMode === "r2v" && (
-                                            <span className="absolute top-2 right-2 text-[10px] font-medium text-primary bg-primary/20 px-1.5 py-0.5 rounded">
+                                            <span className="absolute top-2 right-2 text-[0.625rem] font-medium text-primary bg-primary/20 px-1.5 py-0.5 rounded">
                                                 {tc("recommended")}
                                             </span>
                                         )}

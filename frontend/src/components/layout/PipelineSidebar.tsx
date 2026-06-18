@@ -137,12 +137,12 @@ export default function PipelineSidebar({ activeStep, onStepChange, steps, bread
                                 <div className="flex items-center gap-2">
                                     <span className={clsx("font-medium", step.comingSoon && "opacity-70")}>{step.label}</span>
                                     {step.comingSoon && (
-                                        <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 font-medium">
+                                        <span className="text-[0.5rem] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 font-medium">
                                             {tp("beta")}
                                         </span>
                                     )}
                                 </div>
-                                <span className="text-[10px] opacity-50 font-mono">{tp("stepIndex", { number: index + 1 })}</span>
+                                <span className="text-[0.625rem] opacity-50 font-mono">{tp("stepIndex", { number: index + 1 })}</span>
                             </div>
 
                             {isActive && (

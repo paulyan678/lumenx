@@ -271,7 +271,7 @@ export default function EnvConfigDialog({ isOpen, onClose, isRequired = false }:
                   <div className="flex items-center justify-between mb-4">
                     <div>
                       <h3 className="text-sm font-bold text-foreground">{t("ossMirror")}</h3>
-                      <p className="text-[10px] text-text-muted mt-1">{t("ossMirrorDesc")}</p>
+                      <p className="text-[0.625rem] text-text-muted mt-1">{t("ossMirrorDesc")}</p>
                     </div>
                     <a
                       href="https://oss.console.aliyun.com/overview"
@@ -331,7 +331,7 @@ export default function EnvConfigDialog({ isOpen, onClose, isRequired = false }:
                 <div className="pt-4 border-t border-glass-border">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-sm font-bold text-foreground">Kling Provider</h3>
-                    <span className="text-[10px] text-text-muted">{t("chooseProvider")}</span>
+                    <span className="text-[0.625rem] text-text-muted">{t("chooseProvider")}</span>
                   </div>
                   <div className="bg-glass border border-glass-border rounded-lg p-4 space-y-4">
                     <div className="flex flex-wrap gap-2">
@@ -389,7 +389,7 @@ export default function EnvConfigDialog({ isOpen, onClose, isRequired = false }:
                 <div className="pt-4 border-t border-glass-border">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-sm font-bold text-foreground">Vidu Provider</h3>
-                    <span className="text-[10px] text-text-muted">{t("chooseProvider")}</span>
+                    <span className="text-[0.625rem] text-text-muted">{t("chooseProvider")}</span>
                   </div>
                   <div className="bg-input-bg border border-glass-border rounded-lg p-4 space-y-4">
                     <div className="flex flex-wrap gap-2">
@@ -443,7 +443,7 @@ export default function EnvConfigDialog({ isOpen, onClose, isRequired = false }:
                       className={inputClass}
                     />
                     {!config.MULEROUTER_API_KEY && config.MULERUN_CLI_LOGGED_IN && (
-                      <p className="text-[11px] text-green-400 mt-1">✓ MuleRun CLI 已登录，无需手动填写</p>
+                      <p className="text-[0.6875rem] text-green-400 mt-1">✓ MuleRun CLI 已登录，无需手动填写</p>
                     )}
                   </div>
                   <details className="group">
@@ -453,21 +453,21 @@ export default function EnvConfigDialog({ isOpen, onClose, isRequired = false }:
                     </summary>
                     <div className="mt-2 space-y-2 pl-4 border-l border-glass-border">
                       <div className="flex items-center gap-2 text-xs text-text-secondary">
-                        <span className="shrink-0 w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[10px] font-bold">1</span>
+                        <span className="shrink-0 w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[0.625rem] font-bold">1</span>
                         <span>安装 CLI</span>
-                        <code className="ml-auto px-2 py-0.5 bg-glass rounded text-[11px] font-mono select-all">npm i -g @mulerunai/cli</code>
+                        <code className="ml-auto px-2 py-0.5 bg-glass rounded text-[0.6875rem] font-mono select-all">npm i -g @mulerunai/cli</code>
                       </div>
                       <div className="flex items-center gap-2 text-xs text-text-secondary">
-                        <span className="shrink-0 w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[10px] font-bold">2</span>
+                        <span className="shrink-0 w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[0.625rem] font-bold">2</span>
                         <span>浏览器登录</span>
-                        <code className="ml-auto px-2 py-0.5 bg-glass rounded text-[11px] font-mono select-all">mulerun login</code>
+                        <code className="ml-auto px-2 py-0.5 bg-glass rounded text-[0.6875rem] font-mono select-all">mulerun login</code>
                       </div>
                       <div className="flex items-center gap-2 text-xs text-text-secondary">
-                        <span className="shrink-0 w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[10px] font-bold">3</span>
+                        <span className="shrink-0 w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[0.625rem] font-bold">3</span>
                         <span>复制 Key</span>
-                        <code className="ml-auto px-2 py-0.5 bg-glass rounded text-[11px] font-mono select-all">mulerun studio config</code>
+                        <code className="ml-auto px-2 py-0.5 bg-glass rounded text-[0.6875rem] font-mono select-all">mulerun studio config</code>
                       </div>
-                      <p className="text-[11px] text-text-secondary/50 mt-1">Key 格式为 muk-...，粘贴到上方输入框即可。本地开发如已登录 CLI，无需填写。</p>
+                      <p className="text-[0.6875rem] text-text-secondary/50 mt-1">Key 格式为 muk-...，粘贴到上方输入框即可。本地开发如已登录 CLI，无需填写。</p>
                     </div>
                   </details>
                 </div>

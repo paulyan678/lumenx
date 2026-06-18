@@ -81,8 +81,8 @@ const variantStyles: Record<Variant, string> = {
 };
 
 const sizeStyles: Record<Size, string> = {
-    sm: "min-h-[30px] px-3.5 text-[12.5px] gap-1.5",
-    md: "min-h-[38px] px-5 text-[13px] gap-2",
+    sm: "min-h-[30px] px-3.5 text-[0.78125rem] gap-1.5",
+    md: "min-h-[38px] px-5 text-[0.8125rem] gap-2",
 };
 
 export default function WorkflowActionButton({

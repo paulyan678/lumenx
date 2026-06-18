@@ -402,7 +402,7 @@ function EpisodeContentPanel({
               </div>
               <div>
                 <p className="text-xs font-medium text-text-secondary">{t("noFrames")}</p>
-                <p className="text-[11px] text-text-muted">{t("startCreating")}</p>
+                <p className="text-[0.6875rem] text-text-muted">{t("startCreating")}</p>
               </div>
             </div>
           ) : (
@@ -420,7 +420,7 @@ function EpisodeContentPanel({
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-[10px] text-text-muted font-mono">
+                    <div className="w-full h-full flex items-center justify-center text-[0.625rem] text-text-muted font-mono">
                       #{i + 1}
                     </div>
                   )}
@@ -439,15 +439,15 @@ function EpisodeContentPanel({
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-surface rounded-lg p-3 border border-glass-border text-center">
             <p className="text-lg font-bold text-foreground">{characters.length}</p>
-            <p className="text-[11px] text-text-muted">{t("characters")}</p>
+            <p className="text-[0.6875rem] text-text-muted">{t("characters")}</p>
           </div>
           <div className="bg-surface rounded-lg p-3 border border-glass-border text-center">
             <p className="text-lg font-bold text-foreground">{scenes.length}</p>
-            <p className="text-[11px] text-text-muted">{t("scenes")}</p>
+            <p className="text-[0.6875rem] text-text-muted">{t("scenes")}</p>
           </div>
           <div className="bg-surface rounded-lg p-3 border border-glass-border text-center">
             <p className="text-lg font-bold text-foreground">{frames.length}</p>
-            <p className="text-[11px] text-text-muted">{t("storyboardFrames")}</p>
+            <p className="text-[0.6875rem] text-text-muted">{t("storyboardFrames")}</p>
           </div>
         </div>
       </div>

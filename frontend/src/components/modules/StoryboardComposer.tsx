@@ -337,7 +337,7 @@ export default function StoryboardComposer() {
                 subtitle={tStep("storyboardComposerSubtitle")}
                 trailing={(
                     <div className="flex items-center gap-2">
-                        <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">
+                        <span className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-text-muted">
                             <span className="text-foreground font-medium">{currentProject?.frames?.length || 0}</span>
                             <span className="ml-1.5">frames</span>
                         </span>
@@ -408,7 +408,7 @@ export default function StoryboardComposer() {
                                         ) : (
                                             <div className="w-full h-full flex flex-col items-center justify-center text-text-muted gap-2">
                                                 <ImageIcon size={24} className="opacity-20" />
-                                                <span className="text-[10px]">{t("noImage", { defaultMessage: "No Image" })}</span>
+                                                <span className="text-[0.625rem]">{t("noImage", { defaultMessage: "No Image" })}</span>
                                             </div>
                                         )
 
@@ -470,9 +470,9 @@ export default function StoryboardComposer() {
                                         <div className="flex items-start justify-between">
                                             <div className="space-y-1">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="font-mono text-[10px] font-semibold text-text-secondary uppercase tracking-[0.18em]">{t("actionLabel")}</span>
+                                                    <span className="font-mono text-[0.625rem] font-semibold text-text-secondary uppercase tracking-[0.18em]">{t("actionLabel")}</span>
                                                     {frame.camera_movement && (
-                                                        <span className="font-mono text-[9.5px] uppercase tracking-[0.12em] px-1.5 py-0.5 bg-primary/15 text-primary rounded border border-primary/40">
+                                                        <span className="font-mono text-[0.59375rem] uppercase tracking-[0.12em] px-1.5 py-0.5 bg-primary/15 text-primary rounded border border-primary/40">
                                                             {frame.camera_movement}
                                                         </span>
                                                     )}
@@ -485,7 +485,7 @@ export default function StoryboardComposer() {
 
                                         {frame.dialogue && (
                                             <div className="mt-auto pt-3 border-t border-border-subtle">
-                                                <span className="font-mono text-[10px] font-semibold text-text-secondary uppercase tracking-[0.18em] block mb-1">{t("dialogueLabel")}</span>
+                                                <span className="font-mono text-[0.625rem] font-semibold text-text-secondary uppercase tracking-[0.18em] block mb-1">{t("dialogueLabel")}</span>
                                                 <p className="text-sm text-text-secondary italic">"{frame.dialogue}"</p>
                                             </div>
                                         )}
@@ -801,7 +801,7 @@ function ImageWithRetry({ src, alt, className, onClick }: { src: string, alt: st
             {error && retryCount >= 10 && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-red-500/10 backdrop-blur-sm z-20 p-2 text-center">
                     <span className="text-xs text-red-400 font-bold">Failed to load</span>
-                    <span className="text-[10px] text-red-400/70 break-all">{src}</span>
+                    <span className="text-[0.625rem] text-red-400/70 break-all">{src}</span>
                 </div>
             )}
         </div>

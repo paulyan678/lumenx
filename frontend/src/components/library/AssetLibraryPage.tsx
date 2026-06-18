@@ -305,21 +305,21 @@ export default function AssetLibraryPage() {
       {/* Header */}
       <header className="px-4 md:px-7 pt-5 md:pt-6 pb-3 flex items-end gap-5">
         <div className="flex-1 min-w-0">
-          <div className="font-mono text-[9.5px] uppercase tracking-[0.22em] text-text-muted">
+          <div className="font-mono text-[0.59375rem] uppercase tracking-[0.22em] text-text-muted">
             ASSET LIBRARY · <span className="text-primary font-semibold atelier-eyebrow-accent">{t("gallery") || "画廊"}</span>
           </div>
-          <h1 className="text-[26px] md:text-[34px] font-display atelier-display font-semibold text-foreground leading-tight tracking-tight mt-1">
+          <h1 className="text-[1.625rem] md:text-[2.125rem] font-display atelier-display font-semibold text-foreground leading-tight tracking-tight mt-1">
             {t("title")}
           </h1>
         </div>
         <div className="flex items-center gap-2.5 pb-1">
-          <span className="font-mono text-[10px] text-text-muted tracking-wide uppercase">
+          <span className="font-mono text-[0.625rem] text-text-muted tracking-wide uppercase">
             {t("assetCount", { count: visibleCount })}
           </span>
           <button
             type="button"
             onClick={() => setNewAssetOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-primary text-on-accent text-[12px] font-semibold hover:bg-primary-hover transition-colors"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-primary text-on-accent text-[0.75rem] font-semibold hover:bg-primary-hover transition-colors"
           >
             <Plus size={14} />
             {t("newAsset")}
@@ -346,7 +346,7 @@ export default function AssetLibraryPage() {
                 type="button"
                 aria-pressed={on}
                 onClick={() => setViewAxis(v.id)}
-                className={`px-3.5 py-1.5 rounded-full text-[11px] font-semibold transition-colors ${
+                className={`px-3.5 py-1.5 rounded-full text-[0.6875rem] font-semibold transition-colors ${
                   on ? "text-foreground atelier-pill-tab-active bg-surface shadow-sm" : "text-text-muted hover:text-foreground"
                 }`}
               >
@@ -366,12 +366,12 @@ export default function AssetLibraryPage() {
                 aria-selected={on}
                 tabIndex={on ? 0 : -1}
                 onClick={() => setActiveType(pill.id)}
-                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[11px] font-semibold transition-colors ${
+                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[0.6875rem] font-semibold transition-colors ${
                   on ? "text-foreground atelier-pill-tab-active bg-surface shadow-sm" : "text-text-muted hover:text-foreground"
                 }`}
               >
                 {pill.label}
-                <span className={`font-mono text-[9.5px] ${on ? "text-text-secondary" : "text-text-muted"}`}>{pill.count}</span>
+                <span className={`font-mono text-[0.59375rem] ${on ? "text-text-secondary" : "text-text-muted"}`}>{pill.count}</span>
               </button>
             );
           })}
@@ -383,7 +383,7 @@ export default function AssetLibraryPage() {
           aria-pressed={starredOnly}
           aria-label={t("starredOnlyAria")}
           onClick={() => setStarredOnly((v) => !v)}
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-colors ${
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[0.6875rem] font-semibold border transition-colors ${
             starredOnly
               ? "text-status-starred-fg bg-status-starred-bg border-status-starred-border"
               : "text-text-muted border-glass-border hover:text-foreground"
@@ -401,7 +401,7 @@ export default function AssetLibraryPage() {
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t("searchPlaceholder")}
             aria-label={t("searchPlaceholder")}
-            className="w-full bg-transparent border-0 rounded-full py-2 pl-9 pr-4 text-[13px] text-foreground placeholder-text-muted focus:outline-none"
+            className="w-full bg-transparent border-0 rounded-full py-2 pl-9 pr-4 text-[0.8125rem] text-foreground placeholder-text-muted focus:outline-none"
           />
         </div>
 
@@ -413,7 +413,7 @@ export default function AssetLibraryPage() {
             aria-haspopup="listbox"
             aria-expanded={sortOpen}
             aria-label={t("sortLabel")}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium text-text-muted border border-glass-border hover:text-foreground transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[0.6875rem] font-medium text-text-muted border border-glass-border hover:text-foreground transition-colors"
           >
             <ArrowDownUp size={12} />
             {sortLabelMap[sortMode]}
@@ -449,7 +449,7 @@ export default function AssetLibraryPage() {
                         setSortMode(opt.id);
                         setSortOpen(false);
                       }}
-                      className={`w-full flex items-center justify-between gap-3 px-3 py-1.5 rounded-lg text-[12px] font-medium text-left transition-colors ${
+                      className={`w-full flex items-center justify-between gap-3 px-3 py-1.5 rounded-lg text-[0.75rem] font-medium text-left transition-colors ${
                         opt.disabled
                           ? "text-text-muted opacity-60 cursor-not-allowed"
                           : on
@@ -460,7 +460,7 @@ export default function AssetLibraryPage() {
                       <span className="flex items-center gap-2">
                         {opt.label}
                         {opt.disabled && (
-                          <span className="font-mono text-[8.5px] uppercase tracking-[0.06em] text-text-muted px-1.5 py-0.5 rounded-full bg-surface-inset border border-glass-border">
+                          <span className="font-mono text-[0.53125rem] uppercase tracking-[0.06em] text-text-muted px-1.5 py-0.5 rounded-full bg-surface-inset border border-glass-border">
                             {t("sortUsageHint")}
                           </span>
                         )}
@@ -480,31 +480,31 @@ export default function AssetLibraryPage() {
         <div className="flex-1 overflow-y-auto px-7 pb-10 pt-3">
           {loading ? (
             <div className="flex items-center justify-center py-20">
-              <div className="text-text-secondary text-[13px]">{tc("loading")}</div>
+              <div className="text-text-secondary text-[0.8125rem]">{tc("loading")}</div>
             </div>
           ) : counts.all === 0 ? (
             <div className="flex flex-col items-center justify-center py-16">
               <div className="glass-panel atelier-card p-10 rounded-2xl border border-glass-border text-center max-w-[620px] w-full relative overflow-hidden">
                 <div className="relative z-[1] flex flex-col items-center gap-4">
-                  <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-text-muted">
+                  <div className="font-mono text-[0.625rem] uppercase tracking-[0.22em] text-text-muted">
                     CAST · SCENES · PROPS
                   </div>
-                  <p className="text-[34px] font-display atelier-display font-medium italic leading-[1.25] tracking-tight text-foreground">
+                  <p className="text-[2.125rem] font-display atelier-display font-medium italic leading-[1.25] tracking-tight text-foreground">
                     {t("emptyQuote")}
                   </p>
-                  <p className="text-[15px] text-text-secondary max-w-[440px]">{t("noAssetsHint")}</p>
+                  <p className="text-[0.9375rem] text-text-secondary max-w-[440px]">{t("noAssetsHint")}</p>
                 </div>
               </div>
             </div>
           ) : groups.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-text-muted">
               <Search size={48} className="mb-3 opacity-60" />
-              <p className="text-[15px] font-display atelier-display text-foreground">{t("noMatchTitle")}</p>
-              <p className="text-[12px] text-text-muted mt-1">{tc("noMatchHint")}</p>
+              <p className="text-[0.9375rem] font-display atelier-display text-foreground">{t("noMatchTitle")}</p>
+              <p className="text-[0.75rem] text-text-muted mt-1">{tc("noMatchHint")}</p>
               <button
                 type="button"
                 onClick={() => { setActiveType("all"); setSearchQuery(""); setStarredOnly(false); }}
-                className="mt-4 glass-button text-[13px] font-semibold"
+                className="mt-4 glass-button text-[0.8125rem] font-semibold"
               >
                 {tc("clearFilters")}
               </button>
@@ -515,8 +515,8 @@ export default function AssetLibraryPage() {
                 <div key={grp.key}>
                   {/* 分组标题 + 尾线 + 计数 */}
                   <div className="flex items-baseline gap-3 mb-4">
-                    <span className="text-[24px] font-display atelier-display font-semibold text-foreground tracking-tight">{grp.title}</span>
-                    <span className="font-mono text-[10px] text-text-muted tracking-wide uppercase">{grp.meta}</span>
+                    <span className="text-[1.5rem] font-display atelier-display font-semibold text-foreground tracking-tight">{grp.title}</span>
+                    <span className="font-mono text-[0.625rem] text-text-muted tracking-wide uppercase">{grp.meta}</span>
                     <span className="atelier-group-line flex-1 h-px bg-border-subtle" />
                   </div>
 
@@ -605,14 +605,14 @@ export default function AssetLibraryPage() {
                                 <Star size={13} className={isStar ? "fill-current" : ""} />
                               </button>
                               {vc > 0 && (
-                                <span className="px-2 py-[3px] rounded-full font-mono text-[9px] font-semibold text-white bg-black/55 backdrop-blur-md tracking-wide">
+                                <span className="px-2 py-[3px] rounded-full font-mono text-[0.5625rem] font-semibold text-white bg-black/55 backdrop-blur-md tracking-wide">
                                   {t("variantCount", { count: vc })}
                                 </span>
                               )}
                             </div>
                             {/* kind chip（仅「按项目」视图 + 「全部」类型下显示，告知卡片类型） */}
                             {viewAxis === "source" && activeType === "all" && (
-                              <span className="absolute bottom-2 left-2 px-2 py-[3px] rounded-full font-mono text-[8.5px] font-semibold uppercase tracking-[0.06em] text-white bg-black/55 backdrop-blur-md">
+                              <span className="absolute bottom-2 left-2 px-2 py-[3px] rounded-full font-mono text-[0.53125rem] font-semibold uppercase tracking-[0.06em] text-white bg-black/55 backdrop-blur-md">
                                 {TYPE_LABEL[type]}
                               </span>
                             )}
@@ -620,9 +620,9 @@ export default function AssetLibraryPage() {
                           <div className="p-3">
                             <div className="text-sm font-medium text-foreground truncate">{asset.name}</div>
                             {viewAxis === "type" ? (
-                              <div className="text-[11px] text-text-muted truncate mt-0.5">{src.name}</div>
+                              <div className="text-[0.6875rem] text-text-muted truncate mt-0.5">{src.name}</div>
                             ) : (
-                              asset.description && <div className="text-[11px] text-text-muted truncate mt-0.5">{asset.description}</div>
+                              asset.description && <div className="text-[0.6875rem] text-text-muted truncate mt-0.5">{asset.description}</div>
                             )}
                           </div>
                         </div>

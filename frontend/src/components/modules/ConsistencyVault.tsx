@@ -786,8 +786,8 @@ function TabButton({ active, onClick, icon, label, count }: any) {
                 }`}
         >
             <span className={active ? "text-primary" : ""}>{icon}</span>
-            <span className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em]">{label}</span>
-            <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded-full border ${
+            <span className="font-mono text-[0.65625rem] font-semibold uppercase tracking-[0.14em]">{label}</span>
+            <span className={`font-mono text-[0.5625rem] px-1.5 py-0.5 rounded-full border ${
                 active
                     ? "text-primary border-primary/40 bg-[rgba(100,108,255,0.08)]"
                     : "text-text-muted border-glass-border bg-black/30"

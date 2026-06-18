@@ -337,7 +337,7 @@ export default function ImportAssetsDialog({ isOpen, onClose, seriesId, onImport
                                                 <div className="p-2">
                                                     <p className="text-xs font-medium text-foreground truncate">{asset.name}</p>
                                                     {asset.description && (
-                                                        <p className="text-[10px] text-text-secondary mt-0.5 line-clamp-1">{asset.description}</p>
+                                                        <p className="text-[0.625rem] text-text-secondary mt-0.5 line-clamp-1">{asset.description}</p>
                                                     )}
                                                 </div>
                                             </button>

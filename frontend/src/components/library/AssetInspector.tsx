@@ -336,7 +336,7 @@ export default function AssetInspector({
           onClick={onToggleStar}
           aria-pressed={starred}
           aria-label={starred ? t("unstar") : t("star")}
-          className={`absolute top-3 left-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-mono text-[10px] font-bold uppercase tracking-[0.1em] backdrop-blur-md border transition-colors ${
+          className={`absolute top-3 left-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-mono text-[0.625rem] font-bold uppercase tracking-[0.1em] backdrop-blur-md border transition-colors ${
             starred
               ? "text-status-starred-fg bg-status-starred-bg border-status-starred-border"
               : "text-text-secondary bg-black/40 border-transparent hover:text-foreground"
@@ -360,7 +360,7 @@ export default function AssetInspector({
           <div className="font-display atelier-display text-xl font-semibold text-foreground tracking-tight">
             {asset.name}
           </div>
-          <div className="font-mono text-[9.5px] text-text-muted tracking-[0.06em] uppercase mt-1.5">
+          <div className="font-mono text-[0.59375rem] text-text-muted tracking-[0.06em] uppercase mt-1.5">
             {TYPE_LABEL[type]} · {sourceName} · {t("variantCount", { count: variants.length })}
           </div>
         </div>
@@ -368,7 +368,7 @@ export default function AssetInspector({
         {/* Variant strip */}
         {variants.length > 1 && (
           <div>
-            <div className="font-mono text-[9px] font-semibold uppercase tracking-[0.16em] text-text-secondary mb-2.5">
+            <div className="font-mono text-[0.5625rem] font-semibold uppercase tracking-[0.16em] text-text-secondary mb-2.5">
               {t("variantsSection")}
             </div>
             <div className="grid grid-cols-4 gap-2">
@@ -394,16 +394,16 @@ export default function AssetInspector({
 
         {/* Metadata */}
         <div>
-          <div className="font-mono text-[9px] font-semibold uppercase tracking-[0.16em] text-text-secondary mb-2.5">
+          <div className="font-mono text-[0.5625rem] font-semibold uppercase tracking-[0.16em] text-text-secondary mb-2.5">
             {t("metadataSection")}
           </div>
           <div className="flex flex-col">
             {metaRows.map((row) => (
               <div
                 key={row.label}
-                className="flex justify-between items-center py-2 border-b border-glass-border last:border-b-0 text-[13px]"
+                className="flex justify-between items-center py-2 border-b border-glass-border last:border-b-0 text-[0.8125rem]"
               >
-                <span className="font-mono text-[10px] text-text-muted tracking-[0.04em]">{row.label}</span>
+                <span className="font-mono text-[0.625rem] text-text-muted tracking-[0.04em]">{row.label}</span>
                 <span className="text-foreground font-medium">{row.value}</span>
               </div>
             ))}
@@ -413,10 +413,10 @@ export default function AssetInspector({
         {/* Prompt */}
         {prompt && (
           <div>
-            <div className="font-mono text-[9px] font-semibold uppercase tracking-[0.16em] text-text-secondary mb-2.5">
+            <div className="font-mono text-[0.5625rem] font-semibold uppercase tracking-[0.16em] text-text-secondary mb-2.5">
               {t("promptSection")}
             </div>
-            <div className="bg-surface-inset rounded-lg p-3.5 text-[13px] leading-relaxed text-text-secondary border-l-2 border-status-starred-border">
+            <div className="bg-surface-inset rounded-lg p-3.5 text-[0.8125rem] leading-relaxed text-text-secondary border-l-2 border-status-starred-border">
               {prompt}
             </div>
           </div>
@@ -448,7 +448,7 @@ export default function AssetInspector({
             >
               <Sparkles size={15} />
               {t("generateMoreVariants")}
-              <span className="inline-flex items-center rounded-full px-1.5 py-0.5 font-mono text-[8.5px] font-semibold tracking-[0.06em] text-status-pending-fg bg-status-pending-bg border border-status-pending-border">
+              <span className="inline-flex items-center rounded-full px-1.5 py-0.5 font-mono text-[0.53125rem] font-semibold tracking-[0.06em] text-status-pending-fg bg-status-pending-bg border border-status-pending-border">
                 {t("genInEpisodeBadge")}
               </span>
             </button>

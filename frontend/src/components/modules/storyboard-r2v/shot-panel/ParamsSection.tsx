@@ -155,7 +155,7 @@ export default function ParamsSection({
             onToggle={() => setOpen(!open)}
             subtitle={activeModel ? `${activeModel.name}` : undefined}
             trailing={inFlightCount > 0 ? (
-                <span className="rounded-full bg-primary/20 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-primary">
+                <span className="rounded-full bg-primary/20 px-1.5 py-0.5 text-[0.625rem] font-semibold leading-none text-primary">
                     {`${inFlightCount} ${t("inFlightShort")}`}
                 </span>
             ) : undefined}

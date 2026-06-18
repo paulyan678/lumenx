@@ -198,7 +198,7 @@ export default function ProjectCard({ project, onDelete }: ProjectCardProps) {
 
                 {/* Status badge — top-left */}
                 <div className="absolute top-3 left-3 z-[2]">
-                    <span className={`atelier-badge inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[9.5px] font-mono font-semibold uppercase tracking-wider ${badge.cls}`}>
+                    <span className={`atelier-badge inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[0.59375rem] font-mono font-semibold uppercase tracking-wider ${badge.cls}`}>
                         <span className="w-[5px] h-[5px] rounded-full bg-current" />
                         {badge.label}
                     </span>
@@ -213,10 +213,10 @@ export default function ProjectCard({ project, onDelete }: ProjectCardProps) {
 
                 {/* Title + meta overlay — bottom-left */}
                 <div className="absolute bottom-3 left-4 right-4 z-[2]">
-                    <h3 className="font-display atelier-display text-[22px] font-semibold leading-[1.05] tracking-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.6)] truncate">
+                    <h3 className="font-display atelier-display text-[1.375rem] font-semibold leading-[1.05] tracking-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.6)] truncate">
                         {project.title}
                     </h3>
-                    <div className="font-mono text-[9px] uppercase tracking-wider mt-1 truncate text-foreground/75">
+                    <div className="font-mono text-[0.5625rem] uppercase tracking-wider mt-1 truncate text-foreground/75">
                         {project.episode_number ? `EP.${String(project.episode_number).padStart(2, "0")} · ` : ""}
                         {t("shotCount", { count: frameCount })}
                     </div>
@@ -226,10 +226,10 @@ export default function ProjectCard({ project, onDelete }: ProjectCardProps) {
             {/* Meta footer */}
             <div className="flex items-center justify-between px-4 py-3.5">
                 <div className="flex flex-col gap-1.5 min-w-0">
-                    <span className="font-mono text-[9px] uppercase tracking-wider text-text-muted truncate">
+                    <span className="font-mono text-[0.5625rem] uppercase tracking-wider text-text-muted truncate">
                         {badge.label}{dateStr ? ` · ${dateStr}` : ""}
                     </span>
-                    <div className="flex items-center gap-2.5 font-mono text-[10px] text-text-secondary">
+                    <div className="flex items-center gap-2.5 font-mono text-[0.625rem] text-text-secondary">
                         <span className="inline-flex items-center gap-1">
                             <Film size={11} className="text-text-muted" />
                             {t("shotCount", { count: frameCount })}

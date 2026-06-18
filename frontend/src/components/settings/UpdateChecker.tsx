@@ -103,7 +103,7 @@ export default function UpdateChecker() {
   const showOpenButton = status === "update" || status === "error";
 
   return (
-    <div className="flex items-center justify-between gap-3 flex-wrap py-2.5 border-t border-glass-border text-[12.5px]">
+    <div className="flex items-center justify-between gap-3 flex-wrap py-2.5 border-t border-glass-border text-[0.78125rem]">
       <span className="text-text-secondary shrink-0">版本更新</span>
 
       <div className="flex items-center gap-2.5 flex-wrap justify-end">
@@ -111,7 +111,7 @@ export default function UpdateChecker() {
         <span
           role="status"
           aria-live="polite"
-          className={`inline-flex items-center gap-1.5 font-mono text-[11.5px] ${statusColor}`}
+          className={`inline-flex items-center gap-1.5 font-mono text-[0.71875rem] ${statusColor}`}
         >
           {status === "latest" && (
             <>
@@ -137,7 +137,7 @@ export default function UpdateChecker() {
           <button
             type="button"
             onClick={() => openReleases(status === "update" ? releaseUrl : undefined)}
-            className="inline-flex items-center gap-1 text-primary hover:underline text-[12px] font-medium"
+            className="inline-flex items-center gap-1 text-primary hover:underline text-[0.75rem] font-medium"
             aria-label="在 GitHub 打开发布页"
           >
             打开发布页
@@ -150,7 +150,7 @@ export default function UpdateChecker() {
           onClick={handleCheck}
           disabled={checking}
           aria-label="检查更新"
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-glass-border text-primary hover:border-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-[12px] font-medium"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-glass-border text-primary hover:border-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-[0.75rem] font-medium"
         >
           {checking ? (
             <Loader2 size={13} className="animate-spin" />

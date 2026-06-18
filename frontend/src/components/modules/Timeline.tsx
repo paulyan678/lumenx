@@ -39,7 +39,7 @@ export default function Timeline() {
             <div className="flex-1 overflow-y-auto p-2 space-y-1 relative">
                 {/* Time Ruler */}
                 <div className="h-6 border-b border-border-subtle flex items-end pb-1 px-2 mb-2">
-                    <div className="flex justify-between w-full text-[10px] font-mono text-text-muted">
+                    <div className="flex justify-between w-full text-[0.625rem] font-mono text-text-muted">
                         <span>00:00</span>
                         <span>00:15</span>
                         <span>00:30</span>

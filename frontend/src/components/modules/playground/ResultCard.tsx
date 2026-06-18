@@ -64,9 +64,9 @@ function FailedCard({ generation, onRetry, onDelete }: { generation: PlaygroundG
       >
         <div className="absolute inset-0 bg-red-500/[0.05]" />
         <div className="relative text-center px-4 py-3 w-full">
-          <p className="font-mono text-[10px] text-red-400/80 uppercase mb-2">生成失败</p>
+          <p className="font-mono text-[0.625rem] text-red-400/80 uppercase mb-2">生成失败</p>
           {error && (
-            <p className={`text-[10px] text-text-muted leading-relaxed break-all ${expanded ? '' : 'line-clamp-2'}`}>
+            <p className={`text-[0.625rem] text-text-muted leading-relaxed break-all ${expanded ? '' : 'line-clamp-2'}`}>
               {error}
             </p>
           )}
@@ -77,7 +77,7 @@ function FailedCard({ generation, onRetry, onDelete }: { generation: PlaygroundG
           {onRetry && (
             <button
               onClick={(e) => { e.stopPropagation(); onRetry(generation); }}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-medium text-primary bg-primary/10 hover:bg-primary/20 transition-colors"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[0.625rem] font-medium text-primary bg-primary/10 hover:bg-primary/20 transition-colors"
             >
               ↻ 重试
             </button>
@@ -85,7 +85,7 @@ function FailedCard({ generation, onRetry, onDelete }: { generation: PlaygroundG
           {onDelete && (
             <button
               onClick={(e) => { e.stopPropagation(); onDelete(generation); }}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-red-400/60 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+              className="inline-flex items-center gap-1 px-2 py-1 rounded text-[0.625rem] font-medium text-red-400/60 hover:text-red-400 hover:bg-red-500/10 transition-colors"
             >
               × 删除
             </button>
@@ -93,25 +93,25 @@ function FailedCard({ generation, onRetry, onDelete }: { generation: PlaygroundG
           {error && (
             <button
               onClick={handleCopy}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-text-muted hover:text-foreground hover:bg-hover-bg transition-colors"
+              className="inline-flex items-center gap-1 px-2 py-1 rounded text-[0.625rem] font-medium text-text-muted hover:text-foreground hover:bg-hover-bg transition-colors"
             >
               {copied ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
               {copied ? '已复制' : '复制全文'}
             </button>
           )}
-          <span className="text-[9px] text-text-muted ml-auto">
+          <span className="text-[0.5625rem] text-text-muted ml-auto">
             {expanded ? '收起' : '展开'}
           </span>
         </div>
       </div>
 
       <div className="px-3 py-[10px]">
-        <p className="text-[11px] text-text-secondary line-clamp-2 mb-1.5">{prompt}</p>
+        <p className="text-[0.6875rem] text-text-secondary line-clamp-2 mb-1.5">{prompt}</p>
         <div className="flex items-center gap-2">
-          <span className="font-mono text-[9px] bg-glass text-text-muted rounded px-[6px] py-[2px]">
+          <span className="font-mono text-[0.5625rem] bg-glass text-text-muted rounded px-[6px] py-[2px]">
             {model_id || mode}
           </span>
-          <span className="font-mono text-[9px] text-text-muted">
+          <span className="font-mono text-[0.5625rem] text-text-muted">
             {formatTime(created_at)}
           </span>
         </div>
@@ -190,7 +190,7 @@ function CompletedCard({ generation, onGenerateVideo, onOpenDetail }: { generati
 
         {/* Video badge top-left */}
         {isVideo && (
-          <span className="absolute top-2 left-2 font-mono text-[9px] bg-black/60 text-foreground/80 backdrop-blur-sm rounded px-[6px] py-[2px] uppercase">
+          <span className="absolute top-2 left-2 font-mono text-[0.5625rem] bg-black/60 text-foreground/80 backdrop-blur-sm rounded px-[6px] py-[2px] uppercase">
             {MODE_LABELS[mode] || mode}
           </span>
         )}
@@ -225,29 +225,29 @@ function CompletedCard({ generation, onGenerateVideo, onOpenDetail }: { generati
 
       {/* Info area */}
       <div className="px-3 py-[10px]">
-        <p className="text-[11px] text-text-secondary line-clamp-2 mb-1.5">{prompt}</p>
+        <p className="text-[0.6875rem] text-text-secondary line-clamp-2 mb-1.5">{prompt}</p>
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="font-mono text-[9px] bg-glass text-text-muted rounded px-[6px] py-[2px]">
+          <span className="font-mono text-[0.5625rem] bg-glass text-text-muted rounded px-[6px] py-[2px]">
             {model_id || mode}
           </span>
           {/* Size or resolution tag */}
           {generation.parameters.size && (
-            <span className="font-mono text-[9px] bg-glass text-text-muted rounded px-[6px] py-[2px]">
+            <span className="font-mono text-[0.5625rem] bg-glass text-text-muted rounded px-[6px] py-[2px]">
               {(generation.parameters.size as string).replace('*', '×').replace('x', '×')}
             </span>
           )}
           {generation.parameters.resolution && !generation.parameters.size && (
-            <span className="font-mono text-[9px] bg-glass text-text-muted rounded px-[6px] py-[2px]">
+            <span className="font-mono text-[0.5625rem] bg-glass text-text-muted rounded px-[6px] py-[2px]">
               {generation.parameters.resolution as string}
             </span>
           )}
           {/* Mode badge */}
-          <span className="font-mono text-[9px] bg-primary/10 text-primary/70 rounded px-[6px] py-[2px] uppercase">
+          <span className="font-mono text-[0.5625rem] bg-primary/10 text-primary/70 rounded px-[6px] py-[2px] uppercase">
             {MODE_LABELS[mode] || mode}
           </span>
-          <span className="font-mono text-[9px] text-text-muted ml-auto">{formatTime(created_at)}</span>
+          <span className="font-mono text-[0.5625rem] text-text-muted ml-auto">{formatTime(created_at)}</span>
           {saved && (
-            <span className="flex items-center gap-0.5 text-[9px] text-green-400/70">
+            <span className="flex items-center gap-0.5 text-[0.5625rem] text-green-400/70">
               <Star className="w-2.5 h-2.5 fill-current" />
             </span>
           )}
@@ -281,7 +281,7 @@ export default function ResultCard({ generation, onGenerateVideo, onRetry, onOpe
           {/* Centered spinner + text */}
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
             <div className="w-6 h-6 border-2 border-glass-border border-t-primary rounded-full animate-spin" />
-            <span className="font-mono text-[10px] text-text-muted uppercase">
+            <span className="font-mono text-[0.625rem] text-text-muted uppercase">
               {status === 'pending' ? '排队中...' : '生成中...'}
             </span>
           </div>
@@ -297,12 +297,12 @@ export default function ResultCard({ generation, onGenerateVideo, onRetry, onOpe
 
         {/* Info area */}
         <div className="px-3 py-[10px]">
-          <p className="text-[11px] text-text-secondary line-clamp-2 mb-1.5">{prompt}</p>
+          <p className="text-[0.6875rem] text-text-secondary line-clamp-2 mb-1.5">{prompt}</p>
           <div className="flex items-center gap-2">
-            <span className="font-mono text-[9px] bg-glass text-text-muted rounded px-[6px] py-[2px]">
+            <span className="font-mono text-[0.5625rem] bg-glass text-text-muted rounded px-[6px] py-[2px]">
               {model_id || mode}
             </span>
-            <span className="font-mono text-[9px] text-text-muted">
+            <span className="font-mono text-[0.5625rem] text-text-muted">
               {formatTime(created_at)}
             </span>
           </div>

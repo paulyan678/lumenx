@@ -262,14 +262,14 @@ export default function DetailPanel({
               {generation.model_id}
             </h2>
             <div className="flex items-center gap-2 mb-1">
-              <span className="font-mono text-[10px] bg-elevated text-text-secondary rounded px-[6px] py-[2px] uppercase">
+              <span className="font-mono text-[0.625rem] bg-elevated text-text-secondary rounded px-[6px] py-[2px] uppercase">
                 {MODE_LABELS[generation.mode] || generation.mode}
               </span>
-              <span className="font-mono text-[10px] text-text-muted">
+              <span className="font-mono text-[0.625rem] text-text-muted">
                 {generation.id.slice(0, 8)}
               </span>
             </div>
-            <p className="font-mono text-[11px] text-text-muted">
+            <p className="font-mono text-[0.6875rem] text-text-muted">
               {formatTimestamp(generation.created_at)}
             </p>
           </div>
@@ -332,19 +332,19 @@ export default function DetailPanel({
           {/* Section 3: Prompt */}
           <div className="mb-6">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="font-mono text-[10px] uppercase tracking-[0.18em] text-amber-500/80">
+              <h3 className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-amber-500/80">
                 PROMPT
               </h3>
               <button
                 onClick={handleCopyPrompt}
-                className="flex items-center gap-1 px-2 py-1 rounded text-[10px] text-text-muted hover:text-foreground hover:bg-hover-bg transition-colors"
+                className="flex items-center gap-1 px-2 py-1 rounded text-[0.625rem] text-text-muted hover:text-foreground hover:bg-hover-bg transition-colors"
               >
                 <Copy className="w-3 h-3" />
                 {copied ? 'Copied' : 'Copy'}
               </button>
             </div>
             <div className="max-h-40 overflow-y-auto rounded-lg bg-glass border border-glass-border p-3">
-              <p className="text-[12px] text-foreground/80 leading-relaxed whitespace-pre-wrap break-words">
+              <p className="text-[0.75rem] text-foreground/80 leading-relaxed whitespace-pre-wrap break-words">
                 {generation.prompt || '(empty)'}
               </p>
             </div>
@@ -353,14 +353,14 @@ export default function DetailPanel({
           {/* Section 4: Parameters */}
           {paramEntries.length > 0 && (
             <div className="mb-6">
-              <h3 className="font-mono text-[10px] uppercase tracking-[0.18em] text-amber-500/80 mb-2">
+              <h3 className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-amber-500/80 mb-2">
                 参数
               </h3>
               <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                 {paramEntries.map(([label, value]) => (
                   <div key={label}>
-                    <p className="text-[10px] text-text-muted mb-0.5">{label}</p>
-                    <p className="text-[12px] text-foreground font-mono truncate">
+                    <p className="text-[0.625rem] text-text-muted mb-0.5">{label}</p>
+                    <p className="text-[0.75rem] text-foreground font-mono truncate">
                       {value}
                     </p>
                   </div>
@@ -372,11 +372,11 @@ export default function DetailPanel({
           {/* Section 5: Negative prompt */}
           {generation.negative_prompt && (
             <div className="mb-6">
-              <h3 className="font-mono text-[10px] uppercase tracking-[0.18em] text-amber-500/80 mb-2">
+              <h3 className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-amber-500/80 mb-2">
                 NEGATIVE PROMPT
               </h3>
               <div className="max-h-28 overflow-y-auto rounded-lg bg-glass border border-glass-border p-3">
-                <p className="text-[12px] text-text-secondary leading-relaxed whitespace-pre-wrap break-words">
+                <p className="text-[0.75rem] text-text-secondary leading-relaxed whitespace-pre-wrap break-words">
                   {generation.negative_prompt}
                 </p>
               </div>
@@ -386,11 +386,11 @@ export default function DetailPanel({
           {/* Error display for failed generations */}
           {generation.status === 'failed' && generation.error && (
             <div className="mb-6">
-              <h3 className="font-mono text-[10px] uppercase tracking-[0.18em] text-red-400/80 mb-2">
+              <h3 className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-red-400/80 mb-2">
                 ERROR
               </h3>
               <div className="max-h-28 overflow-y-auto rounded-lg bg-red-500/[0.04] border border-red-500/[0.12] p-3">
-                <p className="text-[11px] text-red-300/80 leading-relaxed break-all font-mono">
+                <p className="text-[0.6875rem] text-red-300/80 leading-relaxed break-all font-mono">
                   {generation.error}
                 </p>
               </div>

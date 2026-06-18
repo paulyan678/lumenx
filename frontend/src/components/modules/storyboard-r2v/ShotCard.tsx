@@ -321,10 +321,10 @@ export default function ShotCard({
             if (shot.videoStatus === "failed") {
                 return (
                     <div className="w-full aspect-video flex flex-col items-center justify-center gap-2">
-                        <span className="text-[11px] text-rose-400 font-medium">{t("generationFailed")}</span>
+                        <span className="text-[0.6875rem] text-rose-400 font-medium">{t("generationFailed")}</span>
                         <button
                             onClick={onGenerateVideo}
-                            className="text-[11px] text-primary hover:text-primary/80 transition-colors font-medium"
+                            className="text-[0.6875rem] text-primary hover:text-primary/80 transition-colors font-medium"
                         >
                             {t("retry")}
                         </button>
@@ -348,7 +348,7 @@ export default function ShotCard({
                             alt={t("t2iCompleted") || "First frame"}
                             className="w-full h-full"
                         />
-                        <div className="absolute bottom-2 left-2 text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/90 text-white font-medium backdrop-blur-sm pointer-events-none">
+                        <div className="absolute bottom-2 left-2 text-[0.625rem] px-1.5 py-0.5 rounded-full bg-emerald-500/90 text-white font-medium backdrop-blur-sm pointer-events-none">
                             {t("generateVideoNext")}
                         </div>
                     </div>
@@ -367,10 +367,10 @@ export default function ShotCard({
             if (shot.t2iStatus === "failed") {
                 return (
                     <div className="w-full aspect-video flex flex-col items-center justify-center gap-2">
-                        <span className="text-[11px] text-rose-400 font-medium">{t("generationFailed")}</span>
+                        <span className="text-[0.6875rem] text-rose-400 font-medium">{t("generationFailed")}</span>
                         <button
                             onClick={onGenerateT2I}
-                            className="text-[11px] text-primary hover:text-primary/80 transition-colors font-medium"
+                            className="text-[0.6875rem] text-primary hover:text-primary/80 transition-colors font-medium"
                         >
                             {t("retry")}
                         </button>
@@ -386,8 +386,8 @@ export default function ShotCard({
                     <div className="w-10 h-10 rounded-xl bg-glass border border-glass-border flex items-center justify-center">
                         <ImageIcon size={18} strokeWidth={1.5} />
                     </div>
-                    <span className="text-[11px] font-medium">{t("generateImageOrUpload")}</span>
-                    <span className="text-[10px] text-text-muted">↓ Step 1</span>
+                    <span className="text-[0.6875rem] font-medium">{t("generateImageOrUpload")}</span>
+                    <span className="text-[0.625rem] text-text-muted">↓ Step 1</span>
                 </div>
             );
         }
@@ -416,10 +416,10 @@ export default function ShotCard({
         if (shot.videoStatus === "failed") {
             return (
                 <div className="w-full aspect-video flex flex-col items-center justify-center gap-2">
-                    <span className="text-[11px] text-rose-400 font-medium">{t("generationFailed")}</span>
+                    <span className="text-[0.6875rem] text-rose-400 font-medium">{t("generationFailed")}</span>
                     <button
                         onClick={onGenerateVideo}
-                        className="text-[11px] text-primary hover:text-primary/80 transition-colors font-medium"
+                        className="text-[0.6875rem] text-primary hover:text-primary/80 transition-colors font-medium"
                     >
                         {t("retry")}
                     </button>
@@ -431,7 +431,7 @@ export default function ShotCard({
                 <div className="w-10 h-10 rounded-xl bg-glass border border-glass-border flex items-center justify-center">
                     <Video size={18} strokeWidth={1.5} />
                 </div>
-                <span className="text-[11px] font-medium">{t("noVideoYet")}</span>
+                <span className="text-[0.6875rem] font-medium">{t("noVideoYet")}</span>
             </div>
         );
     };
@@ -530,7 +530,7 @@ export default function ShotCard({
                         />
                         <button
                             onClick={() => onSetTabMode("t2i_i2v")}
-                            className={`relative z-10 flex items-center gap-1.5 px-3 py-1 text-[11px] font-semibold rounded-md transition-colors duration-200 ${
+                            className={`relative z-10 flex items-center gap-1.5 px-3 py-1 text-[0.6875rem] font-semibold rounded-md transition-colors duration-200 ${
                                 isActiveT2I ? "text-foreground" : "text-text-secondary hover:text-text-secondary/80"
                             }`}
                         >
@@ -539,7 +539,7 @@ export default function ShotCard({
                         </button>
                         <button
                             onClick={() => onSetTabMode("direct_r2v")}
-                            className={`relative z-10 flex items-center gap-1.5 px-3 py-1 text-[11px] font-semibold rounded-md transition-colors duration-200 ${
+                            className={`relative z-10 flex items-center gap-1.5 px-3 py-1 text-[0.6875rem] font-semibold rounded-md transition-colors duration-200 ${
                                 !isActiveT2I ? "text-foreground" : "text-text-secondary hover:text-text-secondary/80"
                             }`}
                         >
@@ -551,11 +551,11 @@ export default function ShotCard({
                     {/* Shot number badge — expand toggle moved to Action Bar
                         (bottom-left cluster) for closer reach. */}
                     <div className="flex items-center gap-2">
-                        <div className="text-[10px] font-mono text-text-muted tabular-nums">
+                        <div className="text-[0.625rem] font-mono text-text-muted tabular-nums">
                             #{String(index + 1).padStart(2, "0")}
                         </div>
                         <div className="w-5 h-5 rounded-full bg-elevated border border-glass-border flex items-center justify-center">
-                            <span className="text-[9px] font-bold text-foreground">{index + 1}</span>
+                            <span className="text-[0.5625rem] font-bold text-foreground">{index + 1}</span>
                         </div>
                     </div>
                 </div>
@@ -574,7 +574,7 @@ export default function ShotCard({
                         {shot.isVideoPinned && shot.videoUrl && onUnpinVideo ? (
                             <div className="group/pin absolute top-1.5 right-1.5 z-10 flex items-center gap-1">
                                 <span
-                                    className="inline-flex items-center gap-1 rounded-full border border-primary/55 bg-primary/20 backdrop-blur-sm px-2 py-[2px] font-mono text-[9.5px] uppercase tracking-[0.14em] text-primary shadow-[0_0_10px_-2px_rgba(100,108,255,0.55)]"
+                                    className="inline-flex items-center gap-1 rounded-full border border-primary/55 bg-primary/20 backdrop-blur-sm px-2 py-[2px] font-mono text-[0.59375rem] uppercase tracking-[0.14em] text-primary shadow-[0_0_10px_-2px_rgba(100,108,255,0.55)]"
                                     title={t("activeTakePinnedTooltip")}
                                 >
                                     <Pin size={9} aria-hidden="true" strokeWidth={2.2} fill="currentColor" />
@@ -585,7 +585,7 @@ export default function ShotCard({
                                     onClick={(e) => { e.stopPropagation(); onUnpinVideo(); }}
                                     title={t("unpinActiveTakeTooltip")}
                                     aria-label={t("unpinActiveTake")}
-                                    className="opacity-0 transition-opacity duration-fast ease-out-quart group-hover/pin:opacity-100 focus-visible:opacity-100 inline-flex items-center gap-1 rounded-full border border-foreground/15 bg-black/55 backdrop-blur-sm px-1.5 py-[2px] font-mono text-[9.5px] uppercase tracking-[0.14em] text-foreground/80 hover:text-foreground hover:border-foreground/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                                    className="opacity-0 transition-opacity duration-fast ease-out-quart group-hover/pin:opacity-100 focus-visible:opacity-100 inline-flex items-center gap-1 rounded-full border border-foreground/15 bg-black/55 backdrop-blur-sm px-1.5 py-[2px] font-mono text-[0.59375rem] uppercase tracking-[0.14em] text-foreground/80 hover:text-foreground hover:border-foreground/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                                 >
                                     <PinOff size={9} aria-hidden="true" strokeWidth={2.2} />
                                     {t("unpinActiveTakeShort")}
@@ -632,14 +632,14 @@ export default function ShotCard({
                                                     noLightbox
                                                 />
                                             ) : (
-                                                <span className="font-mono text-[9px] font-medium text-text-secondary">
+                                                <span className="font-mono text-[0.5625rem] font-medium text-text-secondary">
                                                     {c.name.slice(0, 1)}
                                                 </span>
                                             )}
                                         </button>
                                     ))}
                                     {castAvatars.length > 3 ? (
-                                        <span className="grid h-6 w-6 place-items-center rounded-full border-2 border-surface bg-elevated font-mono text-[9px] font-medium text-text-secondary">
+                                        <span className="grid h-6 w-6 place-items-center rounded-full border-2 border-surface bg-elevated font-mono text-[0.5625rem] font-medium text-text-secondary">
                                             +{castAvatars.length - 3}
                                         </span>
                                     ) : null}
@@ -764,10 +764,10 @@ export default function ShotCard({
                         {/* Dialogue text display (read-only — editing via 配音工作台 modal) */}
                         {shot.dialogueStructured?.line && (
                             <div className="mt-1.5 flex items-start gap-1.5 px-1.5 py-1 -mx-1.5">
-                                <span className="text-[10px] text-text-muted font-medium shrink-0 mt-px">
+                                <span className="text-[0.625rem] text-text-muted font-medium shrink-0 mt-px">
                                     {shot.dialogueStructured.speaker}:
                                 </span>
-                                <span className="text-[11px] text-text-secondary italic leading-relaxed">
+                                <span className="text-[0.6875rem] text-text-secondary italic leading-relaxed">
                                     「{shot.dialogueStructured.line}」
                                 </span>
                             </div>
@@ -779,7 +779,7 @@ export default function ShotCard({
                                 <button
                                     type="button"
                                     onClick={() => setPromptPreviewOpen(v => !v)}
-                                    className="inline-flex items-center gap-1 text-[11px] text-text-muted hover:text-text-secondary transition-colors"
+                                    className="inline-flex items-center gap-1 text-[0.6875rem] text-text-muted hover:text-text-secondary transition-colors"
                                 >
                                     <Code2 size={12} strokeWidth={1.5} />
                                     <span>查看最终提示词</span>
@@ -797,7 +797,7 @@ export default function ShotCard({
                                             transition={{ duration: 0.2 }}
                                             className="overflow-hidden"
                                         >
-                                            <div className="mt-1.5 rounded-md border border-glass-border bg-black/20 px-3 py-2 text-[11.5px] leading-relaxed font-mono space-y-2">
+                                            <div className="mt-1.5 rounded-md border border-glass-border bg-black/20 px-3 py-2 text-[0.71875rem] leading-relaxed font-mono space-y-2">
                                                 {/* Final prompt as model receives it (computed real-time) */}
                                                 <p className="text-text-secondary whitespace-pre-wrap">
                                                     {assembledPromptPreview}
@@ -907,7 +907,7 @@ export default function ShotCard({
                                             aria-pressed={active}
                                             aria-label={`Generate ${n} at a time`}
                                             title={`每次生成 ${n} 条候选`}
-                                            className={`grid h-9 w-9 place-items-center rounded-md border font-mono text-[11px] font-medium transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 ${
+                                            className={`grid h-9 w-9 place-items-center rounded-md border font-mono text-[0.6875rem] font-medium transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 ${
                                                 active
                                                     ? "border-primary/55 bg-primary/15 text-primary"
                                                     : "border-glass-border bg-black/20 text-text-secondary hover:border-foreground/30 hover:text-foreground"
@@ -929,7 +929,7 @@ export default function ShotCard({
                                         ? "请先在上方生成或上传首帧"
                                         : "请先输入提示词")
                                     : `生成 ${generateCount} 条视频候选`}
-                                className="inline-flex items-center justify-center gap-1.5 rounded-md px-5 py-2 min-w-[140px] font-sans text-[13px] font-semibold tracking-tight transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 disabled:cursor-not-allowed disabled:opacity-40 bg-primary text-white border border-[rgba(100,108,255,0.65)] shadow-[inset_0_1.5px_0_rgba(255,255,255,0.14),inset_0_-1px_0_rgba(60,68,200,0.45),0_4px_14px_-2px_rgba(100,108,255,0.45)] hover:bg-primary-hover hover:border-[rgba(100,108,255,0.85)] disabled:hover:bg-primary disabled:hover:border-[rgba(100,108,255,0.65)]"
+                                className="inline-flex items-center justify-center gap-1.5 rounded-md px-5 py-2 min-w-[140px] font-sans text-[0.8125rem] font-semibold tracking-tight transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 disabled:cursor-not-allowed disabled:opacity-40 bg-primary text-white border border-[rgba(100,108,255,0.65)] shadow-[inset_0_1.5px_0_rgba(255,255,255,0.14),inset_0_-1px_0_rgba(60,68,200,0.45),0_4px_14px_-2px_rgba(100,108,255,0.45)] hover:bg-primary-hover hover:border-[rgba(100,108,255,0.85)] disabled:hover:bg-primary disabled:hover:border-[rgba(100,108,255,0.65)]"
                             >
                                 {inFlightCount > 0 ? (
                                     <>
@@ -957,7 +957,7 @@ export default function ShotCard({
                                 onClick={onToggleExpanded}
                                 aria-expanded={expanded}
                                 aria-label={expanded ? t("collapseShot") : t("expandShot")}
-                                className={`inline-flex items-center gap-2 rounded-md border px-3 py-2 font-mono text-[11px] font-medium uppercase tracking-[0.14em] transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 ${
+                                className={`inline-flex items-center gap-2 rounded-md border px-3 py-2 font-mono text-[0.6875rem] font-medium uppercase tracking-[0.14em] transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 ${
                                     expanded
                                         ? "border-primary/40 bg-primary/12 text-primary hover:bg-primary/20"
                                         : "border-glass-border bg-black/30 text-text-secondary hover:border-foreground/30 hover:bg-hover-bg hover:text-foreground"

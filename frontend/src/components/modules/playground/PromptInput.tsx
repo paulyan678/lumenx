@@ -25,7 +25,7 @@ export default function PromptInput() {
         value={prompt}
         onChange={(e) => setPrompt(e.target.value.slice(0, MAX_LENGTH))}
         placeholder="描述你想生成的内容..."
-        className="w-full min-h-[120px] max-h-[280px] resize-y p-[14px] border border-glass-border rounded-xl bg-input-bg text-foreground text-[13px] leading-relaxed placeholder-foreground/40 focus:border-primary focus:ring-[3px] focus:ring-primary/12 outline-none"
+        className="w-full min-h-[120px] max-h-[280px] resize-y p-[14px] border border-glass-border rounded-xl bg-input-bg text-foreground text-[0.8125rem] leading-relaxed placeholder-foreground/40 focus:border-primary focus:ring-[3px] focus:ring-primary/12 outline-none"
       />
 
       {/* Toolbar — below the textarea, not overlapping */}
@@ -33,7 +33,7 @@ export default function PromptInput() {
         <button
           type="button"
           onClick={() => setShowTemplateModal(true)}
-          className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-text-muted hover:text-foreground hover:bg-hover-bg transition-colors"
+          className="inline-flex items-center gap-1 px-2 py-1 rounded text-[0.6875rem] font-medium text-text-muted hover:text-foreground hover:bg-hover-bg transition-colors"
         >
           <Copy size={12} />
           模板
@@ -41,19 +41,19 @@ export default function PromptInput() {
         <button
           type="button"
           onClick={() => setShowHistoryDrawer(true)}
-          className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-text-muted hover:text-foreground hover:bg-hover-bg transition-colors"
+          className="inline-flex items-center gap-1 px-2 py-1 rounded text-[0.6875rem] font-medium text-text-muted hover:text-foreground hover:bg-hover-bg transition-colors"
         >
           <Clock size={12} />
           历史
         </button>
-        <span className="ml-auto font-mono text-[10px] text-text-muted">
+        <span className="ml-auto font-mono text-[0.625rem] text-text-muted">
           {prompt.length} / {MAX_LENGTH}
         </span>
       </div>
 
       {/* Negative prompt toggle */}
       <div
-        className="flex items-center gap-[6px] py-[6px] text-[11px] text-text-muted cursor-pointer hover:text-foreground mt-2"
+        className="flex items-center gap-[6px] py-[6px] text-[0.6875rem] text-text-muted cursor-pointer hover:text-foreground mt-2"
         onClick={() => setShowNegPrompt((v) => !v)}
       >
         <span

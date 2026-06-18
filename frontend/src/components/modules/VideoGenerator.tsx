@@ -137,7 +137,7 @@ export default function VideoGenerator() {
                 title={tStep("motionTitle")}
                 subtitle={tStep("motionSubtitle")}
                 trailing={tasks.length > 0 ? (
-                    <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">
+                    <span className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-text-muted">
                         <span className="text-foreground font-medium">{tasks.length}</span>
                         <span className="ml-1.5">shots</span>
                         {doneCount > 0 ? (

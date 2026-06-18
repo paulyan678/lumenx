@@ -54,14 +54,14 @@ export default function LumenXBranding({ size = "md", showSlogan = true }: Lumen
             </span>
           </div>
           {size !== "sm" && (
-            <span className="font-mono text-[10px] text-text-muted tracking-[0.2em] uppercase -mt-0.5">
+            <span className="font-mono text-[0.625rem] text-text-muted tracking-[0.2em] uppercase -mt-0.5">
               Studio
             </span>
           )}
         </div>
       </div>
       {showSlogan && (
-        <p className="font-mono atelier-display text-[8px] text-text-muted tracking-[0.15em] text-center mt-2.5 uppercase">
+        <p className="font-mono atelier-display text-[0.5rem] text-text-muted tracking-[0.15em] text-center mt-2.5 uppercase">
           Render Noise into Narrative
         </p>
       )}

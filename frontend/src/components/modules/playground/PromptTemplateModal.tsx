@@ -157,8 +157,8 @@ export default function PromptTemplateModal() {
                 <BookmarkPlus size={16} className="text-primary" />
               </div>
               <div>
-                <h2 className="text-[15px] font-semibold text-foreground">Prompt 模板</h2>
-                <p className="text-[10px] text-text-muted mt-0.5">保存常用提示词，一键套用</p>
+                <h2 className="text-[0.9375rem] font-semibold text-foreground">Prompt 模板</h2>
+                <p className="text-[0.625rem] text-text-muted mt-0.5">保存常用提示词，一键套用</p>
               </div>
             </div>
             <button
@@ -178,7 +178,7 @@ export default function PromptTemplateModal() {
                 type="button"
                 onClick={() => setFilterCat(c.value)}
                 className={[
-                  "px-3 py-1.5 rounded-md text-[11px] font-medium transition-all",
+                  "px-3 py-1.5 rounded-md text-[0.6875rem] font-medium transition-all",
                   filterCat === c.value
                     ? "text-foreground bg-elevated border border-glass-border"
                     : "text-text-muted hover:text-foreground hover:bg-hover-bg border border-transparent",
@@ -186,7 +186,7 @@ export default function PromptTemplateModal() {
               >
                 {c.label}
                 {c.value !== "all" && (
-                  <span className="ml-1.5 text-[9px] text-text-muted">
+                  <span className="ml-1.5 text-[0.5625rem] text-text-muted">
                     {templates.filter((t) => t.category === c.value).length}
                   </span>
                 )}
@@ -199,10 +199,10 @@ export default function PromptTemplateModal() {
             {filtered.length === 0 && (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <Sparkles size={28} className="text-text-muted mb-3" />
-                <p className="text-[13px] text-text-muted mb-1">
+                <p className="text-[0.8125rem] text-text-muted mb-1">
                   {filterCat === "all" ? "暂无模板" : `暂无${categoryMeta(filterCat).label}模板`}
                 </p>
-                <p className="text-[11px] text-text-muted">点击下方「新建」创建你的第一个模板</p>
+                <p className="text-[0.6875rem] text-text-muted">点击下方「新建」创建你的第一个模板</p>
               </div>
             )}
 
@@ -216,17 +216,17 @@ export default function PromptTemplateModal() {
                   <div className="flex items-start gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1.5">
-                        <span className="text-[13px] font-medium text-foreground truncate">{tpl.name}</span>
-                        <span className={`text-[9px] font-mono uppercase px-1.5 py-[2px] rounded bg-elevated shrink-0 ${meta.color}`}>
+                        <span className="text-[0.8125rem] font-medium text-foreground truncate">{tpl.name}</span>
+                        <span className={`text-[0.5625rem] font-mono uppercase px-1.5 py-[2px] rounded bg-elevated shrink-0 ${meta.color}`}>
                           {meta.label}
                         </span>
                         {tpl.default_mode && (
-                          <span className="text-[9px] font-mono uppercase px-1.5 py-[2px] rounded bg-glass text-text-muted shrink-0">
+                          <span className="text-[0.5625rem] font-mono uppercase px-1.5 py-[2px] rounded bg-glass text-text-muted shrink-0">
                             {tpl.default_mode}
                           </span>
                         )}
                       </div>
-                      <p className="text-[11px] text-text-muted line-clamp-2 leading-[1.6]">{tpl.prompt}</p>
+                      <p className="text-[0.6875rem] text-text-muted line-clamp-2 leading-[1.6]">{tpl.prompt}</p>
                     </div>
 
                     {/* Actions — visible on hover */}
@@ -246,7 +246,7 @@ export default function PromptTemplateModal() {
                       <button
                         type="button"
                         onClick={() => handleApply(tpl)}
-                        className="h-7 px-2.5 rounded-md text-[11px] font-medium text-primary bg-primary/10 hover:bg-primary/20 transition-colors flex items-center gap-1"
+                        className="h-7 px-2.5 rounded-md text-[0.6875rem] font-medium text-primary bg-primary/10 hover:bg-primary/20 transition-colors flex items-center gap-1"
                       >
                         <Copy size={11} />
                         套用
@@ -284,7 +284,7 @@ export default function PromptTemplateModal() {
                     <button
                       type="button"
                       onClick={handlePrefill}
-                      className="ml-auto inline-flex items-center gap-1.5 text-[11px] font-medium text-text-muted hover:text-foreground transition-colors"
+                      className="ml-auto inline-flex items-center gap-1.5 text-[0.6875rem] font-medium text-text-muted hover:text-foreground transition-colors"
                     >
                       <Copy size={11} />
                       从当前输入保存
@@ -297,7 +297,7 @@ export default function PromptTemplateModal() {
                   <button
                     type="button"
                     onClick={() => { setFormOpen(false); setForm(EMPTY_FORM); }}
-                    className="ml-auto text-[11px] text-text-muted hover:text-foreground transition-colors"
+                    className="ml-auto text-[0.6875rem] text-text-muted hover:text-foreground transition-colors"
                   >
                     收起
                   </button>
@@ -315,7 +315,7 @@ export default function PromptTemplateModal() {
                     value={form.name}
                     onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                     placeholder="模板名称"
-                    className="flex-1 h-9 px-3 text-[13px] bg-glass border border-glass-border rounded-lg text-white placeholder:text-text-muted outline-none focus:border-primary/40 transition-colors"
+                    className="flex-1 h-9 px-3 text-[0.8125rem] bg-glass border border-glass-border rounded-lg text-white placeholder:text-text-muted outline-none focus:border-primary/40 transition-colors"
                     autoFocus
                   />
                 </div>
@@ -328,7 +328,7 @@ export default function PromptTemplateModal() {
                       type="button"
                       onClick={() => setForm((f) => ({ ...f, category: c.value as CategoryValue }))}
                       className={[
-                        "flex-1 py-[6px] rounded-md text-[11px] font-medium text-center cursor-pointer transition-all",
+                        "flex-1 py-[6px] rounded-md text-[0.6875rem] font-medium text-center cursor-pointer transition-all",
                         form.category === c.value
                           ? "text-white bg-primary shadow-[0_1px_4px_rgba(100,108,255,0.3)]"
                           : "text-text-muted hover:text-foreground",
@@ -345,7 +345,7 @@ export default function PromptTemplateModal() {
                   onChange={(e) => setForm((f) => ({ ...f, prompt: e.target.value }))}
                   placeholder="输入 Prompt 内容..."
                   rows={5}
-                  className="w-full min-h-[120px] px-3 py-2.5 text-[13px] leading-relaxed bg-glass border border-glass-border rounded-lg text-white placeholder:text-text-muted outline-none focus:border-primary/40 transition-colors resize-y"
+                  className="w-full min-h-[120px] px-3 py-2.5 text-[0.8125rem] leading-relaxed bg-glass border border-glass-border rounded-lg text-white placeholder:text-text-muted outline-none focus:border-primary/40 transition-colors resize-y"
                 />
 
                 {/* Submit */}
@@ -354,7 +354,7 @@ export default function PromptTemplateModal() {
                   onClick={handleCreate}
                   disabled={busy || !form.name.trim() || !form.prompt.trim()}
                   className={[
-                    "w-full h-9 rounded-lg text-[13px] font-medium transition-all",
+                    "w-full h-9 rounded-lg text-[0.8125rem] font-medium transition-all",
                     form.name.trim() && form.prompt.trim()
                       ? "bg-primary text-white hover:bg-primary-hover shadow-[0_2px_12px_rgba(100,108,255,0.25)]"
                       : "bg-glass text-text-muted cursor-not-allowed",

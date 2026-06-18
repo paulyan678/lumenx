@@ -104,7 +104,7 @@ export default function NewLibraryAssetDialog({ onClose, onCreated }: NewLibrary
             <div className="font-display atelier-display text-lg font-semibold text-foreground tracking-tight">
               {t("newAssetTitle")}
             </div>
-            <div className="text-[12px] text-text-muted mt-0.5">{t("newAssetSubtitle")}</div>
+            <div className="text-[0.75rem] text-text-muted mt-0.5">{t("newAssetSubtitle")}</div>
           </div>
           <button
             type="button"
@@ -119,7 +119,7 @@ export default function NewLibraryAssetDialog({ onClose, onCreated }: NewLibrary
         <form onSubmit={handleSubmit} className="px-5 py-4 flex flex-col gap-4">
           {/* 类型选择 */}
           <div>
-            <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-text-secondary">
+            <span className="font-mono text-[0.625rem] font-semibold uppercase tracking-[0.1em] text-text-secondary">
               {t("assetTypeAria")}
             </span>
             <div
@@ -135,7 +135,7 @@ export default function NewLibraryAssetDialog({ onClose, onCreated }: NewLibrary
                     type="button"
                     aria-pressed={on}
                     onClick={() => setAssetType(opt.id)}
-                    className={`px-3.5 py-1.5 rounded-full text-[11px] font-semibold transition-colors ${
+                    className={`px-3.5 py-1.5 rounded-full text-[0.6875rem] font-semibold transition-colors ${
                       on
                         ? "text-foreground atelier-pill-tab-active bg-surface shadow-sm"
                         : "text-text-muted hover:text-foreground"
@@ -152,7 +152,7 @@ export default function NewLibraryAssetDialog({ onClose, onCreated }: NewLibrary
           <div>
             <label
               htmlFor="lib-asset-name"
-              className="font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-text-secondary"
+              className="font-mono text-[0.625rem] font-semibold uppercase tracking-[0.1em] text-text-secondary"
             >
               {t("nameLabel")}
             </label>
@@ -163,7 +163,7 @@ export default function NewLibraryAssetDialog({ onClose, onCreated }: NewLibrary
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={t("namePlaceholder")}
-              className="mt-2 w-full bg-surface-inset border border-glass-border rounded-lg px-3.5 py-2.5 text-[13px] text-foreground placeholder-text-muted focus:outline-none focus:border-primary/60"
+              className="mt-2 w-full bg-surface-inset border border-glass-border rounded-lg px-3.5 py-2.5 text-[0.8125rem] text-foreground placeholder-text-muted focus:outline-none focus:border-primary/60"
             />
           </div>
 
@@ -171,7 +171,7 @@ export default function NewLibraryAssetDialog({ onClose, onCreated }: NewLibrary
           <div>
             <label
               htmlFor="lib-asset-desc"
-              className="font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-text-secondary"
+              className="font-mono text-[0.625rem] font-semibold uppercase tracking-[0.1em] text-text-secondary"
             >
               {t("descLabel")}
             </label>
@@ -181,7 +181,7 @@ export default function NewLibraryAssetDialog({ onClose, onCreated }: NewLibrary
               onChange={(e) => setDescription(e.target.value)}
               placeholder={t("descPlaceholder")}
               rows={3}
-              className="mt-2 w-full bg-surface-inset border border-glass-border rounded-lg px-3.5 py-2.5 text-[13px] text-foreground placeholder-text-muted focus:outline-none focus:border-primary/60 resize-none"
+              className="mt-2 w-full bg-surface-inset border border-glass-border rounded-lg px-3.5 py-2.5 text-[0.8125rem] text-foreground placeholder-text-muted focus:outline-none focus:border-primary/60 resize-none"
             />
           </div>
 
@@ -189,7 +189,7 @@ export default function NewLibraryAssetDialog({ onClose, onCreated }: NewLibrary
           <div>
             <label
               htmlFor="lib-asset-image"
-              className="font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-text-secondary"
+              className="font-mono text-[0.625rem] font-semibold uppercase tracking-[0.1em] text-text-secondary"
             >
               {t("imageUrlLabel")}
             </label>
@@ -199,9 +199,9 @@ export default function NewLibraryAssetDialog({ onClose, onCreated }: NewLibrary
               value={imageUrl}
               onChange={(e) => setImageUrl(e.target.value)}
               placeholder={t("imageUrlPlaceholder")}
-              className="mt-2 w-full bg-surface-inset border border-glass-border rounded-lg px-3.5 py-2.5 text-[13px] text-foreground placeholder-text-muted focus:outline-none focus:border-primary/60"
+              className="mt-2 w-full bg-surface-inset border border-glass-border rounded-lg px-3.5 py-2.5 text-[0.8125rem] text-foreground placeholder-text-muted focus:outline-none focus:border-primary/60"
             />
-            <div className="text-[11px] text-text-muted mt-1.5">{t("imageUrlHint")}</div>
+            <div className="text-[0.6875rem] text-text-muted mt-1.5">{t("imageUrlHint")}</div>
           </div>
 
           {/* actions */}

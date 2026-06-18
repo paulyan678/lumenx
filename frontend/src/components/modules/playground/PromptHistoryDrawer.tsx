@@ -178,21 +178,21 @@ export default function PromptHistoryDrawer() {
                 ].join(' ')}
               >
                 {/* Prompt text */}
-                <p className="text-[12px] text-foreground/80 leading-relaxed line-clamp-3 mb-2">
+                <p className="text-[0.75rem] text-foreground/80 leading-relaxed line-clamp-3 mb-2">
                   {entry.prompt}
                 </p>
 
                 {/* Meta row */}
                 <div className="flex items-center gap-1.5 mb-2">
-                  <span className="font-mono text-[9px] bg-primary/15 text-primary rounded px-[6px] py-[2px] uppercase">
+                  <span className="font-mono text-[0.5625rem] bg-primary/15 text-primary rounded px-[6px] py-[2px] uppercase">
                     {MODE_LABELS[entry.mode] || entry.mode}
                   </span>
                   {entry.model_id && (
-                    <span className="font-mono text-[9px] bg-glass text-text-muted rounded px-[6px] py-[2px]">
+                    <span className="font-mono text-[0.5625rem] bg-glass text-text-muted rounded px-[6px] py-[2px]">
                       {entry.model_id}
                     </span>
                   )}
-                  <span className="font-mono text-[9px] text-text-muted ml-auto">
+                  <span className="font-mono text-[0.5625rem] text-text-muted ml-auto">
                     {relativeTime(entry.created_at)}
                   </span>
                 </div>
@@ -202,7 +202,7 @@ export default function PromptHistoryDrawer() {
                   <button
                     type="button"
                     onClick={() => handleCopy(entry.prompt)}
-                    className="flex items-center gap-1 text-[11px] text-text-muted hover:text-foreground transition-colors cursor-pointer"
+                    className="flex items-center gap-1 text-[0.6875rem] text-text-muted hover:text-foreground transition-colors cursor-pointer"
                   >
                     <Copy className="w-3 h-3" />
                     复制
@@ -210,7 +210,7 @@ export default function PromptHistoryDrawer() {
                   <button
                     type="button"
                     onClick={() => handleSaveAsTemplate(entry.prompt)}
-                    className="flex items-center gap-1 text-[11px] text-text-muted hover:text-foreground transition-colors cursor-pointer"
+                    className="flex items-center gap-1 text-[0.6875rem] text-text-muted hover:text-foreground transition-colors cursor-pointer"
                   >
                     <BookmarkPlus className="w-3 h-3" />
                     存为模板

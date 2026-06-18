@@ -423,7 +423,7 @@ function Compact({
                         disabled={promptIsEmpty || generating}
                         aria-label={t("t2iCompactReroll")}
                         title={promptIsEmpty ? t("t2iCompactRerollDisabled") : t("t2iCompactRerollTooltip")}
-                        className="btn-tip inline-flex items-center gap-1 px-1.5 h-7 rounded font-mono text-[10.5px] uppercase tracking-tight text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-text-muted"
+                        className="btn-tip inline-flex items-center gap-1 px-1.5 h-7 rounded font-mono text-[0.65625rem] uppercase tracking-tight text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-text-muted"
                     >
                         <RefreshCw size={11} strokeWidth={1.8} aria-hidden="true" className={generating ? "animate-spin" : undefined} />
                         <span>{t("t2iCompactReroll")}</span>
@@ -604,7 +604,7 @@ function StepBadge({
             <span
                 aria-hidden="true"
                 className={clsx(
-                    "grid h-5 w-5 place-items-center rounded-full font-mono text-[10px] font-semibold transition-colors duration-fast ease-out-quart",
+                    "grid h-5 w-5 place-items-center rounded-full font-mono text-[0.625rem] font-semibold transition-colors duration-fast ease-out-quart",
                     done
                         ? "bg-status-completed-bg text-status-completed-fg ring-1 ring-status-completed-border"
                         : "bg-primary/20 text-primary ring-1 ring-primary/40",
@@ -734,7 +734,7 @@ function SinglePreview({ url, isStoryboard, onRemove, storyboardBadgeText }: Sin
             <PreviewImage src={url} alt="" className="h-full w-full" />
             {isStoryboard ? (
                 <span
-                    className="pointer-events-none absolute left-1 top-1 inline-flex items-center gap-1 rounded bg-black/65 px-1.5 py-0.5 font-mono text-[10px] font-medium uppercase text-text-secondary"
+                    className="pointer-events-none absolute left-1 top-1 inline-flex items-center gap-1 rounded bg-black/65 px-1.5 py-0.5 font-mono text-[0.625rem] font-medium uppercase text-text-secondary"
                     title={storyboardBadgeText}
                 >
                     <Pin size={9} aria-hidden="true" />
@@ -787,7 +787,7 @@ function ActivePreview({
                 )}
                 {isStoryboard ? (
                     <span
-                        className="pointer-events-none absolute left-1 top-1 inline-flex items-center gap-1 rounded bg-black/65 px-1.5 py-0.5 font-mono text-[10px] font-medium uppercase text-text-secondary"
+                        className="pointer-events-none absolute left-1 top-1 inline-flex items-center gap-1 rounded bg-black/65 px-1.5 py-0.5 font-mono text-[0.625rem] font-medium uppercase text-text-secondary"
                         title="From Storyboard stage"
                     >
                         <Pin size={9} aria-hidden="true" />

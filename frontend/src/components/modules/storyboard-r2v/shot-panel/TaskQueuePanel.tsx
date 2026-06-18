@@ -337,7 +337,7 @@ function TaskRow({
                         ) : inputThumbUrl ? (
                             <PreviewImage src={inputThumbUrl} alt="input" className="h-full w-full" alwaysShowMagnify clickToLightbox />
                         ) : (
-                            <div className="grid h-full w-full place-items-center font-mono text-[9px] uppercase text-text-muted">
+                            <div className="grid h-full w-full place-items-center font-mono text-[0.5625rem] uppercase text-text-muted">
                                 no thumb
                             </div>
                         )}
@@ -362,7 +362,7 @@ function TaskRow({
                         <div className="flex flex-wrap items-start gap-2">
                             {inputThumbUrl ? (
                                 <div className="space-y-0.5">
-                                    <p className="font-mono text-[9px] uppercase tracking-wider text-text-muted">input</p>
+                                    <p className="font-mono text-[0.5625rem] uppercase tracking-wider text-text-muted">input</p>
                                     <div className="h-[68px] w-[120px] overflow-hidden rounded border border-glass-border bg-black/40">
                                         <PreviewImage src={inputThumbUrl} alt="input" className="h-full w-full" alwaysShowMagnify clickToLightbox />
                                     </div>
@@ -370,7 +370,7 @@ function TaskRow({
                             ) : null}
                             {isCompleted && outputVideoUrl ? (
                                 <div className="space-y-0.5">
-                                    <p className="font-mono text-[9px] uppercase tracking-wider text-text-muted">output</p>
+                                    <p className="font-mono text-[0.5625rem] uppercase tracking-wider text-text-muted">output</p>
                                     <div className="h-[68px] w-[120px] overflow-hidden rounded border border-glass-border bg-black/40">
                                         <PreviewVideo src={outputVideoUrl} alt="output" className="h-full w-full" alwaysShowMagnify clickToLightbox />
                                     </div>
@@ -382,7 +382,7 @@ function TaskRow({
                     {/* Full prompt — preserves whitespace, no clamp */}
                     {fullPrompt ? (
                         <div className="space-y-0.5">
-                            <p className="font-mono text-[9px] uppercase tracking-wider text-text-muted">prompt</p>
+                            <p className="font-mono text-[0.5625rem] uppercase tracking-wider text-text-muted">prompt</p>
                             <p className="whitespace-pre-wrap rounded border border-glass-border/60 bg-black/30 px-2 py-1.5 font-sans text-body-sm leading-snug text-foreground">
                                 {fullPrompt}
                             </p>
@@ -402,7 +402,7 @@ function TaskRow({
                     {/* Failure — full error text wrap */}
                     {isFailed && task.error ? (
                         <div className="space-y-0.5">
-                            <p className="font-mono text-[9px] uppercase tracking-wider text-status-failed-fg/80">error</p>
+                            <p className="font-mono text-[0.5625rem] uppercase tracking-wider text-status-failed-fg/80">error</p>
                             <p className="whitespace-pre-wrap rounded border border-status-failed-border/40 bg-status-failed-bg/60 px-2 py-1.5 font-mono text-chrome-sm leading-snug text-status-failed-fg">
                                 ⚠ {task.error}
                             </p>
@@ -412,7 +412,7 @@ function TaskRow({
                     {/* Provider IDs — full + copy buttons */}
                     {task.provider_task_id || task.provider_request_id ? (
                         <div className="space-y-1 rounded border border-glass-border/60 bg-black/30 px-2 py-1.5">
-                            <p className="font-mono text-[9px] uppercase tracking-wider text-text-muted">{providerLabel} ids</p>
+                            <p className="font-mono text-[0.5625rem] uppercase tracking-wider text-text-muted">{providerLabel} ids</p>
                             {task.provider_task_id ? (
                                 <div className="flex items-center gap-1.5">
                                     <span className="font-mono text-chrome-sm text-text-muted">task:</span>

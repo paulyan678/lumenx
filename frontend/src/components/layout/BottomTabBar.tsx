@@ -39,7 +39,7 @@ export default function BottomTabBar({
             )}
           >
             <Icon size={20} strokeWidth={1.8} />
-            <span className="text-[10px] font-medium leading-none">{t(id)}</span>
+            <span className="text-[0.625rem] font-medium leading-none">{t(id)}</span>
           </button>
         );
       })}

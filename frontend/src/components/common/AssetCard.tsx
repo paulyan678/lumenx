@@ -48,7 +48,7 @@ export default function AssetCard({ asset, type }: AssetCardProps) {
     <div className="glass-panel rounded-xl overflow-hidden relative">
       {isShared ? (
         <span
-          className="absolute right-2 top-2 z-10 inline-flex items-center gap-1 rounded-full border border-status-starred-border bg-status-starred-bg px-2 py-[2px] font-mono text-[10px] font-medium uppercase tracking-[0.18em] text-status-starred-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-[2px]"
+          className="absolute right-2 top-2 z-10 inline-flex items-center gap-1 rounded-full border border-status-starred-border bg-status-starred-bg px-2 py-[2px] font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-status-starred-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-[2px]"
           title={t("seriesSharedTooltip")}
         >
           <Share2 size={10} aria-hidden="true" />

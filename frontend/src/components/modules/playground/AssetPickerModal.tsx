@@ -320,7 +320,7 @@ export default function AssetPickerModal({
                   <span className="text-xs text-text-muted">
                     暂无可用素材
                   </span>
-                  <span className="text-[11px] text-text-muted">
+                  <span className="text-[0.6875rem] text-text-muted">
                     在 Playground 中生成内容后，输出将出现在这里
                   </span>
                 </div>
@@ -385,7 +385,7 @@ export default function AssetPickerModal({
 
                         {/* File name */}
                         <div className="absolute bottom-0 left-0 right-0 px-1.5 py-1 bg-gradient-to-t from-black/70 to-transparent">
-                          <span className="text-[10px] text-foreground/80 truncate block">
+                          <span className="text-[0.625rem] text-foreground/80 truncate block">
                             {asset.label}
                           </span>
                         </div>

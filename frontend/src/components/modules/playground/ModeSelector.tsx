@@ -73,7 +73,7 @@ export default function ModeSelector() {
               type="button"
               onClick={() => setMode(m.key)}
               className={[
-                'flex-1 py-[6px] rounded-md text-[11px] font-medium text-center cursor-pointer transition-all',
+                'flex-1 py-[6px] rounded-md text-[0.6875rem] font-medium text-center cursor-pointer transition-all',
                 mode === m.key
                   ? 'text-foreground bg-elevated border border-glass-border'
                   : 'text-text-muted hover:text-foreground hover:bg-hover-bg',

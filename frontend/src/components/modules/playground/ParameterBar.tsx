@@ -64,7 +64,7 @@ function ParamDropdown({
 
   return (
     <div className="flex flex-col gap-[6px]">
-      <span className="text-[11px] font-medium text-text-muted">{label}</span>
+      <span className="text-[0.6875rem] font-medium text-text-muted">{label}</span>
       <div ref={containerRef} className="relative">
         <button
           type="button"
@@ -126,12 +126,12 @@ function PillToggle({
 }) {
   return (
     <div className="flex flex-col gap-[6px]">
-      <span className="text-[11px] font-medium text-text-muted">{label}</span>
+      <span className="text-[0.6875rem] font-medium text-text-muted">{label}</span>
       <div className="flex gap-0 p-[2px] bg-glass rounded-lg border border-border-subtle">
         <button
           type="button"
           onClick={() => onChange(true)}
-          className={`flex-1 px-3 py-[6px] rounded-md text-[11px] font-medium text-center cursor-pointer transition-all ${
+          className={`flex-1 px-3 py-[6px] rounded-md text-[0.6875rem] font-medium text-center cursor-pointer transition-all ${
             value
               ? 'bg-primary text-white shadow-[0_1px_4px_rgba(100,108,255,0.3)]'
               : 'text-text-muted hover:text-foreground'
@@ -142,7 +142,7 @@ function PillToggle({
         <button
           type="button"
           onClick={() => onChange(false)}
-          className={`flex-1 px-3 py-[6px] rounded-md text-[11px] font-medium text-center cursor-pointer transition-all ${
+          className={`flex-1 px-3 py-[6px] rounded-md text-[0.6875rem] font-medium text-center cursor-pointer transition-all ${
             !value
               ? 'bg-primary text-white shadow-[0_1px_4px_rgba(100,108,255,0.3)]'
               : 'text-text-muted hover:text-foreground'
@@ -185,7 +185,7 @@ function DurationStepper({
 
   return (
     <div className="flex flex-col gap-[6px]">
-      <span className="text-[11px] font-medium text-text-muted">时长</span>
+      <span className="text-[0.6875rem] font-medium text-text-muted">时长</span>
       <div className="flex items-center gap-0 rounded-lg border border-glass-border bg-glass overflow-hidden">
         <button
           type="button"
@@ -204,7 +204,7 @@ function DurationStepper({
             onBlur={handleBlur}
             className="w-8 bg-transparent text-center font-mono text-xs font-medium text-foreground outline-none"
           />
-          <span className="text-[10px] text-text-muted font-mono">s</span>
+          <span className="text-[0.625rem] text-text-muted font-mono">s</span>
         </div>
         <button
           type="button"
@@ -216,8 +216,8 @@ function DurationStepper({
         </button>
       </div>
       <div className="flex justify-between px-1">
-        <span className="text-[9px] text-text-muted font-mono">{min}s</span>
-        <span className="text-[9px] text-text-muted font-mono">{max}s</span>
+        <span className="text-[0.5625rem] text-text-muted font-mono">{min}s</span>
+        <span className="text-[0.5625rem] text-text-muted font-mono">{max}s</span>
       </div>
     </div>
   );
@@ -315,7 +315,7 @@ export default function ParameterBar() {
   // Batch pill renderer (reused for both image and video)
   const batchPills = (
     <div className="flex flex-col gap-[6px]">
-      <span className="text-[11px] font-medium text-text-muted">批量生成</span>
+      <span className="text-[0.6875rem] font-medium text-text-muted">批量生成</span>
       <div className="flex gap-0 p-[2px] bg-glass rounded-lg border border-border-subtle">
         {BATCH_OPTIONS.map((n) => (
           <button
@@ -414,14 +414,14 @@ export default function ParameterBar() {
             {/* Duration */}
             {durationFixed ? (
               <div className="flex flex-col gap-[6px]">
-                <span className="text-[11px] font-medium text-text-muted">时长</span>
+                <span className="text-[0.6875rem] font-medium text-text-muted">时长</span>
                 <div className="w-full flex items-center px-3 py-2.5 rounded-lg bg-glass border border-glass-border text-text-muted text-xs font-medium">
                   {durationValue}s (固定)
                 </div>
               </div>
             ) : modelDuration?.type === 'buttons' ? (
               <div className="flex flex-col gap-[6px]">
-                <span className="text-[11px] font-medium text-text-muted">时长</span>
+                <span className="text-[0.6875rem] font-medium text-text-muted">时长</span>
                 <div className="flex gap-0 p-[2px] bg-glass rounded-lg border border-border-subtle">
                   {modelDuration.options.map((n) => (
                     <button
@@ -461,7 +461,7 @@ export default function ParameterBar() {
           <button
             type="button"
             onClick={() => setShowAdvanced(!showAdvanced)}
-            className="text-[11px] font-medium text-text-muted hover:text-foreground transition-colors cursor-pointer"
+            className="text-[0.6875rem] font-medium text-text-muted hover:text-foreground transition-colors cursor-pointer"
           >
             {showAdvanced ? '▾' : '▸'} 高级参数
           </button>
@@ -470,7 +470,7 @@ export default function ParameterBar() {
             <div className="grid grid-cols-2 gap-3 mt-3">
               {supportsSeed && (
                 <div className="flex flex-col gap-[6px]">
-                  <span className="text-[11px] font-medium text-text-muted">Seed</span>
+                  <span className="text-[0.6875rem] font-medium text-text-muted">Seed</span>
                   <input
                     type="number"
                     placeholder="随机"

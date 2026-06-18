@@ -169,10 +169,10 @@ export default function ResultGallery() {
       {/* Header */}
       <div className="px-7 py-4 flex items-center justify-between border-b border-border-subtle shrink-0">
         <div className="flex items-center gap-2">
-          <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-text-muted">
+          <span className="font-mono text-[0.6875rem] uppercase tracking-[0.18em] text-text-muted">
             生成结果
           </span>
-          <span className="font-mono text-[10px] bg-elevated text-text-secondary rounded px-[6px] py-[1px]">
+          <span className="font-mono text-[0.625rem] bg-elevated text-text-secondary rounded px-[6px] py-[1px]">
             {filtered.length}
           </span>
         </div>
@@ -183,7 +183,7 @@ export default function ResultGallery() {
               <button
                 key={f.key}
                 onClick={() => setActiveFilter(f.key)}
-                className={`rounded px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                className={`rounded px-2.5 py-1 text-[0.6875rem] font-medium transition-colors ${
                   activeFilter === f.key
                     ? 'bg-elevated text-foreground/80'
                     : 'text-text-muted hover:text-foreground'
@@ -239,7 +239,7 @@ export default function ResultGallery() {
                     className="col-span-full flex items-center gap-3 py-2"
                   >
                     <div className="flex-1 h-px bg-elevated" />
-                    <span className="font-mono text-[9px] text-text-muted uppercase tracking-wider whitespace-nowrap">
+                    <span className="font-mono text-[0.5625rem] text-text-muted uppercase tracking-wider whitespace-nowrap">
                       {item.label}
                     </span>
                     <div className="flex-1 h-px bg-elevated" />

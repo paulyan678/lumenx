@@ -712,7 +712,7 @@ export default function VideoCreator({ onTaskCreated, remixData, onRemixClear, p
                                                             <span className="text-xs text-foreground font-bold">Select</span>
                                                         </div>
                                                         {/* Frame Number Badge */}
-                                                        <div className="absolute top-1 left-1 bg-surface px-1.5 rounded text-[10px] text-text-secondary backdrop-blur-sm">
+                                                        <div className="absolute top-1 left-1 bg-surface px-1.5 rounded text-[0.625rem] text-text-secondary backdrop-blur-sm">
                                                             #{frame.id.slice(0, 4)}
                                                         </div>
                                                         {/* Extract Last Frame Button */}
@@ -720,7 +720,7 @@ export default function VideoCreator({ onTaskCreated, remixData, onRemixClear, p
                                                             <button
                                                                 onClick={(e) => handleExtractLastFrame(frame.id, e)}
                                                                 disabled={isExtracting}
-                                                                className={`absolute bottom-1 right-1 flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium backdrop-blur-sm transition-colors ${
+                                                                className={`absolute bottom-1 right-1 flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.625rem] font-medium backdrop-blur-sm transition-colors ${
                                                                     hasExtracted
                                                                         ? "bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-primary/20 hover:text-primary hover:border-primary/30"
                                                                         : "bg-primary/20 text-primary border border-primary/30 hover:bg-primary/40"
@@ -882,7 +882,7 @@ export default function VideoCreator({ onTaskCreated, remixData, onRemixClear, p
                                                             {frame.action_description || frame.image_prompt || 'No description'}
                                                         </p>
                                                         {frame.dialogue && (
-                                                            <p className="text-[10px] text-primary mt-1 italic line-clamp-1">
+                                                            <p className="text-[0.625rem] text-primary mt-1 italic line-clamp-1">
                                                                 “{frame.dialogue}”
                                                             </p>
                                                         )}
@@ -928,7 +928,7 @@ export default function VideoCreator({ onTaskCreated, remixData, onRemixClear, p
                                                     >
                                                         {/* Slot Header */}
                                                         <div className="absolute top-2 left-2 z-10">
-                                                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary text-white font-bold">
+                                                            <span className="text-[0.625rem] px-2 py-0.5 rounded-full bg-primary text-white font-bold">
                                                                 character{slotIndex + 1}
                                                             </span>
                                                         </div>
@@ -971,7 +971,7 @@ export default function VideoCreator({ onTaskCreated, remixData, onRemixClear, p
                                                                     ))}
                                                                 </select>
                                                                 {slotIndex === 0 && (
-                                                                    <p className="text-[10px] text-amber-400 mt-1">Required</p>
+                                                                    <p className="text-[0.625rem] text-amber-400 mt-1">Required</p>
                                                                 )}
                                                             </div>
                                                         )}
@@ -1005,7 +1005,7 @@ export default function VideoCreator({ onTaskCreated, remixData, onRemixClear, p
                                                     >
                                                         {/* Slot Header */}
                                                         <div className="absolute top-2 left-2 z-10">
-                                                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary text-white font-bold">
+                                                            <span className="text-[0.625rem] px-2 py-0.5 rounded-full bg-primary text-white font-bold">
                                                                 Character {slotIndex + 1}
                                                             </span>
                                                         </div>
@@ -1048,7 +1048,7 @@ export default function VideoCreator({ onTaskCreated, remixData, onRemixClear, p
                                                                     ))}
                                                                 </select>
                                                                 {slotIndex === 0 && (
-                                                                    <p className="text-[10px] text-amber-400 mt-2">Required</p>
+                                                                    <p className="text-[0.625rem] text-amber-400 mt-2">Required</p>
                                                                 )}
                                                             </div>
                                                         )}
@@ -1121,7 +1121,7 @@ export default function VideoCreator({ onTaskCreated, remixData, onRemixClear, p
                                             {video?.thumbnail ? (
                                                 <img src={getAssetUrl(video.thumbnail)} alt="" className="w-4 h-4 rounded-full object-cover" />
                                             ) : (
-                                                <span className="w-4 h-4 rounded-full bg-primary/30 flex items-center justify-center text-[10px]">+</span>
+                                                <span className="w-4 h-4 rounded-full bg-primary/30 flex items-center justify-center text-[0.625rem]">+</span>
                                             )}
                                             <span>Insert {slot?.name || `Char ${idx + 1}`}</span>
                                         </button>
@@ -1157,7 +1157,7 @@ export default function VideoCreator({ onTaskCreated, remixData, onRemixClear, p
                                         </span>
                                         <button
                                             onClick={() => { setPolishedPrompt(null); setFeedbackText(""); }}
-                                            className="text-[10px] text-text-secondary hover:text-foreground"
+                                            className="text-[0.625rem] text-text-secondary hover:text-foreground"
                                         >
                                             ✕
                                         </button>
@@ -1166,13 +1166,13 @@ export default function VideoCreator({ onTaskCreated, remixData, onRemixClear, p
                                     {/* Chinese Prompt */}
                                     <div className="space-y-1">
                                         <div className="flex justify-between items-center">
-                                            <span className="text-[10px] font-bold text-text-muted uppercase">CN (Preview)</span>
+                                            <span className="text-[0.625rem] font-bold text-text-muted uppercase">CN (Preview)</span>
                                             <button
                                                 onClick={() => {
                                                     navigator.clipboard.writeText(polishedPrompt.cn);
                                                     alert("CN prompt copied");
                                                 }}
-                                                className="text-[10px] text-text-secondary hover:text-foreground bg-surface px-2 py-0.5 rounded"
+                                                className="text-[0.625rem] text-text-secondary hover:text-foreground bg-surface px-2 py-0.5 rounded"
                                             >
                                                 复制
                                             </button>
@@ -1185,14 +1185,14 @@ export default function VideoCreator({ onTaskCreated, remixData, onRemixClear, p
                                     {/* English Prompt */}
                                     <div className="space-y-1">
                                         <div className="flex justify-between items-center">
-                                            <span className="text-[10px] font-bold text-text-muted uppercase">EN (Generation)</span>
+                                            <span className="text-[0.625rem] font-bold text-text-muted uppercase">EN (Generation)</span>
                                             <div className="flex gap-1">
                                                 <button
                                                     onClick={() => {
                                                         navigator.clipboard.writeText(polishedPrompt.en);
                                                         alert("English prompt copied");
                                                     }}
-                                                    className="text-[10px] text-text-secondary hover:text-foreground bg-surface px-2 py-0.5 rounded"
+                                                    className="text-[0.625rem] text-text-secondary hover:text-foreground bg-surface px-2 py-0.5 rounded"
                                                 >
                                                     Copy
                                                 </button>
@@ -1201,7 +1201,7 @@ export default function VideoCreator({ onTaskCreated, remixData, onRemixClear, p
                                                         setSegments([{ type: "text", value: polishedPrompt.en, id: `polished-${Date.now()}` }]);
                                                         setPolishedPrompt(null);
                                                     }}
-                                                    className="text-[10px] text-foreground bg-primary hover:bg-primary/90 px-2 py-0.5 rounded font-bold"
+                                                    className="text-[0.625rem] text-foreground bg-primary hover:bg-primary/90 px-2 py-0.5 rounded font-bold"
                                                 >
                                                     应用
                                                 </button>

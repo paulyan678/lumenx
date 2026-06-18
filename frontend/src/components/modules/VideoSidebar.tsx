@@ -143,7 +143,7 @@ export default function VideoSidebar({ tasks, onRemix, params, setParams }: Vide
                     <List size={16} />
                     {tm("queue")}
                     {tasks.filter(t => t.status === "pending" || t.status === "processing").length > 0 && (
-                        <span className="bg-primary text-white text-[10px] px-1.5 rounded-full">
+                        <span className="bg-primary text-white text-[0.625rem] px-1.5 rounded-full">
                             {tasks.filter(t => t.status === "pending" || t.status === "processing").length}
                         </span>
                     )}
@@ -213,7 +213,7 @@ export default function VideoSidebar({ tasks, onRemix, params, setParams }: Vide
                                                     onChange={(e) => updateParam("duration", parseInt(e.target.value))}
                                                     className="w-full h-1.5 bg-hover-bg rounded-full appearance-none cursor-pointer accent-primary [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:shadow-lg"
                                                 />
-                                                <div className="flex justify-between text-[10px] text-text-muted mt-1">
+                                                <div className="flex justify-between text-[0.625rem] text-text-muted mt-1">
                                                     <span>{durationConfig.min}s</span>
                                                     <span>{durationConfig.max}s</span>
                                                 </div>
@@ -262,7 +262,7 @@ export default function VideoSidebar({ tasks, onRemix, params, setParams }: Vide
                                                     } ${!params.promptExtend ? 'opacity-50 cursor-not-allowed' : ''}`}
                                             >
                                                 <span className="font-medium">Single</span>
-                                                <span className="text-[10px] text-text-muted">{tm("singleShot")}</span>
+                                                <span className="text-[0.625rem] text-text-muted">{tm("singleShot")}</span>
                                             </button>
                                             <button
                                                 onClick={() => updateParam("shotType", "multi")}
@@ -273,10 +273,10 @@ export default function VideoSidebar({ tasks, onRemix, params, setParams }: Vide
                                                     } ${!params.promptExtend ? 'opacity-50 cursor-not-allowed' : ''}`}
                                             >
                                                 <span className="font-medium">Multi</span>
-                                                <span className="text-[10px] text-text-muted">{tm("multiShot")}</span>
+                                                <span className="text-[0.625rem] text-text-muted">{tm("multiShot")}</span>
                                             </button>
                                         </div>
-                                        <p className="text-[10px] text-text-muted mt-1.5">
+                                        <p className="text-[0.625rem] text-text-muted mt-1.5">
                                             {tm("multiShotHint")}
                                         </p>
                                     </div>
@@ -300,7 +300,7 @@ export default function VideoSidebar({ tasks, onRemix, params, setParams }: Vide
                                                 </button>
                                             ))}
                                         </div>
-                                        <p className="text-[10px] text-text-muted mt-1.5">
+                                        <p className="text-[0.625rem] text-text-muted mt-1.5">
                                             {tm("proModeHint")}
                                         </p>
                                     </div>
@@ -371,7 +371,7 @@ export default function VideoSidebar({ tasks, onRemix, params, setParams }: Vide
                                             onChange={(e) => updateParam("cfgScale", parseFloat(e.target.value))}
                                             className="w-full h-1.5 bg-hover-bg rounded-full appearance-none cursor-pointer accent-blue-500 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-500 [&::-webkit-slider-thumb]:shadow-lg"
                                         />
-                                        <div className="flex justify-between text-[10px] text-text-muted mt-1">
+                                        <div className="flex justify-between text-[0.625rem] text-text-muted mt-1">
                                             <span>{modelParams.cfgScale.min} {tm("cfgMin")}</span>
                                             <span>{modelParams.cfgScale.max} {tm("cfgMax")}</span>
                                         </div>
