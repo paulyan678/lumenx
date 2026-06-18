@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useTranslations } from "next-intl";
-import { Search, Image as ImageIcon, Star, ArrowDownUp } from "lucide-react";
+import { Search, Star, ArrowDownUp } from "lucide-react";
 import { api } from "@/lib/api";
 import type { Series, Project, Character, Scene, Prop } from "@/store/projectStore";
 import { toast } from "@/store/toastStore";
 import { characterImageUrl, characterVariants } from "@/lib/characterImage";
+import { coverGradient, GRAIN_URL } from "@/lib/atelierCover";
 import { rovingKeyDown } from "@/lib/a11y";
 import AssetInspector from "./AssetInspector";
 
@@ -372,8 +373,19 @@ export default function AssetLibraryPage() {
                                 <img src={url} alt={asset.name} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
                               )
                             ) : (
-                              <div className="w-full h-full grid place-items-center">
-                                <ImageIcon size={28} className="text-text-muted" />
+                              // 无图：atelier 文字/渐变封面（取代发灰占位图标）— 确定性渐变 + 颗粒 + 首字母
+                              <div
+                                className="absolute inset-0 grid place-items-center overflow-hidden"
+                                style={{ background: coverGradient(asset.id || asset.name) }}
+                                aria-hidden="true"
+                              >
+                                <div
+                                  className="pointer-events-none absolute inset-0 mix-blend-overlay opacity-50"
+                                  style={{ backgroundImage: GRAIN_URL }}
+                                />
+                                <span className="relative font-display atelier-display font-semibold leading-none select-none text-foreground/90 text-[clamp(1.75rem,4.5vw,2.75rem)]">
+                                  {(Array.from(asset.name.trim())[0] || "?").toUpperCase()}
+                                </span>
                               </div>
                             )}
                             {isStar && (
@@ -429,6 +441,8 @@ export default function AssetLibraryPage() {
             asset={selectedAsset}
             type={selected.type}
             sourceName={selectedSource.name}
+            sourceId={selected.sourceId}
+            sourceKind={selectedSource.kind}
             starred={!!selectedAsset.starred}
             onClose={() => setSelected(null)}
             onToggleStar={() => toggleStar(selected.sourceId, selected.assetId, selected.type)}
