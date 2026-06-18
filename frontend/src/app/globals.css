@@ -417,6 +417,35 @@ body {
   /* Prevent scrolling on the main body, we want an app-like feel */
 }
 
+/* ─── Atelier scrollbar — thin, graphite, recedes into the dark ───
+   Mirrors the Line B mockup (tokens.css). Falls back to the graphite-700/600
+   hex if the primitive scale isn't defined as a CSS var in this theme. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--p-graphite-700, #292430);
+  border-radius: 8px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--p-graphite-600, #38323f);
+  background-clip: padding-box; /* shorthand above resets clip → re-assert inset */
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+/* Firefox — both properties inherit, so html cascades to every scroll region */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--p-graphite-700, #292430) transparent;
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;
