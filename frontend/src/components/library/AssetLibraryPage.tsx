@@ -330,6 +330,7 @@ export default function AssetLibraryPage() {
                       const vc = variantCount(asset, type);
                       const isSel = selected?.sourceId === src.id && selected?.assetId === asset.id;
                       const isStar = !!asset.starred;
+                      const isChar = type === "characters";
                       return (
                         <div
                           key={`${type}-${asset.id}`}
@@ -350,9 +351,26 @@ export default function AssetLibraryPage() {
                           }`}
                           style={{ animationDelay: `${Math.min(i * 50, 250)}ms` }}
                         >
-                          <div className="aspect-square bg-surface-inset overflow-hidden relative">
+                          <div className={`${isChar ? "aspect-[4/3]" : "aspect-square"} bg-surface-inset overflow-hidden relative`}>
                             {url ? (
-                              <img src={url} alt={asset.name} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                              isChar ? (
+                                // 角色卡横竖混杂 → 磨砂铺底（模糊同图填满留白）+ object-contain 完整显示不裁切
+                                <>
+                                  <img
+                                    src={url}
+                                    alt=""
+                                    aria-hidden="true"
+                                    className="absolute inset-0 w-full h-full object-cover blur-xl scale-110 opacity-40"
+                                  />
+                                  <img
+                                    src={url}
+                                    alt={asset.name}
+                                    className="relative w-full h-full object-contain transition-transform group-hover:scale-105"
+                                  />
+                                </>
+                              ) : (
+                                <img src={url} alt={asset.name} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                              )
                             ) : (
                               <div className="w-full h-full grid place-items-center">
                                 <ImageIcon size={28} className="text-text-muted" />
