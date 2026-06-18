@@ -359,7 +359,7 @@
   },
   "nav": {
     "workspace": "工作区",
-    "library": "主体库",
+    "library": "资产库",
     "playground": "创作台",
     "settings": "设置"
   },
@@ -854,7 +854,7 @@
     "saving": "保存中..."
   },
   "library": {
-    "title": "主体库",
+    "title": "资产库",
     "characterLabel": "角色",
     "sceneLabel": "场景",
     "propLabel": "道具",
