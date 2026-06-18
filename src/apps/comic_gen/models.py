@@ -642,3 +642,19 @@ class Series(BaseModel):
 
     created_at: float
     updated_at: float
+
+
+class GlobalAssetLibrary(BaseModel):
+    """Project-independent global asset pool (LumenX Core shared library).
+
+    A single top-level curated container of reusable assets that any
+    project may reference by id. It is the *lowest* layer in the
+    resolver (Episode > Series > Global) — assets here never override a
+    project's or series' own assets, they only add ids that aren't
+    already present locally. Reuses the existing Character/Scene/Prop
+    schema verbatim. Persisted to output/library_assets.json alongside
+    projects.json / series.json."""
+
+    characters: List[Character] = Field(default_factory=list, description="Shared global character assets")
+    scenes: List[Scene] = Field(default_factory=list, description="Shared global scene assets")
+    props: List[Prop] = Field(default_factory=list, description="Shared global prop assets")
