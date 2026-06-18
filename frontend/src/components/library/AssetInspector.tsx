@@ -34,8 +34,8 @@ interface AssetInspectorProps {
   sourceName: string;
   /** 裸 series/project id（调生成/刷新 API 用）。 */
   sourceId: string;
-  /** 资产归属：series 无生成端点 → 变体生成置灰。 */
-  sourceKind: "series" | "project";
+  /** 资产归属：series/global 无生成端点 → 变体生成置灰。 */
+  sourceKind: "series" | "project" | "global";
   starred: boolean;
   onClose: () => void;
   onToggleStar: () => void;

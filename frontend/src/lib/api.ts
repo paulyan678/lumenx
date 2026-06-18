@@ -1230,6 +1230,11 @@ export const api = {
         const response = await axios.get(`${API_URL}/series`);
         return response.data;
     },
+    /** Core 全局/共享资产池（跨系列/项目聚合）。后端：GET /library/assets → {characters, scenes, props}。 */
+    listLibraryAssets: async () => {
+        const res = await axios.get(`${API_URL}/library/assets`);
+        return res.data;
+    },
     getSeries: async (seriesId: string) => {
         const response = await axios.get(`${API_URL}/series/${seriesId}`);
         return response.data;
