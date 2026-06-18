@@ -54,7 +54,7 @@ export default function LumenXBranding({ size = "md", showSlogan = true }: Lumen
             </span>
           </div>
           {size !== "sm" && (
-            <span className="font-mono text-[0.625rem] text-text-muted tracking-[0.2em] uppercase -mt-0.5">
+            <span className="font-mono text-[0.6875rem] text-text-muted tracking-[0.2em] uppercase -mt-0.5">
               Studio
             </span>
           )}

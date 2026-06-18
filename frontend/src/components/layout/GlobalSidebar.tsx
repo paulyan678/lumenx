@@ -58,7 +58,7 @@ function NavButton({
           active ? "text-primary" : "text-text-muted group-hover:text-foreground"
         )}
       />
-      <span className="text-sm">{label}</span>
+      <span className="text-base">{label}</span>
     </button>
   );
 }
@@ -89,7 +89,7 @@ export default function GlobalSidebar({ activeTab, onTabChange }: GlobalSidebarP
         className="text-left px-4 pt-5 pb-4 border-b border-glass-border hover:opacity-90 transition-opacity"
       >
         <LumenXBranding size="md" showSlogan={false} />
-        <p className="font-display atelier-display text-[0.625rem] italic text-text-muted tracking-wide leading-snug mt-2.5">
+        <p className="font-display atelier-display text-[0.75rem] italic text-text-muted tracking-wide leading-snug mt-2.5">
           Render Noise into Narrative
         </p>
       </button>
@@ -115,7 +115,7 @@ export default function GlobalSidebar({ activeTab, onTabChange }: GlobalSidebarP
           icon={Settings}
           onClick={() => handleNav("settings", "#/settings")}
         />
-        <div className="px-3 pt-2.5 font-mono text-[0.625rem] tracking-wide text-text-muted">
+        <div className="px-3 pt-2.5 font-mono text-[0.6875rem] tracking-wide text-text-muted">
           {APP_VERSION}
         </div>
       </div>

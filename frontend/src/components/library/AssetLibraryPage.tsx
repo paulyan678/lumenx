@@ -313,13 +313,13 @@ export default function AssetLibraryPage() {
           </h1>
         </div>
         <div className="flex items-center gap-2.5 pb-1">
-          <span className="font-mono text-[0.625rem] text-text-muted tracking-wide uppercase">
+          <span className="font-mono text-[0.75rem] text-text-muted tracking-wide uppercase">
             {t("assetCount", { count: visibleCount })}
           </span>
           <button
             type="button"
             onClick={() => setNewAssetOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-primary text-on-accent text-[0.75rem] font-semibold hover:bg-primary-hover transition-colors"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-primary text-on-accent text-[0.875rem] font-semibold hover:bg-primary-hover transition-colors"
           >
             <Plus size={14} />
             {t("newAsset")}
