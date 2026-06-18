@@ -1251,6 +1251,17 @@ export const api = {
         const res = await axios.post(`${API_URL}/library/assets`, { asset_type: assetType, ...data });
         return res.data;
     },
+    /** 上传一张本地图片到全局资产库，返回可被前端加载的 image_url。
+     *  后端契约：POST /library/assets/upload，multipart 字段名 "file" → { image_url }。
+     *  调用方拿到 image_url 后传给 createLibraryAsset。 */
+    uploadLibraryImage: async (file: File): Promise<{ image_url: string }> => {
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await axios.post<{ image_url: string }>(`${API_URL}/library/assets/upload`, formData, {
+            headers: { "Content-Type": "multipart/form-data" },
+        });
+        return res.data;
+    },
     /** 补丁更新全局资产（仅发送的字段生效，PATCH 语义）。后端：PUT /library/assets/{type}/{id}。assetType 单数。 */
     updateLibraryAsset: async (
         assetType: string,

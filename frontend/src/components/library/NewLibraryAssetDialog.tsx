@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useRef, useEffect, type FormEvent } from "react";
+import { useState, useRef, useEffect, type FormEvent, type ChangeEvent } from "react";
 import { useTranslations } from "next-intl";
-import { X, Loader2, Plus } from "lucide-react";
+import { X, Loader2, Plus, Upload, Image as ImageIcon } from "lucide-react";
 import { api } from "@/lib/api";
+import { getAssetUrl } from "@/lib/utils";
 import { toast } from "@/store/toastStore";
 
 type AssetTab = "characters" | "scenes" | "props";
@@ -19,8 +20,8 @@ interface NewLibraryAssetDialogProps {
 
 /**
  * 资产库「新建全局资产」轻量弹窗（T6-entries）。
- * 选类型(角色/场景/道具) + 名称 + 描述 +（可选）图片 URL → POST /library/assets。
- * v1 仅支持填图片 URL；本地文件上传留作 follow-up（见 imageUrlHint 文案）。
+ * 选类型(角色/场景/道具) + 名称 + 描述 +（可选）图片（上传本地文件或填 URL）→ POST /library/assets。
+ * 本地上传走 POST /library/assets/upload（multipart 字段 "file" → { image_url }），结果写入 imageUrl。
  */
 export default function NewLibraryAssetDialog({ onClose, onCreated }: NewLibraryAssetDialogProps) {
   const t = useTranslations("library");
@@ -30,8 +31,10 @@ export default function NewLibraryAssetDialog({ onClose, onCreated }: NewLibrary
   const [description, setDescription] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const nameRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const onCloseRef = useRef(onClose);
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -56,9 +59,27 @@ export default function NewLibraryAssetDialog({ onClose, onCreated }: NewLibrary
     { id: "props", label: t("propLabel") },
   ];
 
+  // 上传本地图片 → 后端返回 image_url，写入 imageUrl 作为创建用图。
+  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // reset so re-selecting the same file fires onChange again
+    if (!file) return;
+    setUploading(true);
+    try {
+      const { image_url } = await api.uploadLibraryImage(file);
+      setImageUrl(image_url);
+      toast.success(t("uploadSuccess"));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      toast.error(t("uploadFailed"), msg ? { body: msg } : undefined);
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleSubmit = async (e?: FormEvent) => {
     e?.preventDefault();
-    if (submitting) return;
+    if (submitting || uploading) return;
     const trimmed = name.trim();
     if (!trimmed) {
       toast.error(t("nameRequired"));
@@ -185,11 +206,47 @@ export default function NewLibraryAssetDialog({ onClose, onCreated }: NewLibrary
             />
           </div>
 
-          {/* 图片 URL（可选） */}
+          {/* 图片（可选）— 上传本地图片，或填图片 URL（备选） */}
           <div>
+            <span className="font-mono text-[0.625rem] font-semibold uppercase tracking-[0.1em] text-text-secondary">
+              {t("imageLabel")}
+            </span>
+
+            {/* 上传本地图片 + 预览缩略图 */}
+            <div className="mt-2 flex items-center gap-3">
+              {imageUrl ? (
+                <img
+                  src={getAssetUrl(imageUrl)}
+                  alt=""
+                  className="w-12 h-12 rounded-lg object-cover border border-glass-border bg-surface-inset shrink-0"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-lg grid place-items-center border border-glass-border bg-surface-inset text-text-muted shrink-0">
+                  <ImageIcon size={16} aria-hidden="true" />
+                </div>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-surface-inset border border-glass-border text-text-secondary text-[0.8125rem] font-medium hover:text-foreground transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                {uploading ? t("uploading") : t("uploadImageButton")}
+              </button>
+            </div>
+
+            {/* 备选：直接填图片 URL */}
             <label
               htmlFor="lib-asset-image"
-              className="font-mono text-[0.625rem] font-semibold uppercase tracking-[0.1em] text-text-secondary"
+              className="block mt-3 font-mono text-[0.625rem] font-semibold uppercase tracking-[0.1em] text-text-secondary"
             >
               {t("imageUrlLabel")}
             </label>
@@ -215,7 +272,7 @@ export default function NewLibraryAssetDialog({ onClose, onCreated }: NewLibrary
             </button>
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || uploading}
               className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-primary text-on-accent text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {submitting ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}

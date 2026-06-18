@@ -103,7 +103,12 @@ export default function ProjectCard({ project, onDelete }: ProjectCardProps) {
     };
 
     const handleOpen = () => {
-        window.location.hash = `#/project/${project.id}`;
+        // Series episodes open through the series → episode route so the
+        // series/episode breadcrumb context is preserved; standalone
+        // projects fall back to the flat project route.
+        window.location.hash = project.series_id
+            ? `#/series/${project.series_id}/episode/${project.id}`
+            : `#/project/${project.id}`;
     };
 
     const handleDelete = (e: React.MouseEvent) => {
