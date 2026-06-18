@@ -4,12 +4,13 @@ import { useState, useEffect, useRef, useId } from "react";
 import { motion } from "framer-motion";
 import {
   Plus, RefreshCw, Library, FileUp, X, ChevronDown, FileText,
-  Zap, Film, Sparkles, Search,
+  Zap, Film, Sparkles, Search, Clock, MoreVertical,
 } from "lucide-react";
 import { useProjectStore, Project } from "@/store/projectStore";
 import { toast } from "@/store/toastStore";
 import { useOnline } from "@/lib/useOnline";
 import { rovingKeyDown } from "@/lib/a11y";
+import { getAssetUrl } from "@/lib/utils";
 import ProjectCard, { deriveStatus, type DerivedStatus } from "@/components/project/ProjectCard";
 import CreateProjectDialog from "@/components/project/CreateProjectDialog";
 import EnvConfigDialog from "@/components/project/EnvConfigDialog";
@@ -327,6 +328,119 @@ function NewProjectTile({ onClick }: { onClick: () => void }) {
   );
 }
 
+// localStorage key for the workspace gallery/list view preference.
+const WS_VIEW_KEY = "lumenx_workspace_view";
+
+// Mirror of ProjectCard's cover derivation, kept local so the list view can
+// render thumbnails without importing from / altering ProjectCard. The backend
+// has no dedicated cover field, so we fall back through the richest source.
+function deriveCover(project: Project): string | undefined {
+  const frames = (project.frames || []) as Array<Record<string, any>>;
+  for (const f of frames) {
+    const direct = f?.rendered_image_url || f?.image_url;
+    if (direct) return getAssetUrl(direct);
+    const variants = f?.rendered_image_asset?.variants || f?.image_asset?.variants;
+    if (variants?.length) {
+      const sel = variants.find((v: any) => v.id === (f?.rendered_image_asset?.selected_id || f?.image_asset?.selected_id));
+      const url = sel?.url || variants[0]?.url;
+      if (url) return getAssetUrl(url);
+    }
+  }
+  for (const s of (project.scenes || []) as Array<Record<string, any>>) {
+    if (s?.image_url) return getAssetUrl(s.image_url);
+    const variants = s?.image_asset?.variants;
+    if (variants?.length) {
+      const url = variants[0]?.url;
+      if (url) return getAssetUrl(url);
+    }
+  }
+  return undefined;
+}
+
+// ── Project Row (Line B list-view item) ──
+function ProjectRow({ project, crumb }: { project: Project; crumb: string }) {
+  const t = useTranslations("project");
+  const cover = deriveCover(project);
+  const status = deriveStatus(project);
+  const frameCount = project.frames?.length || 0;
+  const sceneCount = project.scenes?.length || 0;
+
+  const open = () => { window.location.hash = `#/project/${project.id}`; };
+
+  const badge = {
+    completed: { label: t("statusCompleted"), cls: "text-status-completed-fg bg-status-completed-bg border-status-completed-border" },
+    processing: { label: t("statusProcessing"), cls: "text-status-processing-fg bg-status-processing-bg border-status-processing-border" },
+    pending: { label: t("statusDraft"), cls: "text-status-pending-fg bg-status-pending-bg border-status-pending-border" },
+  }[status];
+
+  return (
+    <div
+      onClick={open}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        // Only activate from the row itself — nested controls (⋯) handle their own keys.
+        if (e.target !== e.currentTarget) return;
+        if (e.key === "Enter" || e.key === " ") {
+          if (e.key === " ") e.preventDefault();
+          open();
+        }
+      }}
+      className="group glass-panel flex items-center gap-4 rounded-xl border border-glass-border px-3 py-2.5 cursor-pointer hover:bg-hover-bg transition-colors"
+    >
+      {/* Thumbnail */}
+      <div className="relative w-[68px] aspect-[16/10] flex-shrink-0 rounded-lg overflow-hidden bg-surface-inset">
+        {cover ? (
+          <img src={cover} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full grid place-items-center text-text-muted">
+            <FileText size={16} />
+          </div>
+        )}
+      </div>
+
+      {/* Name + series/episode crumb */}
+      <div className="flex-1 min-w-0">
+        <h3 className="font-display atelier-display text-[16px] font-semibold leading-tight tracking-tight text-foreground truncate">
+          {project.title}
+        </h3>
+        {crumb && (
+          <div className="font-mono text-[9.5px] uppercase tracking-wider text-text-muted mt-0.5 truncate">
+            {crumb}
+          </div>
+        )}
+      </div>
+
+      {/* Status badge */}
+      <span className={`atelier-badge hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[9.5px] font-mono font-semibold uppercase tracking-wider flex-shrink-0 ${badge.cls}`}>
+        <span className="w-[5px] h-[5px] rounded-full bg-current" />
+        {badge.label}
+      </span>
+
+      {/* Shot count / duration */}
+      <div className="hidden md:flex items-center gap-3 font-mono text-[10px] text-text-secondary flex-shrink-0">
+        <span className="inline-flex items-center gap-1">
+          <Film size={11} className="text-text-muted" />
+          {t("shotCount", { count: frameCount })}
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <Clock size={11} className="text-text-muted" />
+          {sceneCount}
+        </span>
+      </div>
+
+      {/* More */}
+      <button
+        onClick={(e) => e.stopPropagation()}
+        className="w-8 h-8 rounded-lg grid place-items-center text-text-muted hover:text-foreground hover:bg-hover-bg transition-colors flex-shrink-0"
+        aria-label={t("moreActions")}
+      >
+        <MoreVertical size={15} />
+      </button>
+    </div>
+  );
+}
+
 // ── Episode Breadcrumb Wrapper ──
 function EpisodeBreadcrumbWrapper({ seriesId, episodeId }: { seriesId: string; episodeId: string }) {
   const [seriesTitle, setSeriesTitle] = useState<string>("");
@@ -375,6 +489,7 @@ export default function Home() {
   const [wsSearch, setWsSearch] = useState("");
   const online = useOnline();
   const [wsStatus, setWsStatus] = useState<DerivedStatus | "all">("all");
+  const [viewMode, setViewMode] = useState<"gallery" | "list">("gallery");
   const [projectId, setProjectId] = useState<string | null>(null);
   const [seriesId, setSeriesId] = useState<string | null>(null);
   const [episodeId, setEpisodeId] = useState<string | null>(null);
@@ -393,6 +508,17 @@ export default function Home() {
     syncProjects();
     fetchSeriesList();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Hydrate the persisted gallery/list view preference (client-only to avoid
+  // an SSR/CSR mismatch — default stays "gallery" on first paint).
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(WS_VIEW_KEY);
+      if (saved === "gallery" || saved === "list") setViewMode(saved);
+    } catch {
+      /* localStorage unavailable — keep default */
+    }
   }, []);
 
   // Load episodes for all series when seriesList changes
@@ -544,6 +670,12 @@ export default function Home() {
 
   const handleTabChange = (tab: GlobalTab) => {
     setActiveTab(tab);
+  };
+
+  // Persisted gallery/list switch for the workspace.
+  const changeViewMode = (mode: "gallery" | "list") => {
+    setViewMode(mode);
+    try { localStorage.setItem(WS_VIEW_KEY, mode); } catch { /* localStorage unavailable */ }
   };
 
   // Determine content based on activeTab
@@ -702,11 +834,25 @@ export default function Home() {
               className="w-full bg-transparent border-0 rounded-full py-2 pl-9 pr-4 text-[13px] text-foreground placeholder-text-muted focus:outline-none"
             />
           </div>
-          <div className="inline-flex p-[3px] rounded-full bg-surface-inset atelier-pill-tabs ml-auto">
-            <button className="inline-flex items-center px-3.5 py-1.5 rounded-full text-[11px] font-semibold text-foreground atelier-pill-tab-active bg-surface shadow-sm">
+          <div className="inline-flex p-[3px] rounded-full bg-surface-inset atelier-pill-tabs ml-auto" role="group" aria-label={`${t("gallery") || "画廊"} / ${t("list") || "列表"}`}>
+            <button
+              type="button"
+              onClick={() => changeViewMode("gallery")}
+              aria-pressed={viewMode === "gallery"}
+              className={`inline-flex items-center px-3.5 py-1.5 rounded-full text-[11px] font-semibold transition-colors ${
+                viewMode === "gallery" ? "text-foreground atelier-pill-tab-active bg-surface shadow-sm" : "text-text-muted hover:text-foreground"
+              }`}
+            >
               {t("gallery") || "画廊"}
             </button>
-            <button className="inline-flex items-center px-3.5 py-1.5 rounded-full text-[11px] font-semibold text-text-muted hover:text-foreground transition-colors">
+            <button
+              type="button"
+              onClick={() => changeViewMode("list")}
+              aria-pressed={viewMode === "list"}
+              className={`inline-flex items-center px-3.5 py-1.5 rounded-full text-[11px] font-semibold transition-colors ${
+                viewMode === "list" ? "text-foreground atelier-pill-tab-active bg-surface shadow-sm" : "text-text-muted hover:text-foreground"
+              }`}
+            >
               {t("list") || "列表"}
             </button>
           </div>
@@ -793,18 +939,46 @@ export default function Home() {
                       </span>
                       <span className="atelier-group-line h-px flex-1 bg-glass-border" />
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-                      {eps.map((ep, i) => (
-                        <div
-                          key={`ep-${ep.id}`}
-                          className="atelier-reveal"
-                          style={{ animationDelay: `${Math.min(i * 60, 300)}ms` }}
-                        >
-                          <ProjectCard project={ep} onDelete={deleteProject} />
-                        </div>
-                      ))}
-                      {!wsFiltering && <NewProjectTile onClick={() => { window.location.hash = `#/series/${s.id}`; }} />}
-                    </div>
+                    {viewMode === "list" ? (
+                      <div className="flex flex-col gap-1.5">
+                        {eps.map((ep, i) => (
+                          <div
+                            key={`ep-${ep.id}`}
+                            className="atelier-reveal"
+                            style={{ animationDelay: `${Math.min(i * 60, 300)}ms` }}
+                          >
+                            <ProjectRow
+                              project={ep}
+                              crumb={`${s.title}${ep.episode_number ? ` · EP.${String(ep.episode_number).padStart(2, "0")}` : ""}`}
+                            />
+                          </div>
+                        ))}
+                        {!wsFiltering && (
+                          <button
+                            onClick={() => { window.location.hash = `#/series/${s.id}`; }}
+                            className="group flex items-center gap-3 rounded-xl border border-dashed border-border bg-transparent px-3 py-2.5 text-text-secondary hover:text-foreground hover:border-primary transition-colors"
+                          >
+                            <span className="w-8 h-8 rounded-lg grid place-items-center bg-surface group-hover:text-primary transition-colors flex-shrink-0">
+                              <Plus size={15} />
+                            </span>
+                            <span className="text-[13px] font-semibold">{t("newProject")}</span>
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                        {eps.map((ep, i) => (
+                          <div
+                            key={`ep-${ep.id}`}
+                            className="atelier-reveal"
+                            style={{ animationDelay: `${Math.min(i * 60, 300)}ms` }}
+                          >
+                            <ProjectCard project={ep} onDelete={deleteProject} />
+                          </div>
+                        ))}
+                        {!wsFiltering && <NewProjectTile onClick={() => { window.location.hash = `#/series/${s.id}`; }} />}
+                      </div>
+                    )}
                   </section>
                 );
               })}
@@ -825,18 +999,43 @@ export default function Home() {
                     </span>
                     <span className="atelier-group-line h-px flex-1 bg-glass-border" />
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-                    {sp.map((p, i) => (
-                      <div
-                        key={`p-${p.id}`}
-                        className="atelier-reveal"
-                        style={{ animationDelay: `${Math.min(i * 60, 300)}ms` }}
-                      >
-                        <ProjectCard project={p} onDelete={deleteProject} />
-                      </div>
-                    ))}
-                    {!wsFiltering && <NewProjectTile onClick={() => setIsDialogOpen(true)} />}
-                  </div>
+                  {viewMode === "list" ? (
+                    <div className="flex flex-col gap-1.5">
+                      {sp.map((p, i) => (
+                        <div
+                          key={`p-${p.id}`}
+                          className="atelier-reveal"
+                          style={{ animationDelay: `${Math.min(i * 60, 300)}ms` }}
+                        >
+                          <ProjectRow project={p} crumb="" />
+                        </div>
+                      ))}
+                      {!wsFiltering && (
+                        <button
+                          onClick={() => setIsDialogOpen(true)}
+                          className="group flex items-center gap-3 rounded-xl border border-dashed border-border bg-transparent px-3 py-2.5 text-text-secondary hover:text-foreground hover:border-primary transition-colors"
+                        >
+                          <span className="w-8 h-8 rounded-lg grid place-items-center bg-surface group-hover:text-primary transition-colors flex-shrink-0">
+                            <Plus size={15} />
+                          </span>
+                          <span className="text-[13px] font-semibold">{t("newProject")}</span>
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                      {sp.map((p, i) => (
+                        <div
+                          key={`p-${p.id}`}
+                          className="atelier-reveal"
+                          style={{ animationDelay: `${Math.min(i * 60, 300)}ms` }}
+                        >
+                          <ProjectCard project={p} onDelete={deleteProject} />
+                        </div>
+                      ))}
+                      {!wsFiltering && <NewProjectTile onClick={() => setIsDialogOpen(true)} />}
+                    </div>
+                  )}
                 </section>
                 );
               })()}
