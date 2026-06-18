@@ -905,7 +905,7 @@ export default function Home() {
                     <div className="flex items-baseline gap-3 mt-4 mb-4 mx-0.5">
                       <button
                         onClick={() => { window.location.hash = `#/series/${s.id}`; }}
-                        className="font-display atelier-display text-[22px] font-semibold tracking-tight text-foreground hover:text-primary transition-colors"
+                        className="font-display atelier-display text-[24px] font-semibold tracking-tight text-foreground hover:text-primary transition-colors"
                       >
                         {s.title}
                       </button>
@@ -941,7 +941,7 @@ export default function Home() {
                         )}
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                      <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-8">
                         {eps.map((ep, i) => (
                           <div
                             key={`ep-${ep.id}`}
@@ -966,7 +966,7 @@ export default function Home() {
                 return (
                 <section aria-label={t("standaloneGroup") || "独立项目"}>
                   <div className="flex items-baseline gap-3 mt-6 mb-4 mx-0.5">
-                    <span className="font-display atelier-display text-[22px] font-semibold tracking-tight text-foreground">
+                    <span className="font-display atelier-display text-[24px] font-semibold tracking-tight text-foreground">
                       {t("standaloneGroup") || "独立项目"}
                     </span>
                     <span className="font-mono text-[10px] uppercase tracking-wider text-text-muted">
@@ -998,7 +998,7 @@ export default function Home() {
                       )}
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                    <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-8">
                       {sp.map((p, i) => (
                         <div
                           key={`p-${p.id}`}

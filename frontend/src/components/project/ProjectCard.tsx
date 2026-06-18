@@ -115,7 +115,6 @@ export default function ProjectCard({ project, onDelete }: ProjectCardProps) {
 
     return (
         <motion.article
-            whileHover={{ scale: 1.005 }}
             className={`glass-panel atelier-proj-card ${isFeatured ? "atelier-proj-featured" : ""} group relative rounded-2xl overflow-hidden cursor-pointer border border-glass-border`}
             onClick={handleOpen}
             role="button"
