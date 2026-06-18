@@ -277,6 +277,8 @@ export interface Project {
     mix_settings?: Record<string, number>;
     series_id?: string;
     episode_number?: number;
+    /** T13 — user-starred (featured) flag; drives the amber-halation card. */
+    starred?: boolean;
 }
 
 interface ProjectStore {

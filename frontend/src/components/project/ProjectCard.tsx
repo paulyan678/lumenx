@@ -2,12 +2,13 @@
 
 import { motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
-import { Play, Trash2, Film, Clock, MoreVertical, ExternalLink } from "lucide-react";
+import { Play, Trash2, Film, Clock, MoreVertical, ExternalLink, Star } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Project } from "@/store/projectStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import { getAssetUrl } from "@/lib/utils";
 import { coverGradient, GRAIN_URL } from "@/lib/atelierCover";
+import { api } from "@/lib/api";
 
 interface ProjectCardProps {
     project: Project;
@@ -84,7 +85,22 @@ export default function ProjectCard({ project, onDelete }: ProjectCardProps) {
     const cover = deriveCover(project);
     const status = deriveStatus(project);
     const frameCount = project.frames?.length || 0;
-    const isFeatured = status === "completed";
+
+    // Featured == user-starred (amber-halation signature). Optimistic local
+    // state, initialised from the server flag; rolls back if the toggle fails.
+    const [starred, setStarred] = useState<boolean>(!!project.starred);
+    const isFeatured = starred;
+
+    const handleToggleStar = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        const prev = starred;
+        setStarred(!prev); // optimistic
+        try {
+            await api.toggleProjectStarred(project.id);
+        } catch {
+            setStarred(prev); // rollback on failure
+        }
+    };
 
     const handleOpen = () => {
         window.location.hash = `#/project/${project.id}`;
@@ -160,6 +176,25 @@ export default function ProjectCard({ project, onDelete }: ProjectCardProps) {
                 )}
                 {/* Gradient legibility scrim */}
                 <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-transparent from-40% to-black/60" />
+
+                {/* Featured amber halation — warm inset glow laid over the
+                    thumbnail (starred signature; replaces the old teal ring). */}
+                {isFeatured ? (
+                    <div className="atelier-proj-halation absolute inset-0 pointer-events-none z-[1]" aria-hidden="true" />
+                ) : null}
+
+                {/* Star toggle — top-right; always shown when starred, hover/focus-revealed otherwise */}
+                <div className="absolute top-3 right-3 z-[3]">
+                    <button
+                        type="button"
+                        onClick={handleToggleStar}
+                        aria-label={starred ? t("unstar") : t("star")}
+                        aria-pressed={starred}
+                        className={`w-8 h-8 rounded-full grid place-items-center backdrop-blur-md transition-all bg-black/35 hover:bg-black/55 ${starred ? "text-status-starred-solid opacity-100" : "text-foreground/70 hover:text-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100"}`}
+                    >
+                        <Star size={15} fill={starred ? "currentColor" : "none"} aria-hidden="true" />
+                    </button>
+                </div>
 
                 {/* Status badge — top-left */}
                 <div className="absolute top-3 left-3 z-[2]">

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { X, Star, Download, Sparkles, Loader2 } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { X, Star, Download, Sparkles, Loader2, Globe } from "lucide-react";
 import type { Character, Scene, Prop, ImageAsset, ImageVariant } from "@/store/projectStore";
 import { characterImageAsset } from "@/lib/characterImage";
 import { api } from "@/lib/api";
@@ -39,6 +40,8 @@ interface AssetInspectorProps {
   starred: boolean;
   onClose: () => void;
   onToggleStar: () => void;
+  /** 提升到全局成功后回调（父层刷新库以显示新入池资产）。可选。 */
+  onPromoted?: () => void;
 }
 
 /** Character 走 characterImageAsset（reference_sheet→full_body，归一化成 ImageAsset 形状）；scene/prop 用 image_asset。 */
@@ -104,7 +107,9 @@ export default function AssetInspector({
   starred,
   onClose,
   onToggleStar,
+  onPromoted,
 }: AssetInspectorProps) {
+  const t = useTranslations("library");
   const imageAsset = primaryImageAsset(asset, type);
   const baseVariants = imageAsset?.variants ?? [];
   // 本地新生成的变体（来自「生成更多变体」）。父层 library 自己持有 `sources` 且只在整页
@@ -116,6 +121,7 @@ export default function AssetInspector({
   const defaultId = imageAsset?.selected_id ?? baseVariants[0]?.id ?? null;
   const [activeVariantId, setActiveVariantId] = useState<string | null>(defaultId);
   const [generating, setGenerating] = useState(false);
+  const [promoting, setPromoting] = useState(false);
 
   // 切换选中资产时重置本地高亮的变体 + 丢弃上一个资产本地追加的变体。
   useEffect(() => {
@@ -260,6 +266,25 @@ export default function AssetInspector({
       if (aliveRef.current) toast.update(tid, { kind: "error", title: "变体生成失败", body: msg, autoCloseMs: 0 });
     } finally {
       if (aliveRef.current) setGenerating(false);
+    }
+  };
+
+  // 提升到全局：把 project/series 来源资产 deep-copy 进全局共享池（global 来源不显示该按钮）。
+  // 成功后 toast 并回调父层刷新（新入池资产即出现在「全局 / 共享」分组）。
+  const handlePromote = async () => {
+    if (sourceKind === "global" || promoting) return;
+    // 父层传入的是列表 key（`project-<id>` / `series-<id>`）；promote API 需要裸 id。
+    const rawSourceId = sourceId.replace(/^(project|series)-/, "");
+    setPromoting(true);
+    try {
+      await api.promoteAssetToLibrary(sourceKind, rawSourceId, SINGULAR_TYPE[type], asset.id);
+      toast.success(t("promoteSuccess"), { body: t("promoteSuccessBody", { name: asset.name }) });
+      onPromoted?.();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : t("promoteFailed");
+      toast.error(t("promoteFailed"), { body: msg });
+    } finally {
+      setPromoting(false);
     }
   };
 
@@ -425,6 +450,18 @@ export default function AssetInspector({
               <span className="inline-flex items-center rounded-full px-1.5 py-0.5 font-mono text-[8.5px] font-semibold tracking-[0.06em] text-status-pending-fg bg-status-pending-bg border border-status-pending-border">
                 剧集内生成
               </span>
+            </button>
+          )}
+          {/* 提升到全局：project/series 来源可用；global 来源隐藏（无需自我提升）。 */}
+          {sourceKind !== "global" && (
+            <button
+              type="button"
+              onClick={handlePromote}
+              disabled={promoting}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-surface-inset border border-glass-border text-foreground text-sm font-medium hover:bg-hover-bg transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {promoting ? <Loader2 size={15} className="animate-spin" /> : <Globe size={15} />}
+              {promoting ? t("promoting") : t("promoteToGlobal")}
             </button>
           )}
           {/* 下载：v1 实做 */}

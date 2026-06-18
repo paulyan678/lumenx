@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useTranslations } from "next-intl";
-import { Search, Star, ArrowDownUp, ChevronDown, Check } from "lucide-react";
+import { Search, Star, ArrowDownUp, ChevronDown, Check, Plus } from "lucide-react";
 import { api } from "@/lib/api";
 import type { Series, Project, Character, Scene, Prop, ImageAsset } from "@/store/projectStore";
 import { toast } from "@/store/toastStore";
@@ -10,6 +10,7 @@ import { characterImageUrl, characterVariants } from "@/lib/characterImage";
 import { coverGradient, GRAIN_URL } from "@/lib/atelierCover";
 import { rovingKeyDown } from "@/lib/a11y";
 import AssetInspector from "./AssetInspector";
+import NewLibraryAssetDialog from "./NewLibraryAssetDialog";
 
 type AssetTab = "characters" | "scenes" | "props";
 type TypeFilter = AssetTab | "all";
@@ -95,6 +96,7 @@ export default function AssetLibraryPage() {
   const [viewAxis, setViewAxis] = useState<ViewAxis>("type");
   const [starredOnly, setStarredOnly] = useState(false);
   const [selected, setSelected] = useState<{ sourceId: string; assetId: string; type: AssetTab } | null>(null);
+  const [newAssetOpen, setNewAssetOpen] = useState(false);
 
   useEffect(() => {
     loadAssets();
@@ -272,7 +274,6 @@ export default function AssetLibraryPage() {
   const toggleStar = async (sourceId: string, assetId: string, type: AssetTab) => {
     const src = sources.find((s) => s.id === sourceId);
     if (!src) return;
-    if (src.kind === "global") return; // 全局/共享池暂无 star 持久化端点（留待 T6-entries）。
     const cur = (src[type] as (Character | Scene | Prop)[]).find((a) => a.id === assetId);
     const prevStarred = !!cur?.starred;
     const setStarredTo = (val: boolean) => (prev: AssetSource[]) =>
@@ -284,6 +285,7 @@ export default function AssetLibraryPage() {
     setSources(setStarredTo(!prevStarred)); // 乐观更新
     try {
       if (src.kind === "series") await api.toggleSeriesAssetStarred(src.rawId, assetId, SINGULAR[type]);
+      else if (src.kind === "global") await api.updateLibraryAsset(SINGULAR[type], assetId, { starred: !prevStarred });
       else await api.toggleAssetStarred(src.rawId, assetId, SINGULAR[type]);
     } catch (e) {
       console.error("toggle star failed", e);
@@ -314,6 +316,14 @@ export default function AssetLibraryPage() {
           <span className="font-mono text-[10px] text-text-muted tracking-wide uppercase">
             {t("assetCount", { count: visibleCount })}
           </span>
+          <button
+            type="button"
+            onClick={() => setNewAssetOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-primary text-on-accent text-[12px] font-semibold hover:bg-primary-hover transition-colors"
+          >
+            <Plus size={14} />
+            {t("newAsset")}
+          </button>
         </div>
       </header>
 
@@ -518,7 +528,6 @@ export default function AssetLibraryPage() {
                       const isSel = selected?.sourceId === src.id && selected?.assetId === asset.id && selected?.type === type;
                       const isStar = !!asset.starred;
                       const isChar = type === "characters";
-                      const isGlobal = src.kind === "global";
                       return (
                         <div
                           key={`${type}-${asset.id}`}
@@ -584,15 +593,14 @@ export default function AssetLibraryPage() {
                                 type="button"
                                 aria-label={isStar ? t("unstar") : t("star")}
                                 aria-pressed={isStar}
-                                disabled={isGlobal}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   toggleStar(src.id, asset.id, type);
                                 }}
                                 onKeyDown={(e) => e.stopPropagation()}
-                                className={`w-7 h-7 rounded-full grid place-items-center backdrop-blur-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                                className={`w-7 h-7 rounded-full grid place-items-center backdrop-blur-md transition-colors cursor-pointer ${
                                   isStar ? "text-status-starred-fg bg-status-starred-bg" : "text-white bg-black/45 hover:text-status-starred-fg"
-                                } ${isGlobal ? "" : "cursor-pointer"}`}
+                                }`}
                               >
                                 <Star size={13} className={isStar ? "fill-current" : ""} />
                               </button>
@@ -638,9 +646,15 @@ export default function AssetLibraryPage() {
             starred={!!selectedAsset.starred}
             onClose={() => setSelected(null)}
             onToggleStar={() => toggleStar(selected.sourceId, selected.assetId, selected.type)}
+            onPromoted={loadAssets}
           />
         )}
       </div>
+
+      {/* 新建全局资产弹窗（T6-entries） */}
+      {newAssetOpen && (
+        <NewLibraryAssetDialog onClose={() => setNewAssetOpen(false)} onCreated={loadAssets} />
+      )}
     </div>
   );
 }

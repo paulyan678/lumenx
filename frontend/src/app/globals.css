@@ -757,15 +757,23 @@ html.atelier-light .atelier-proj-card {
     inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
-/* .atelier-proj-featured — teal glow for completed/featured projects.
-   (Line B: completed = teal; amber --halation stays reserved for
-   starred/selected accents elsewhere — one warm highlight per screen.) */
+/* .atelier-proj-featured — starred project signature. The cyan "completed"
+   outer ring is gone (T13): featured now == user-starred, expressed as the
+   amber --halation laid over the thumbnail (.atelier-proj-halation) plus a
+   quiet warm border tint here at the card level. One warm highlight per card. */
 html.atelier-dark .atelier-proj-featured,
 html.atelier-light .atelier-proj-featured {
+  border-color: var(--color-status-starred-border);
   box-shadow:
-    var(--glow-primary),
     0 2px 8px rgba(0, 0, 0, 0.40),
     inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* .atelier-proj-halation — amber inset halation painted over a starred
+   project's thumbnail (sits above the cover image, below badge/title). Uses
+   the theme --halation token so it re-tints correctly per theme. */
+.atelier-proj-halation {
+  box-shadow: var(--halation);
 }
 
 /* .atelier-asset-card — library asset tile with squared subtle radius. */

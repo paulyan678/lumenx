@@ -233,6 +233,13 @@ export const api = {
         return res.data;
     },
 
+    /** Toggle the user-starred (featured) flag on a project. Returns the
+     *  updated Script. No request body — the backend flips the current flag. */
+    toggleProjectStarred: async (scriptId: string) => {
+        const res = await axios.post(`${API_URL}/projects/${scriptId}/toggle_starred`);
+        return res.data;
+    },
+
     reparseProject: async (scriptId: string, text: string) => {
         const res = await axios.put(`${API_URL}/projects/${scriptId}/reparse`, { text });
         return { ...res.data, originalText: res.data.original_text };
@@ -1233,6 +1240,49 @@ export const api = {
     /** Core 全局/共享资产池（跨系列/项目聚合）。后端：GET /library/assets → {characters, scenes, props}。 */
     listLibraryAssets: async () => {
         const res = await axios.get(`${API_URL}/library/assets`);
+        return res.data;
+    },
+    /** 新建一条全局/共享资产。后端：POST /library/assets。
+     *  assetType 为单数（"character"|"scene"|"prop"）。data 可含 name/description/persona/image_url/voice_id。 */
+    createLibraryAsset: async (
+        assetType: string,
+        data: { name: string; description?: string; persona?: string; image_url?: string; voice_id?: string },
+    ) => {
+        const res = await axios.post(`${API_URL}/library/assets`, { asset_type: assetType, ...data });
+        return res.data;
+    },
+    /** 补丁更新全局资产（仅发送的字段生效，PATCH 语义）。后端：PUT /library/assets/{type}/{id}。assetType 单数。 */
+    updateLibraryAsset: async (
+        assetType: string,
+        assetId: string,
+        patch: {
+            name?: string;
+            description?: string;
+            persona?: string;
+            image_url?: string;
+            voice_id?: string;
+            starred?: boolean;
+            locked?: boolean;
+            visual_weight?: number;
+        },
+    ) => {
+        const res = await axios.put(`${API_URL}/library/assets/${assetType}/${assetId}`, patch);
+        return res.data;
+    },
+    /** 把项目/系列来源资产 deep-copy 提升进全局共享池。后端：POST /library/assets/promote。
+     *  sourceKind: "project"|"series"；assetType 单数。 */
+    promoteAssetToLibrary: async (
+        sourceKind: "project" | "series",
+        sourceId: string,
+        assetType: string,
+        assetId: string,
+    ) => {
+        const res = await axios.post(`${API_URL}/library/assets/promote`, {
+            source_kind: sourceKind,
+            source_id: sourceId,
+            asset_type: assetType,
+            asset_id: assetId,
+        });
         return res.data;
     },
     getSeries: async (seriesId: string) => {
