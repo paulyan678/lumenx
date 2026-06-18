@@ -131,6 +131,44 @@ class PlaygroundService:
         shutil.copy2(src_path, dest_path)
         logger.info("Saved output %s to library: %s", output_id, dest_path)
 
+        # Wave A (shared asset pool): besides copying the file, register a real
+        # global library asset record so the output is curatable through the
+        # /library/assets CRUD. category -> asset_type mapping; anything
+        # unknown (incl. the "general" default) falls back to "prop".
+        asset_type = self._category_to_asset_type(category)
+        prompt_text = (gen.prompt or "").strip()
+        asset_name = prompt_text[:40] or os.path.splitext(os.path.basename(dest_path))[0]
+        try:
+            # Deferred import: comic_gen.api owns the live ComicGenPipeline
+            # singleton -- the same instance that backs the /library/assets
+            # CRUD endpoints, so the new asset is immediately visible there.
+            # A top-level import would create a cycle (comic_gen.api imports the
+            # playground router at module load), so we import lazily at call
+            # time when both modules are fully initialised.
+            from ..comic_gen.api import pipeline as comic_pipeline
+
+            asset = comic_pipeline.create_library_asset(
+                asset_type,
+                {
+                    "name": asset_name,
+                    "description": prompt_text,
+                    # Point the library record at the freshly-copied file.
+                    "image_url": dest_path,
+                },
+            )
+            logger.info(
+                "save_to_library: created global %s asset %s from output %s",
+                asset_type,
+                getattr(asset, "id", "?"),
+                output_id,
+            )
+        except Exception:
+            logger.exception(
+                "save_to_library: failed to register global library asset for output %s",
+                output_id,
+            )
+            return False
+
         target_output.saved_to_library = True
         self.storage.update_generation(gen)
         return True
@@ -387,6 +425,18 @@ class PlaygroundService:
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _category_to_asset_type(category: Optional[str]) -> str:
+        """Map a Playground save category to a global-library asset_type.
+
+        Known categories (``character`` / ``scene`` / ``prop``) pass through;
+        everything else -- including the ``"general"`` default, empty string,
+        or ``None`` -- falls back to ``"prop"``."""
+        normalized = (category or "").strip().lower()
+        if normalized in ("character", "scene", "prop"):
+            return normalized
+        return "prop"
 
     @staticmethod
     def _resolve_first_input_media(gen: PlaygroundGeneration):
