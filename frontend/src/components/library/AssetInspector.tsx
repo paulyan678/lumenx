@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { X, Star, Download } from "lucide-react";
+import { X, Star, Download, Clapperboard, Sparkles } from "lucide-react";
 import type { Character, Scene, Prop, ImageAsset } from "@/store/projectStore";
 import { characterImageAsset } from "@/lib/characterImage";
 
@@ -71,9 +71,10 @@ function downloadExt(url: string, contentType?: string): string {
 
 /**
  * 资产库右侧详情抽屉（Line B "Luminous Atelier"）。
- * 库专用，不复用共享 AssetCard。展示选中资产的 hero + 变体条 + 元数据 + prompt + 下载。
- * SEED/MODEL/SIZE 当前数据模型未存（变体仅 id/url/created_at/prompt_used），故不显示。
- * 「用于分镜 / 生成更多变体」涉及跨模块流程，v1 暂不接入。
+ * 库专用，不复用共享 AssetCard。展示选中资产的 hero + 变体条 + 元数据 + prompt + 动作。
+ * 元数据数据驱动（metaRows）：SEED/MODEL/SIZE 当前数据模型未存（变体仅
+ * id/url/created_at/prompt_used），故读为 undefined → 不渲染；后端补字段后 UI 零改自动出现。
+ * 动作区：「下载」v1 实做；「用于分镜 / 生成更多变体」涉及跨模块流程，v1 以 disabled 占位（即将支持）。
  */
 export default function AssetInspector({
   asset,
@@ -115,6 +116,20 @@ export default function AssetInspector({
   const activeVariant = variants.find((v) => v.id === activeVariantId) ?? variants[0];
   const heroUrl = activeVariant?.url ?? fallbackUrl(asset, type);
   const prompt = activeVariant?.prompt_used ?? "";
+
+  // 元数据行（数据驱动）：先放现有四项，再在字段存在时追加 SEED/MODEL/SIZE。
+  // 后端 TODO：当前 ImageVariant 仅 id/url/created_at/prompt_used，资产无 seed/model/size，
+  // 故 assetMeta.* 读为 undefined → 不 push → 不渲染。后端补字段后此处零改自动出现。
+  const assetMeta = asset as Partial<{ seed: number | string; model: string; size: string }>;
+  const metaRows: { label: string; value: string }[] = [
+    { label: "类型", value: TYPE_LABEL[type] },
+    { label: "来源", value: sourceName },
+    { label: "变体", value: `${variants.length}` },
+    { label: "创建", value: timeAgo(activeVariant?.created_at) },
+  ];
+  if (assetMeta.seed != null) metaRows.push({ label: "SEED", value: String(assetMeta.seed) });
+  if (assetMeta.model) metaRows.push({ label: "MODEL", value: assetMeta.model });
+  if (assetMeta.size) metaRows.push({ label: "SIZE", value: assetMeta.size });
 
   const handleDownload = async () => {
     if (!heroUrl) return;
@@ -226,18 +241,13 @@ export default function AssetInspector({
             元数据 · METADATA
           </div>
           <div className="flex flex-col">
-            {[
-              { k: "类型", v: TYPE_LABEL[type] },
-              { k: "来源", v: sourceName },
-              { k: "变体", v: `${variants.length}` },
-              { k: "创建", v: timeAgo(activeVariant?.created_at) },
-            ].map((row) => (
+            {metaRows.map((row) => (
               <div
-                key={row.k}
+                key={row.label}
                 className="flex justify-between items-center py-2 border-b border-glass-border last:border-b-0 text-[13px]"
               >
-                <span className="font-mono text-[10px] text-text-muted tracking-[0.04em]">{row.k}</span>
-                <span className="text-foreground font-medium">{row.v}</span>
+                <span className="font-mono text-[10px] text-text-muted tracking-[0.04em]">{row.label}</span>
+                <span className="text-foreground font-medium">{row.value}</span>
               </div>
             ))}
           </div>
@@ -255,16 +265,51 @@ export default function AssetInspector({
           </div>
         )}
 
-        {/* Actions（v1：下载实做；用于分镜/生成更多变体待接入跨模块流程） */}
-        <button
-          type="button"
-          onClick={handleDownload}
-          disabled={!heroUrl}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-surface-inset border border-glass-border text-foreground text-sm font-medium hover:bg-hover-bg transition-colors disabled:opacity-40"
-        >
-          <Download size={15} />
-          下载
-        </button>
+        {/* Actions */}
+        {/*
+          用于分镜 / 生成更多变体：v1 占位，可见但 disabled（即将支持）。
+          将来接线（均为 cross-module，故此处不接后端）：
+          · 用于分镜 → 先让用户选目标项目/分镜（Inspector 无当前 project 上下文），
+            再把本变体作为参考图注入该 frame；
+          · 生成更多变体 → 复用「按项目 batch 生成」管线，对当前 asset 的 imageAsset.variants
+            append 新变体（而非替换）。
+        */}
+        <div className="flex flex-col gap-2">
+          <button
+            type="button"
+            disabled
+            title="即将支持"
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-surface-inset border border-glass-border text-text-muted text-sm font-medium cursor-not-allowed disabled:opacity-60"
+          >
+            <Clapperboard size={15} />
+            用于分镜
+            <span className="inline-flex items-center rounded-full px-1.5 py-0.5 font-mono text-[8.5px] font-semibold tracking-[0.06em] text-status-pending-fg bg-status-pending-bg border border-status-pending-border">
+              即将支持
+            </span>
+          </button>
+          <button
+            type="button"
+            disabled
+            title="即将支持"
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-surface-inset border border-glass-border text-text-muted text-sm font-medium cursor-not-allowed disabled:opacity-60"
+          >
+            <Sparkles size={15} />
+            生成更多变体
+            <span className="inline-flex items-center rounded-full px-1.5 py-0.5 font-mono text-[8.5px] font-semibold tracking-[0.06em] text-status-pending-fg bg-status-pending-bg border border-status-pending-border">
+              即将支持
+            </span>
+          </button>
+          {/* 下载：v1 实做 */}
+          <button
+            type="button"
+            onClick={handleDownload}
+            disabled={!heroUrl}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-surface-inset border border-glass-border text-foreground text-sm font-medium hover:bg-hover-bg transition-colors disabled:opacity-40"
+          >
+            <Download size={15} />
+            下载
+          </button>
+        </div>
       </div>
     </aside>
   );
