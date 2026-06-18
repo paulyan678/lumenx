@@ -297,7 +297,7 @@ interface ProjectStore {
 
     // Actions
     setProjects: (projects: Project[]) => void;  // For syncing from backend
-    createProject: (title: string, text: string, skipAnalysis?: boolean, workflowMode?: string) => Promise<void>;
+    createProject: (title: string, text: string, skipAnalysis?: boolean, workflowMode?: string, seriesId?: string) => Promise<void>;
     analyzeProject: (script: string) => Promise<void>;
     analyzeArtStyle: (scriptId: string, text: string) => Promise<void>;
     loadProjects: () => void;
@@ -439,10 +439,10 @@ export const useProjectStore = create<ProjectStore>()(
             // Sync projects from backend
             setProjects: (projects: Project[]) => set({ projects }),
 
-            createProject: async (title: string, text: string, skipAnalysis: boolean = false, workflowMode: string = "r2v") => {
+            createProject: async (title: string, text: string, skipAnalysis: boolean = false, workflowMode: string = "r2v", seriesId?: string) => {
                 set({ isLoading: true });
                 try {
-                    let project = await api.createProject(title, text, skipAnalysis, workflowMode);
+                    let project = await api.createProject(title, text, skipAnalysis, workflowMode, seriesId);
                     // Inject SettingsPage defaults into the new project. These
                     // are persisted to localStorage by SettingsPage but were
                     // never wired into creation — so changing defaults had no

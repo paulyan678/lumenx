@@ -455,6 +455,7 @@ function EpisodeBreadcrumbWrapper({ seriesId, episodeId }: { seriesId: string; e
 // ── Main Component ──
 export default function Home() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [dialogSeries, setDialogSeries] = useState<{ id: string; title: string } | null>(null);
   const [isSeriesDialogOpen, setIsSeriesDialogOpen] = useState(false);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -930,7 +931,7 @@ export default function Home() {
                         ))}
                         {!wsFiltering && (
                           <button
-                            onClick={() => { window.location.hash = `#/series/${s.id}`; }}
+                            onClick={() => { setDialogSeries({ id: s.id, title: s.title }); setIsDialogOpen(true); }}
                             className="group flex items-center gap-3 rounded-xl border border-dashed border-border bg-transparent px-3 py-2.5 text-text-secondary hover:text-foreground hover:border-primary transition-colors"
                           >
                             <span className="w-8 h-8 rounded-lg grid place-items-center bg-surface group-hover:text-primary transition-colors flex-shrink-0">
@@ -951,7 +952,7 @@ export default function Home() {
                             <ProjectCard project={ep} onDelete={deleteProject} />
                           </div>
                         ))}
-                        {!wsFiltering && <NewProjectTile onClick={() => { window.location.hash = `#/series/${s.id}`; }} />}
+                        {!wsFiltering && <NewProjectTile onClick={() => { setDialogSeries({ id: s.id, title: s.title }); setIsDialogOpen(true); }} />}
                       </div>
                     )}
                   </section>
@@ -1044,7 +1045,9 @@ export default function Home() {
       {/* Create Project Dialog */}
       <CreateProjectDialog
         isOpen={isDialogOpen}
-        onClose={() => setIsDialogOpen(false)}
+        seriesId={dialogSeries?.id}
+        seriesTitle={dialogSeries?.title}
+        onClose={() => { setIsDialogOpen(false); setDialogSeries(null); }}
       />
 
       {/* Create Series Dialog */}
