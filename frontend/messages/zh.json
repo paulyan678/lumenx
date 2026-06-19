@@ -1606,6 +1606,34 @@
       "failed": "生成失败",
       "queued": "排队中…",
       "processing": "生成中…"
+    },
+    "media": {
+      "uploading": "上传中...",
+      "dragOrClick": "拖拽或点击上传",
+      "localUpload": "本地上传",
+      "pickFromLibrary": "从资产库选取",
+      "replaceFile": "替换文件",
+      "fileCount": "{current} / {max} 张",
+      "hints": {
+        "t2i": "上传参考图自动切换为图像编辑模式",
+        "i2i": "支持 JPG / PNG / WebP，建议尺寸不小于 512px",
+        "i2v": "支持 JPG / PNG / WebP，建议尺寸不小于 720px",
+        "r2v": "支持 JPG / PNG / WebP，最多 9 张参考图",
+        "v2v": "支持 MP4 / MOV / WebM",
+        "r2vSeedance": "Seedance 支持图片、视频、音频作为参考素材"
+      }
+    },
+    "prompt": {
+      "placeholder": "描述你想生成的内容...",
+      "templates": "模板",
+      "history": "历史",
+      "negativeLabel": "负面提示词",
+      "negativePlaceholder": "不希望出现的内容..."
+    },
+    "model": {
+      "selectPlaceholder": "选择模型",
+      "noModels": "当前模式无可用模型",
+      "recommended": "推荐"
     }
   }
 }

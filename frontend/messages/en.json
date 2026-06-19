@@ -1606,6 +1606,34 @@
       "failed": "Generation failed",
       "queued": "Queued…",
       "processing": "Generating…"
+    },
+    "media": {
+      "uploading": "Uploading…",
+      "dragOrClick": "Drag or click to upload",
+      "localUpload": "Local upload",
+      "pickFromLibrary": "Pick from library",
+      "replaceFile": "Replace file",
+      "fileCount": "{current} / {max}",
+      "hints": {
+        "t2i": "Upload a reference image to auto-switch to image-edit mode",
+        "i2i": "JPG / PNG / WebP supported; recommended at least 512px",
+        "i2v": "JPG / PNG / WebP supported; recommended at least 720px",
+        "r2v": "JPG / PNG / WebP supported; up to 9 reference images",
+        "v2v": "MP4 / MOV / WebM supported",
+        "r2vSeedance": "Seedance accepts image, video, and audio as reference material"
+      }
+    },
+    "prompt": {
+      "placeholder": "Describe what you want to generate…",
+      "templates": "Templates",
+      "history": "History",
+      "negativeLabel": "Negative prompt",
+      "negativePlaceholder": "What you don't want to see…"
+    },
+    "model": {
+      "selectPlaceholder": "Select model",
+      "noModels": "No models available for this mode",
+      "recommended": "Recommended"
     }
   }
 }

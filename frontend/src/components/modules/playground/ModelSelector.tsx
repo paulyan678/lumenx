@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo } from 'react';
+import { useTranslations } from 'next-intl';
 import { usePlaygroundStore } from './usePlaygroundStore';
 import { getModelsForMode, getModelDisplayInfo, type PlaygroundModelOption } from './playgroundModels';
 
@@ -8,6 +9,7 @@ export default function ModelSelector() {
   const mode = usePlaygroundStore((s) => s.mode);
   const modelId = usePlaygroundStore((s) => s.modelId);
   const setModelId = usePlaygroundStore((s) => s.setModelId);
+  const t = useTranslations('playground');
 
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -68,7 +70,7 @@ export default function ModelSelector() {
       >
         <span className="w-2 h-2 rounded-full bg-primary shrink-0" />
         <span className="flex-1 text-[0.8125rem] font-medium text-foreground truncate">
-          {selected?.displayName ?? 'Select model'}
+          {selected?.displayName ?? t('model.selectPlaceholder')}
         </span>
         <span className="font-mono text-[0.625rem] text-text-muted uppercase tracking-wider shrink-0">
           {selected?.family ?? ''}
@@ -85,7 +87,7 @@ export default function ModelSelector() {
       {open && (
         <div className="absolute top-full mt-1 w-full bg-elevated atelier-card border border-glass-border rounded-lg shadow-xl z-20 max-h-60 overflow-y-auto">
           {availableModels.length === 0 && (
-            <div className="px-3 py-2 text-[0.75rem] text-text-muted">当前模式无可用模型</div>
+            <div className="px-3 py-2 text-[0.75rem] text-text-muted">{t('model.noModels')}</div>
           )}
           {groupedModels.map((group, gi) => (
             <div key={group.family}>
@@ -111,7 +113,7 @@ export default function ModelSelector() {
                   </span>
                   {m.recommended && (
                     <span className="text-[0.5rem] font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0">
-                      推荐
+                      {t('model.recommended')}
                     </span>
                   )}
                   {m.id === modelId && (

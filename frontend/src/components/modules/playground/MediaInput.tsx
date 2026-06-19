@@ -2,6 +2,7 @@
 
 import { useRef, useState, useCallback } from 'react';
 import { ImagePlus, Film, X } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { playgroundApi } from '@/lib/api';
 import { usePlaygroundStore, type PlaygroundMode } from './usePlaygroundStore';
 import AssetPickerModal from './AssetPickerModal';
@@ -13,7 +14,7 @@ import AssetPickerModal from './AssetPickerModal';
 interface ModeConfig {
   label: string;
   accept: string;
-  hint: string;
+  hintKey: string;
   multiple: boolean;
   maxFiles: number;
   icon: 'image' | 'video';
@@ -23,7 +24,7 @@ const MODE_CONFIG: Partial<Record<PlaygroundMode, ModeConfig>> = {
   t2i: {
     label: '参考图片（可选）',
     accept: 'image/*',
-    hint: '上传参考图自动切换为图像编辑模式',
+    hintKey: 't2i',
     multiple: true,
     maxFiles: 9,
     icon: 'image',
@@ -31,7 +32,7 @@ const MODE_CONFIG: Partial<Record<PlaygroundMode, ModeConfig>> = {
   i2i: {
     label: '参考图片',
     accept: 'image/*',
-    hint: '支持 JPG / PNG / WebP，建议尺寸不小于 512px',
+    hintKey: 'i2i',
     multiple: false,
     maxFiles: 1,
     icon: 'image',
@@ -39,7 +40,7 @@ const MODE_CONFIG: Partial<Record<PlaygroundMode, ModeConfig>> = {
   i2v: {
     label: '首帧图片',
     accept: 'image/*',
-    hint: '支持 JPG / PNG / WebP，建议尺寸不小于 720px',
+    hintKey: 'i2v',
     multiple: false,
     maxFiles: 1,
     icon: 'image',
@@ -47,7 +48,7 @@ const MODE_CONFIG: Partial<Record<PlaygroundMode, ModeConfig>> = {
   r2v: {
     label: '参考图片',
     accept: 'image/*',
-    hint: '支持 JPG / PNG / WebP，最多 9 张参考图',
+    hintKey: 'r2v',
     multiple: true,
     maxFiles: 9,
     icon: 'image',
@@ -55,7 +56,7 @@ const MODE_CONFIG: Partial<Record<PlaygroundMode, ModeConfig>> = {
   v2v: {
     label: '源视频',
     accept: 'video/*',
-    hint: '支持 MP4 / MOV / WebM',
+    hintKey: 'v2v',
     multiple: false,
     maxFiles: 1,
     icon: 'video',
@@ -95,6 +96,7 @@ export default function MediaInput() {
   const modelId = usePlaygroundStore((s) => s.modelId);
   const inputMedia = usePlaygroundStore((s) => s.inputMedia);
   const setInputMedia = usePlaygroundStore((s) => s.setInputMedia);
+  const t = useTranslations('playground');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -111,7 +113,7 @@ export default function MediaInput() {
       ...config,
       label: '参考素材（图片/视频/音频）',
       accept: 'image/*,video/*,audio/*',
-      hint: 'Seedance 支持图片、视频、音频作为参考素材',
+      hintKey: 'r2vSeedance',
     };
   }
 
@@ -262,10 +264,10 @@ export default function MediaInput() {
           )}
 
           <span className="text-xs text-text-secondary">
-            {uploading ? '上传中...' : '拖拽或点击上传'}
+            {uploading ? t('media.uploading') : t('media.dragOrClick')}
           </span>
 
-          <span className="text-[0.6875rem] text-text-muted">{config.hint}</span>
+          <span className="text-[0.6875rem] text-text-muted">{t(`media.hints.${config.hintKey}`)}</span>
         </div>
 
         {/* Action buttons */}
@@ -276,14 +278,14 @@ export default function MediaInput() {
             disabled={uploading}
             className={ACTION_BTN_CLASS}
           >
-            本地上传
+            {t('media.localUpload')}
           </button>
           <button
             type="button"
             onClick={() => setShowAssetPicker(true)}
             className={ACTION_BTN_CLASS}
           >
-            从资产库选取
+            {t('media.pickFromLibrary')}
           </button>
         </div>
 
@@ -372,7 +374,7 @@ export default function MediaInput() {
         {/* File count for r2v */}
         {config.multiple && (
           <div className="font-mono text-[0.6875rem] text-text-muted">
-            {inputMedia.length} / {config.maxFiles} 张
+            {t('media.fileCount', { current: inputMedia.length, max: config.maxFiles })}
           </div>
         )}
       </div>
@@ -385,14 +387,14 @@ export default function MediaInput() {
           disabled={uploading}
           className={ACTION_BTN_CLASS}
         >
-          {uploading ? '上传中...' : '替换文件'}
+          {uploading ? t('media.uploading') : t('media.replaceFile')}
         </button>
         <button
           type="button"
           onClick={() => setShowAssetPicker(true)}
           className={ACTION_BTN_CLASS}
         >
-          从资产库选取
+          {t('media.pickFromLibrary')}
         </button>
       </div>
 

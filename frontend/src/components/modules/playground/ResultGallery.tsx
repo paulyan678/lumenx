@@ -39,7 +39,7 @@ function formatSessionLabel(
 }
 
 export default function ResultGallery() {
-  const { history, startGeneration, updateGeneration } = usePlaygroundStore();
+  const { history, startGeneration, updateGeneration, useResultAsReference } = usePlaygroundStore();
   const t = useTranslations('playground');
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'gallery'>('grid');
@@ -100,6 +100,12 @@ export default function ResultGallery() {
       console.error('[Playground] Delete failed:', err);
     }
   }, []);
+
+  // Image result → "Generate video": set the image as i2v reference and switch mode.
+  const handleGenerateVideo = useCallback(
+    (mediaPath: string) => useResultAsReference(mediaPath, 'image', 'i2v'),
+    [useResultAsReference],
+  );
 
   const filtered = useMemo(() => {
     if (activeFilter === 'all') return history;
@@ -268,7 +274,8 @@ export default function ResultGallery() {
                   key={item.data.id}
                   generation={item.data}
                   onRetry={handleRetry}
-          onDelete={handleDelete}
+                  onDelete={handleDelete}
+                  onGenerateVideo={handleGenerateVideo}
                   onOpenDetail={setDetailGen}
                 />
               );
@@ -285,6 +292,7 @@ export default function ResultGallery() {
           onClose={() => setDetailGen(null)}
           onNavigate={setDetailGen}
           onRetry={handleRetry}
+          onGenerateVideo={handleGenerateVideo}
         />
       )}
     </div>
