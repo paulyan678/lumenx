@@ -193,7 +193,7 @@ export default function PlaygroundPage() {
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-background text-foreground">
+    <div className="flex h-full flex-col overflow-hidden text-foreground">
       {/* ═══ PAGE HEADER ═══ */}
       <header className="flex shrink-0 items-center justify-between border-b border-border-subtle px-7 py-5">
         <div className="flex flex-col gap-1">
@@ -201,7 +201,7 @@ export default function PlaygroundPage() {
             {t('compose.eyebrow')}
           </span>
           <div className="flex items-baseline gap-[10px]">
-            <h1 className="font-display text-2xl font-semibold tracking-tight text-foreground atelier-display">
+            <h1 className="font-display text-[1.625rem] md:text-[2.125rem] font-semibold tracking-tight text-foreground atelier-display">
               {t('header.title')}
             </h1>
             <span className="font-mono text-[0.6875rem] uppercase tracking-[0.1em] text-text-muted">
@@ -274,7 +274,7 @@ export default function PlaygroundPage() {
           <div className="flex-1" />
 
           {/* Generate CTA (sticky) */}
-          <div className="sticky bottom-0 -mx-4 -mb-4 border-t border-glass-border bg-background px-4 pb-4 pt-4">
+          <div className="sticky bottom-0 -mx-4 -mb-4 border-t border-glass-border bg-surface-inset px-4 pb-4 pt-4">
             <button
               type="button"
               onClick={handleGenerate}
