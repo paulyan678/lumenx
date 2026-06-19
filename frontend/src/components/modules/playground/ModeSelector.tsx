@@ -21,7 +21,7 @@ export default function ModeSelector() {
         type="button"
         onClick={() => setMode(key)}
         className={[
-          'flex-1 rounded-full px-3 py-1.5 text-[0.6875rem] font-medium text-center transition-all cursor-pointer',
+          'flex-1 rounded-full px-3 py-1.5 text-[0.6875rem] font-semibold text-center transition-all cursor-pointer',
           active
             ? 'bg-surface text-foreground shadow-[0_2px_8px_rgba(0,0,0,0.4)] atelier-pill-tab-active'
             : 'text-text-muted hover:text-foreground hover:bg-hover-bg',

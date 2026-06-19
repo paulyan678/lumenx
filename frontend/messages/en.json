@@ -1550,7 +1550,9 @@
   "playground": {
     "header": {
       "title": "Playground",
-      "resultsCount": "{count} results"
+      "resultsCount": "{count} results",
+      "subtitle": "Freeform · not tied to a project",
+      "eyebrowAccent": "GALLERY"
     },
     "compose": {
       "eyebrow": "Compose",

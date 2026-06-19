@@ -70,7 +70,7 @@ const MODE_CONFIG: Partial<Record<PlaygroundMode, ModeConfig>> = {
 // Neutral glass action button (本地上传 / 替换文件 / 从资产库选取). Replaces the
 // old `border-primary/30 text-primary` accent so the panel reads quiet in Line B.
 const ACTION_BTN_CLASS =
-  'flex-1 px-3 py-1.5 rounded-lg text-xs border border-border-subtle ' +
+  'flex-1 px-3 py-1.5 rounded-full text-xs border border-border-subtle ' +
   'text-foreground/80 hover:bg-hover-bg hover:text-foreground ' +
   'transition-colors disabled:opacity-40';
 
@@ -246,7 +246,7 @@ export default function MediaInput() {
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           className={`
-            border border-dashed rounded-xl p-6 bg-input-bg
+            border border-dashed rounded-[14px] p-6 bg-input-bg
             flex flex-col items-center gap-3 text-center cursor-pointer
             transition-colors
             ${
@@ -307,13 +307,13 @@ export default function MediaInput() {
 
   return (
     <div className="space-y-2">
-      <div className="border border-solid border-border-subtle rounded-xl p-3 space-y-3 bg-input-bg">
+      <div className="space-y-3">
         {/* Thumbnail row */}
         <div className="flex flex-wrap gap-2">
           {inputMedia.map((path, index) => (
             <div
               key={path + index}
-              className="group relative w-20 h-[60px] rounded-lg overflow-hidden bg-elevated border border-border-subtle"
+              className="group relative w-[72px] h-[72px] rounded-[14px] overflow-hidden bg-elevated border border-border-subtle"
             >
               {isVideoPath(path) ? (
                 <video
@@ -359,7 +359,7 @@ export default function MediaInput() {
               onClick={handleClick}
               disabled={uploading}
               className="
-                w-20 h-[60px] rounded-lg bg-input-bg
+                w-[72px] h-[72px] rounded-[14px] bg-input-bg
                 border border-dashed border-border-subtle
                 flex items-center justify-center
                 text-text-muted hover:text-foreground hover:border-foreground/30 hover:bg-hover-bg

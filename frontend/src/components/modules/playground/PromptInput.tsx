@@ -27,15 +27,15 @@ export default function PromptInput() {
         value={prompt}
         onChange={(e) => setPrompt(e.target.value.slice(0, MAX_LENGTH))}
         placeholder={t('prompt.placeholder')}
-        className="glass-input w-full min-h-[120px] max-h-[280px] resize-y rounded-xl p-[14px] text-foreground text-[0.8125rem] leading-relaxed placeholder-foreground/40 focus:border-primary focus:ring-[3px] focus:ring-primary/15"
+        className="w-full min-h-[120px] max-h-[280px] resize-y bg-transparent border-0 rounded-none p-0 text-foreground text-[0.8125rem] leading-relaxed placeholder-foreground/40 focus:ring-0"
       />
 
       {/* Toolbar — below the textarea, not overlapping */}
-      <div className="flex items-center gap-[6px] mt-1.5 px-1">
+      <div className="flex items-center gap-[6px] border-t border-border-subtle pt-2.5 mt-3">
         <button
           type="button"
           onClick={() => setShowTemplateModal(true)}
-          className="inline-flex items-center gap-1 px-2 py-1 rounded text-[0.6875rem] font-medium text-text-muted hover:text-foreground hover:bg-hover-bg transition-colors"
+          className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[0.6875rem] font-medium text-text-muted hover:text-foreground hover:bg-hover-bg transition-colors"
         >
           <Copy size={12} />
           {t('prompt.templates')}
@@ -43,7 +43,7 @@ export default function PromptInput() {
         <button
           type="button"
           onClick={() => setShowHistoryDrawer(true)}
-          className="inline-flex items-center gap-1 px-2 py-1 rounded text-[0.6875rem] font-medium text-text-muted hover:text-foreground hover:bg-hover-bg transition-colors"
+          className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[0.6875rem] font-medium text-text-muted hover:text-foreground hover:bg-hover-bg transition-colors"
         >
           <Clock size={12} />
           {t('prompt.history')}
@@ -72,7 +72,7 @@ export default function PromptInput() {
           value={negativePrompt}
           onChange={(e) => setNegativePrompt(e.target.value)}
           placeholder={t('prompt.negativePlaceholder')}
-          className="glass-input w-full min-h-[60px] resize-y rounded-lg border-border-subtle p-[10px] text-text-secondary text-xs placeholder-foreground/40 focus:border-primary focus:ring-[3px] focus:ring-primary/15"
+          className="w-full min-h-[60px] resize-y bg-transparent border-0 rounded-none p-0 text-text-secondary text-xs placeholder-foreground/40 focus:ring-0"
         />
       )}
 

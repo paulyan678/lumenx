@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { usePlaygroundStore } from './usePlaygroundStore';
 import { getModelsForMode, getModelDisplayInfo, type PlaygroundModelOption } from './playgroundModels';
@@ -64,7 +65,7 @@ export default function ModelSelector() {
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className={`flex items-center gap-[10px] w-full text-left cursor-pointer glass-input hover:border-foreground/30 ${
+        className={`flex items-center gap-[10px] w-full text-left cursor-pointer glass-input hover:border-foreground/30 bg-surface-inset rounded-[14px] ${
           open ? 'shadow-[var(--glow-primary)]' : ''
         }`}
       >
@@ -75,13 +76,11 @@ export default function ModelSelector() {
         <span className="font-mono text-[0.625rem] text-text-muted uppercase tracking-wider shrink-0">
           {selected?.family ?? ''}
         </span>
-        <span
-          className={`text-text-muted text-xs shrink-0 transition-transform ${
+        <ChevronDown
+          className={`w-3 h-3 text-text-muted shrink-0 transition-transform ${
             open ? 'rotate-180' : ''
           }`}
-        >
-          &#9662;
-        </span>
+        />
       </button>
 
       {open && (

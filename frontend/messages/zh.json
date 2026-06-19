@@ -1550,7 +1550,9 @@
   "playground": {
     "header": {
       "title": "创作台",
-      "resultsCount": "{count} 结果"
+      "resultsCount": "{count} 结果",
+      "subtitle": "自由生成 · 不绑定项目",
+      "eyebrowAccent": "结果画廊"
     },
     "compose": {
       "eyebrow": "创作输入",

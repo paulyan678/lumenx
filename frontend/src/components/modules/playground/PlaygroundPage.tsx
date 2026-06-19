@@ -199,6 +199,7 @@ export default function PlaygroundPage() {
         <div className="flex flex-col gap-1">
           <span className="font-mono text-[0.625rem] font-medium uppercase tracking-[0.2em] text-text-muted">
             {t('compose.eyebrow')}
+            <span className="text-primary font-semibold"> · {t('header.eyebrowAccent')}</span>
           </span>
           <div className="flex items-baseline gap-[10px]">
             <h1 className="font-display text-[1.625rem] md:text-[2.125rem] font-semibold tracking-tight text-foreground atelier-display">
@@ -208,6 +209,9 @@ export default function PlaygroundPage() {
               {t('header.resultsCount', { count: resultCount })}
             </span>
           </div>
+          <p className="font-mono text-text-muted text-[0.6875rem] tracking-[0.06em]">
+            {t('header.subtitle')}
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <span className="atelier-badge rounded border border-glass-border bg-glass px-2 py-1 text-[0.625rem] uppercase tracking-[0.18em] text-text-muted">
