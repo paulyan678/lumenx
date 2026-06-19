@@ -442,11 +442,11 @@ body {
 }
 /* Firefox — both properties inherit, so html cascades to every scroll region */
 html {
-  /* T11 global type-scale knob: 112.5% of the 16px UA default = 18px root.
-     Single source of truth for app-wide font scaling — every rem-based
-     fontSize token (tailwind.config.ts) and text-[…rem] utility scales off
-     this. Adjust this one value to grow/shrink the whole UI's typography. */
-  font-size: 112.5%;
+  /* T11 global type-scale knob. 100% = 16px root, matching the Line B
+     mockup's base (was 112.5%/18px — that inflated chrome text out of
+     proportion). Single source of truth for app-wide font scaling — every
+     rem-based fontSize token and text-[…rem] utility scales off this. */
+  font-size: 100%;
   scrollbar-width: thin;
   scrollbar-color: var(--p-graphite-700, #292430) transparent;
 }

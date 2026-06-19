@@ -221,7 +221,7 @@ export default function PlaygroundPage() {
         {/* ─── LEFT: INPUT PANEL ─── */}
         <aside className="flex w-[420px] shrink-0 flex-col gap-3 overflow-y-auto border-r border-glass-border bg-surface-inset px-4 py-4 scrollbar-thin">
           {/* Mode */}
-          <section className="glass-panel atelier-card rounded-[20px] px-5 py-4">
+          <section className="glass-panel atelier-card rounded-[20px] px-5 py-5">
             <div className="mb-3 font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-text-muted">
               {t('compose.modeLabel')}
             </div>
@@ -229,7 +229,7 @@ export default function PlaygroundPage() {
           </section>
 
           {/* Model */}
-          <section className="glass-panel atelier-card rounded-[20px] px-5 py-4 relative z-30">
+          <section className="glass-panel atelier-card rounded-[20px] px-5 py-5 relative z-30">
             <div className="mb-3 font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-text-muted">
               {t('compose.modelLabel')}
             </div>
@@ -238,7 +238,7 @@ export default function PlaygroundPage() {
 
           {/* Media Input (conditional) */}
           {showMediaInput && (
-            <section className="glass-panel atelier-card rounded-[20px] px-5 py-4">
+            <section className="glass-panel atelier-card rounded-[20px] px-5 py-5">
               <div className="mb-3 font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-text-muted">
                 {t(
                   mode === 'v2v'
@@ -255,7 +255,7 @@ export default function PlaygroundPage() {
           )}
 
           {/* Prompt */}
-          <section className="glass-panel atelier-card rounded-[20px] px-5 py-4">
+          <section className="glass-panel atelier-card rounded-[20px] px-5 py-5">
             <div className="mb-3 font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-text-muted">
               {t('compose.promptLabel')}
             </div>
@@ -263,7 +263,7 @@ export default function PlaygroundPage() {
           </section>
 
           {/* Parameters */}
-          <section className="glass-panel atelier-card rounded-[20px] px-5 py-4">
+          <section className="glass-panel atelier-card rounded-[20px] px-5 py-5">
             <div className="mb-3 font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-text-muted">
               {t('compose.parametersLabel')}
             </div>

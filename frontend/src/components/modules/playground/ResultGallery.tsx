@@ -191,7 +191,7 @@ export default function ResultGallery() {
             {t('results.eyebrow')}
           </span>
           <div className="flex items-center gap-2">
-            <span className="text-2xl font-semibold tracking-tight text-foreground font-display atelier-display">
+            <span className="text-[2.125rem] leading-[1.1] font-semibold tracking-[-0.02em] text-foreground font-display atelier-display">
               {t('results.title')}
             </span>
             <span className="font-mono text-[0.625rem] bg-elevated text-text-secondary rounded px-[6px] py-[1px]">
