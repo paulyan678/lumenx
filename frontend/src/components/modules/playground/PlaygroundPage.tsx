@@ -282,10 +282,10 @@ export default function PlaygroundPage() {
               className={[
                 'inline-flex w-full items-center justify-center gap-[7px] rounded-full px-6 py-[13px]',
                 "font-['Space_Grotesk',sans-serif] text-sm font-semibold",
-                'transition-all duration-150',
+                'bg-primary text-on-accent shadow-[var(--glow-primary)] transition-all duration-150',
                 canGenerate
-                  ? 'bg-primary text-on-accent shadow-[var(--glow-primary)] hover:bg-primary-hover hover:-translate-y-px cursor-pointer'
-                  : 'bg-primary/40 text-on-accent/60 shadow-none cursor-not-allowed',
+                  ? 'hover:bg-primary-hover hover:-translate-y-px cursor-pointer'
+                  : 'cursor-not-allowed',
               ].join(' ')}
             >
               <Sparkles size={16} aria-hidden="true" />
