@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useCallback, useRef } from 'react';
+import { useTranslations } from 'next-intl';
 import ModeSelector from './ModeSelector';
 import ModelSelector from './ModelSelector';
 import MediaInput from './MediaInput';
@@ -64,6 +65,8 @@ function toGeneration(resp: PlaygroundGenerationResponse): PlaygroundGeneration 
 // ---------------------------------------------------------------------------
 
 export default function PlaygroundPage() {
+  const t = useTranslations('playground');
+
   const mode = usePlaygroundStore((s) => s.mode);
   const modelId = usePlaygroundStore((s) => s.modelId);
   const prompt = usePlaygroundStore((s) => s.prompt);
@@ -185,7 +188,6 @@ export default function PlaygroundPage() {
   const resultCount = history.length;
   const showMediaInput = MODES_WITH_MEDIA.includes(mode) || MODES_WITH_OPTIONAL_MEDIA.includes(mode);
   const canGenerate = prompt.trim().length > 0;
-  const generateLabel = batchSize > 1 ? `生成 ×${batchSize}` : '生成';
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
@@ -193,16 +195,21 @@ export default function PlaygroundPage() {
     <div className="flex h-full flex-col overflow-hidden bg-background text-foreground">
       {/* ═══ PAGE HEADER ═══ */}
       <header className="flex shrink-0 items-center justify-between border-b border-border-subtle px-7 py-5">
-        <div className="flex items-center">
-          <h1 className="font-['Space_Grotesk',sans-serif] text-xl font-semibold tracking-tight text-foreground">
-            创作台
-          </h1>
-          <span className="ml-[10px] font-mono text-[0.6875rem] uppercase tracking-[0.1em] text-text-muted">
-            {resultCount} results
+        <div className="flex flex-col gap-1">
+          <span className="font-mono text-[0.625rem] font-medium uppercase tracking-[0.2em] text-text-muted">
+            {t('compose.eyebrow')}
           </span>
+          <div className="flex items-baseline gap-[10px]">
+            <h1 className="font-['Space_Grotesk',sans-serif] text-2xl font-semibold tracking-tight text-foreground atelier-display">
+              {t('header.title')}
+            </h1>
+            <span className="font-mono text-[0.6875rem] uppercase tracking-[0.1em] text-text-muted">
+              {t('header.resultsCount', { count: resultCount })}
+            </span>
+          </div>
         </div>
         <div className="flex items-center gap-3">
-          <span className="rounded border border-glass-border px-2 py-1 font-mono text-[0.625rem] uppercase tracking-[0.18em] text-text-muted">
+          <span className="atelier-badge rounded border border-glass-border bg-glass px-2 py-1 text-[0.625rem] uppercase tracking-[0.18em] text-text-muted">
             {MODE_LABELS[mode]}
           </span>
         </div>
@@ -211,45 +218,53 @@ export default function PlaygroundPage() {
       {/* ═══ SPLIT LAYOUT ═══ */}
       <div className="flex flex-1 overflow-hidden min-h-0">
         {/* ─── LEFT: INPUT PANEL ─── */}
-        <aside className="flex w-[420px] shrink-0 flex-col overflow-y-auto border-r border-glass-border bg-glass scrollbar-thin">
+        <aside className="flex w-[420px] shrink-0 flex-col gap-3 overflow-y-auto border-r border-glass-border bg-surface-inset px-4 py-4 scrollbar-thin">
           {/* Mode */}
-          <section className="px-6 py-5">
+          <section className="glass-panel atelier-card rounded-2xl px-5 py-4">
             <div className="mb-3 font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-text-muted">
-              生成模式
+              {t('compose.modeLabel')}
             </div>
             <ModeSelector />
           </section>
 
           {/* Model */}
-          <section className="border-t border-border-subtle px-6 py-5">
+          <section className="glass-panel atelier-card rounded-2xl px-5 py-4">
             <div className="mb-3 font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-text-muted">
-              模型
+              {t('compose.modelLabel')}
             </div>
             <ModelSelector />
           </section>
 
           {/* Media Input (conditional) */}
           {showMediaInput && (
-            <section className="border-t border-border-subtle px-6 py-5">
+            <section className="glass-panel atelier-card rounded-2xl px-5 py-4">
               <div className="mb-3 font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-text-muted">
-                {mode === 'v2v' ? '源视频' : mode === 'r2v' ? '参考素材' : '首帧图片'}
+                {t(
+                  mode === 'v2v'
+                    ? 'compose.mediaSourceVideo'
+                    : mode === 'r2v'
+                      ? 'compose.mediaRefMaterial'
+                      : mode === 'i2v'
+                        ? 'compose.mediaFirstFrame'
+                        : 'compose.mediaReference'
+                )}
               </div>
               <MediaInput />
             </section>
           )}
 
           {/* Prompt */}
-          <section className="border-t border-border-subtle px-6 py-5">
+          <section className="glass-panel atelier-card rounded-2xl px-5 py-4">
             <div className="mb-3 font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-text-muted">
-              Prompt
+              {t('compose.promptLabel')}
             </div>
             <PromptInput />
           </section>
 
           {/* Parameters */}
-          <section className="border-t border-border-subtle px-6 py-5">
+          <section className="glass-panel atelier-card rounded-2xl px-5 py-4">
             <div className="mb-3 font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-text-muted">
-              参数
+              {t('compose.parametersLabel')}
             </div>
             <ParameterBar />
           </section>
@@ -258,23 +273,25 @@ export default function PlaygroundPage() {
           <div className="flex-1" />
 
           {/* Generate CTA (sticky) */}
-          <div className="sticky bottom-0 border-t border-glass-border bg-background px-6 py-5">
+          <div className="sticky bottom-0 -mx-4 -mb-4 border-t border-glass-border bg-background px-4 pb-4 pt-4">
             <button
               type="button"
               onClick={handleGenerate}
               disabled={!canGenerate}
               className={[
-                'relative w-full overflow-hidden rounded-lg px-6 py-[14px]',
-                "font-['Space_Grotesk',sans-serif] text-sm font-semibold tracking-[0.02em] text-foreground",
+                'relative w-full overflow-hidden rounded-xl px-6 py-[14px]',
+                "font-['Space_Grotesk',sans-serif] text-sm font-semibold tracking-[0.02em]",
                 'transition-all duration-150',
                 canGenerate
-                  ? 'bg-primary hover:bg-primary-hover hover:shadow-[0_4px_20px_rgba(100,108,255,0.35)] active:scale-[0.98] cursor-pointer'
-                  : 'bg-primary/40 cursor-not-allowed',
+                  ? 'bg-primary text-on-accent hover:bg-primary-hover hover:shadow-[var(--glow-primary)] active:scale-[0.98] cursor-pointer'
+                  : 'bg-primary/40 text-on-accent/70 cursor-not-allowed',
               ].join(' ')}
             >
-              {/* Glow overlay */}
-              <span className="pointer-events-none absolute inset-0 bg-gradient-to-br from-purple-600/20 via-primary/10 to-pink-500/15 opacity-0 transition-opacity duration-250 group-hover:opacity-100" />
-              <span className="relative">{generateLabel}</span>
+              <span className="relative">
+                {batchSize > 1
+                  ? t('compose.generateBatch', { count: batchSize })
+                  : t('compose.generate')}
+              </span>
             </button>
           </div>
         </aside>

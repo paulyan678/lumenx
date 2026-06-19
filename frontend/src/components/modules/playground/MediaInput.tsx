@@ -63,6 +63,17 @@ const MODE_CONFIG: Partial<Record<PlaygroundMode, ModeConfig>> = {
 };
 
 // ---------------------------------------------------------------------------
+// Shared style tokens (Line B — semantic tokens only, theme-safe)
+// ---------------------------------------------------------------------------
+
+// Neutral glass action button (本地上传 / 替换文件 / 从资产库选取). Replaces the
+// old `border-primary/30 text-primary` accent so the panel reads quiet in Line B.
+const ACTION_BTN_CLASS =
+  'flex-1 px-3 py-1.5 rounded-lg text-xs border border-border-subtle ' +
+  'text-foreground/80 hover:bg-hover-bg hover:text-foreground ' +
+  'transition-colors disabled:opacity-40';
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -218,28 +229,27 @@ export default function MediaInput() {
   );
 
   // -------------------------------------------------------------------------
-  // Render: empty state
+  // Render: empty state — Line B reference slot (recessed drop target)
+  //
+  // The section label is provided by the parent SectionCard (PlaygroundPage),
+  // so this component renders only the slot + actions to avoid a double header.
   // -------------------------------------------------------------------------
 
   if (!hasMedia) {
     return (
       <div className="space-y-2">
-        <label className="block text-xs font-medium text-foreground/80">
-          {config.label}
-        </label>
-
         <div
           onClick={handleClick}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           className={`
-            border border-dashed rounded-xl p-6
+            border border-dashed rounded-xl p-6 bg-input-bg
             flex flex-col items-center gap-3 text-center cursor-pointer
             transition-colors
             ${
               dragOver
-                ? 'border-primary/50 bg-primary/5'
+                ? 'border-primary/60 bg-primary/8 shadow-[var(--glow-primary)]'
                 : 'border-glass-border hover:border-foreground/30 hover:bg-hover-bg'
             }
             ${uploading ? 'pointer-events-none opacity-60' : ''}
@@ -264,24 +274,14 @@ export default function MediaInput() {
             type="button"
             onClick={handleClick}
             disabled={uploading}
-            className="
-              flex-1 px-3 py-1.5 rounded-lg text-xs
-              border border-glass-border text-foreground/80
-              hover:bg-hover-bg hover:text-foreground
-              transition-colors disabled:opacity-40
-            "
+            className={ACTION_BTN_CLASS}
           >
             本地上传
           </button>
           <button
             type="button"
             onClick={() => setShowAssetPicker(true)}
-            className="
-              flex-1 px-3 py-1.5 rounded-lg text-xs
-              border border-primary/30 text-primary
-              hover:bg-primary/10
-              transition-colors
-            "
+            className={ACTION_BTN_CLASS}
           >
             从资产库选取
           </button>
@@ -300,22 +300,18 @@ export default function MediaInput() {
   }
 
   // -------------------------------------------------------------------------
-  // Render: has media state
+  // Render: has media state — filled reference slot with thumbnail tiles
   // -------------------------------------------------------------------------
 
   return (
     <div className="space-y-2">
-      <label className="block text-xs font-medium text-foreground/80">
-        {config.label}
-      </label>
-
-      <div className="border border-solid border-glass-border rounded-xl p-3 space-y-3">
+      <div className="border border-solid border-border-subtle rounded-xl p-3 space-y-3 bg-input-bg">
         {/* Thumbnail row */}
         <div className="flex flex-wrap gap-2">
           {inputMedia.map((path, index) => (
             <div
               key={path + index}
-              className="group relative w-20 h-[60px] rounded-lg overflow-hidden bg-glass border border-glass-border"
+              className="group relative w-20 h-[60px] rounded-lg overflow-hidden bg-elevated border border-border-subtle"
             >
               {isVideoPath(path) ? (
                 <video
@@ -331,14 +327,14 @@ export default function MediaInput() {
                 />
               )}
 
-              {/* Remove button on hover */}
+              {/* Remove badge on hover (functional black corner scrim) */}
               <button
                 type="button"
                 onClick={() => handleRemove(index)}
                 className="
-                  absolute top-0.5 right-0.5
+                  absolute top-1 right-1
                   w-4 h-4 rounded-full
-                  bg-black/70 text-foreground/80
+                  bg-black/70 text-white
                   flex items-center justify-center
                   opacity-0 group-hover:opacity-100
                   transition-opacity
@@ -347,8 +343,8 @@ export default function MediaInput() {
                 <X className="w-3 h-3" />
               </button>
 
-              {/* File name tooltip */}
-              <div className="absolute bottom-0 left-0 right-0 px-1 py-0.5 bg-black/60 text-[0.5625rem] text-foreground/80 truncate">
+              {/* File name — bottom gradient scrim (functional, theme-agnostic) */}
+              <div className="absolute bottom-0 left-0 right-0 px-1 py-0.5 bg-gradient-to-t from-black/75 to-transparent text-[0.5625rem] text-white truncate">
                 {getFileName(path)}
               </div>
             </div>
@@ -361,10 +357,10 @@ export default function MediaInput() {
               onClick={handleClick}
               disabled={uploading}
               className="
-                w-20 h-[60px] rounded-lg
-                border border-dashed border-glass-border
+                w-20 h-[60px] rounded-lg bg-input-bg
+                border border-dashed border-border-subtle
                 flex items-center justify-center
-                text-text-muted hover:text-foreground hover:border-foreground/30
+                text-text-muted hover:text-foreground hover:border-foreground/30 hover:bg-hover-bg
                 transition-colors disabled:opacity-40
               "
             >
@@ -375,7 +371,7 @@ export default function MediaInput() {
 
         {/* File count for r2v */}
         {config.multiple && (
-          <div className="text-[0.6875rem] text-text-muted">
+          <div className="font-mono text-[0.6875rem] text-text-muted">
             {inputMedia.length} / {config.maxFiles} 张
           </div>
         )}
@@ -387,24 +383,14 @@ export default function MediaInput() {
           type="button"
           onClick={handleReplace}
           disabled={uploading}
-          className="
-            flex-1 px-3 py-1.5 rounded-lg text-xs
-            border border-glass-border text-foreground/80
-            hover:bg-hover-bg hover:text-foreground
-            transition-colors disabled:opacity-40
-          "
+          className={ACTION_BTN_CLASS}
         >
           {uploading ? '上传中...' : '替换文件'}
         </button>
         <button
           type="button"
           onClick={() => setShowAssetPicker(true)}
-          className="
-            flex-1 px-3 py-1.5 rounded-lg text-xs
-            border border-primary/30 text-primary
-            hover:bg-primary/10
-            transition-colors
-          "
+          className={ACTION_BTN_CLASS}
         >
           从资产库选取
         </button>

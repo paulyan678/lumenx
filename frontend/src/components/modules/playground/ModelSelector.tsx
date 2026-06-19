@@ -62,20 +62,28 @@ export default function ModelSelector() {
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className="flex items-center gap-[10px] px-[14px] py-[10px] border border-glass-border rounded-lg bg-input-bg cursor-pointer w-full text-left transition-colors hover:border-foreground/30"
+        className={`flex items-center gap-[10px] w-full text-left cursor-pointer glass-input hover:border-foreground/30 ${
+          open ? 'shadow-[var(--glow-primary)]' : ''
+        }`}
       >
-        <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+        <span className="w-2 h-2 rounded-full bg-primary shrink-0" />
         <span className="flex-1 text-[0.8125rem] font-medium text-foreground truncate">
           {selected?.displayName ?? 'Select model'}
         </span>
         <span className="font-mono text-[0.625rem] text-text-muted uppercase tracking-wider shrink-0">
           {selected?.family ?? ''}
         </span>
-        <span className="text-text-muted text-xs shrink-0">&#9662;</span>
+        <span
+          className={`text-text-muted text-xs shrink-0 transition-transform ${
+            open ? 'rotate-180' : ''
+          }`}
+        >
+          &#9662;
+        </span>
       </button>
 
       {open && (
-        <div className="absolute top-full mt-1 w-full bg-elevated border border-glass-border rounded-lg shadow-xl z-20 max-h-60 overflow-y-auto">
+        <div className="absolute top-full mt-1 w-full bg-elevated atelier-card border border-glass-border rounded-lg shadow-xl z-20 max-h-60 overflow-y-auto">
           {availableModels.length === 0 && (
             <div className="px-3 py-2 text-[0.75rem] text-text-muted">当前模式无可用模型</div>
           )}

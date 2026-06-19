@@ -83,6 +83,15 @@ interface PlaygroundState {
   setPrompt: (prompt: string) => void;
   setNegativePrompt: (neg: string) => void;
   setInputMedia: (media: string[]) => void;
+  /** Push a generated result back into the compose panel as reference input,
+   *  switching to the appropriate mode. Image → i2i (default) or i2v when an
+   *  explicit targetMode is given; video → v2v. Respects per-mode model
+   *  preference (same behavior as setMode). */
+  useResultAsReference: (
+    mediaPath: string,
+    mediaType: 'image' | 'video',
+    targetMode?: PlaygroundMode,
+  ) => void;
   setParameters: (params: Record<string, any>) => void;
   setBatchSize: (size: number) => void;
   setShowAdvancedParams: (show: boolean) => void;
@@ -188,6 +197,18 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
   setNegativePrompt: (negativePrompt) => set({ negativePrompt }),
 
   setInputMedia: (inputMedia) => set({ inputMedia }),
+
+  useResultAsReference: (mediaPath, mediaType, targetMode) => {
+    const { modelPreferences } = get();
+    const mode: PlaygroundMode =
+      targetMode ?? (mediaType === 'video' ? 'v2v' : 'i2i');
+    const preferredModel = modelPreferences[mode];
+    set({
+      mode,
+      inputMedia: [mediaPath],
+      ...(preferredModel !== undefined ? { modelId: preferredModel } : {}),
+    });
+  },
 
   setParameters: (parameters) => set({ parameters }),
 

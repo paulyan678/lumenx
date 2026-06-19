@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
+import { useTranslations } from 'next-intl';
 import { Sparkles, Grid3x3, GalleryHorizontal } from 'lucide-react';
 import { usePlaygroundStore, type PlaygroundGeneration } from './usePlaygroundStore';
 import { playgroundApi } from '@/lib/api';
@@ -12,7 +13,11 @@ type FilterType = 'all' | 'image' | 'video';
 
 const VIDEO_MODES = new Set(['t2v', 'i2v', 'r2v', 'v2v']);
 
-function formatSessionLabel(dateStr: string): string {
+function formatSessionLabel(
+  dateStr: string,
+  todayLabel: string,
+  yesterdayLabel: string,
+): string {
   const date = new Date(dateStr);
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -23,10 +28,10 @@ function formatSessionLabel(dateStr: string): string {
   const mm = String(date.getMinutes()).padStart(2, '0');
 
   if (itemDay.getTime() === today.getTime()) {
-    return `今天 · ${hh}:${mm}`;
+    return `${todayLabel} · ${hh}:${mm}`;
   }
   if (itemDay.getTime() === yesterday.getTime()) {
-    return `昨天 · ${hh}:${mm}`;
+    return `${yesterdayLabel} · ${hh}:${mm}`;
   }
   const month = date.getMonth() + 1;
   const day = date.getDate();
@@ -35,6 +40,7 @@ function formatSessionLabel(dateStr: string): string {
 
 export default function ResultGallery() {
   const { history, startGeneration, updateGeneration } = usePlaygroundStore();
+  const t = useTranslations('playground');
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'gallery'>('grid');
   const [detailGen, setDetailGen] = useState<PlaygroundGeneration | null>(null);
@@ -128,7 +134,11 @@ export default function ResultGallery() {
         if (gap > 30 * 60 * 1000) {
           result.push({
             type: 'divider',
-            label: formatSessionLabel(sorted[i].created_at),
+            label: formatSessionLabel(
+              sorted[i].created_at,
+              t('results.today'),
+              t('results.yesterday'),
+            ),
             key: `divider-${sorted[i].id}`,
           });
         }
@@ -137,7 +147,7 @@ export default function ResultGallery() {
     }
 
     return result;
-  }, [sorted]);
+  }, [sorted, t]);
 
   // Flat list of generation data items (no dividers) for GalleryView and DetailPanel
   const dataItems = useMemo(
@@ -149,17 +159,19 @@ export default function ResultGallery() {
   );
 
   const filters: { key: FilterType; label: string }[] = [
-    { key: 'all', label: '全部' },
-    { key: 'image', label: '图片' },
-    { key: 'video', label: '视频' },
+    { key: 'all', label: t('results.filterAll') },
+    { key: 'image', label: t('results.filterImage') },
+    { key: 'video', label: t('results.filterVideo') },
   ];
 
   if (history.length === 0) {
     return (
       <div className="flex flex-col flex-1 overflow-hidden min-w-0 items-center justify-center">
         <Sparkles className="w-12 h-12 text-text-muted opacity-40 mb-4" />
-        <p className="text-sm text-text-muted mb-1">暂无生成结果</p>
-        <p className="text-xs text-text-muted">输入提示词并点击生成，结果将展示在这里</p>
+        <p className="font-['Space_Grotesk',sans-serif] atelier-display text-base text-foreground mb-1">
+          {t('results.emptyTitle')}
+        </p>
+        <p className="text-xs text-text-muted">{t('results.emptyBody')}</p>
       </div>
     );
   }
@@ -168,25 +180,30 @@ export default function ResultGallery() {
     <div className="flex flex-col flex-1 overflow-hidden min-w-0">
       {/* Header */}
       <div className="px-7 py-4 flex items-center justify-between border-b border-border-subtle shrink-0">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-1">
           <span className="font-mono text-[0.6875rem] uppercase tracking-[0.18em] text-text-muted">
-            生成结果
+            {t('results.eyebrow')}
           </span>
-          <span className="font-mono text-[0.625rem] bg-elevated text-text-secondary rounded px-[6px] py-[1px]">
-            {filtered.length}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-2xl font-semibold tracking-tight text-foreground font-['Space_Grotesk',sans-serif] atelier-display">
+              {t('results.title')}
+            </span>
+            <span className="font-mono text-[0.625rem] bg-elevated text-text-secondary rounded px-[6px] py-[1px]">
+              {filtered.length}
+            </span>
+          </div>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1 rounded-md bg-glass p-[3px]">
+          <div className="flex items-center gap-[2px] bg-surface-inset rounded-full p-[3px] atelier-pill-tabs">
             {filters.map((f) => (
               <button
                 key={f.key}
                 onClick={() => setActiveFilter(f.key)}
-                className={`rounded px-2.5 py-1 text-[0.6875rem] font-medium transition-colors ${
+                className={`rounded-full px-3 py-1.5 text-[0.6875rem] font-medium text-center transition-all cursor-pointer ${
                   activeFilter === f.key
-                    ? 'bg-elevated text-foreground/80'
-                    : 'text-text-muted hover:text-foreground'
+                    ? 'bg-surface text-foreground atelier-pill-tab-active'
+                    : 'text-text-muted hover:text-foreground hover:bg-hover-bg'
                 }`}
               >
                 {f.label}
@@ -194,26 +211,26 @@ export default function ResultGallery() {
             ))}
           </div>
 
-          <div className="flex items-center gap-0.5 rounded-md bg-glass p-[3px]">
+          <div className="flex items-center gap-[2px] bg-surface-inset rounded-full p-[3px] atelier-pill-tabs">
             <button
               onClick={() => setViewMode('grid')}
-              className={`rounded p-1.5 transition-colors ${
+              className={`rounded-full p-1.5 transition-all cursor-pointer ${
                 viewMode === 'grid'
-                  ? 'bg-elevated text-foreground'
-                  : 'text-text-muted hover:text-foreground'
+                  ? 'bg-surface text-foreground atelier-pill-tab-active'
+                  : 'text-text-muted hover:text-foreground hover:bg-hover-bg'
               }`}
-              title="Grid view"
+              title={t('results.gridView')}
             >
               <Grid3x3 className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => setViewMode('gallery')}
-              className={`rounded p-1.5 transition-colors ${
+              className={`rounded-full p-1.5 transition-all cursor-pointer ${
                 viewMode === 'gallery'
-                  ? 'bg-elevated text-foreground'
-                  : 'text-text-muted hover:text-foreground'
+                  ? 'bg-surface text-foreground atelier-pill-tab-active'
+                  : 'text-text-muted hover:text-foreground hover:bg-hover-bg'
               }`}
-              title="Gallery view"
+              title={t('results.galleryView')}
             >
               <GalleryHorizontal className="w-3.5 h-3.5" />
             </button>
@@ -238,11 +255,11 @@ export default function ResultGallery() {
                     key={item.key}
                     className="col-span-full flex items-center gap-3 py-2"
                   >
-                    <div className="flex-1 h-px bg-elevated" />
+                    <div className="flex-1 h-px bg-border-subtle" />
                     <span className="font-mono text-[0.5625rem] text-text-muted uppercase tracking-wider whitespace-nowrap">
                       {item.label}
                     </span>
-                    <div className="flex-1 h-px bg-elevated" />
+                    <div className="flex-1 h-px bg-border-subtle" />
                   </div>
                 );
               }

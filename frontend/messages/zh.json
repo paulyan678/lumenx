@@ -1546,5 +1546,66 @@
     "imgLoadFailedRetry": "加载失败，点击重试",
     "videoLoadFailed": "视频加载失败",
     "videoLoadFailedRetry": "视频加载失败，点击重试"
+  },
+  "playground": {
+    "header": {
+      "title": "创作台",
+      "resultsCount": "{count} 结果"
+    },
+    "compose": {
+      "eyebrow": "创作输入",
+      "title": "创作台",
+      "modeLabel": "生成模式",
+      "modelLabel": "模型",
+      "promptLabel": "Prompt",
+      "parametersLabel": "参数",
+      "mediaReference": "参考图片",
+      "mediaFirstFrame": "首帧图片",
+      "mediaRefMaterial": "参考素材",
+      "mediaSourceVideo": "源视频",
+      "generate": "生成",
+      "generateBatch": "生成 ×{count}"
+    },
+    "mode": {
+      "image": "图像生成",
+      "video": "视频生成",
+      "groupImage": "图像",
+      "groupVideo": "视频",
+      "t2i": "文生图",
+      "i2i": "图生图",
+      "t2v": "文生",
+      "i2v": "图生",
+      "r2v": "参考生",
+      "v2v": "编辑"
+    },
+    "results": {
+      "eyebrow": "生成结果",
+      "title": "结果",
+      "emptyTitle": "暂无生成结果",
+      "emptyBody": "输入提示词并点击生成，结果将展示在这里",
+      "filterAll": "全部",
+      "filterImage": "图片",
+      "filterVideo": "视频",
+      "gridView": "网格视图",
+      "galleryView": "画廊视图",
+      "today": "今天",
+      "yesterday": "昨天"
+    },
+    "card": {
+      "saveToLibrary": "保存到资产库",
+      "saved": "已保存",
+      "useAsReference": "用作参考图",
+      "download": "下载",
+      "generateVideo": "生成视频",
+      "retry": "重试",
+      "delete": "删除",
+      "copyError": "复制全文",
+      "copied": "已复制",
+      "expand": "展开",
+      "collapse": "收起",
+      "failed": "生成失败",
+      "queued": "排队中…",
+      "processing": "生成中…"
+    }
   }
 }

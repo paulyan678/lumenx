@@ -127,14 +127,14 @@ function PillToggle({
   return (
     <div className="flex flex-col gap-[6px]">
       <span className="text-[0.6875rem] font-medium text-text-muted">{label}</span>
-      <div className="flex gap-0 p-[2px] bg-glass rounded-lg border border-border-subtle">
+      <div className="flex gap-[2px] p-[3px] bg-surface-inset rounded-full atelier-pill-tabs">
         <button
           type="button"
           onClick={() => onChange(true)}
-          className={`flex-1 px-3 py-[6px] rounded-md text-[0.6875rem] font-medium text-center cursor-pointer transition-all ${
+          className={`flex-1 rounded-full px-3 py-1.5 text-[0.6875rem] font-medium text-center cursor-pointer transition-all ${
             value
-              ? 'bg-primary text-white shadow-[0_1px_4px_rgba(100,108,255,0.3)]'
-              : 'text-text-muted hover:text-foreground'
+              ? 'bg-surface text-foreground shadow-[0_2px_8px_rgba(0,0,0,0.4)] atelier-pill-tab-active'
+              : 'text-text-muted hover:text-foreground hover:bg-hover-bg'
           }`}
         >
           ON
@@ -142,10 +142,10 @@ function PillToggle({
         <button
           type="button"
           onClick={() => onChange(false)}
-          className={`flex-1 px-3 py-[6px] rounded-md text-[0.6875rem] font-medium text-center cursor-pointer transition-all ${
+          className={`flex-1 rounded-full px-3 py-1.5 text-[0.6875rem] font-medium text-center cursor-pointer transition-all ${
             !value
-              ? 'bg-primary text-white shadow-[0_1px_4px_rgba(100,108,255,0.3)]'
-              : 'text-text-muted hover:text-foreground'
+              ? 'bg-surface text-foreground shadow-[0_2px_8px_rgba(0,0,0,0.4)] atelier-pill-tab-active'
+              : 'text-text-muted hover:text-foreground hover:bg-hover-bg'
           }`}
         >
           OFF
@@ -316,16 +316,16 @@ export default function ParameterBar() {
   const batchPills = (
     <div className="flex flex-col gap-[6px]">
       <span className="text-[0.6875rem] font-medium text-text-muted">批量生成</span>
-      <div className="flex gap-0 p-[2px] bg-glass rounded-lg border border-border-subtle">
+      <div className="flex gap-[2px] p-[3px] bg-surface-inset rounded-full atelier-pill-tabs">
         {BATCH_OPTIONS.map((n) => (
           <button
             key={n}
             type="button"
             onClick={() => setBatchSize(n)}
-            className={`flex-1 py-[6px] rounded-md font-mono text-xs font-medium cursor-pointer transition-all text-center ${
+            className={`flex-1 rounded-full px-3 py-1.5 font-mono text-[0.6875rem] font-medium cursor-pointer transition-all text-center ${
               batchSize === n
-                ? 'text-white bg-primary shadow-[0_1px_4px_rgba(100,108,255,0.3)]'
-                : 'text-text-muted hover:text-foreground'
+                ? 'text-foreground bg-surface shadow-[0_2px_8px_rgba(0,0,0,0.4)] atelier-pill-tab-active'
+                : 'text-text-muted hover:text-foreground hover:bg-hover-bg'
             }`}
           >
             x{n}
@@ -422,16 +422,16 @@ export default function ParameterBar() {
             ) : modelDuration?.type === 'buttons' ? (
               <div className="flex flex-col gap-[6px]">
                 <span className="text-[0.6875rem] font-medium text-text-muted">时长</span>
-                <div className="flex gap-0 p-[2px] bg-glass rounded-lg border border-border-subtle">
+                <div className="flex gap-[2px] p-[3px] bg-surface-inset rounded-full atelier-pill-tabs">
                   {modelDuration.options.map((n) => (
                     <button
                       key={n}
                       type="button"
                       onClick={() => updateParam('duration', n)}
-                      className={`flex-1 py-[6px] rounded-md font-mono text-xs font-medium cursor-pointer transition-all text-center ${
+                      className={`flex-1 rounded-full px-3 py-1.5 font-mono text-[0.6875rem] font-medium cursor-pointer transition-all text-center ${
                         durationValue === n
-                          ? 'text-white bg-primary shadow-[0_1px_4px_rgba(100,108,255,0.3)]'
-                          : 'text-text-muted hover:text-foreground'
+                          ? 'text-foreground bg-surface shadow-[0_2px_8px_rgba(0,0,0,0.4)] atelier-pill-tab-active'
+                          : 'text-text-muted hover:text-foreground hover:bg-hover-bg'
                       }`}
                     >
                       {n}s
@@ -469,12 +469,12 @@ export default function ParameterBar() {
           {showAdvanced && (
             <div className="grid grid-cols-2 gap-3 mt-3">
               {supportsSeed && (
-                <div className="flex flex-col gap-[6px]">
+                <div className="flex flex-col gap-[6px] atelier-field">
                   <span className="text-[0.6875rem] font-medium text-text-muted">Seed</span>
                   <input
                     type="number"
                     placeholder="随机"
-                    className="bg-glass border border-glass-border rounded-lg px-3 py-2.5 text-xs text-foreground font-mono w-full outline-none focus:border-foreground/[0.15] transition placeholder:text-text-muted"
+                    className="glass-input w-full text-xs text-foreground font-mono placeholder:text-text-muted"
                     value={parameters.seed ?? ''}
                     onChange={(e) => {
                       const val = e.target.value;

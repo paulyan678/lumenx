@@ -1546,5 +1546,66 @@
     "imgLoadFailedRetry": "Failed to load — click to retry",
     "videoLoadFailed": "Video failed to load",
     "videoLoadFailedRetry": "Video failed to load — click to retry"
+  },
+  "playground": {
+    "header": {
+      "title": "Playground",
+      "resultsCount": "{count} results"
+    },
+    "compose": {
+      "eyebrow": "Compose",
+      "title": "Playground",
+      "modeLabel": "Mode",
+      "modelLabel": "Model",
+      "promptLabel": "Prompt",
+      "parametersLabel": "Parameters",
+      "mediaReference": "Reference image",
+      "mediaFirstFrame": "First frame",
+      "mediaRefMaterial": "Reference material",
+      "mediaSourceVideo": "Source video",
+      "generate": "Generate",
+      "generateBatch": "Generate ×{count}"
+    },
+    "mode": {
+      "image": "Image",
+      "video": "Video",
+      "groupImage": "Image",
+      "groupVideo": "Video",
+      "t2i": "Text",
+      "i2i": "Image",
+      "t2v": "Text",
+      "i2v": "Image",
+      "r2v": "Reference",
+      "v2v": "Edit"
+    },
+    "results": {
+      "eyebrow": "Results",
+      "title": "Results",
+      "emptyTitle": "No results yet",
+      "emptyBody": "Enter a prompt and hit Generate — results show up here.",
+      "filterAll": "All",
+      "filterImage": "Images",
+      "filterVideo": "Videos",
+      "gridView": "Grid view",
+      "galleryView": "Gallery view",
+      "today": "Today",
+      "yesterday": "Yesterday"
+    },
+    "card": {
+      "saveToLibrary": "Save to library",
+      "saved": "Saved",
+      "useAsReference": "Use as reference",
+      "download": "Download",
+      "generateVideo": "Generate video",
+      "retry": "Retry",
+      "delete": "Delete",
+      "copyError": "Copy error",
+      "copied": "Copied",
+      "expand": "Expand",
+      "collapse": "Collapse",
+      "failed": "Generation failed",
+      "queued": "Queued…",
+      "processing": "Generating…"
+    }
   }
 }

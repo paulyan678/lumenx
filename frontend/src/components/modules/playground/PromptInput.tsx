@@ -25,7 +25,7 @@ export default function PromptInput() {
         value={prompt}
         onChange={(e) => setPrompt(e.target.value.slice(0, MAX_LENGTH))}
         placeholder="描述你想生成的内容..."
-        className="w-full min-h-[120px] max-h-[280px] resize-y p-[14px] border border-glass-border rounded-xl bg-input-bg text-foreground text-[0.8125rem] leading-relaxed placeholder-foreground/40 focus:border-primary focus:ring-[3px] focus:ring-primary/12 outline-none"
+        className="glass-input w-full min-h-[120px] max-h-[280px] resize-y rounded-xl p-[14px] text-foreground text-[0.8125rem] leading-relaxed placeholder-foreground/40 focus:border-primary focus:ring-[3px] focus:ring-primary/15"
       />
 
       {/* Toolbar — below the textarea, not overlapping */}
@@ -70,7 +70,7 @@ export default function PromptInput() {
           value={negativePrompt}
           onChange={(e) => setNegativePrompt(e.target.value)}
           placeholder="不希望出现的内容..."
-          className="w-full min-h-[60px] resize-y p-[10px] border border-border-subtle rounded-lg bg-input-bg text-text-secondary text-xs placeholder-foreground/40 focus:border-primary focus:ring-[3px] focus:ring-primary/12 outline-none"
+          className="glass-input w-full min-h-[60px] resize-y rounded-lg border-border-subtle p-[10px] text-text-secondary text-xs placeholder-foreground/40 focus:border-primary focus:ring-[3px] focus:ring-primary/15"
         />
       )}
 
