@@ -228,7 +228,7 @@ export default function PlaygroundPage() {
           </section>
 
           {/* Model */}
-          <section className="glass-panel atelier-card rounded-2xl px-5 py-4">
+          <section className="glass-panel atelier-card rounded-2xl px-5 py-4 relative z-30">
             <div className="mb-3 font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-text-muted">
               {t('compose.modelLabel')}
             </div>
