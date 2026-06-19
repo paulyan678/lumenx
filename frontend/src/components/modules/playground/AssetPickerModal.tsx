@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Check, Image, Film, Loader2 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { API_URL, playgroundApi } from '@/lib/api';
 
 // ---------------------------------------------------------------------------
@@ -71,6 +72,7 @@ export default function AssetPickerModal({
   onSelect,
   accept,
 }: AssetPickerModalProps) {
+  const t = useTranslations('playground');
   const [assets, setAssets] = useState<AssetItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -194,19 +196,19 @@ export default function AssetPickerModal({
   const tabs: { key: FilterTab; label: string; icon: React.ReactNode; show: boolean }[] = [
     {
       key: 'all',
-      label: '全部',
+      label: t('assetPicker.tabAll'),
       icon: null,
       show: accept === 'all',
     },
     {
       key: 'image',
-      label: '图片',
+      label: t('assetPicker.tabImage'),
       icon: <Image className="w-3.5 h-3.5" />,
       show: accept === 'all' || accept === 'image',
     },
     {
       key: 'video',
-      label: '视频',
+      label: t('assetPicker.tabVideo'),
       icon: <Film className="w-3.5 h-3.5" />,
       show: accept === 'all' || accept === 'video',
     },
@@ -247,41 +249,37 @@ export default function AssetPickerModal({
             {/* -------------------------------------------------------------- */}
             {/* Header                                                          */}
             {/* -------------------------------------------------------------- */}
-            <div className="flex items-center justify-between px-5 pt-5 pb-3">
-              <h2 className="text-sm font-semibold text-foreground">
-                选择素材
-              </h2>
+            <div className="px-6 py-5 border-b border-glass-border flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-primary/15 flex items-center justify-center">
+                  <Image size={16} className="text-primary" />
+                </div>
+                <h2 className="text-[0.9375rem] font-semibold text-foreground">{t('assetPicker.title')}</h2>
+              </div>
 
               <button
                 type="button"
                 onClick={onClose}
-                className="
-                  w-7 h-7 rounded-lg flex items-center justify-center
-                  text-text-muted hover:text-foreground hover:bg-hover-bg
-                  transition-colors
-                "
+                className="grid h-8 w-8 place-items-center rounded-lg text-text-muted transition-colors hover:bg-hover-bg hover:text-foreground"
               >
-                <X className="w-4 h-4" />
+                <X size={16} />
               </button>
             </div>
 
             {/* Filter tabs */}
             {visibleTabs.length > 1 && (
-              <div className="flex items-center gap-1.5 px-5 pb-3">
+              <div className="flex items-center gap-1.5 px-6 pt-4 pb-2 shrink-0">
                 {visibleTabs.map((tab) => (
                   <button
                     key={tab.key}
                     type="button"
                     onClick={() => setActiveTab(tab.key)}
-                    className={`
-                      flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs
-                      transition-colors
-                      ${
-                        activeTab === tab.key
-                          ? 'bg-primary/15 text-primary border border-primary/30'
-                          : 'text-text-secondary hover:text-foreground hover:bg-hover-bg border border-transparent'
-                      }
-                    `}
+                    className={[
+                      "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[0.6875rem] font-medium transition-all border",
+                      activeTab === tab.key
+                        ? "text-primary bg-primary/15 border-primary/30"
+                        : "text-text-muted hover:text-foreground hover:bg-hover-bg border-transparent",
+                    ].join(" ")}
                   >
                     {tab.icon}
                     {tab.label}
@@ -293,23 +291,23 @@ export default function AssetPickerModal({
             {/* -------------------------------------------------------------- */}
             {/* Grid                                                            */}
             {/* -------------------------------------------------------------- */}
-            <div className="flex-1 overflow-y-auto px-5 pb-2 min-h-0">
+            <div className="flex-1 overflow-y-auto px-6 pb-2 min-h-0">
               {loading && (
                 <div className="flex flex-col items-center justify-center py-16 gap-3">
                   <Loader2 className="w-6 h-6 text-text-muted animate-spin" />
-                  <span className="text-xs text-text-muted">加载中...</span>
+                  <span className="text-xs text-text-muted">{t('assetPicker.loading')}</span>
                 </div>
               )}
 
               {error && !loading && (
                 <div className="flex flex-col items-center justify-center py-16 gap-3">
-                  <span className="text-xs text-red-400/80">{error}</span>
+                  <span className="text-xs text-status-failed-fg">{error}</span>
                   <button
                     type="button"
                     onClick={fetchAssets}
                     className="text-xs text-primary hover:underline"
                   >
-                    重试
+                    {t('assetPicker.retry')}
                   </button>
                 </div>
               )}
@@ -318,10 +316,10 @@ export default function AssetPickerModal({
                 <div className="flex flex-col items-center justify-center py-16 gap-2">
                   <Image className="w-8 h-8 text-text-muted" />
                   <span className="text-xs text-text-muted">
-                    暂无可用素材
+                    {t('assetPicker.empty')}
                   </span>
                   <span className="text-[0.6875rem] text-text-muted">
-                    在 Playground 中生成内容后，输出将出现在这里
+                    {t('assetPicker.emptyHint')}
                   </span>
                 </div>
               )}
@@ -399,7 +397,7 @@ export default function AssetPickerModal({
             {/* -------------------------------------------------------------- */}
             {/* Footer                                                          */}
             {/* -------------------------------------------------------------- */}
-            <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-glass-border">
+            <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-glass-border">
               <button
                 type="button"
                 onClick={onClose}
@@ -410,24 +408,21 @@ export default function AssetPickerModal({
                   transition-colors
                 "
               >
-                取消
+                {t('assetPicker.cancel')}
               </button>
               <button
                 type="button"
                 onClick={handleSelect}
                 disabled={!selected}
-                className={`
-                  flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium
-                  transition-all
-                  ${
-                    selected
-                      ? 'bg-primary text-on-accent hover:bg-primary-hover shadow-lg shadow-primary/20'
-                      : 'bg-elevated text-text-muted cursor-not-allowed'
-                  }
-                `}
+                className={[
+                  "inline-flex items-center gap-[7px] px-4 py-2 rounded-full text-xs font-medium transition-all",
+                  selected
+                    ? "bg-primary text-on-accent shadow-[var(--glow-primary)] hover:bg-primary-hover hover:-translate-y-px"
+                    : "bg-elevated text-text-muted cursor-not-allowed",
+                ].join(" ")}
               >
                 <Check className="w-3.5 h-3.5" />
-                选择
+                {t('assetPicker.select')}
               </button>
             </div>
           </motion.div>

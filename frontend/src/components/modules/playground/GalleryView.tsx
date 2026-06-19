@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Video, AlertCircle } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { API_URL } from '@/lib/api';
 import type { PlaygroundGeneration } from './usePlaygroundStore';
 
@@ -41,6 +42,7 @@ export default function GalleryView({
   onOpenDetail,
   onRetry,
 }: GalleryViewProps) {
+  const t = useTranslations('playground');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const thumbnailStripRef = useRef<HTMLDivElement>(null);
 
@@ -126,7 +128,7 @@ export default function GalleryView({
             />
           )
         ) : current.status === 'failed' ? (
-          <div className="flex flex-col items-center gap-3 text-red-400/70">
+          <div className="flex flex-col items-center gap-3 text-status-failed-fg">
             <AlertCircle className="w-10 h-10" />
             <p className="font-mono text-xs">Generation failed</p>
             {current.error && (
@@ -155,7 +157,7 @@ export default function GalleryView({
 
       {/* Info bar */}
       <div className="px-6 py-3 bg-surface space-y-1.5">
-        <p className="text-xs text-text-secondary line-clamp-2 leading-relaxed cursor-pointer hover:text-foreground transition-colors" onClick={handleClick} title="点击查看详情">
+        <p className="text-xs text-text-secondary line-clamp-2 leading-relaxed cursor-pointer hover:text-foreground transition-colors" onClick={handleClick} title={t('gallery.viewDetail')}>
           {current.prompt || '(no prompt)'}
         </p>
         <div className="flex items-center gap-2">
@@ -205,8 +207,8 @@ export default function GalleryView({
                 }`}
               >
                 {isFailed ? (
-                  <div className="w-full h-full bg-red-500/10 flex items-center justify-center">
-                    <AlertCircle className="w-4 h-4 text-red-400/60" />
+                  <div className="w-full h-full bg-status-failed-bg flex items-center justify-center">
+                    <AlertCircle className="w-4 h-4 text-status-failed-fg" />
                   </div>
                 ) : genIsVideo ? (
                   <div className="w-full h-full bg-gradient-to-br from-elevated to-surface flex items-center justify-center">

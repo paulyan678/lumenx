@@ -14,6 +14,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { API_URL, playgroundApi } from '@/lib/api';
+import { useTranslations } from 'next-intl';
 import { usePlaygroundStore, type PlaygroundGeneration } from './usePlaygroundStore';
 
 // ---------------------------------------------------------------------------
@@ -70,6 +71,7 @@ export default function DetailPanel({
   onRetry,
   onGenerateVideo,
 }: DetailPanelProps) {
+  const t = useTranslations('playground');
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -227,6 +229,11 @@ export default function DetailPanel({
             </div>
           )}
 
+          {/* Amber halation overlay — only when saved to library (mirrors ResultCard) */}
+          {saved && (
+            <div className="atelier-proj-halation pointer-events-none absolute inset-0 z-[1]" />
+          )}
+
           {/* Navigation arrows */}
           {hasPrev && (
             <button
@@ -279,7 +286,7 @@ export default function DetailPanel({
             {mediaUrl && (
               <button
                 onClick={handleDownload}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-elevated border border-glass-border text-foreground/80 text-sm font-medium hover:bg-hover-bg transition-colors"
+                className="w-full inline-flex items-center justify-center gap-[7px] px-4 py-2.5 rounded-full bg-elevated border border-glass-border text-foreground/80 text-sm font-medium hover:bg-hover-bg transition"
               >
                 <Download className="w-4 h-4" />
                 Download
@@ -289,22 +296,22 @@ export default function DetailPanel({
               <button
                 onClick={handleSaveToLibrary}
                 disabled={saving}
-                className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-wait ${
+                className={`w-full inline-flex items-center justify-center gap-[7px] px-4 py-2.5 rounded-full border text-sm font-medium transition cursor-pointer disabled:opacity-50 disabled:cursor-wait ${
                   saved
-                    ? 'bg-glass border-green-500/20 text-green-400 hover:border-foreground/30 hover:text-foreground'
-                    : 'bg-elevated border-glass-border text-foreground/80 hover:bg-hover-bg'
+                    ? 'bg-status-starred-bg border-status-starred-border text-status-starred-fg hover:opacity-80'
+                    : 'bg-primary border-transparent text-on-accent shadow-[var(--glow-primary)] hover:bg-primary-hover hover:-translate-y-px'
                 }`}
               >
                 <Star
-                  className={`w-4 h-4 ${saved ? 'fill-green-400 text-green-400' : ''}`}
+                  className={`w-4 h-4 ${saved ? 'fill-status-starred-solid text-status-starred-solid' : ''}`}
                 />
-                {saving ? '处理中...' : saved ? '已收藏（点击取消）' : '收藏到资产库'}
+                {saving ? t('detail.saving') : saved ? t('detail.savedCancel') : t('detail.saveToLibrary')}
               </button>
             )}
             {!isVideo && output?.media_path && onGenerateVideo && (
               <button
                 onClick={() => onGenerateVideo(output.media_path)}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-primary/10 border border-primary/20 text-primary text-sm font-medium hover:bg-primary/20 transition-colors"
+                className="w-full inline-flex items-center justify-center gap-[7px] px-4 py-2.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium hover:bg-primary/20 transition"
               >
                 <Video className="w-4 h-4" />
                 Generate Video
@@ -313,7 +320,7 @@ export default function DetailPanel({
             {generation.status === 'failed' && onRetry && (
               <button
                 onClick={() => onRetry(generation)}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm font-medium hover:bg-amber-500/20 transition-colors"
+                className="w-full inline-flex items-center justify-center gap-[7px] px-4 py-2.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium hover:bg-primary/20 transition"
               >
                 <RotateCcw className="w-4 h-4" />
                 Retry
@@ -322,7 +329,7 @@ export default function DetailPanel({
             <button
               onClick={handleDelete}
               disabled={deleting}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-red-500/[0.06] border border-red-500/[0.12] text-red-400/80 text-sm font-medium hover:bg-red-500/[0.12] transition-colors"
+              className="w-full inline-flex items-center justify-center gap-[7px] px-4 py-2.5 rounded-full bg-status-failed-bg border border-status-failed-border text-status-failed-fg text-sm font-medium hover:opacity-80 transition"
             >
               <Trash2 className="w-4 h-4" />
               {deleting ? 'Deleting...' : 'Delete'}
@@ -332,7 +339,7 @@ export default function DetailPanel({
           {/* Section 3: Prompt */}
           <div className="mb-6">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-amber-500/80">
+              <h3 className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-text-muted">
                 PROMPT
               </h3>
               <button
@@ -353,17 +360,18 @@ export default function DetailPanel({
           {/* Section 4: Parameters */}
           {paramEntries.length > 0 && (
             <div className="mb-6">
-              <h3 className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-amber-500/80 mb-2">
-                参数
+              <h3 className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-text-muted mb-2">
+                {t('detail.parameters')}
               </h3>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+              <div className="flex flex-wrap gap-1.5">
                 {paramEntries.map(([label, value]) => (
-                  <div key={label}>
-                    <p className="text-[0.625rem] text-text-muted mb-0.5">{label}</p>
-                    <p className="text-[0.75rem] text-foreground font-mono truncate">
-                      {value}
-                    </p>
-                  </div>
+                  <span
+                    key={label}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-inset border border-border-subtle text-[0.6875rem] text-text-secondary"
+                  >
+                    <span className="font-mono text-[0.5625rem] uppercase tracking-wide text-text-muted">{label}</span>
+                    {value}
+                  </span>
                 ))}
               </div>
             </div>
@@ -372,7 +380,7 @@ export default function DetailPanel({
           {/* Section 5: Negative prompt */}
           {generation.negative_prompt && (
             <div className="mb-6">
-              <h3 className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-amber-500/80 mb-2">
+              <h3 className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-text-muted mb-2">
                 NEGATIVE PROMPT
               </h3>
               <div className="max-h-28 overflow-y-auto rounded-lg bg-glass border border-glass-border p-3">
@@ -386,11 +394,11 @@ export default function DetailPanel({
           {/* Error display for failed generations */}
           {generation.status === 'failed' && generation.error && (
             <div className="mb-6">
-              <h3 className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-red-400/80 mb-2">
+              <h3 className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-status-failed-fg mb-2">
                 ERROR
               </h3>
-              <div className="max-h-28 overflow-y-auto rounded-lg bg-red-500/[0.04] border border-red-500/[0.12] p-3">
-                <p className="text-[0.6875rem] text-red-300/80 leading-relaxed break-all font-mono">
+              <div className="max-h-28 overflow-y-auto rounded-lg bg-status-failed-bg border border-status-failed-border p-3">
+                <p className="text-[0.6875rem] text-status-failed-fg leading-relaxed break-all font-mono">
                   {generation.error}
                 </p>
               </div>

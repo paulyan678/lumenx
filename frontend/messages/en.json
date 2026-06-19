@@ -1621,7 +1621,9 @@
         "r2v": "JPG / PNG / WebP supported; up to 9 reference images",
         "v2v": "MP4 / MOV / WebM supported",
         "r2vSeedance": "Seedance accepts image, video, and audio as reference material"
-      }
+      },
+      "labelReferenceOptional": "Reference image (optional)",
+      "labelRefMaterialAV": "Reference material (image/video/audio)"
     },
     "prompt": {
       "placeholder": "Describe what you want to generate…",
@@ -1668,6 +1670,40 @@
       "hoursAgo": "{count}h ago",
       "daysAgo": "{count}d ago",
       "monthsAgo": "{count}mo ago"
+    },
+    "assetPicker": {
+      "tabAll": "All",
+      "tabImage": "Images",
+      "tabVideo": "Videos",
+      "title": "Select media",
+      "loading": "Loading…",
+      "retry": "Retry",
+      "empty": "No media available",
+      "emptyHint": "Generate something in the Playground and your outputs will appear here",
+      "cancel": "Cancel",
+      "select": "Select"
+    },
+    "parameters": {
+      "imageSize": "Image size",
+      "quality": "Quality",
+      "aspectRatio": "Aspect ratio",
+      "resolution": "Resolution",
+      "duration": "Duration",
+      "durationFixedSuffix": "(fixed)",
+      "batchSize": "Batch",
+      "advanced": "Advanced",
+      "seedPlaceholder": "Random",
+      "promptExtend": "Prompt extend",
+      "watermark": "Watermark"
+    },
+    "detail": {
+      "saving": "Saving…",
+      "savedCancel": "Saved (click to remove)",
+      "saveToLibrary": "Save to library",
+      "parameters": "Parameters"
+    },
+    "gallery": {
+      "viewDetail": "Click to view details"
     }
   }
 }

@@ -12,7 +12,7 @@ import AssetPickerModal from './AssetPickerModal';
 // ---------------------------------------------------------------------------
 
 interface ModeConfig {
-  label: string;
+  labelKey: string;
   accept: string;
   hintKey: string;
   multiple: boolean;
@@ -22,7 +22,7 @@ interface ModeConfig {
 
 const MODE_CONFIG: Partial<Record<PlaygroundMode, ModeConfig>> = {
   t2i: {
-    label: '参考图片（可选）',
+    labelKey: 'media.labelReferenceOptional',
     accept: 'image/*',
     hintKey: 't2i',
     multiple: true,
@@ -30,7 +30,7 @@ const MODE_CONFIG: Partial<Record<PlaygroundMode, ModeConfig>> = {
     icon: 'image',
   },
   i2i: {
-    label: '参考图片',
+    labelKey: 'compose.mediaReference',
     accept: 'image/*',
     hintKey: 'i2i',
     multiple: false,
@@ -38,7 +38,7 @@ const MODE_CONFIG: Partial<Record<PlaygroundMode, ModeConfig>> = {
     icon: 'image',
   },
   i2v: {
-    label: '首帧图片',
+    labelKey: 'compose.mediaFirstFrame',
     accept: 'image/*',
     hintKey: 'i2v',
     multiple: false,
@@ -46,7 +46,7 @@ const MODE_CONFIG: Partial<Record<PlaygroundMode, ModeConfig>> = {
     icon: 'image',
   },
   r2v: {
-    label: '参考图片',
+    labelKey: 'compose.mediaReference',
     accept: 'image/*',
     hintKey: 'r2v',
     multiple: true,
@@ -54,7 +54,7 @@ const MODE_CONFIG: Partial<Record<PlaygroundMode, ModeConfig>> = {
     icon: 'image',
   },
   v2v: {
-    label: '源视频',
+    labelKey: 'compose.mediaSourceVideo',
     accept: 'video/*',
     hintKey: 'v2v',
     multiple: false,
@@ -111,7 +111,7 @@ export default function MediaInput() {
   if (config && mode === 'r2v' && isSeedance) {
     config = {
       ...config,
-      label: '参考素材（图片/视频/音频）',
+      labelKey: 'media.labelRefMaterialAV',
       accept: 'image/*,video/*,audio/*',
       hintKey: 'r2vSeedance',
     };

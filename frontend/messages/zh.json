@@ -1621,7 +1621,9 @@
         "r2v": "支持 JPG / PNG / WebP，最多 9 张参考图",
         "v2v": "支持 MP4 / MOV / WebM",
         "r2vSeedance": "Seedance 支持图片、视频、音频作为参考素材"
-      }
+      },
+      "labelReferenceOptional": "参考图片（可选）",
+      "labelRefMaterialAV": "参考素材（图片/视频/音频）"
     },
     "prompt": {
       "placeholder": "描述你想生成的内容...",
@@ -1668,6 +1670,40 @@
       "hoursAgo": "{count} 小时前",
       "daysAgo": "{count} 天前",
       "monthsAgo": "{count} 个月前"
+    },
+    "assetPicker": {
+      "tabAll": "全部",
+      "tabImage": "图片",
+      "tabVideo": "视频",
+      "title": "选择素材",
+      "loading": "加载中...",
+      "retry": "重试",
+      "empty": "暂无可用素材",
+      "emptyHint": "在 Playground 中生成内容后，输出将出现在这里",
+      "cancel": "取消",
+      "select": "选择"
+    },
+    "parameters": {
+      "imageSize": "图像尺寸",
+      "quality": "画质",
+      "aspectRatio": "画面比例",
+      "resolution": "分辨率",
+      "duration": "时长",
+      "durationFixedSuffix": "(固定)",
+      "batchSize": "批量生成",
+      "advanced": "高级参数",
+      "seedPlaceholder": "随机",
+      "promptExtend": "提示词扩展",
+      "watermark": "水印"
+    },
+    "detail": {
+      "saving": "处理中...",
+      "savedCancel": "已收藏（点击取消）",
+      "saveToLibrary": "收藏到资产库",
+      "parameters": "参数"
+    },
+    "gallery": {
+      "viewDetail": "点击查看详情"
     }
   }
 }

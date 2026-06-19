@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { usePlaygroundStore } from './usePlaygroundStore';
 import { getModelParams, getModelDuration } from './playgroundModels';
 import { ChevronDown, Check } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -172,6 +173,7 @@ function DurationStepper({
   step: number;
   onChange: (v: number) => void;
 }) {
+  const t = useTranslations('playground');
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value.replace(/[^0-9]/g, '');
     if (raw === '') return;
@@ -185,7 +187,7 @@ function DurationStepper({
 
   return (
     <div className="flex flex-col gap-[6px]">
-      <span className="text-[0.6875rem] font-medium text-text-muted">时长</span>
+      <span className="text-[0.6875rem] font-medium text-text-muted">{t('parameters.duration')}</span>
       <div className="flex items-center gap-0 rounded-lg border border-glass-border bg-glass overflow-hidden">
         <button
           type="button"
@@ -228,6 +230,7 @@ function DurationStepper({
 // ---------------------------------------------------------------------------
 
 export default function ParameterBar() {
+  const t = useTranslations('playground');
   const mode = usePlaygroundStore((s) => s.mode);
   const modelId = usePlaygroundStore((s) => s.modelId);
   const parameters = usePlaygroundStore((s) => s.parameters);
@@ -315,7 +318,7 @@ export default function ParameterBar() {
   // Batch pill renderer (reused for both image and video)
   const batchPills = (
     <div className="flex flex-col gap-[6px]">
-      <span className="text-[0.6875rem] font-medium text-text-muted">批量生成</span>
+      <span className="text-[0.6875rem] font-medium text-text-muted">{t('parameters.batchSize')}</span>
       <div className="flex gap-[2px] p-[3px] bg-surface-inset rounded-full atelier-pill-tabs">
         {BATCH_OPTIONS.map((n) => (
           <button
@@ -345,7 +348,7 @@ export default function ParameterBar() {
             {/* Size (image-specific, replaces resolution) */}
             {hasSize && (
               <ParamDropdown
-                label="图像尺寸"
+                label={t('parameters.imageSize')}
                 value={(parameters.size as string) ?? sizeDefault}
                 options={sizeOptions}
                 onChange={(v) => updateParam('size', v)}
@@ -356,7 +359,7 @@ export default function ParameterBar() {
             {/* Quality (GPT-Image-2 specific) */}
             {hasQuality && (
               <ParamDropdown
-                label="画质"
+                label={t('parameters.quality')}
                 value={(parameters.quality as string) ?? qualityDefault}
                 options={qualityOptions}
                 onChange={(v) => updateParam('quality', v)}
@@ -376,7 +379,7 @@ export default function ParameterBar() {
             {/* Ratio */}
             {hasRatio && (
               <ParamDropdown
-                label="画面比例"
+                label={t('parameters.aspectRatio')}
                 value={(parameters.aspect_ratio as string) ?? ratioDefault}
                 options={ratioOptions}
                 onChange={(v) => updateParam('aspect_ratio', v)}
@@ -386,7 +389,7 @@ export default function ParameterBar() {
             {/* Resolution */}
             {hasResolution && (
               <ParamDropdown
-                label="分辨率"
+                label={t('parameters.resolution')}
                 value={(parameters.resolution as string) ?? resolutionDefault}
                 options={resolutionOptions}
                 onChange={(v) => updateParam('resolution', v)}
@@ -397,13 +400,13 @@ export default function ParameterBar() {
             {!hasRatio && !hasResolution && (
               <>
                 <ParamDropdown
-                  label="画面比例"
+                  label={t('parameters.aspectRatio')}
                   value={(parameters.aspect_ratio as string) ?? FALLBACK_RATIOS[0]}
                   options={FALLBACK_RATIOS}
                   onChange={(v) => updateParam('aspect_ratio', v)}
                 />
                 <ParamDropdown
-                  label="分辨率"
+                  label={t('parameters.resolution')}
                   value={(parameters.resolution as string) ?? FALLBACK_RESOLUTIONS[0]}
                   options={FALLBACK_RESOLUTIONS}
                   onChange={(v) => updateParam('resolution', v)}
@@ -414,14 +417,14 @@ export default function ParameterBar() {
             {/* Duration */}
             {durationFixed ? (
               <div className="flex flex-col gap-[6px]">
-                <span className="text-[0.6875rem] font-medium text-text-muted">时长</span>
+                <span className="text-[0.6875rem] font-medium text-text-muted">{t('parameters.duration')}</span>
                 <div className="w-full flex items-center px-3 py-2.5 rounded-lg bg-glass border border-glass-border text-text-muted text-xs font-medium">
-                  {durationValue}s (固定)
+                  {durationValue}s {t('parameters.durationFixedSuffix')}
                 </div>
               </div>
             ) : modelDuration?.type === 'buttons' ? (
               <div className="flex flex-col gap-[6px]">
-                <span className="text-[0.6875rem] font-medium text-text-muted">时长</span>
+                <span className="text-[0.6875rem] font-medium text-text-muted">{t('parameters.duration')}</span>
                 <div className="flex gap-[2px] p-[3px] bg-surface-inset rounded-full atelier-pill-tabs">
                   {modelDuration.options.map((n) => (
                     <button
@@ -463,7 +466,7 @@ export default function ParameterBar() {
             onClick={() => setShowAdvanced(!showAdvanced)}
             className="text-[0.6875rem] font-medium text-text-muted hover:text-foreground transition-colors cursor-pointer"
           >
-            {showAdvanced ? '▾' : '▸'} 高级参数
+            {showAdvanced ? '▾' : '▸'} {t('parameters.advanced')}
           </button>
 
           {showAdvanced && (
@@ -473,7 +476,7 @@ export default function ParameterBar() {
                   <span className="text-[0.6875rem] font-medium text-text-muted">Seed</span>
                   <input
                     type="number"
-                    placeholder="随机"
+                    placeholder={t('parameters.seedPlaceholder')}
                     className="glass-input w-full text-xs text-foreground font-mono placeholder:text-text-muted"
                     value={parameters.seed ?? ''}
                     onChange={(e) => {
@@ -486,7 +489,7 @@ export default function ParameterBar() {
 
               {supportsPromptExtend && (
                 <PillToggle
-                  label="提示词扩展"
+                  label={t('parameters.promptExtend')}
                   value={parameters.prompt_extend !== false}
                   onChange={(v) => updateParam('prompt_extend', v)}
                 />
@@ -494,7 +497,7 @@ export default function ParameterBar() {
 
               {supportsWatermark && (
                 <PillToggle
-                  label="水印"
+                  label={t('parameters.watermark')}
                   value={parameters.watermark === true}
                   onChange={(v) => updateParam('watermark', v)}
                 />
