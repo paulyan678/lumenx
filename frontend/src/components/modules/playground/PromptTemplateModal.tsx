@@ -2,14 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useTranslations } from "next-intl";
 import { X, Plus, Copy, Trash2, Sparkles, BookmarkPlus, Star } from "lucide-react";
 import { playgroundApi } from "@/lib/api";
 import { usePlaygroundStore, type PlaygroundTemplate } from "./usePlaygroundStore";
 
 const CATEGORIES = [
-  { value: "image", label: "图像", color: "text-blue-400" },
-  { value: "video", label: "视频", color: "text-purple-400" },
-  { value: "general", label: "通用", color: "text-text-secondary" },
+  { value: "image", labelKey: "template.catImage", color: "text-blue-400" },
+  { value: "video", labelKey: "template.catVideo", color: "text-purple-400" },
+  { value: "general", labelKey: "template.catGeneral", color: "text-text-secondary" },
 ] as const;
 
 type CategoryValue = (typeof CATEGORIES)[number]["value"];
@@ -27,6 +28,7 @@ interface FormState {
 const EMPTY_FORM: FormState = { name: "", category: "general", prompt: "" };
 
 export default function PromptTemplateModal() {
+  const t = useTranslations("playground");
   const {
     templates,
     showTemplateModal,
@@ -127,7 +129,7 @@ export default function PromptTemplateModal() {
 
   const filtered = (filterCat === "all"
     ? templates
-    : templates.filter((t) => t.category === filterCat)
+    : templates.filter((x) => x.category === filterCat)
   ).sort((a, b) => {
     const aFav = isTemplateFavorited(a.id) ? 0 : 1;
     const bFav = isTemplateFavorited(b.id) ? 0 : 1;
@@ -148,7 +150,7 @@ export default function PromptTemplateModal() {
           role="dialog"
           aria-modal="true"
           tabIndex={-1}
-          className="pointer-events-auto w-[560px] max-h-[85vh] bg-surface border border-glass-border rounded-2xl shadow-[0_24px_80px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden outline-none"
+          className="pointer-events-auto w-[560px] max-h-[85vh] bg-elevated border border-glass-border rounded-2xl shadow-2xl flex flex-col overflow-hidden outline-none"
         >
           {/* Header */}
           <div className="px-6 py-5 border-b border-glass-border flex items-center justify-between shrink-0">
@@ -157,8 +159,8 @@ export default function PromptTemplateModal() {
                 <BookmarkPlus size={16} className="text-primary" />
               </div>
               <div>
-                <h2 className="text-[0.9375rem] font-semibold text-foreground">Prompt 模板</h2>
-                <p className="text-[0.625rem] text-text-muted mt-0.5">保存常用提示词，一键套用</p>
+                <h2 className="text-[0.9375rem] font-semibold text-foreground">{t("template.title")}</h2>
+                <p className="text-[0.625rem] text-text-muted mt-0.5">{t("template.subtitle")}</p>
               </div>
             </div>
             <button
@@ -172,22 +174,22 @@ export default function PromptTemplateModal() {
 
           {/* Filter tabs */}
           <div className="px-6 pt-4 pb-2 flex gap-1.5 shrink-0">
-            {[{ value: "all" as const, label: "全部" }, ...CATEGORIES].map((c) => (
+            {[{ value: "all" as const, labelKey: "template.filterAll" as const }, ...CATEGORIES].map((c) => (
               <button
                 key={c.value}
                 type="button"
                 onClick={() => setFilterCat(c.value)}
                 className={[
-                  "px-3 py-1.5 rounded-md text-[0.6875rem] font-medium transition-all",
+                  "px-3 py-1.5 rounded-md text-[0.6875rem] font-medium transition-all border",
                   filterCat === c.value
-                    ? "text-foreground bg-elevated border border-glass-border"
-                    : "text-text-muted hover:text-foreground hover:bg-hover-bg border border-transparent",
+                    ? "text-primary bg-primary/15 border-primary/30"
+                    : "text-text-muted hover:text-foreground hover:bg-hover-bg border-transparent",
                 ].join(" ")}
               >
-                {c.label}
+                {t(c.labelKey)}
                 {c.value !== "all" && (
                   <span className="ml-1.5 text-[0.5625rem] text-text-muted">
-                    {templates.filter((t) => t.category === c.value).length}
+                    {templates.filter((x) => x.category === c.value).length}
                   </span>
                 )}
               </button>
@@ -200,9 +202,11 @@ export default function PromptTemplateModal() {
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <Sparkles size={28} className="text-text-muted mb-3" />
                 <p className="text-[0.8125rem] text-text-muted mb-1">
-                  {filterCat === "all" ? "暂无模板" : `暂无${categoryMeta(filterCat).label}模板`}
+                  {filterCat === "all"
+                    ? t("template.emptyAll")
+                    : t("template.emptyFiltered", { category: t(categoryMeta(filterCat).labelKey) })}
                 </p>
-                <p className="text-[0.6875rem] text-text-muted">点击下方「新建」创建你的第一个模板</p>
+                <p className="text-[0.6875rem] text-text-muted">{t("template.emptyHint")}</p>
               </div>
             )}
 
@@ -218,7 +222,7 @@ export default function PromptTemplateModal() {
                       <div className="flex items-center gap-2 mb-1.5">
                         <span className="text-[0.8125rem] font-medium text-foreground truncate">{tpl.name}</span>
                         <span className={`text-[0.5625rem] font-mono uppercase px-1.5 py-[2px] rounded bg-elevated shrink-0 ${meta.color}`}>
-                          {meta.label}
+                          {t(meta.labelKey)}
                         </span>
                         {tpl.default_mode && (
                           <span className="text-[0.5625rem] font-mono uppercase px-1.5 py-[2px] rounded bg-glass text-text-muted shrink-0">
@@ -236,12 +240,12 @@ export default function PromptTemplateModal() {
                         onClick={() => toggleTemplateFavorite(tpl.id)}
                         className={`h-7 w-7 rounded-md flex items-center justify-center transition-colors ${
                           isTemplateFavorited(tpl.id)
-                            ? 'text-amber-400'
-                            : 'text-text-muted hover:text-amber-400/70'
+                            ? 'text-status-starred-solid'
+                            : 'text-text-muted hover:text-status-starred-solid/70'
                         }`}
-                        title={isTemplateFavorited(tpl.id) ? '取消收藏' : '收藏'}
+                        title={isTemplateFavorited(tpl.id) ? t('template.unfavorite') : t('template.favorite')}
                       >
-                        <Star size={12} className={isTemplateFavorited(tpl.id) ? 'fill-amber-400' : ''} />
+                        <Star size={12} className={isTemplateFavorited(tpl.id) ? 'fill-status-starred-solid' : ''} />
                       </button>
                       <button
                         type="button"
@@ -249,13 +253,13 @@ export default function PromptTemplateModal() {
                         className="h-7 px-2.5 rounded-md text-[0.6875rem] font-medium text-primary bg-primary/10 hover:bg-primary/20 transition-colors flex items-center gap-1"
                       >
                         <Copy size={11} />
-                        套用
+                        {t('template.apply')}
                       </button>
                       <button
                         type="button"
                         onClick={() => handleDelete(tpl.id)}
                         disabled={deletingId === tpl.id}
-                        className="h-7 w-7 rounded-md flex items-center justify-center text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-30"
+                        className="h-7 w-7 rounded-md flex items-center justify-center text-text-muted hover:text-status-failed-fg hover:bg-status-failed-bg transition-colors disabled:opacity-30"
                       >
                         <Trash2 size={12} />
                       </button>
@@ -278,7 +282,7 @@ export default function PromptTemplateModal() {
                     className="inline-flex items-center gap-1.5 text-xs font-medium text-text-muted hover:text-foreground transition-colors"
                   >
                     <Plus size={14} />
-                    新建模板
+                    {t('template.newTemplate')}
                   </button>
                   {currentPrompt.trim() && (
                     <button
@@ -287,19 +291,19 @@ export default function PromptTemplateModal() {
                       className="ml-auto inline-flex items-center gap-1.5 text-[0.6875rem] font-medium text-text-muted hover:text-foreground transition-colors"
                     >
                       <Copy size={11} />
-                      从当前输入保存
+                      {t('template.saveFromCurrent')}
                     </button>
                   )}
                 </>
               ) : (
                 <>
-                  <span className="text-xs font-medium text-text-secondary">新建模板</span>
+                  <span className="text-xs font-medium text-text-secondary">{t('template.newTemplate')}</span>
                   <button
                     type="button"
                     onClick={() => { setFormOpen(false); setForm(EMPTY_FORM); }}
                     className="ml-auto text-[0.6875rem] text-text-muted hover:text-foreground transition-colors"
                   >
-                    收起
+                    {t('template.collapse')}
                   </button>
                 </>
               )}
@@ -314,8 +318,8 @@ export default function PromptTemplateModal() {
                     type="text"
                     value={form.name}
                     onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                    placeholder="模板名称"
-                    className="flex-1 h-9 px-3 text-[0.8125rem] bg-glass border border-glass-border rounded-lg text-white placeholder:text-text-muted outline-none focus:border-primary/40 transition-colors"
+                    placeholder={t("template.namePlaceholder")}
+                    className="flex-1 h-9 px-3 text-[0.8125rem] bg-glass border border-glass-border rounded-lg text-foreground placeholder:text-text-muted outline-none focus:border-primary/40 transition-colors"
                     autoFocus
                   />
                 </div>
@@ -330,11 +334,11 @@ export default function PromptTemplateModal() {
                       className={[
                         "flex-1 py-[6px] rounded-md text-[0.6875rem] font-medium text-center cursor-pointer transition-all",
                         form.category === c.value
-                          ? "text-white bg-primary shadow-[0_1px_4px_rgba(100,108,255,0.3)]"
+                          ? "text-foreground bg-surface shadow-[0_2px_8px_rgba(0,0,0,0.4)] atelier-pill-tab-active"
                           : "text-text-muted hover:text-foreground",
                       ].join(" ")}
                     >
-                      {c.label}
+                      {t(c.labelKey)}
                     </button>
                   ))}
                 </div>
@@ -343,9 +347,9 @@ export default function PromptTemplateModal() {
                 <textarea
                   value={form.prompt}
                   onChange={(e) => setForm((f) => ({ ...f, prompt: e.target.value }))}
-                  placeholder="输入 Prompt 内容..."
+                  placeholder={t("template.promptPlaceholder")}
                   rows={5}
-                  className="w-full min-h-[120px] px-3 py-2.5 text-[0.8125rem] leading-relaxed bg-glass border border-glass-border rounded-lg text-white placeholder:text-text-muted outline-none focus:border-primary/40 transition-colors resize-y"
+                  className="w-full min-h-[120px] px-3 py-2.5 text-[0.8125rem] leading-relaxed bg-glass border border-glass-border rounded-lg text-foreground placeholder:text-text-muted outline-none focus:border-primary/40 transition-colors resize-y"
                 />
 
                 {/* Submit */}
@@ -356,11 +360,11 @@ export default function PromptTemplateModal() {
                   className={[
                     "w-full h-9 rounded-lg text-[0.8125rem] font-medium transition-all",
                     form.name.trim() && form.prompt.trim()
-                      ? "bg-primary text-white hover:bg-primary-hover shadow-[0_2px_12px_rgba(100,108,255,0.25)]"
-                      : "bg-glass text-text-muted cursor-not-allowed",
+                      ? "bg-primary text-on-accent hover:bg-primary-hover shadow-[var(--glow-primary)]"
+                      : "bg-elevated text-text-muted cursor-not-allowed",
                   ].join(" ")}
                 >
-                  {busy ? "保存中…" : "保存模板"}
+                  {busy ? t("template.saving") : t("template.save")}
                 </button>
               </div>
             )}

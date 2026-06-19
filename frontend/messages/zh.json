@@ -1634,6 +1634,40 @@
       "selectPlaceholder": "选择模型",
       "noModels": "当前模式无可用模型",
       "recommended": "推荐"
+    },
+    "template": {
+      "title": "Prompt 模板",
+      "subtitle": "保存常用提示词，一键套用",
+      "filterAll": "全部",
+      "catImage": "图像",
+      "catVideo": "视频",
+      "catGeneral": "通用",
+      "emptyAll": "暂无模板",
+      "emptyFiltered": "暂无{category}模板",
+      "emptyHint": "点击下方「新建」创建你的第一个模板",
+      "favorite": "收藏",
+      "unfavorite": "取消收藏",
+      "apply": "套用",
+      "newTemplate": "新建模板",
+      "saveFromCurrent": "从当前输入保存",
+      "collapse": "收起",
+      "namePlaceholder": "模板名称",
+      "promptPlaceholder": "输入 Prompt 内容...",
+      "saving": "保存中…",
+      "save": "保存模板"
+    },
+    "history": {
+      "title": "Prompt 历史",
+      "searchPlaceholder": "搜索历史 prompt...",
+      "noMatch": "无匹配结果",
+      "empty": "暂无生成历史",
+      "copy": "复制",
+      "saveAsTemplate": "存为模板",
+      "justNow": "刚刚",
+      "minutesAgo": "{count} 分钟前",
+      "hoursAgo": "{count} 小时前",
+      "daysAgo": "{count} 天前",
+      "monthsAgo": "{count} 个月前"
     }
   }
 }

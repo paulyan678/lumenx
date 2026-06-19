@@ -1634,6 +1634,40 @@
       "selectPlaceholder": "Select model",
       "noModels": "No models available for this mode",
       "recommended": "Recommended"
+    },
+    "template": {
+      "title": "Prompt templates",
+      "subtitle": "Save frequent prompts, apply in one click",
+      "filterAll": "All",
+      "catImage": "Image",
+      "catVideo": "Video",
+      "catGeneral": "General",
+      "emptyAll": "No templates yet",
+      "emptyFiltered": "No {category} templates yet",
+      "emptyHint": "Click “New” below to create your first template",
+      "favorite": "Favorite",
+      "unfavorite": "Unfavorite",
+      "apply": "Apply",
+      "newTemplate": "New template",
+      "saveFromCurrent": "Save from current input",
+      "collapse": "Collapse",
+      "namePlaceholder": "Template name",
+      "promptPlaceholder": "Enter prompt content…",
+      "saving": "Saving…",
+      "save": "Save template"
+    },
+    "history": {
+      "title": "Prompt history",
+      "searchPlaceholder": "Search prompt history…",
+      "noMatch": "No matching results",
+      "empty": "No history yet",
+      "copy": "Copy",
+      "saveAsTemplate": "Save as template",
+      "justNow": "Just now",
+      "minutesAgo": "{count}m ago",
+      "hoursAgo": "{count}h ago",
+      "daysAgo": "{count}d ago",
+      "monthsAgo": "{count}mo ago"
     }
   }
 }

@@ -379,7 +379,7 @@ export default function AssetPickerModal({
                         {/* Selected checkmark */}
                         {isSelected && (
                           <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
-                            <Check className="w-3 h-3 text-white" />
+                            <Check className="w-3 h-3 text-on-accent" />
                           </div>
                         )}
 
@@ -421,7 +421,7 @@ export default function AssetPickerModal({
                   transition-all
                   ${
                     selected
-                      ? 'bg-primary text-white hover:bg-primary-hover shadow-lg shadow-primary/20'
+                      ? 'bg-primary text-on-accent hover:bg-primary-hover shadow-lg shadow-primary/20'
                       : 'bg-elevated text-text-muted cursor-not-allowed'
                   }
                 `}

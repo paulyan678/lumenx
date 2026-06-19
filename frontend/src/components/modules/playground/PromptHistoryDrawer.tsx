@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
+import { useTranslations } from 'next-intl';
 import { X, Copy, BookmarkPlus, Search } from 'lucide-react';
 import { usePlaygroundStore } from './usePlaygroundStore';
 
@@ -17,18 +18,25 @@ const MODE_LABELS: Record<string, string> = {
   v2v: 'V2V',
 };
 
-function relativeTime(dateStr: string): string {
+type RelTime =
+  | { key: 'history.justNow' }
+  | {
+      key: 'history.minutesAgo' | 'history.hoursAgo' | 'history.daysAgo' | 'history.monthsAgo';
+      count: number;
+    };
+
+function relativeTime(dateStr: string): RelTime {
   const diff = Date.now() - new Date(dateStr).getTime();
   const seconds = Math.floor(diff / 1000);
-  if (seconds < 60) return '刚刚';
+  if (seconds < 60) return { key: 'history.justNow' };
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes} 分钟前`;
+  if (minutes < 60) return { key: 'history.minutesAgo', count: minutes };
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} 小时前`;
+  if (hours < 24) return { key: 'history.hoursAgo', count: hours };
   const days = Math.floor(hours / 24);
-  if (days < 30) return `${days} 天前`;
+  if (days < 30) return { key: 'history.daysAgo', count: days };
   const months = Math.floor(days / 30);
-  return `${months} 个月前`;
+  return { key: 'history.monthsAgo', count: months };
 }
 
 // ---------------------------------------------------------------------------
@@ -47,6 +55,7 @@ interface HistoryEntry {
 // ---------------------------------------------------------------------------
 
 export default function PromptHistoryDrawer() {
+  const t = useTranslations('playground');
   const showHistoryDrawer = usePlaygroundStore((s) => s.showHistoryDrawer);
   const setShowHistoryDrawer = usePlaygroundStore((s) => s.setShowHistoryDrawer);
   const history = usePlaygroundStore((s) => s.history);
@@ -134,7 +143,7 @@ export default function PromptHistoryDrawer() {
       >
         {/* ── Header ─────────────────────────────────────────────────── */}
         <div className="px-5 py-4 border-b border-border-subtle flex items-center justify-between shrink-0">
-          <h2 className="text-sm font-medium text-foreground">Prompt 历史</h2>
+          <h2 className="text-sm font-medium text-foreground">{t('history.title')}</h2>
           <button
             type="button"
             onClick={handleClose}
@@ -152,7 +161,7 @@ export default function PromptHistoryDrawer() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="搜索历史 prompt..."
+              placeholder={t('history.searchPlaceholder')}
               className="w-full bg-glass border border-glass-border rounded-lg pl-9 pr-3 py-2 text-xs text-foreground/80 placeholder:text-text-muted outline-none focus:border-foreground/[0.12] transition-colors"
             />
           </div>
@@ -163,7 +172,7 @@ export default function PromptHistoryDrawer() {
           {filtered.length === 0 ? (
             <div className="flex items-center justify-center h-full">
               <p className="text-xs text-text-muted">
-                {search.trim() ? '无匹配结果' : '暂无生成历史'}
+                {search.trim() ? t('history.noMatch') : t('history.empty')}
               </p>
             </div>
           ) : (
@@ -193,7 +202,10 @@ export default function PromptHistoryDrawer() {
                     </span>
                   )}
                   <span className="font-mono text-[0.5625rem] text-text-muted ml-auto">
-                    {relativeTime(entry.created_at)}
+                    {(() => {
+                      const rt = relativeTime(entry.created_at);
+                      return 'count' in rt ? t(rt.key, { count: rt.count }) : t(rt.key);
+                    })()}
                   </span>
                 </div>
 
@@ -205,7 +217,7 @@ export default function PromptHistoryDrawer() {
                     className="flex items-center gap-1 text-[0.6875rem] text-text-muted hover:text-foreground transition-colors cursor-pointer"
                   >
                     <Copy className="w-3 h-3" />
-                    复制
+                    {t('history.copy')}
                   </button>
                   <button
                     type="button"
@@ -213,7 +225,7 @@ export default function PromptHistoryDrawer() {
                     className="flex items-center gap-1 text-[0.6875rem] text-text-muted hover:text-foreground transition-colors cursor-pointer"
                   >
                     <BookmarkPlus className="w-3 h-3" />
-                    存为模板
+                    {t('history.saveAsTemplate')}
                   </button>
                 </div>
               </div>
