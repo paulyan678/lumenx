@@ -8,9 +8,9 @@ import { playgroundApi } from "@/lib/api";
 import { usePlaygroundStore, type PlaygroundTemplate } from "./usePlaygroundStore";
 
 const CATEGORIES = [
-  { value: "image", labelKey: "template.catImage", color: "text-blue-400" },
-  { value: "video", labelKey: "template.catVideo", color: "text-purple-400" },
-  { value: "general", labelKey: "template.catGeneral", color: "text-text-secondary" },
+  { value: "image", labelKey: "template.catImage", color: "text-primary" },
+  { value: "video", labelKey: "template.catVideo", color: "text-accent" },
+  { value: "general", labelKey: "template.catGeneral", color: "text-text-muted" },
 ] as const;
 
 type CategoryValue = (typeof CATEGORIES)[number]["value"];
@@ -334,7 +334,7 @@ export default function PromptTemplateModal() {
                       className={[
                         "flex-1 py-[6px] rounded-md text-[0.6875rem] font-medium text-center cursor-pointer transition-all",
                         form.category === c.value
-                          ? "text-foreground bg-surface shadow-[0_2px_8px_rgba(0,0,0,0.4)] atelier-pill-tab-active"
+                          ? "bg-primary text-on-accent"
                           : "text-text-muted hover:text-foreground",
                       ].join(" ")}
                     >

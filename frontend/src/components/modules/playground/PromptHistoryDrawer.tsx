@@ -128,10 +128,11 @@ export default function PromptHistoryDrawer() {
   if (!showHistoryDrawer) return null;
 
   return (
-    // Overlay
+    // Transparent click-catcher — closes on outside click WITHOUT a dark scrim,
+    // so the workspace behind stays fully visible (history is a side panel, not
+    // a takeover modal).
     <div
-      className="fixed inset-0 z-50 bg-black/60 transition-opacity duration-250"
-      style={{ opacity: visible ? 1 : 0 }}
+      className="fixed inset-0 z-50"
       onClick={handleClose}
     >
       {/* Drawer */}

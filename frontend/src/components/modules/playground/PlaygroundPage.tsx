@@ -2,6 +2,7 @@
 
 import { useEffect, useCallback, useRef } from 'react';
 import { useTranslations } from 'next-intl';
+import { Sparkles } from 'lucide-react';
 import ModeSelector from './ModeSelector';
 import ModelSelector from './ModelSelector';
 import MediaInput from './MediaInput';
@@ -279,15 +280,16 @@ export default function PlaygroundPage() {
               onClick={handleGenerate}
               disabled={!canGenerate}
               className={[
-                'relative w-full overflow-hidden rounded-xl px-6 py-[14px]',
-                "font-['Space_Grotesk',sans-serif] text-sm font-semibold tracking-[0.04em]",
+                'inline-flex w-full items-center justify-center gap-[7px] rounded-full px-6 py-[13px]',
+                "font-['Space_Grotesk',sans-serif] text-sm font-semibold",
                 'transition-all duration-150',
                 canGenerate
-                  ? 'bg-primary text-on-accent shadow-[var(--glow-primary)] hover:bg-primary-hover hover:-translate-y-px hover:brightness-110 active:translate-y-0 active:scale-[0.98] cursor-pointer'
+                  ? 'bg-primary text-on-accent shadow-[var(--glow-primary)] hover:bg-primary-hover hover:-translate-y-px cursor-pointer'
                   : 'bg-primary/40 text-on-accent/60 shadow-none cursor-not-allowed',
               ].join(' ')}
             >
-              <span className="relative">
+              <Sparkles size={16} aria-hidden="true" />
+              <span>
                 {batchSize > 1
                   ? t('compose.generateBatch', { count: batchSize })
                   : t('compose.generate')}
