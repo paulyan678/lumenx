@@ -200,14 +200,14 @@ export default function DetailPanel({
     <>
       {/* Overlay */}
       <div
-        className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm"
+        className="fixed inset-0 z-50 bg-overlay backdrop-blur-md"
         onClick={onClose}
       />
 
       {/* Container */}
       <div className="fixed inset-4 md:inset-8 z-50 bg-surface border border-glass-border rounded-[20px] shadow-2xl flex overflow-hidden">
         {/* ─── LEFT SIDE (Media) ─────────────────────────────────────────── */}
-        <div className="relative w-[60%] h-full bg-surface flex items-center justify-center">
+        <div className="relative w-[60%] h-full bg-surface-inset flex items-center justify-center">
           {mediaUrl ? (
             isVideo ? (
               <video
@@ -253,53 +253,130 @@ export default function DetailPanel({
           )}
         </div>
 
-        {/* ─── RIGHT SIDE (Details) ──────────────────────────────────────── */}
-        <div className="relative w-[40%] h-full overflow-y-auto p-6 border-l border-glass-border">
+        {/* ─── RIGHT SIDE (Details) — 3 zones: header / scroll body / pinned footer ─── */}
+        <div className="relative w-[40%] h-full flex flex-col border-l border-glass-border">
           {/* Close button */}
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 w-8 h-8 rounded-lg bg-glass border border-glass-border flex items-center justify-center hover:bg-hover-bg transition-colors"
+            className="absolute top-4 right-4 z-10 w-8 h-8 rounded-lg bg-glass border border-glass-border flex items-center justify-center hover:bg-hover-bg transition-colors"
           >
             <X className="w-4 h-4 text-text-secondary" />
           </button>
 
-          {/* Section 1: Title */}
-          <div className="mb-6 pr-10">
-            <h2 className="text-lg font-semibold text-foreground mb-1">
-              {generation.model_id}
-            </h2>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="font-mono text-[0.625rem] bg-elevated text-text-secondary rounded px-[6px] py-[2px] uppercase">
+          {/* ── Header ── */}
+          <div className="shrink-0 px-6 pt-6 pb-4 border-b border-glass-border pr-14">
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="font-mono text-[0.5625rem] bg-elevated text-text-secondary rounded px-[6px] py-[2px] uppercase tracking-[0.1em]">
                 {MODE_LABELS[generation.mode] || generation.mode}
               </span>
-              <span className="font-mono text-[0.625rem] text-text-muted">
+              <span className="font-mono text-[0.5625rem] text-text-muted uppercase tracking-[0.1em]">
                 {generation.id.slice(0, 8)}
               </span>
             </div>
-            <p className="font-mono text-[0.6875rem] text-text-muted">
+            <h2 className="font-display atelier-display text-xl font-semibold tracking-tight text-foreground leading-tight">
+              {generation.model_id}
+            </h2>
+            <p className="font-mono text-[0.625rem] text-text-muted mt-1.5">
               {formatTimestamp(generation.created_at)}
             </p>
           </div>
 
-          {/* Section 2: Actions */}
-          <div className="flex flex-col gap-2 mb-6">
-            {mediaUrl && (
-              <button
-                onClick={handleDownload}
-                className="w-full inline-flex items-center justify-center gap-[7px] px-4 py-2.5 rounded-full bg-elevated border border-glass-border text-foreground/80 text-sm font-medium hover:bg-hover-bg transition"
-              >
-                <Download className="w-4 h-4" />
-                Download
-              </button>
+          {/* ── Body (scrollable) ── */}
+          <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-5">
+            {/* Prompt */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-text-muted">
+                  PROMPT
+                </h3>
+                <button
+                  onClick={handleCopyPrompt}
+                  className="flex items-center gap-1 px-2 py-1 rounded text-[0.625rem] text-text-muted hover:text-foreground hover:bg-hover-bg transition-colors"
+                >
+                  <Copy className="w-3 h-3" />
+                  {copied ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+              <div className="rounded-[16px] bg-surface-inset border border-glass-border p-4 max-h-48 overflow-y-auto">
+                <p className="font-display italic text-[0.9375rem] text-text-secondary leading-relaxed whitespace-pre-wrap break-words">
+                  {generation.prompt ? `“${generation.prompt}”` : '(empty)'}
+                </p>
+              </div>
+            </div>
+
+            {/* Parameters — labeled spec grid; first entry (Size) is a hero row */}
+            {paramEntries.length > 0 && (
+              <div>
+                <h3 className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-text-muted mb-2">
+                  {t('detail.parameters')}
+                </h3>
+                <div className="rounded-[16px] bg-surface-inset border border-glass-border p-4 grid grid-cols-2 gap-x-4 gap-y-3.5">
+                  {paramEntries.map(([label, value], i) => (
+                    <div key={label} className={i === 0 ? 'col-span-2' : ''}>
+                      <div className="font-mono text-[0.625rem] uppercase tracking-[0.08em] text-text-muted mb-1">
+                        {label}
+                      </div>
+                      <div
+                        className={`font-mono text-foreground ${
+                          i === 0 ? 'text-[1.0625rem]' : 'text-sm'
+                        }`}
+                      >
+                        {value}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
-            {output && (
+
+            {/* Negative prompt */}
+            {generation.negative_prompt && (
+              <div>
+                <h3 className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-text-muted mb-2">
+                  NEGATIVE PROMPT
+                </h3>
+                <div className="rounded-[16px] bg-surface-inset border border-glass-border p-4 max-h-28 overflow-y-auto">
+                  <p className="text-[0.8125rem] text-text-secondary leading-relaxed whitespace-pre-wrap break-words">
+                    {generation.negative_prompt}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Error display for failed generations */}
+            {generation.status === 'failed' && generation.error && (
+              <div>
+                <h3 className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-status-failed-fg mb-2">
+                  ERROR
+                </h3>
+                <div className="max-h-28 overflow-y-auto rounded-[16px] bg-status-failed-bg border border-status-failed-border p-4">
+                  <p className="text-[0.6875rem] text-status-failed-fg leading-relaxed break-all font-mono">
+                    {generation.error}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── Footer (pinned actions) — one teal primary, neutral secondaries, subdued delete ── */}
+          <div className="shrink-0 border-t border-glass-border px-6 py-4 space-y-2.5">
+            {/* Primary: Retry (failed) or Save to library */}
+            {generation.status === 'failed' && onRetry ? (
+              <button
+                onClick={() => onRetry(generation)}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-primary text-on-accent text-sm font-medium shadow-[var(--glow-primary)] hover:bg-primary-hover transition"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Retry
+              </button>
+            ) : output ? (
               <button
                 onClick={handleSaveToLibrary}
                 disabled={saving}
-                className={`w-full inline-flex items-center justify-center gap-[7px] px-4 py-2.5 rounded-full border text-sm font-medium transition cursor-pointer disabled:opacity-50 disabled:cursor-wait ${
+                className={`w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium transition cursor-pointer disabled:opacity-50 disabled:cursor-wait ${
                   saved
-                    ? 'bg-status-starred-bg border-status-starred-border text-status-starred-fg hover:opacity-80'
-                    : 'bg-primary border-transparent text-on-accent shadow-[var(--glow-primary)] hover:bg-primary-hover hover:-translate-y-px'
+                    ? 'bg-status-starred-bg border border-status-starred-border text-status-starred-fg hover:opacity-80'
+                    : 'bg-primary text-on-accent shadow-[var(--glow-primary)] hover:bg-primary-hover'
                 }`}
               >
                 <Star
@@ -307,103 +384,42 @@ export default function DetailPanel({
                 />
                 {saving ? t('detail.saving') : saved ? t('detail.savedCancel') : t('detail.saveToLibrary')}
               </button>
+            ) : null}
+
+            {/* Secondary row: Download + Generate Video (neutral ghosts) */}
+            {(mediaUrl || (!isVideo && output?.media_path && onGenerateVideo)) && (
+              <div className="flex gap-2">
+                {mediaUrl && (
+                  <button
+                    onClick={handleDownload}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-full bg-surface-inset border border-glass-border text-text-secondary text-[0.8125rem] font-medium hover:text-foreground hover:bg-hover-bg transition"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download
+                  </button>
+                )}
+                {!isVideo && output?.media_path && onGenerateVideo && (
+                  <button
+                    onClick={() => onGenerateVideo(output.media_path)}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-full bg-surface-inset border border-glass-border text-text-secondary text-[0.8125rem] font-medium hover:text-foreground hover:bg-hover-bg transition"
+                  >
+                    <Video className="w-4 h-4" />
+                    Generate Video
+                  </button>
+                )}
+              </div>
             )}
-            {!isVideo && output?.media_path && onGenerateVideo && (
-              <button
-                onClick={() => onGenerateVideo(output.media_path)}
-                className="w-full inline-flex items-center justify-center gap-[7px] px-4 py-2.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium hover:bg-primary/20 transition"
-              >
-                <Video className="w-4 h-4" />
-                Generate Video
-              </button>
-            )}
-            {generation.status === 'failed' && onRetry && (
-              <button
-                onClick={() => onRetry(generation)}
-                className="w-full inline-flex items-center justify-center gap-[7px] px-4 py-2.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium hover:bg-primary/20 transition"
-              >
-                <RotateCcw className="w-4 h-4" />
-                Retry
-              </button>
-            )}
+
+            {/* Delete — subdued, red only on hover */}
             <button
               onClick={handleDelete}
               disabled={deleting}
-              className="w-full inline-flex items-center justify-center gap-[7px] px-4 py-2.5 rounded-full bg-status-failed-bg border border-status-failed-border text-status-failed-fg text-sm font-medium hover:opacity-80 transition"
+              className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-full text-[0.8125rem] font-medium text-text-muted hover:text-status-failed-fg hover:bg-status-failed-bg transition disabled:opacity-40"
             >
               <Trash2 className="w-4 h-4" />
               {deleting ? 'Deleting...' : 'Delete'}
             </button>
           </div>
-
-          {/* Section 3: Prompt */}
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-text-muted">
-                PROMPT
-              </h3>
-              <button
-                onClick={handleCopyPrompt}
-                className="flex items-center gap-1 px-2 py-1 rounded text-[0.625rem] text-text-muted hover:text-foreground hover:bg-hover-bg transition-colors"
-              >
-                <Copy className="w-3 h-3" />
-                {copied ? 'Copied' : 'Copy'}
-              </button>
-            </div>
-            <div className="max-h-40 overflow-y-auto pr-1">
-              <p className="font-display italic text-[0.9375rem] text-text-secondary leading-relaxed whitespace-pre-wrap break-words">
-                {generation.prompt ? `“${generation.prompt}”` : '(empty)'}
-              </p>
-            </div>
-          </div>
-
-          {/* Section 4: Parameters */}
-          {paramEntries.length > 0 && (
-            <div className="mb-6">
-              <h3 className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-text-muted mb-2">
-                {t('detail.parameters')}
-              </h3>
-              <div className="flex flex-wrap gap-1.5">
-                {paramEntries.map(([label, value]) => (
-                  <span
-                    key={label}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-inset border border-border-subtle text-[0.6875rem] text-text-secondary"
-                  >
-                    <span className="font-mono text-[0.5625rem] uppercase tracking-wide text-text-muted">{label}</span>
-                    {value}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Section 5: Negative prompt */}
-          {generation.negative_prompt && (
-            <div className="mb-6">
-              <h3 className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-text-muted mb-2">
-                NEGATIVE PROMPT
-              </h3>
-              <div className="max-h-28 overflow-y-auto rounded-lg bg-glass border border-glass-border p-3">
-                <p className="text-[0.75rem] text-text-secondary leading-relaxed whitespace-pre-wrap break-words">
-                  {generation.negative_prompt}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Error display for failed generations */}
-          {generation.status === 'failed' && generation.error && (
-            <div className="mb-6">
-              <h3 className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-status-failed-fg mb-2">
-                ERROR
-              </h3>
-              <div className="max-h-28 overflow-y-auto rounded-lg bg-status-failed-bg border border-status-failed-border p-3">
-                <p className="text-[0.6875rem] text-status-failed-fg leading-relaxed break-all font-mono">
-                  {generation.error}
-                </p>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </>
