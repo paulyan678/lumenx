@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslations } from "next-intl";
-import { X, Plus, Copy, Trash2, Sparkles, BookmarkPlus, Star } from "lucide-react";
+import { X, Plus, Copy, Trash2, Sparkles, Star, ChevronLeft } from "lucide-react";
 import { playgroundApi } from "@/lib/api";
 import { usePlaygroundStore, type PlaygroundTemplate } from "./usePlaygroundStore";
 
@@ -19,6 +19,12 @@ function categoryMeta(cat: string) {
   return CATEGORIES.find((c) => c.value === cat) ?? CATEGORIES[2];
 }
 
+function modeToCategory(mode: string): CategoryValue {
+  if (mode === "t2i" || mode === "i2i") return "image";
+  if (mode === "t2v" || mode === "i2v" || mode === "r2v" || mode === "v2v") return "video";
+  return "general";
+}
+
 interface FormState {
   name: string;
   category: CategoryValue;
@@ -27,6 +33,12 @@ interface FormState {
 
 const EMPTY_FORM: FormState = { name: "", category: "general", prompt: "" };
 
+/**
+ * Prompt-template surface — a right-side drawer (mirrors PromptHistoryDrawer) with
+ * two views: BROWSE (filter + cards) and CREATE (full-height form). Leaving the
+ * create view via outside-click / Esc / X / back returns to browse and preserves
+ * the draft (no data loss, no confirm); a full close only happens from browse.
+ */
 export default function PromptTemplateModal() {
   const t = useTranslations("playground");
   const {
@@ -45,54 +57,94 @@ export default function PromptTemplateModal() {
     isTemplateFavorited,
   } = usePlaygroundStore();
 
-  const [formOpen, setFormOpen] = useState(false);
+  const [view, setView] = useState<"browse" | "create">("browse");
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [busy, setBusy] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [filterCat, setFilterCat] = useState<CategoryValue | "all">("all");
+  const [visible, setVisible] = useState(false);
 
-  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const nameInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Animate in after mount; open straight into CREATE (prefilled) when there is a
+  // current prompt to capture, otherwise BROWSE.
   useEffect(() => {
-    if (!showTemplateModal) return;
-    const t = window.setTimeout(() => dialogRef.current?.focus(), 0);
-    return () => window.clearTimeout(t);
-  }, [showTemplateModal]);
+    if (showTemplateModal) {
+      const raf = requestAnimationFrame(() => setVisible(true));
+      if (currentPrompt.trim()) {
+        setForm({ name: "", category: modeToCategory(currentMode), prompt: currentPrompt });
+        setView("create");
+      } else {
+        setView("browse");
+      }
+      return () => cancelAnimationFrame(raf);
+    }
+    setVisible(false);
+  }, [showTemplateModal]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Autofocus the name field on entering CREATE
+  useEffect(() => {
+    if (showTemplateModal && view === "create") {
+      const id = window.setTimeout(() => nameInputRef.current?.focus(), 60);
+      return () => window.clearTimeout(id);
+    }
+  }, [showTemplateModal, view]);
+
+  // Animated close — resets to browse + clears the form after the slide-out.
+  const close = useCallback(() => {
+    setVisible(false);
+    window.setTimeout(() => {
+      setShowTemplateModal(false);
+      setView("browse");
+      setForm(EMPTY_FORM);
+    }, 250);
+  }, [setShowTemplateModal]);
+
+  // Outside-click / Esc / X: from CREATE, retreat to BROWSE (keep the draft); from
+  // BROWSE, close the drawer. Never silently discards an unsaved template.
+  const dismiss = useCallback(() => {
+    if (view === "create") {
+      setView("browse");
+    } else {
+      close();
+    }
+  }, [view, close]);
+
+  // Esc to dismiss
   useEffect(() => {
     if (!showTemplateModal) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { e.preventDefault(); setShowTemplateModal(false); }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        dismiss();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [showTemplateModal, setShowTemplateModal]);
+  }, [showTemplateModal, dismiss]);
 
-  // Auto-open form with pre-filled prompt when modal opens with currentPrompt set
-  useEffect(() => {
-    if (showTemplateModal && currentPrompt.trim() && !formOpen) {
-      setForm({
-        name: "",
-        category: (currentMode === "t2i" || currentMode === "i2i") ? "image"
-          : (currentMode === "t2v" || currentMode === "i2v" || currentMode === "r2v" || currentMode === "v2v") ? "video"
-          : "general",
-        prompt: currentPrompt,
-      });
-      setFormOpen(true);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showTemplateModal]);
+  const handleApply = useCallback(
+    (tpl: PlaygroundTemplate) => {
+      applyTemplate(tpl);
+      close();
+    },
+    [applyTemplate, close],
+  );
 
-  const handleApply = useCallback((tpl: PlaygroundTemplate) => {
-    applyTemplate(tpl);
-    setShowTemplateModal(false);
-  }, [applyTemplate, setShowTemplateModal]);
-
-  const handleDelete = useCallback(async (id: string) => {
-    setDeletingId(id);
-    try { await playgroundApi.deleteTemplate(id); removeTemplate(id); } catch { /* silent */ }
-    finally { setDeletingId(null); }
-  }, [removeTemplate]);
+  const handleDelete = useCallback(
+    async (id: string) => {
+      setDeletingId(id);
+      try {
+        await playgroundApi.deleteTemplate(id);
+        removeTemplate(id);
+      } catch {
+        /* silent */
+      } finally {
+        setDeletingId(null);
+      }
+    },
+    [removeTemplate],
+  );
 
   const handleCreate = useCallback(async () => {
     if (!form.name.trim() || !form.prompt.trim()) return;
@@ -109,272 +161,260 @@ export default function PromptTemplateModal() {
       });
       addTemplate(created as unknown as PlaygroundTemplate);
       setForm(EMPTY_FORM);
-      setFormOpen(false);
-    } catch { /* silent */ }
-    finally { setBusy(false); }
+      setView("browse");
+    } catch {
+      /* silent */
+    } finally {
+      setBusy(false);
+    }
   }, [form, addTemplate, currentMode, currentModelId, currentParams, currentNegativePrompt]);
 
-  const handlePrefill = useCallback(() => {
-    setForm({
-      name: "",
-      category: (currentMode === "t2i" || currentMode === "i2i") ? "image"
-        : (currentMode === "t2v" || currentMode === "i2v" || currentMode === "r2v" || currentMode === "v2v") ? "video"
-        : "general",
-      prompt: currentPrompt,
-    });
-    setFormOpen(true);
-  }, [currentPrompt, currentMode]);
+  // Enter CREATE — resume an in-progress draft if any, else prefill from current state.
+  const openCreate = useCallback(() => {
+    setForm((f) =>
+      f.name.trim() || f.prompt.trim()
+        ? f
+        : { name: "", category: modeToCategory(currentMode), prompt: currentPrompt },
+    );
+    setView("create");
+  }, [currentMode, currentPrompt]);
+
+  // "Save from current" — always (re)prefill from the current compose state.
+  const saveFromCurrent = useCallback(() => {
+    setForm({ name: "", category: modeToCategory(currentMode), prompt: currentPrompt });
+    setView("create");
+  }, [currentMode, currentPrompt]);
 
   if (!showTemplateModal || typeof window === "undefined") return null;
 
-  const filtered = (filterCat === "all"
-    ? templates
-    : templates.filter((x) => x.category === filterCat)
+  const filtered = (
+    filterCat === "all" ? templates : templates.filter((x) => x.category === filterCat)
   ).sort((a, b) => {
     const aFav = isTemplateFavorited(a.id) ? 0 : 1;
     const bFav = isTemplateFavorited(b.id) ? 0 : 1;
     return aFav - bFav;
   });
 
-  const modal = (
-    <>
+  const drawer = (
+    // Transparent click-catcher — no dark scrim, workspace stays visible (side panel).
+    <div className="fixed inset-0 z-50" onClick={dismiss}>
       <div
-        aria-hidden="true"
-        className="fixed inset-0 z-50 bg-overlay backdrop-blur-md"
-        onClick={() => setShowTemplateModal(false)}
-      />
-
-      <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-        <div
-          ref={dialogRef}
-          role="dialog"
-          aria-modal="true"
-          tabIndex={-1}
-          className="pointer-events-auto w-[560px] max-h-[85vh] bg-elevated border border-glass-border rounded-[20px] shadow-2xl flex flex-col overflow-hidden outline-none"
-        >
-          {/* Header */}
-          <div className="px-6 py-5 border-b border-glass-border flex items-center justify-between shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-primary/15 flex items-center justify-center">
-                <BookmarkPlus size={16} className="text-primary" />
-              </div>
-              <div>
-                <h2 className="font-display atelier-display text-[1.375rem] font-semibold tracking-tight text-foreground">{t("template.title")}</h2>
-                <p className="text-[0.625rem] text-text-muted mt-0.5">{t("template.subtitle")}</p>
-              </div>
-            </div>
+        className="fixed right-0 top-0 h-full w-[420px] bg-elevated border-l border-glass-border shadow-2xl flex flex-col transition-transform duration-250 ease-out"
+        style={{ transform: visible ? "translateX(0)" : "translateX(100%)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* ── Header ── */}
+        <div className="px-6 py-5 border-b border-border-subtle flex items-center gap-2 shrink-0">
+          {view === "create" && (
             <button
               type="button"
-              onClick={() => setShowTemplateModal(false)}
-              className="grid h-8 w-8 place-items-center rounded-lg text-text-muted transition-colors hover:bg-hover-bg hover:text-foreground"
+              onClick={() => setView("browse")}
+              className="w-8 h-8 -ml-1.5 rounded-lg flex items-center justify-center text-text-muted hover:text-foreground hover:bg-hover-bg transition-colors cursor-pointer"
             >
-              <X size={16} />
+              <ChevronLeft className="w-4 h-4" />
             </button>
-          </div>
+          )}
+          <h2 className="font-display atelier-display text-[1.375rem] font-semibold tracking-tight text-foreground">
+            {view === "create" ? t("template.newTemplate") : t("template.title")}
+          </h2>
+          <button
+            type="button"
+            onClick={dismiss}
+            className="ml-auto w-8 h-8 rounded-lg flex items-center justify-center text-text-muted hover:text-foreground hover:bg-hover-bg transition-colors cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
 
-          {/* Filter tabs — Line B segmented pill */}
-          <div className="px-6 pt-4 pb-2 shrink-0">
-            <div className="flex gap-[2px] p-[3px] bg-surface-inset rounded-full atelier-pill-tabs">
-              {[{ value: "all" as const, labelKey: "template.filterAll" as const }, ...CATEGORIES].map((c) => (
-                <button
-                  key={c.value}
-                  type="button"
-                  onClick={() => setFilterCat(c.value)}
-                  className={[
-                    "flex-1 rounded-full px-3 py-1.5 text-[0.6875rem] font-medium text-center cursor-pointer transition-all",
-                    filterCat === c.value
-                      ? "bg-primary text-on-accent"
-                      : "text-text-muted hover:text-foreground hover:bg-hover-bg",
-                  ].join(" ")}
-                >
-                  {t(c.labelKey)}
-                  {c.value !== "all" && (
-                    <span className="ml-1.5 text-[0.5625rem] opacity-60">
-                      {templates.filter((x) => x.category === c.value).length}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Template list */}
-          <div className="flex-1 overflow-y-auto px-6 py-3 min-h-0 space-y-2">
-            {filtered.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <Sparkles size={28} className="text-text-muted/60 mb-3" />
-                <p className="font-display italic text-[0.9375rem] text-text-secondary mb-1.5 leading-relaxed">
-                  {filterCat === "all"
-                    ? t("template.emptyAll")
-                    : t("template.emptyFiltered", { category: t(categoryMeta(filterCat).labelKey) })}
-                </p>
-                <p className="text-[0.6875rem] text-text-muted">{t("template.emptyHint")}</p>
+        {view === "browse" ? (
+          <>
+            {/* ── Filter pills ── */}
+            <div className="px-6 pt-4 pb-2 shrink-0">
+              <div className="flex gap-[2px] p-[3px] bg-surface-inset rounded-full atelier-pill-tabs">
+                {[{ value: "all" as const, labelKey: "template.filterAll" as const }, ...CATEGORIES].map((c) => (
+                  <button
+                    key={c.value}
+                    type="button"
+                    onClick={() => setFilterCat(c.value)}
+                    className={[
+                      "flex-1 rounded-full px-2 py-1.5 text-[0.6875rem] font-medium text-center cursor-pointer transition-all",
+                      filterCat === c.value
+                        ? "bg-primary text-on-accent"
+                        : "text-text-muted hover:text-foreground hover:bg-hover-bg",
+                    ].join(" ")}
+                  >
+                    {t(c.labelKey)}
+                    {c.value !== "all" && (
+                      <span className="ml-1 text-[0.5625rem] opacity-60">
+                        {templates.filter((x) => x.category === c.value).length}
+                      </span>
+                    )}
+                  </button>
+                ))}
               </div>
-            )}
+            </div>
 
-            {filtered.map((tpl) => {
-              const meta = categoryMeta(tpl.category);
-              return (
-                <div
-                  key={tpl.id}
-                  className="group p-4 rounded-[20px] bg-glass atelier-asset-card border border-glass-border hover:border-foreground/30 transition-all"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <span className="text-[0.8125rem] font-medium text-foreground truncate">{tpl.name}</span>
-                        <span className={`text-[0.5625rem] font-mono uppercase px-1.5 py-[2px] rounded bg-elevated shrink-0 ${meta.color}`}>
-                          {t(meta.labelKey)}
-                        </span>
-                        {tpl.default_mode && (
-                          <span className="text-[0.5625rem] font-mono uppercase px-1.5 py-[2px] rounded bg-glass text-text-muted shrink-0">
-                            {tpl.default_mode}
-                          </span>
-                        )}
-                      </div>
-                      <p className="font-display italic text-[0.8125rem] text-text-secondary line-clamp-2 leading-[1.6]">{tpl.prompt}</p>
-                    </div>
-
-                    {/* Actions — visible on hover */}
-                    <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        type="button"
-                        onClick={() => toggleTemplateFavorite(tpl.id)}
-                        className={`h-7 w-7 rounded-md flex items-center justify-center transition-colors ${
-                          isTemplateFavorited(tpl.id)
-                            ? 'text-status-starred-solid'
-                            : 'text-text-muted hover:text-status-starred-solid/70'
-                        }`}
-                        title={isTemplateFavorited(tpl.id) ? t('template.unfavorite') : t('template.favorite')}
-                      >
-                        <Star size={12} className={isTemplateFavorited(tpl.id) ? 'fill-status-starred-solid' : ''} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleApply(tpl)}
-                        className="h-7 px-2.5 rounded-md text-[0.6875rem] font-medium text-primary bg-primary/10 hover:bg-primary/20 transition-colors flex items-center gap-1"
-                      >
-                        <Copy size={11} />
-                        {t('template.apply')}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(tpl.id)}
-                        disabled={deletingId === tpl.id}
-                        className="h-7 w-7 rounded-md flex items-center justify-center text-text-muted hover:text-status-failed-fg hover:bg-status-failed-bg transition-colors disabled:opacity-30"
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
-                  </div>
+            {/* ── Template list ── */}
+            <div className="flex-1 overflow-y-auto px-6 py-2 min-h-0 space-y-2">
+              {filtered.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-center px-6">
+                  <Sparkles className="w-7 h-7 text-text-muted/60 mb-3" />
+                  <p className="font-display italic text-[0.9375rem] text-text-secondary mb-1.5 leading-relaxed">
+                    {filterCat === "all"
+                      ? t("template.emptyAll")
+                      : t("template.emptyFiltered", { category: t(categoryMeta(filterCat).labelKey) })}
+                  </p>
+                  <p className="text-[0.6875rem] text-text-muted">{t("template.emptyHint")}</p>
                 </div>
-              );
-            })}
-          </div>
-
-          {/* Footer: create form */}
-          <div className="border-t border-glass-border shrink-0">
-            {/* Toggle row */}
-            <div className="px-6 py-3 flex items-center">
-              {!formOpen ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setFormOpen(true)}
-                    className="inline-flex items-center gap-1.5 text-xs font-medium text-text-muted hover:text-foreground transition-colors"
-                  >
-                    <Plus size={14} />
-                    {t('template.newTemplate')}
-                  </button>
-                  {currentPrompt.trim() && (
-                    <button
-                      type="button"
-                      onClick={handlePrefill}
-                      className="ml-auto inline-flex items-center gap-1.5 text-[0.6875rem] font-medium text-text-muted hover:text-foreground transition-colors"
-                    >
-                      <Copy size={11} />
-                      {t('template.saveFromCurrent')}
-                    </button>
-                  )}
-                </>
               ) : (
-                <>
-                  <span className="text-xs font-medium text-text-secondary">{t('template.newTemplate')}</span>
-                  <button
-                    type="button"
-                    onClick={() => { setFormOpen(false); setForm(EMPTY_FORM); }}
-                    className="ml-auto text-[0.6875rem] text-text-muted hover:text-foreground transition-colors"
-                  >
-                    {t('template.collapse')}
-                  </button>
-                </>
+                filtered.map((tpl) => {
+                  const meta = categoryMeta(tpl.category);
+                  return (
+                    <div
+                      key={tpl.id}
+                      className="group p-4 rounded-[20px] bg-glass atelier-asset-card border border-glass-border hover:border-foreground/30 transition-all"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <span className="text-[0.8125rem] font-medium text-foreground truncate">{tpl.name}</span>
+                            <span className={`text-[0.5625rem] font-mono uppercase px-1.5 py-[2px] rounded bg-elevated shrink-0 ${meta.color}`}>
+                              {t(meta.labelKey)}
+                            </span>
+                            {tpl.default_mode && (
+                              <span className="text-[0.5625rem] font-mono uppercase px-1.5 py-[2px] rounded bg-glass text-text-muted shrink-0">
+                                {tpl.default_mode}
+                              </span>
+                            )}
+                          </div>
+                          <p className="font-display italic text-[0.8125rem] text-text-secondary line-clamp-2 leading-[1.6]">
+                            {tpl.prompt}
+                          </p>
+                        </div>
+
+                        {/* Actions — visible on hover */}
+                        <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            type="button"
+                            onClick={() => toggleTemplateFavorite(tpl.id)}
+                            className={`h-7 w-7 rounded-md flex items-center justify-center transition-colors ${
+                              isTemplateFavorited(tpl.id)
+                                ? "text-status-starred-solid"
+                                : "text-text-muted hover:text-status-starred-solid/70"
+                            }`}
+                            title={isTemplateFavorited(tpl.id) ? t("template.unfavorite") : t("template.favorite")}
+                          >
+                            <Star size={12} className={isTemplateFavorited(tpl.id) ? "fill-status-starred-solid" : ""} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleApply(tpl)}
+                            className="h-7 px-2.5 rounded-md text-[0.6875rem] font-medium text-primary bg-primary/10 hover:bg-primary/20 transition-colors flex items-center gap-1"
+                          >
+                            <Copy size={11} />
+                            {t("template.apply")}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(tpl.id)}
+                            disabled={deletingId === tpl.id}
+                            className="h-7 w-7 rounded-md flex items-center justify-center text-text-muted hover:text-status-failed-fg hover:bg-status-failed-bg transition-colors disabled:opacity-30"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
               )}
             </div>
 
-            {/* Create form */}
-            {formOpen && (
-              <div className="px-6 pb-5 space-y-3">
-                {/* Name + Category row */}
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={form.name}
-                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                    placeholder={t("template.namePlaceholder")}
-                    className="flex-1 h-9 px-3 text-[0.8125rem] bg-surface-inset border border-glass-border rounded-[14px] text-foreground placeholder:text-text-muted outline-none focus:border-foreground/30 transition-colors"
-                    autoFocus
-                  />
-                </div>
-
-                {/* Category pills */}
-                <div className="flex gap-[2px] p-[3px] bg-surface-inset rounded-full atelier-pill-tabs">
-                  {CATEGORIES.map((c) => (
-                    <button
-                      key={c.value}
-                      type="button"
-                      onClick={() => setForm((f) => ({ ...f, category: c.value as CategoryValue }))}
-                      className={[
-                        "flex-1 py-[6px] rounded-full text-[0.6875rem] font-medium text-center cursor-pointer transition-all",
-                        form.category === c.value
-                          ? "bg-primary text-on-accent"
-                          : "text-text-muted hover:text-foreground hover:bg-hover-bg",
-                      ].join(" ")}
-                    >
-                      {t(c.labelKey)}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Prompt */}
-                <textarea
-                  value={form.prompt}
-                  onChange={(e) => setForm((f) => ({ ...f, prompt: e.target.value }))}
-                  placeholder={t("template.promptPlaceholder")}
-                  rows={5}
-                  className="w-full min-h-[120px] px-3 py-2.5 text-[0.8125rem] leading-relaxed bg-surface-inset border border-glass-border rounded-[14px] text-foreground placeholder:text-text-muted outline-none focus:border-foreground/30 transition-colors resize-y"
-                />
-
-                {/* Submit */}
+            {/* ── Footer: new template ── */}
+            <div className="border-t border-border-subtle shrink-0 px-6 py-3 flex items-center">
+              <button
+                type="button"
+                onClick={openCreate}
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-text-muted hover:text-foreground transition-colors"
+              >
+                <Plus size={14} />
+                {t("template.newTemplate")}
+              </button>
+              {currentPrompt.trim() && (
                 <button
                   type="button"
-                  onClick={handleCreate}
-                  disabled={busy || !form.name.trim() || !form.prompt.trim()}
-                  className={[
-                    "w-full h-9 rounded-lg text-[0.8125rem] font-medium transition-all",
-                    form.name.trim() && form.prompt.trim()
-                      ? "bg-primary text-on-accent hover:bg-primary-hover shadow-[var(--glow-primary)]"
-                      : "bg-elevated text-text-muted cursor-not-allowed",
-                  ].join(" ")}
+                  onClick={saveFromCurrent}
+                  className="ml-auto inline-flex items-center gap-1.5 text-[0.6875rem] font-medium text-text-muted hover:text-foreground transition-colors"
                 >
-                  {busy ? t("template.saving") : t("template.save")}
+                  <Copy size={11} />
+                  {t("template.saveFromCurrent")}
                 </button>
+              )}
+            </div>
+          </>
+        ) : (
+          /* ── Create view (full drawer height) ── */
+          <div className="flex-1 flex flex-col min-h-0">
+            <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-3 min-h-0">
+              {/* Name */}
+              <input
+                ref={nameInputRef}
+                type="text"
+                value={form.name}
+                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                placeholder={t("template.namePlaceholder")}
+                className="w-full h-9 px-3 text-[0.8125rem] bg-surface-inset border border-glass-border rounded-[14px] text-foreground placeholder:text-text-muted outline-none focus:border-foreground/30 transition-colors shrink-0"
+              />
+
+              {/* Category pills */}
+              <div className="flex gap-[2px] p-[3px] bg-surface-inset rounded-full atelier-pill-tabs shrink-0">
+                {CATEGORIES.map((c) => (
+                  <button
+                    key={c.value}
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, category: c.value as CategoryValue }))}
+                    className={[
+                      "flex-1 py-[6px] rounded-full text-[0.6875rem] font-medium text-center cursor-pointer transition-all",
+                      form.category === c.value
+                        ? "bg-primary text-on-accent"
+                        : "text-text-muted hover:text-foreground hover:bg-hover-bg",
+                    ].join(" ")}
+                  >
+                    {t(c.labelKey)}
+                  </button>
+                ))}
               </div>
-            )}
+
+              {/* Prompt */}
+              <textarea
+                value={form.prompt}
+                onChange={(e) => setForm((f) => ({ ...f, prompt: e.target.value }))}
+                placeholder={t("template.promptPlaceholder")}
+                className="w-full flex-1 min-h-[180px] px-3 py-2.5 text-[0.8125rem] leading-relaxed bg-surface-inset border border-glass-border rounded-[14px] text-foreground placeholder:text-text-muted outline-none focus:border-foreground/30 transition-colors resize-none"
+              />
+            </div>
+
+            {/* Footer: save */}
+            <div className="border-t border-border-subtle shrink-0 px-6 py-4">
+              <button
+                type="button"
+                onClick={handleCreate}
+                disabled={busy || !form.name.trim() || !form.prompt.trim()}
+                className={[
+                  "w-full h-9 rounded-full text-[0.8125rem] font-medium transition-all",
+                  form.name.trim() && form.prompt.trim()
+                    ? "bg-primary text-on-accent hover:bg-primary-hover shadow-[var(--glow-primary)]"
+                    : "bg-surface-inset text-text-muted cursor-not-allowed",
+                ].join(" ")}
+              >
+                {busy ? t("template.saving") : t("template.save")}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
-    </>
+    </div>
   );
 
-  return createPortal(modal, document.body);
+  return createPortal(drawer, document.body);
 }

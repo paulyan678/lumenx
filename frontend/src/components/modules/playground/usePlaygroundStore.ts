@@ -216,9 +216,11 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
 
   setShowAdvancedParams: (showAdvancedParams) => set({ showAdvancedParams }),
 
-  setShowTemplateModal: (showTemplateModal) => set({ showTemplateModal }),
+  setShowTemplateModal: (showTemplateModal) =>
+    set(showTemplateModal ? { showTemplateModal, showHistoryDrawer: false } : { showTemplateModal }),
 
-  setShowHistoryDrawer: (showHistoryDrawer) => set({ showHistoryDrawer }),
+  setShowHistoryDrawer: (showHistoryDrawer) =>
+    set(showHistoryDrawer ? { showHistoryDrawer, showTemplateModal: false } : { showHistoryDrawer }),
 
   // -- Generation lifecycle --------------------------------------------------
 
