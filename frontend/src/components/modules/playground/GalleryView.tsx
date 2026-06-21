@@ -108,7 +108,7 @@ export default function GalleryView({
     <div className="flex flex-col h-full">
       {/* Main media area */}
       <div
-        className="flex-1 flex items-center justify-center p-6 bg-background"
+        className="flex-1 min-h-0 overflow-hidden flex items-center justify-center p-6 bg-background"
         onClick={handleClick}
       >
         {current.status === 'completed' && mediaUrl ? (

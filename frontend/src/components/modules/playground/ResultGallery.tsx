@@ -246,11 +246,13 @@ export default function ResultGallery() {
 
       {/* Content area */}
       {viewMode === 'gallery' ? (
-        <GalleryView
-          generations={dataItems}
-          onOpenDetail={setDetailGen}
-          onRetry={handleRetry}
-        />
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <GalleryView
+            generations={dataItems}
+            onOpenDetail={setDetailGen}
+            onRetry={handleRetry}
+          />
+        </div>
       ) : (
         <div className="flex-1 overflow-y-auto p-6">
           <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4 content-start">
