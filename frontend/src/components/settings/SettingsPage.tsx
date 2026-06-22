@@ -1090,8 +1090,8 @@ export default function SettingsPage() {
       <div className="atelier-page-grain" aria-hidden="true" />
 
       {/* Head: eyebrow(当前分类) + 「设置」标题 + 横向 Tab —— 取代竖向子栏 */}
-      <header className="flex-shrink-0 border-b border-glass-border px-5 md:px-10 pt-6 pb-4 relative z-10">
-        <div className="max-w-6xl mx-auto w-full">
+      <header className="flex-shrink-0 border-b border-glass-border px-4 md:px-7 pt-6 pb-4 relative z-10">
+        <div className="w-full">
         <div className="font-mono text-[0.625rem] font-medium uppercase tracking-[0.2em] text-text-muted">
           SETTINGS · <span className="text-primary font-semibold">{CATEGORY_TITLE[active]}</span>
         </div>
@@ -1124,8 +1124,8 @@ export default function SettingsPage() {
       </header>
 
       {/* Scroll area */}
-      <div className="flex-1 overflow-y-auto px-10 py-8 relative z-10">
-        <div className="max-w-6xl mx-auto flex flex-col gap-6">
+      <div className="flex-1 overflow-y-auto px-4 md:px-7 py-8 relative z-10">
+        <div className="max-w-4xl flex flex-col gap-6">
           {!online && (
             <div
               role="status"
