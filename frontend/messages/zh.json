@@ -1708,6 +1708,15 @@
     },
     "gallery": {
       "viewDetail": "点击查看详情"
+    },
+    "queue": {
+      "label": "队列",
+      "concurrency": "并发数",
+      "runningHint": "运行中 {count}",
+      "empty": "队列为空",
+      "pending": "待发",
+      "dispatching": "派发中",
+      "cancel": "取消"
     }
   }
 }

@@ -1708,6 +1708,15 @@
     },
     "gallery": {
       "viewDetail": "Click to view details"
+    },
+    "queue": {
+      "label": "Queue",
+      "concurrency": "Concurrency",
+      "runningHint": "{count} running",
+      "empty": "Queue is empty",
+      "pending": "Queued",
+      "dispatching": "Starting",
+      "cancel": "Cancel"
     }
   }
 }

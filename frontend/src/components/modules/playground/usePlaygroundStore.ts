@@ -26,6 +26,31 @@ function saveFeatured(map: Record<string, string>): void {
 }
 
 // ---------------------------------------------------------------------------
+// Generation queue — client-side concurrency gate. Default concurrency is
+// persisted to localStorage; queued ids use a simple module counter.
+// ---------------------------------------------------------------------------
+
+const CONCURRENCY_LS_KEY = 'lumenx:playground:concurrency';
+const DEFAULT_CONCURRENCY = 3;
+
+function loadConcurrency(): number {
+  if (typeof window === 'undefined') return DEFAULT_CONCURRENCY;
+  const raw = Number(window.localStorage.getItem(CONCURRENCY_LS_KEY));
+  return Number.isFinite(raw) && raw >= 1 && raw <= 8 ? raw : DEFAULT_CONCURRENCY;
+}
+
+function saveConcurrency(n: number): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(CONCURRENCY_LS_KEY, String(n));
+  } catch {
+    /* ignore */
+  }
+}
+
+let queueSeq = 0;
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -67,6 +92,19 @@ export interface PlaygroundTemplate {
   updated_at: string;
 }
 
+export interface QueuedRequest {
+  id: string;
+  mode: PlaygroundMode;
+  modelId: string;
+  prompt: string;
+  negativePrompt?: string;
+  inputMedia: string[];
+  parameters: Record<string, any>;
+  batchSize: number;
+  status: 'pending' | 'dispatching';
+  enqueuedAt: number;
+}
+
 // ---------------------------------------------------------------------------
 // State & Actions
 // ---------------------------------------------------------------------------
@@ -106,6 +144,14 @@ interface PlaygroundState {
   featuredByGen: Record<string, string>;
   toggleFeatured: (genId: string, outputId: string) => void;
   isFeatured: (genId: string, outputId: string) => boolean;
+
+  // Generation queue (client-side concurrency gate)
+  queue: QueuedRequest[];
+  maxConcurrent: number;
+  enqueueRequest: (req: Omit<QueuedRequest, 'id' | 'status' | 'enqueuedAt'>) => void;
+  markDispatching: (id: string) => void;
+  removeFromQueue: (id: string) => void;
+  setMaxConcurrent: (n: number) => void;
 
   // Actions — input setters
   setMode: (mode: PlaygroundMode) => void;
@@ -209,6 +255,27 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
     set({ featuredByGen: next });
   },
   isFeatured: (genId, outputId) => get().featuredByGen[genId] === outputId,
+
+  // -- Generation queue (client-side concurrency gate) -----------------------
+  queue: [],
+  maxConcurrent: loadConcurrency(),
+  enqueueRequest: (req) =>
+    set((s) => ({
+      queue: [
+        ...s.queue,
+        { ...req, id: `q${++queueSeq}`, status: 'pending' as const, enqueuedAt: Date.now() },
+      ],
+    })),
+  markDispatching: (id) =>
+    set((s) => ({
+      queue: s.queue.map((q) => (q.id === id ? { ...q, status: 'dispatching' as const } : q)),
+    })),
+  removeFromQueue: (id) => set((s) => ({ queue: s.queue.filter((q) => q.id !== id) })),
+  setMaxConcurrent: (n) => {
+    const clamped = Math.max(1, Math.min(8, Math.round(n)));
+    saveConcurrency(clamped);
+    set({ maxConcurrent: clamped });
+  },
 
   // =========================================================================
   // Actions

@@ -8,6 +8,7 @@ import { playgroundApi } from '@/lib/api';
 import ResultCard from './ResultCard';
 import GalleryView from './GalleryView';
 import DetailPanel from './DetailPanel';
+import QueuePanel from './QueuePanel';
 
 type FilterType = 'all' | 'image' | 'video';
 
@@ -270,6 +271,8 @@ export default function ResultGallery() {
               <GalleryHorizontal className="w-4 h-4" />
             </button>
           </div>
+
+          <QueuePanel />
         </div>
       </div>
 

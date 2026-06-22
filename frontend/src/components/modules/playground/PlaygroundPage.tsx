@@ -9,7 +9,7 @@ import MediaInput from './MediaInput';
 import PromptInput from './PromptInput';
 import ParameterBar from './ParameterBar';
 import ResultGallery from './ResultGallery';
-import { usePlaygroundStore, type PlaygroundMode, type PlaygroundGeneration } from './usePlaygroundStore';
+import { usePlaygroundStore, type PlaygroundMode, type PlaygroundGeneration, type QueuedRequest } from './usePlaygroundStore';
 import { playgroundApi, type PlaygroundGenerationResponse } from '@/lib/api';
 
 // ---------------------------------------------------------------------------
@@ -80,6 +80,12 @@ export default function PlaygroundPage() {
   const setTemplates = usePlaygroundStore((s) => s.setTemplates);
   const startGeneration = usePlaygroundStore((s) => s.startGeneration);
   const updateGeneration = usePlaygroundStore((s) => s.updateGeneration);
+  const enqueueRequest = usePlaygroundStore((s) => s.enqueueRequest);
+  const markDispatching = usePlaygroundStore((s) => s.markDispatching);
+  const removeFromQueue = usePlaygroundStore((s) => s.removeFromQueue);
+  const queue = usePlaygroundStore((s) => s.queue);
+  const activeCount = usePlaygroundStore((s) => s.activeGenerationIds.length);
+  const maxConcurrent = usePlaygroundStore((s) => s.maxConcurrent);
 
   const pollTimers = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
 
@@ -151,38 +157,67 @@ export default function PlaygroundPage() {
     pollTimers.current.set(generationId, timer);
   }, [updateGeneration]);
 
-  // ─── Generate handler ──────────────────────────────────────────────────────
+  // ─── Generate handler — enqueue a request; the dispatcher runs it ──────────
 
-  const handleGenerate = useCallback(async () => {
+  const handleGenerate = useCallback(() => {
     if (!prompt.trim()) return;
+    // Auto-detect i2i: t2i + reference images -> i2i
+    const effectiveMode = (mode === 't2i' && inputMedia.length > 0) ? 'i2i' : mode;
+    enqueueRequest({
+      mode: effectiveMode,
+      modelId,
+      prompt: prompt.trim(),
+      negativePrompt: negativePrompt || undefined,
+      inputMedia,
+      parameters,
+      batchSize,
+    });
+  }, [mode, modelId, prompt, negativePrompt, inputMedia, parameters, batchSize, enqueueRequest]);
 
+  // ─── Queue dispatcher — POST a queued request, then poll for status ────────
+
+  const dispatchRequest = useCallback(async (req: QueuedRequest) => {
     try {
-      // Auto-detect i2i: if user is in "图像" tab (t2i) and has uploaded reference images, switch to i2i
-      const effectiveMode = (mode === 't2i' && inputMedia.length > 0) ? 'i2i' : mode;
       const resp = await playgroundApi.generate({
-        mode: effectiveMode,
-        model_id: modelId,
-        prompt: prompt.trim(),
-        negative_prompt: negativePrompt || undefined,
-        input_media: inputMedia.length > 0 ? inputMedia : undefined,
-        parameters: Object.keys(parameters).length > 0 ? parameters : undefined,
-        batch_size: batchSize > 1 ? batchSize : undefined,
+        mode: req.mode,
+        model_id: req.modelId,
+        prompt: req.prompt,
+        negative_prompt: req.negativePrompt || undefined,
+        input_media: req.inputMedia.length > 0 ? req.inputMedia : undefined,
+        parameters: Object.keys(req.parameters).length > 0 ? req.parameters : undefined,
+        batch_size: req.batchSize > 1 ? req.batchSize : undefined,
       });
-
       const gen = toGeneration(resp);
       startGeneration(gen);
-
-      // Begin polling for status
+      removeFromQueue(req.id);
       if (gen.status !== 'completed' && gen.status !== 'failed') {
         startPolling(gen.id);
       }
     } catch (err) {
-      console.error('[Playground] Generation request failed:', err);
+      console.error('[Playground] Dispatch failed:', err);
+      removeFromQueue(req.id);
     }
-  }, [
-    mode, modelId, prompt, negativePrompt, inputMedia,
-    parameters, batchSize, startGeneration, startPolling,
-  ]);
+  }, [startGeneration, removeFromQueue, startPolling]);
+
+  // Pump: dispatch pending requests up to the concurrency limit.
+  const pump = useCallback(() => {
+    const s = usePlaygroundStore.getState();
+    const dispatching = s.queue.filter((q) => q.status === 'dispatching').length;
+    let slots = s.maxConcurrent - s.activeGenerationIds.length - dispatching;
+    if (slots <= 0) return;
+    for (const req of s.queue) {
+      if (slots <= 0) break;
+      if (req.status !== 'pending') continue;
+      slots -= 1;
+      markDispatching(req.id);
+      dispatchRequest(req);
+    }
+  }, [markDispatching, dispatchRequest]);
+
+  // Run the pump whenever the queue, in-flight count, or concurrency changes.
+  useEffect(() => {
+    pump();
+  }, [queue, activeCount, maxConcurrent, pump]);
 
   // ─── Derived values ────────────────────────────────────────────────────────
 
