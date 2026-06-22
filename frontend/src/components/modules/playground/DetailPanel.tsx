@@ -261,19 +261,19 @@ export default function DetailPanel({
         </div>
 
         {/* ─── RIGHT SIDE (Details) — 3 zones: header / scroll body / pinned footer ─── */}
-        <div className="relative w-[40%] h-full overflow-y-auto border-l border-glass-border">
+        <div className="relative w-[40%] h-full overflow-y-auto border-l border-border-subtle">
           {/* Close button */}
           <button
             onClick={onClose}
             className="absolute top-4 right-4 z-10 w-8 h-8 rounded-lg bg-glass border border-glass-border flex items-center justify-center hover:bg-hover-bg transition-colors"
           >
-            <X className="w-4 h-4 text-text-secondary" />
+            <X className="w-4 h-4 text-text-muted" />
           </button>
 
           {/* ── Header ── */}
-          <div className="px-6 pt-6 pb-4 border-b border-glass-border pr-14">
+          <div className="px-6 pt-6 pb-4 border-b border-border-subtle pr-14">
             <div className="flex items-center gap-2 mb-1.5">
-              <span className="font-mono text-[0.5625rem] bg-elevated text-text-secondary rounded px-[6px] py-[2px] uppercase tracking-[0.1em]">
+              <span className="font-mono text-[0.5625rem] bg-primary/15 text-primary rounded px-[6px] py-[2px] uppercase tracking-[0.1em]">
                 {MODE_LABELS[generation.mode] || generation.mode}
               </span>
               <span className="font-mono text-[0.5625rem] text-text-muted uppercase tracking-[0.1em]">
@@ -293,7 +293,7 @@ export default function DetailPanel({
             {/* Prompt */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <h3 className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-text-muted">
+                <h3 className="font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-text-muted">
                   PROMPT
                 </h3>
                 <button
@@ -304,7 +304,7 @@ export default function DetailPanel({
                   {copied ? 'Copied' : 'Copy'}
                 </button>
               </div>
-              <div className="rounded-[16px] bg-surface-inset border border-glass-border p-4 max-h-48 overflow-y-auto">
+              <div className="rounded-[14px] bg-surface-inset border border-border-subtle p-4 max-h-48 overflow-y-auto">
                 <p className="font-display italic text-[0.9375rem] text-text-secondary leading-relaxed whitespace-pre-wrap break-words">
                   {generation.prompt ? `“${generation.prompt}”` : '(empty)'}
                 </p>
@@ -314,10 +314,10 @@ export default function DetailPanel({
             {/* Parameters — labeled spec grid; first entry (Size) is a hero row */}
             {paramEntries.length > 0 && (
               <div>
-                <h3 className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-text-muted mb-2">
+                <h3 className="font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-text-muted mb-2">
                   {t('detail.parameters')}
                 </h3>
-                <div className="rounded-[16px] bg-surface-inset border border-glass-border p-4 grid grid-cols-2 gap-x-4 gap-y-3.5">
+                <div className="rounded-[14px] bg-surface-inset border border-border-subtle p-4 grid grid-cols-2 gap-x-4 gap-y-3.5">
                   {paramEntries.map(([label, value], i) => (
                     <div key={label} className={i === 0 ? 'col-span-2' : ''}>
                       <div className="font-mono text-[0.625rem] uppercase tracking-[0.08em] text-text-muted mb-1">
@@ -339,10 +339,10 @@ export default function DetailPanel({
             {/* Negative prompt */}
             {generation.negative_prompt && (
               <div>
-                <h3 className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-text-muted mb-2">
+                <h3 className="font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-text-muted mb-2">
                   NEGATIVE PROMPT
                 </h3>
-                <div className="rounded-[16px] bg-surface-inset border border-glass-border p-4 max-h-28 overflow-y-auto">
+                <div className="rounded-[14px] bg-surface-inset border border-border-subtle p-4 max-h-28 overflow-y-auto">
                   <p className="text-[0.8125rem] text-text-secondary leading-relaxed whitespace-pre-wrap break-words">
                     {generation.negative_prompt}
                   </p>
@@ -366,7 +366,7 @@ export default function DetailPanel({
           </div>
 
           {/* ── Actions (flow after content; not pinned to bottom) ── */}
-          <div className="border-t border-glass-border px-6 py-4 space-y-2.5">
+          <div className="border-t border-border-subtle px-6 py-4 space-y-2.5">
             {/* Primary: Retry (failed) or Save to library */}
             {generation.status === 'failed' && onRetry ? (
               <button

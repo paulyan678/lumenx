@@ -261,7 +261,7 @@ export default function PlaygroundPage() {
         <aside className="flex w-[420px] shrink-0 flex-col gap-3 overflow-y-auto border-r border-glass-border px-4 py-4 scrollbar-thin">
           {/* Mode */}
           <section className="glass-panel atelier-card rounded-[20px] px-5 py-5">
-            <div className="mb-3 font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-text-muted">
+            <div className="mb-3 font-mono text-[0.625rem] font-semibold uppercase tracking-[0.16em] text-text-secondary">
               {t('compose.modeLabel')}
             </div>
             <ModeSelector />
@@ -269,7 +269,7 @@ export default function PlaygroundPage() {
 
           {/* Prompt — first, the primary input */}
           <section className="glass-panel atelier-card rounded-[20px] px-5 py-5">
-            <div className="mb-3 font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-text-muted">
+            <div className="mb-3 font-mono text-[0.625rem] font-semibold uppercase tracking-[0.16em] text-text-secondary">
               {t('compose.promptLabel')}
             </div>
             <PromptInput />
@@ -278,7 +278,7 @@ export default function PlaygroundPage() {
           {/* Media Input (conditional) */}
           {showMediaInput && (
             <section className="glass-panel atelier-card rounded-[20px] px-5 py-5">
-              <div className="mb-3 font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-text-muted">
+              <div className="mb-3 font-mono text-[0.625rem] font-semibold uppercase tracking-[0.16em] text-text-secondary">
                 {t(
                   mode === 'v2v'
                     ? 'compose.mediaSourceVideo'
@@ -295,12 +295,12 @@ export default function PlaygroundPage() {
 
           {/* Model & Parameters — merged into one card (mockup) */}
           <section className="glass-panel atelier-card rounded-[20px] px-5 py-5 relative z-30">
-            <div className="mb-3 font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-text-muted">
+            <div className="mb-3 font-mono text-[0.625rem] font-semibold uppercase tracking-[0.16em] text-text-secondary">
               {t('compose.modelLabel')}
             </div>
             <ModelSelector />
             <div className="my-4 h-px bg-border-subtle" />
-            <div className="mb-3 font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-text-muted">
+            <div className="mb-3 font-mono text-[0.625rem] font-semibold uppercase tracking-[0.16em] text-text-secondary">
               {t('compose.parametersLabel')}
             </div>
             <ParameterBar />
@@ -318,7 +318,7 @@ export default function PlaygroundPage() {
               className={[
                 'inline-flex w-full items-center justify-center gap-[7px] rounded-full px-6 py-[13px]',
                 "font-['Space_Grotesk',sans-serif] text-sm font-semibold",
-                'bg-primary text-on-accent shadow-[var(--glow-primary)] transition-all duration-150',
+                'bg-primary text-on-accent shadow-[var(--glow-primary)] transition-all duration-150 disabled:opacity-40 disabled:shadow-none',
                 canGenerate
                   ? 'hover:bg-primary-hover hover:-translate-y-px cursor-pointer'
                   : 'cursor-not-allowed',

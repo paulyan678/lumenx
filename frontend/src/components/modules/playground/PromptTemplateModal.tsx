@@ -239,7 +239,7 @@ export default function PromptTemplateModal() {
                     className={[
                       "flex-1 rounded-full px-2 py-1.5 text-[0.6875rem] font-medium text-center cursor-pointer transition-all",
                       filterCat === c.value
-                        ? "bg-primary text-on-accent"
+                        ? "bg-surface text-foreground atelier-pill-tab-active"
                         : "text-text-muted hover:text-foreground hover:bg-hover-bg",
                     ].join(" ")}
                   >

@@ -261,7 +261,7 @@ export default function MediaInput() {
             ${
               dragOver
                 ? 'border-primary/60 bg-primary/8 shadow-[var(--glow-primary)]'
-                : 'border-glass-border hover:border-foreground/30 hover:bg-hover-bg'
+                : 'border-border-subtle hover:border-foreground/30 hover:bg-hover-bg'
             }
             ${uploading ? 'pointer-events-none opacity-60' : ''}
           `}

@@ -71,7 +71,7 @@ function ParamDropdown({
           type="button"
           disabled={disabled}
           onClick={() => !disabled && setOpen((o) => !o)}
-          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-[14px] bg-surface-inset border border-glass-border text-foreground text-xs font-medium transition cursor-pointer ${
+          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-[14px] bg-surface-inset border border-border-subtle text-foreground text-xs font-medium transition cursor-pointer ${
             disabled
               ? 'opacity-50 cursor-not-allowed'
               : 'hover:border-foreground/30'
@@ -82,7 +82,7 @@ function ParamDropdown({
         </button>
 
         {open && (
-          <div className="absolute top-full mt-1 w-full bg-elevated border border-glass-border rounded-lg shadow-xl z-30 max-h-48 overflow-y-auto">
+          <div className="absolute top-full mt-1 w-full bg-elevated atelier-card border border-border-subtle z-30 max-h-48 overflow-y-auto">
             {options.map((opt) => (
               <div
                 key={opt}
@@ -188,7 +188,7 @@ function DurationStepper({
   return (
     <div className="flex flex-col gap-[6px]">
       <span className="font-mono text-[0.625rem] uppercase tracking-[0.08em] text-text-muted">{t('parameters.duration')}</span>
-      <div className="flex items-center gap-0 rounded-[14px] border border-glass-border bg-surface-inset overflow-hidden">
+      <div className="flex items-center gap-0 rounded-[14px] border border-border-subtle bg-surface-inset overflow-hidden">
         <button
           type="button"
           disabled={value <= min}
@@ -418,7 +418,7 @@ export default function ParameterBar() {
             {durationFixed ? (
               <div className="flex flex-col gap-[6px]">
                 <span className="font-mono text-[0.625rem] uppercase tracking-[0.08em] text-text-muted">{t('parameters.duration')}</span>
-                <div className="w-full flex items-center px-3 py-2.5 rounded-[14px] bg-surface-inset border border-glass-border text-text-muted text-xs font-medium">
+                <div className="w-full flex items-center px-3 py-2.5 rounded-[14px] bg-surface-inset border border-border-subtle text-text-muted text-xs font-medium">
                   {durationValue}s {t('parameters.durationFixedSuffix')}
                 </div>
               </div>
