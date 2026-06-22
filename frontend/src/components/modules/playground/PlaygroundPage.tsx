@@ -221,7 +221,7 @@ export default function PlaygroundPage() {
 
   // ─── Derived values ────────────────────────────────────────────────────────
 
-  const resultCount = history.length;
+  const resultCount = history.reduce((n, g) => n + g.outputs.length, 0);
   const showMediaInput = MODES_WITH_MEDIA.includes(mode) || MODES_WITH_OPTIONAL_MEDIA.includes(mode);
   const canGenerate = prompt.trim().length > 0;
 
@@ -267,12 +267,12 @@ export default function PlaygroundPage() {
             <ModeSelector />
           </section>
 
-          {/* Model */}
-          <section className="glass-panel atelier-card rounded-[20px] px-5 py-5 relative z-30">
+          {/* Prompt — first, the primary input */}
+          <section className="glass-panel atelier-card rounded-[20px] px-5 py-5">
             <div className="mb-3 font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-text-muted">
-              {t('compose.modelLabel')}
+              {t('compose.promptLabel')}
             </div>
-            <ModelSelector />
+            <PromptInput />
           </section>
 
           {/* Media Input (conditional) */}
@@ -293,16 +293,13 @@ export default function PlaygroundPage() {
             </section>
           )}
 
-          {/* Prompt */}
-          <section className="glass-panel atelier-card rounded-[20px] px-5 py-5">
+          {/* Model & Parameters — merged into one card (mockup) */}
+          <section className="glass-panel atelier-card rounded-[20px] px-5 py-5 relative z-30">
             <div className="mb-3 font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-text-muted">
-              {t('compose.promptLabel')}
+              {t('compose.modelLabel')}
             </div>
-            <PromptInput />
-          </section>
-
-          {/* Parameters */}
-          <section className="glass-panel atelier-card rounded-[20px] px-5 py-5">
+            <ModelSelector />
+            <div className="my-4 h-px bg-border-subtle" />
             <div className="mb-3 font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-text-muted">
               {t('compose.parametersLabel')}
             </div>

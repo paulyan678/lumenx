@@ -225,7 +225,7 @@ export default function ResultGallery() {
               {t('results.title')}
             </span>
             <span className="font-mono text-[0.625rem] bg-elevated text-text-secondary rounded px-[6px] py-[1px]">
-              {filtered.length}
+              {filtered.reduce((n, g) => n + g.outputs.length, 0)}
             </span>
           </div>
         </div>
