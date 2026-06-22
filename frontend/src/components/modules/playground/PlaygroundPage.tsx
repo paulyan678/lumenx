@@ -198,7 +198,7 @@ export default function PlaygroundPage() {
       <header className="flex shrink-0 items-center justify-between border-b border-border-subtle px-7 py-5">
         <div className="flex flex-col gap-1">
           <span className="font-mono text-[0.625rem] font-medium uppercase tracking-[0.2em] text-text-muted">
-            {t('compose.eyebrow')}
+            FREEFORM STUDIO
             <span className="text-primary font-semibold"> · {t('header.eyebrowAccent')}</span>
           </span>
           <div className="flex items-baseline gap-[10px]">

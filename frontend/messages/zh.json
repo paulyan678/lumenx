@@ -1582,7 +1582,7 @@
     },
     "results": {
       "eyebrow": "生成结果",
-      "title": "结果",
+      "title": "生成结果",
       "emptyTitle": "暂无生成结果",
       "emptyBody": "输入提示词并点击生成，结果将展示在这里",
       "filterAll": "全部",

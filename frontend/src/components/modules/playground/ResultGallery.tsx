@@ -188,7 +188,7 @@ export default function ResultGallery() {
       <div className="px-7 py-4 flex items-center justify-between border-b border-border-subtle shrink-0">
         <div className="flex flex-col gap-1">
           <span className="font-mono text-[0.6875rem] uppercase tracking-[0.18em] text-text-muted">
-            {t('results.eyebrow')}
+            RESULTS
           </span>
           <div className="flex items-center gap-2">
             <span className="text-[2.125rem] leading-[1.1] font-semibold tracking-[-0.02em] text-foreground font-display atelier-display">
@@ -201,12 +201,12 @@ export default function ResultGallery() {
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-[2px] bg-surface-inset rounded-full p-[3px] atelier-pill-tabs">
+          <div className="flex items-center gap-[2px] bg-surface-inset rounded-full p-1 atelier-pill-tabs">
             {filters.map((f) => (
               <button
                 key={f.key}
                 onClick={() => setActiveFilter(f.key)}
-                className={`rounded-full px-3 py-1.5 text-[0.6875rem] font-medium text-center transition-all cursor-pointer ${
+                className={`rounded-full px-4 py-2 text-[0.8125rem] font-medium text-center transition-all cursor-pointer ${
                   activeFilter === f.key
                     ? 'bg-surface text-foreground atelier-pill-tab-active'
                     : 'text-text-muted hover:text-foreground hover:bg-hover-bg'
@@ -217,28 +217,28 @@ export default function ResultGallery() {
             ))}
           </div>
 
-          <div className="flex items-center gap-[2px] bg-surface-inset rounded-full p-[3px] atelier-pill-tabs">
+          <div className="flex items-center gap-[2px] bg-surface-inset rounded-full p-1 atelier-pill-tabs">
             <button
               onClick={() => setViewMode('grid')}
-              className={`rounded-full p-1.5 transition-all cursor-pointer ${
+              className={`rounded-full p-2 transition-all cursor-pointer ${
                 viewMode === 'grid'
                   ? 'bg-surface text-foreground atelier-pill-tab-active'
                   : 'text-text-muted hover:text-foreground hover:bg-hover-bg'
               }`}
               title={t('results.gridView')}
             >
-              <Grid3x3 className="w-3.5 h-3.5" />
+              <Grid3x3 className="w-4 h-4" />
             </button>
             <button
               onClick={() => setViewMode('gallery')}
-              className={`rounded-full p-1.5 transition-all cursor-pointer ${
+              className={`rounded-full p-2 transition-all cursor-pointer ${
                 viewMode === 'gallery'
                   ? 'bg-surface text-foreground atelier-pill-tab-active'
                   : 'text-text-muted hover:text-foreground hover:bg-hover-bg'
               }`}
               title={t('results.galleryView')}
             >
-              <GalleryHorizontal className="w-3.5 h-3.5" />
+              <GalleryHorizontal className="w-4 h-4" />
             </button>
           </div>
         </div>
