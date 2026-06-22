@@ -164,7 +164,7 @@ export default function PromptHistoryDrawer() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t('history.searchPlaceholder')}
-              className="w-full bg-surface-inset border border-glass-border rounded-[14px] pl-9 pr-3 py-2.5 text-xs text-foreground/80 placeholder:text-text-muted outline-none focus:border-foreground/30 transition-colors"
+              className="w-full bg-surface-inset border border-glass-border rounded-[14px] pl-9 pr-3 py-2.5 text-xs text-foreground/80 placeholder:text-text-muted outline-none focus:border-primary transition-colors"
             />
           </div>
         </div>

@@ -272,7 +272,7 @@ export default function PromptTemplateModal() {
                   return (
                     <div
                       key={tpl.id}
-                      className="group p-4 rounded-[20px] bg-glass atelier-asset-card border border-glass-border hover:border-foreground/30 transition-all"
+                      className="group p-4 bg-glass atelier-asset-card border border-glass-border hover:border-foreground/30 transition-all"
                     >
                       <div className="flex items-start gap-3">
                         <div className="flex-1 min-w-0">
@@ -363,7 +363,7 @@ export default function PromptTemplateModal() {
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                 placeholder={t("template.namePlaceholder")}
-                className="w-full h-9 px-3 text-[0.8125rem] bg-surface-inset border border-glass-border rounded-[14px] text-foreground placeholder:text-text-muted outline-none focus:border-foreground/30 transition-colors shrink-0"
+                className="w-full h-9 px-3 text-[0.8125rem] bg-surface-inset border border-glass-border rounded-[14px] text-foreground placeholder:text-text-muted outline-none focus:border-primary transition-colors shrink-0"
               />
 
               {/* Category pills */}
@@ -390,7 +390,7 @@ export default function PromptTemplateModal() {
                 value={form.prompt}
                 onChange={(e) => setForm((f) => ({ ...f, prompt: e.target.value }))}
                 placeholder={t("template.promptPlaceholder")}
-                className="w-full flex-1 min-h-[180px] px-3 py-2.5 text-[0.8125rem] leading-relaxed bg-surface-inset border border-glass-border rounded-[14px] text-foreground placeholder:text-text-muted outline-none focus:border-foreground/30 transition-colors resize-none"
+                className="w-full flex-1 min-h-[180px] px-3 py-2.5 text-[0.8125rem] leading-relaxed bg-surface-inset border border-glass-border rounded-[14px] text-foreground placeholder:text-text-muted outline-none focus:border-primary transition-colors resize-none"
               />
             </div>
 
