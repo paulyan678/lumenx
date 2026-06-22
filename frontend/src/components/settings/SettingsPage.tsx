@@ -1124,8 +1124,8 @@ export default function SettingsPage() {
       </header>
 
       {/* Scroll area */}
-      <div className="flex-1 overflow-y-auto px-4 md:px-7 py-8 relative z-10">
-        <div className="max-w-4xl flex flex-col gap-6">
+      <div className="flex-1 overflow-y-auto px-10 py-8 relative z-10">
+        <div className="max-w-6xl mx-auto flex flex-col gap-6">
           {!online && (
             <div
               role="status"
