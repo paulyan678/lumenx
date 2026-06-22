@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Download, Video, Star, Copy, Check, Replace, Crown } from 'lucide-react';
+import { Download, Video, Copy, Check, Replace, Crown, Bookmark } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { API_URL, playgroundApi } from '@/lib/api';
 import { usePlaygroundStore, type PlaygroundGeneration } from './usePlaygroundStore';
@@ -185,7 +185,7 @@ function CompletedCard({ generation, outputIndex, onGenerateVideo, onOpenDetail 
 
   return (
     <div
-      className={`group rounded-[20px] border bg-glass atelier-asset-card overflow-hidden transition cursor-pointer ${saved ? 'border-status-starred-border ring-1 ring-status-starred-border' : 'border-glass-border hover:border-foreground/30'}`}
+      className={`group rounded-[20px] border bg-glass atelier-asset-card overflow-hidden transition cursor-pointer ${saved ? 'border-primary/40 ring-1 ring-primary/30' : 'border-glass-border hover:border-foreground/30'}`}
       onClick={() => onOpenDetail?.(generation, output.id)}
     >
       {/* Media area */}
@@ -229,7 +229,7 @@ function CompletedCard({ generation, outputIndex, onGenerateVideo, onOpenDetail 
 
         {/* Saved pill top-right */}
         {saved && (
-          <span className="absolute top-2 right-2 z-[2] atelier-badge font-mono text-[0.5625rem] bg-status-starred-bg text-status-starred-fg rounded px-[6px] py-[2px] uppercase">
+          <span className="absolute top-2 right-2 z-[2] atelier-badge font-mono text-[0.5625rem] bg-primary/15 text-primary border border-primary/30 rounded px-[6px] py-[2px] uppercase">
             {t('card.saved')}
           </span>
         )}
@@ -268,10 +268,10 @@ function CompletedCard({ generation, outputIndex, onGenerateVideo, onOpenDetail 
           </button>
           <button
             onClick={handleSaveToLibrary}
-            className={`w-7 h-7 rounded-full backdrop-blur-sm flex items-center justify-center transition ${saved ? 'bg-status-starred-bg' : 'bg-elevated hover:bg-hover-bg'}`}
+            className={`w-7 h-7 rounded-full backdrop-blur-sm flex items-center justify-center transition ${saved ? 'bg-primary/15' : 'bg-elevated hover:bg-hover-bg'}`}
             title={saved ? t('card.saved') : t('card.saveToLibrary')}
           >
-            <Star className={`w-3.5 h-3.5 ${saved ? 'text-status-starred-solid fill-status-starred-solid' : 'text-foreground'}`} />
+            <Bookmark className={`w-3.5 h-3.5 ${saved ? 'text-primary fill-current' : 'text-foreground'}`} />
           </button>
         </div>
       </div>
@@ -300,8 +300,8 @@ function CompletedCard({ generation, outputIndex, onGenerateVideo, onOpenDetail 
           </span>
           <span className="font-mono text-[0.5625rem] text-text-muted ml-auto">{formatTime(created_at)}</span>
           {saved && (
-            <span className="flex items-center gap-0.5 text-[0.5625rem] text-status-starred-fg">
-              <Star className="w-2.5 h-2.5 fill-current" />
+            <span className="flex items-center gap-0.5 text-[0.5625rem] text-primary">
+              <Bookmark className="w-2.5 h-2.5 fill-current" />
             </span>
           )}
         </div>

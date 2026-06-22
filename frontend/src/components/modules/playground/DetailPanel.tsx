@@ -5,8 +5,8 @@ import { createPortal } from 'react-dom';
 import {
   X,
   Download,
-  Star,
   Crown,
+  Bookmark,
   Video,
   RotateCcw,
   Trash2,
@@ -261,7 +261,7 @@ export default function DetailPanel({
         </div>
 
         {/* ─── RIGHT SIDE (Details) — 3 zones: header / scroll body / pinned footer ─── */}
-        <div className="relative w-[40%] h-full flex flex-col border-l border-glass-border">
+        <div className="relative w-[40%] h-full overflow-y-auto border-l border-glass-border">
           {/* Close button */}
           <button
             onClick={onClose}
@@ -271,7 +271,7 @@ export default function DetailPanel({
           </button>
 
           {/* ── Header ── */}
-          <div className="shrink-0 px-6 pt-6 pb-4 border-b border-glass-border pr-14">
+          <div className="px-6 pt-6 pb-4 border-b border-glass-border pr-14">
             <div className="flex items-center gap-2 mb-1.5">
               <span className="font-mono text-[0.5625rem] bg-elevated text-text-secondary rounded px-[6px] py-[2px] uppercase tracking-[0.1em]">
                 {MODE_LABELS[generation.mode] || generation.mode}
@@ -288,8 +288,8 @@ export default function DetailPanel({
             </p>
           </div>
 
-          {/* ── Body (scrollable) ── */}
-          <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-5">
+          {/* ── Body ── */}
+          <div className="px-6 py-5 space-y-5">
             {/* Prompt */}
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -365,8 +365,8 @@ export default function DetailPanel({
             )}
           </div>
 
-          {/* ── Footer (pinned actions) — one teal primary, neutral secondaries, subdued delete ── */}
-          <div className="shrink-0 border-t border-glass-border px-6 py-4 space-y-2.5">
+          {/* ── Actions (flow after content; not pinned to bottom) ── */}
+          <div className="border-t border-glass-border px-6 py-4 space-y-2.5">
             {/* Primary: Retry (failed) or Save to library */}
             {generation.status === 'failed' && onRetry ? (
               <button
@@ -382,13 +382,11 @@ export default function DetailPanel({
                 disabled={saving}
                 className={`w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium transition cursor-pointer disabled:opacity-50 disabled:cursor-wait ${
                   saved
-                    ? 'bg-status-starred-bg border border-status-starred-border text-status-starred-fg hover:opacity-80'
+                    ? 'bg-primary/15 border border-primary/30 text-primary hover:bg-primary/20'
                     : 'bg-primary text-on-accent shadow-[var(--glow-primary)] hover:bg-primary-hover'
                 }`}
               >
-                <Star
-                  className={`w-4 h-4 ${saved ? 'fill-status-starred-solid text-status-starred-solid' : ''}`}
-                />
+                <Bookmark className={`w-4 h-4 ${saved ? 'fill-current' : ''}`} />
                 {saving ? t('detail.saving') : saved ? t('detail.savedCancel') : t('detail.saveToLibrary')}
               </button>
             ) : null}
@@ -407,6 +405,12 @@ export default function DetailPanel({
                 <Crown className={`w-4 h-4 ${featured ? 'fill-status-starred-solid' : ''}`} />
                 {t('card.featured')}
               </button>
+            )}
+
+            {output && (
+              <p className="text-[0.625rem] leading-relaxed text-text-muted">
+                {t('detail.markHint')}
+              </p>
             )}
 
             {/* Secondary row: Download + Generate Video (neutral ghosts) */}

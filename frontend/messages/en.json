@@ -1703,7 +1703,8 @@
       "saving": "Saving…",
       "savedCancel": "Saved (click to remove)",
       "saveToLibrary": "Save to library",
-      "parameters": "Parameters"
+      "parameters": "Parameters",
+      "markHint": "Save: archive to your asset library (reusable across projects) · Featured: mark the best of this batch"
     },
     "gallery": {
       "viewDetail": "Click to view details"
