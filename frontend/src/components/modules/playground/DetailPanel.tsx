@@ -24,6 +24,7 @@ import { usePlaygroundStore, type PlaygroundGeneration } from './usePlaygroundSt
 interface DetailPanelProps {
   generation: PlaygroundGeneration;
   allGenerations: PlaygroundGeneration[];
+  focusOutputId?: string;
   onClose: () => void;
   onNavigate: (generation: PlaygroundGeneration) => void;
   onRetry?: (generation: PlaygroundGeneration) => void;
@@ -66,6 +67,7 @@ function formatTimestamp(dateStr: string): string {
 export default function DetailPanel({
   generation: generationProp,
   allGenerations,
+  focusOutputId,
   onClose,
   onNavigate,
   onRetry,
@@ -82,8 +84,9 @@ export default function DetailPanel({
   const generation = history.find((g) => g.id === generationProp.id) ?? generationProp;
   const saved = generation.outputs[0]?.saved_to_library ?? false;
 
-  // Determine media
-  const output = generation.outputs[0];
+  // Determine media — focus the clicked output of a batch, else the first.
+  const output =
+    generation.outputs.find((o) => o.id === focusOutputId) ?? generation.outputs[0];
   const isVideo =
     output?.media_type === 'video' ||
     ['t2v', 'i2v', 'r2v', 'v2v'].includes(generation.mode);

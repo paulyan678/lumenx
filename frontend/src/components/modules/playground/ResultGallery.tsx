@@ -44,6 +44,12 @@ export default function ResultGallery() {
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'gallery'>('grid');
   const [detailGen, setDetailGen] = useState<PlaygroundGeneration | null>(null);
+  const [detailOutputId, setDetailOutputId] = useState<string | undefined>(undefined);
+
+  const handleOpenDetail = useCallback((gen: PlaygroundGeneration, outputId?: string) => {
+    setDetailGen(gen);
+    setDetailOutputId(outputId);
+  }, []);
 
   const handleRetry = useCallback(async (gen: PlaygroundGeneration) => {
     try {
@@ -164,6 +170,29 @@ export default function ResultGallery() {
     [itemsWithDividers],
   );
 
+  // Grid items: expand each completed generation into one tile per output (so
+  // multi-output batches show all N); keep pending/processing/failed as one card.
+  const gridItems = useMemo(() => {
+    const out: Array<
+      | { kind: 'divider'; label: string; key: string }
+      | { kind: 'output'; gen: PlaygroundGeneration; outputIndex: number }
+      | { kind: 'gen'; gen: PlaygroundGeneration }
+    > = [];
+    for (const item of itemsWithDividers) {
+      if (item.type === 'divider') {
+        out.push({ kind: 'divider', label: item.label, key: item.key });
+        continue;
+      }
+      const g = item.data;
+      if (g.status === 'completed' && g.outputs.length > 0) {
+        g.outputs.forEach((_, i) => out.push({ kind: 'output', gen: g, outputIndex: i }));
+      } else {
+        out.push({ kind: 'gen', gen: g });
+      }
+    }
+    return out;
+  }, [itemsWithDividers]);
+
   const filters: { key: FilterType; label: string }[] = [
     { key: 'all', label: t('results.filterAll') },
     { key: 'image', label: t('results.filterImage') },
@@ -249,36 +278,49 @@ export default function ResultGallery() {
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <GalleryView
             generations={dataItems}
-            onOpenDetail={setDetailGen}
+            onOpenDetail={handleOpenDetail}
             onRetry={handleRetry}
           />
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto p-6">
           <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4 content-start">
-            {itemsWithDividers.map((item) => {
-              if (item.type === 'divider') {
+            {gridItems.map((it) => {
+              if (it.kind === 'divider') {
                 return (
                   <div
-                    key={item.key}
+                    key={it.key}
                     className="col-span-full flex items-center gap-3 py-2"
                   >
                     <div className="flex-1 h-px bg-border-subtle" />
                     <span className="font-mono text-[0.5625rem] text-text-muted uppercase tracking-wider whitespace-nowrap">
-                      {item.label}
+                      {it.label}
                     </span>
                     <div className="flex-1 h-px bg-border-subtle" />
                   </div>
                 );
               }
+              if (it.kind === 'output') {
+                return (
+                  <ResultCard
+                    key={`${it.gen.id}-${it.outputIndex}`}
+                    generation={it.gen}
+                    outputIndex={it.outputIndex}
+                    onRetry={handleRetry}
+                    onDelete={handleDelete}
+                    onGenerateVideo={handleGenerateVideo}
+                    onOpenDetail={handleOpenDetail}
+                  />
+                );
+              }
               return (
                 <ResultCard
-                  key={item.data.id}
-                  generation={item.data}
+                  key={it.gen.id}
+                  generation={it.gen}
                   onRetry={handleRetry}
                   onDelete={handleDelete}
                   onGenerateVideo={handleGenerateVideo}
-                  onOpenDetail={setDetailGen}
+                  onOpenDetail={handleOpenDetail}
                 />
               );
             })}
@@ -291,8 +333,9 @@ export default function ResultGallery() {
         <DetailPanel
           generation={detailGen}
           allGenerations={dataItems}
-          onClose={() => setDetailGen(null)}
-          onNavigate={setDetailGen}
+          focusOutputId={detailOutputId}
+          onClose={() => { setDetailGen(null); setDetailOutputId(undefined); }}
+          onNavigate={(g) => handleOpenDetail(g)}
           onRetry={handleRetry}
           onGenerateVideo={handleGenerateVideo}
         />

@@ -8,9 +8,10 @@ import { usePlaygroundStore, type PlaygroundGeneration } from './usePlaygroundSt
 
 interface ResultCardProps {
   generation: PlaygroundGeneration;
+  outputIndex?: number;
   onGenerateVideo?: (imagePath: string) => void;
   onRetry?: (generation: PlaygroundGeneration) => void;
-  onOpenDetail?: (generation: PlaygroundGeneration) => void;
+  onOpenDetail?: (generation: PlaygroundGeneration, outputId?: string) => void;
   onDelete?: (generation: PlaygroundGeneration) => void;
 }
 
@@ -122,10 +123,10 @@ function FailedCard({ generation, onRetry, onDelete }: { generation: PlaygroundG
   );
 }
 
-function CompletedCard({ generation, onGenerateVideo, onOpenDetail }: { generation: PlaygroundGeneration; onGenerateVideo?: (path: string) => void; onOpenDetail?: (generation: PlaygroundGeneration) => void }) {
+function CompletedCard({ generation, outputIndex, onGenerateVideo, onOpenDetail }: { generation: PlaygroundGeneration; outputIndex: number; onGenerateVideo?: (path: string) => void; onOpenDetail?: (generation: PlaygroundGeneration, outputId?: string) => void }) {
   const { prompt, model_id, mode, outputs, created_at } = generation;
   const t = useTranslations('playground');
-  const output = outputs[0];
+  const output = outputs[outputIndex];
   const isVideo = output?.media_type === 'video' || ['t2v', 'i2v', 'r2v', 'v2v'].includes(mode);
   const [saving, setSaving] = useState(false);
 
@@ -182,7 +183,7 @@ function CompletedCard({ generation, onGenerateVideo, onOpenDetail }: { generati
   return (
     <div
       className={`group rounded-[20px] border bg-glass atelier-asset-card overflow-hidden transition cursor-pointer ${saved ? 'border-status-starred-border ring-1 ring-status-starred-border' : 'border-glass-border hover:border-foreground/30'}`}
-      onClick={() => onOpenDetail?.(generation)}
+      onClick={() => onOpenDetail?.(generation, output.id)}
     >
       {/* Media area */}
       <div className="relative overflow-hidden bg-elevated" style={{ aspectRatio: '16/9' }}>
@@ -286,7 +287,7 @@ function CompletedCard({ generation, onGenerateVideo, onOpenDetail }: { generati
   );
 }
 
-export default function ResultCard({ generation, onGenerateVideo, onRetry, onOpenDetail, onDelete }: ResultCardProps) {
+export default function ResultCard({ generation, outputIndex = 0, onGenerateVideo, onRetry, onOpenDetail, onDelete }: ResultCardProps) {
   const { status, prompt, model_id, mode, created_at } = generation;
   const t = useTranslations('playground');
 
@@ -347,5 +348,5 @@ export default function ResultCard({ generation, onGenerateVideo, onRetry, onOpe
   }
 
   // ─── COMPLETED STATE ────────────────────────────────────────────────────────
-  return <CompletedCard generation={generation} onGenerateVideo={onGenerateVideo} onOpenDetail={onOpenDetail} />;
+  return <CompletedCard generation={generation} outputIndex={outputIndex} onGenerateVideo={onGenerateVideo} onOpenDetail={onOpenDetail} />;
 }
