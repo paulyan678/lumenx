@@ -17,7 +17,8 @@
  * is delegated via onGenerate(payload) so the host (StoryboardR2V)
  * can manage tasks, queue, and shot-state updates.
  */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Dices, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { I2VModelConfig, DurationConfig, ModelParamSupport } from "@/lib/modelCatalog";
@@ -88,6 +89,26 @@ export default function ParamsSection({
     const [open, setOpen] = usePanelSectionState(shotId, "params", true);
     const [advOpen, setAdvOpen] = usePanelSectionState(shotId, "params-advanced", false);
     const [modelOpen, setModelOpen] = useState(false);
+    const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+    const trigRef = useRef<HTMLButtonElement>(null);
+    // Position the dropdown via a portal (escapes the shot card's stacking
+    // context so it isn't covered by the next shot's frame) + close on
+    // scroll/resize so it never floats away from its trigger.
+    useEffect(() => {
+        if (!modelOpen) { setMenuPos(null); return; }
+        const trig = trigRef.current;
+        if (trig) {
+            const r = trig.getBoundingClientRect();
+            setMenuPos({ top: r.bottom + 4, left: r.left });
+        }
+        const close = () => setModelOpen(false);
+        window.addEventListener("scroll", close, true);
+        window.addEventListener("resize", close);
+        return () => {
+            window.removeEventListener("scroll", close, true);
+            window.removeEventListener("resize", close);
+        };
+    }, [modelOpen]);
 
     const activeModel: I2VModelConfig | undefined = useMemo(
         () => modelList.find((m) => m.id === params.model) ?? modelList[0],
@@ -166,6 +187,7 @@ export default function ParamsSection({
                 <ParamRow label="Model">
                     <div className="relative">
                         <button
+                            ref={trigRef}
                             type="button"
                             onClick={() => setModelOpen(v => !v)}
                             aria-expanded={modelOpen}
@@ -178,10 +200,13 @@ export default function ParamsSection({
                                 <path d="m6 9 6 6 6-6" />
                             </svg>
                         </button>
-                        {modelOpen && (
+                        {modelOpen && menuPos && createPortal(
                             <>
-                                <div className="fixed inset-0 z-40" onClick={() => setModelOpen(false)} aria-hidden="true" />
-                                <div className="absolute left-0 top-full z-50 mt-1 min-w-[12rem] max-h-60 overflow-y-auto rounded-md border border-border-subtle bg-elevated p-1 shadow-[var(--shadow-lift)]">
+                                <div className="fixed inset-0 z-[60]" onClick={() => setModelOpen(false)} aria-hidden="true" />
+                                <div
+                                    className="fixed z-[70] max-h-60 min-w-[12rem] overflow-y-auto rounded-md border border-border-subtle bg-elevated p-1 shadow-[var(--shadow-lift)]"
+                                    style={{ top: menuPos.top, left: menuPos.left }}
+                                >
                                     {modelList.map((m) => {
                                         const active = params.model === m.id;
                                         return (
@@ -201,7 +226,8 @@ export default function ParamsSection({
                                         );
                                     })}
                                 </div>
-                            </>
+                            </>,
+                            document.body
                         )}
                     </div>
                 </ParamRow>
