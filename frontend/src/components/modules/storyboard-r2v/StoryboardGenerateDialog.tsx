@@ -127,13 +127,13 @@ export default function StoryboardGenerateDialog({
                                             key={c.key}
                                             className={`flex items-start gap-2 rounded-md border px-3 py-2 ${
                                                 c.pass
-                                                    ? "border-green-500/30 bg-green-500/5"
-                                                    : "border-amber-400/40 bg-amber-400/10"
+                                                    ? "border-status-completed-border bg-status-completed-bg/5"
+                                                    : "border-accent/40 bg-accent/10"
                                             }`}
                                         >
                                             <span
                                                 className={`mt-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full text-[0.625rem] font-bold ${
-                                                    c.pass ? "bg-green-500/20 text-green-400" : "bg-amber-400/20 text-amber-300"
+                                                    c.pass ? "bg-status-completed-bg/20 text-status-completed-fg" : "bg-accent/20 text-accent"
                                                 }`}
                                             >
                                                 {c.pass ? "✓" : "!"}
@@ -160,9 +160,9 @@ export default function StoryboardGenerateDialog({
 
                             {/* Destructive warning when shots already exist */}
                             {allPass && existingShotCount > 0 && (
-                                <div className="flex items-start gap-2 rounded-md border border-amber-400/40 bg-amber-400/10 px-3 py-2">
-                                    <AlertTriangle size={13} className="text-amber-300 mt-0.5 shrink-0" />
-                                    <p className="text-[0.75rem] text-amber-100">
+                                <div className="flex items-start gap-2 rounded-md border border-accent/40 bg-accent/10 px-3 py-2">
+                                    <AlertTriangle size={13} className="text-accent mt-0.5 shrink-0" />
+                                    <p className="text-[0.75rem] text-accent">
                                         {t("willReplaceWarning", { count: existingShotCount })}
                                     </p>
                                 </div>

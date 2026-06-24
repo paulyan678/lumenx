@@ -66,7 +66,7 @@ export function GenerationBanner({
 
             {state === "phase2" && (
                 <BannerShell key="phase2">
-                    <Loader2 size={13} className="animate-spin text-amber-400 shrink-0" />
+                    <Loader2 size={13} className="animate-spin text-status-processing-fg shrink-0" />
                     <span className="text-xs text-text-secondary">
                         {t("bannerRefineProgress", {
                             current: refineProgress?.current ?? 0,
@@ -78,7 +78,7 @@ export function GenerationBanner({
 
             {state === "dialogue" && (
                 <BannerShell key="dialogue">
-                    <Loader2 size={13} className="animate-spin text-blue-400 shrink-0" />
+                    <Loader2 size={13} className="animate-spin text-status-processing-fg shrink-0" />
                     <span className="text-xs text-text-secondary">
                         {t("bannerDialogueProgress", {
                             current: dialogueProgress?.current ?? 0,
@@ -134,14 +134,14 @@ function SummaryBar({
             className="overflow-hidden shrink-0"
         >
             <div className="flex items-center gap-2.5 h-9 px-6 border-b border-border-subtle bg-glass">
-                <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
+                <CheckCircle2 size={14} className="text-status-completed-fg shrink-0" />
                 <span className="text-[0.8125rem] text-text-secondary">
                     {t("bannerFrameCount", { count: summary.frameCount })}
                     {summary.dialogueReady > 0 && (
                         <span className="ml-1.5">{t("bannerDialoguePending", { count: summary.dialogueReady })}</span>
                     )}
                     {summary.dialogueMissing > 0 && (
-                        <span className="ml-1.5 text-amber-400/80">{t("bannerDialogueMissingVoice", { count: summary.dialogueMissing })}</span>
+                        <span className="ml-1.5 text-accent/80">{t("bannerDialogueMissingVoice", { count: summary.dialogueMissing })}</span>
                     )}
                 </span>
                 {showCTA && onGenerateDialogue && (

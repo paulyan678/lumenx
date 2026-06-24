@@ -321,7 +321,7 @@ export default function ShotCard({
             if (shot.videoStatus === "failed") {
                 return (
                     <div className="w-full aspect-video flex flex-col items-center justify-center gap-2">
-                        <span className="text-[0.6875rem] text-rose-400 font-medium">{t("generationFailed")}</span>
+                        <span className="text-[0.6875rem] text-status-failed-fg font-medium">{t("generationFailed")}</span>
                         <button
                             onClick={onGenerateVideo}
                             className="text-[0.6875rem] text-primary hover:text-primary/80 transition-colors font-medium"
@@ -348,7 +348,7 @@ export default function ShotCard({
                             alt={t("t2iCompleted") || "First frame"}
                             className="w-full h-full"
                         />
-                        <div className="absolute bottom-2 left-2 text-[0.625rem] px-1.5 py-0.5 rounded-full bg-emerald-500/90 text-white font-medium backdrop-blur-sm pointer-events-none">
+                        <div className="absolute bottom-2 left-2 text-[0.625rem] px-1.5 py-0.5 rounded-full bg-status-completed-bg/90 text-white font-medium backdrop-blur-sm pointer-events-none">
                             {t("generateVideoNext")}
                         </div>
                     </div>
@@ -367,7 +367,7 @@ export default function ShotCard({
             if (shot.t2iStatus === "failed") {
                 return (
                     <div className="w-full aspect-video flex flex-col items-center justify-center gap-2">
-                        <span className="text-[0.6875rem] text-rose-400 font-medium">{t("generationFailed")}</span>
+                        <span className="text-[0.6875rem] text-status-failed-fg font-medium">{t("generationFailed")}</span>
                         <button
                             onClick={onGenerateT2I}
                             className="text-[0.6875rem] text-primary hover:text-primary/80 transition-colors font-medium"
@@ -416,7 +416,7 @@ export default function ShotCard({
         if (shot.videoStatus === "failed") {
             return (
                 <div className="w-full aspect-video flex flex-col items-center justify-center gap-2">
-                    <span className="text-[0.6875rem] text-rose-400 font-medium">{t("generationFailed")}</span>
+                    <span className="text-[0.6875rem] text-status-failed-fg font-medium">{t("generationFailed")}</span>
                     <button
                         onClick={onGenerateVideo}
                         className="text-[0.6875rem] text-primary hover:text-primary/80 transition-colors font-medium"
@@ -805,7 +805,7 @@ export default function ShotCard({
                                                 {/* Duration is the only field NOT in prompt — show as API param note */}
                                                 {shot.duration && (
                                                     <p className="text-text-muted border-t border-border-subtle pt-1.5">
-                                                        <span className="text-emerald-300/70">{t("durationLabel")}:</span> {shot.duration}s {t("durationApiNote")}
+                                                        <span className="text-status-completed-fg/70">{t("durationLabel")}:</span> {shot.duration}s {t("durationApiNote")}
                                                     </p>
                                                 )}
                                             </div>
@@ -874,7 +874,7 @@ export default function ShotCard({
                                     whileHover={{ scale: 1.08 }}
                                     whileTap={{ scale: 0.92 }}
                                     onClick={onDelete}
-                                    className="p-1.5 rounded-lg hover:bg-hover-bg text-text-secondary hover:text-rose-400 transition-colors"
+                                    className="p-1.5 rounded-lg hover:bg-hover-bg text-text-secondary hover:text-status-failed-fg transition-colors"
                                     title={t("deleteShot")}
                                 >
                                     <Trash2 size={13} strokeWidth={1.5} />
@@ -886,7 +886,7 @@ export default function ShotCard({
                                             whileHover={{ scale: 1.08 }}
                                             whileTap={{ scale: 0.92 }}
                                             onClick={onRefineFrame}
-                                            className="p-1.5 rounded-lg hover:bg-hover-bg text-text-secondary hover:text-amber-400 transition-colors"
+                                            className="p-1.5 rounded-lg hover:bg-hover-bg text-text-secondary hover:text-accent transition-colors"
                                             title={t("refineFrame")}
                                         >
                                             <Sparkles size={13} strokeWidth={1.5} />

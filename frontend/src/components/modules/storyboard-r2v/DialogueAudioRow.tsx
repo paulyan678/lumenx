@@ -90,12 +90,12 @@ export default function DialogueAudioRow({
                         </span>
                     )}
                     {hasDub && (
-                        <span className="px-1.5 py-0.5 rounded font-mono text-[0.59375rem] uppercase tracking-[0.14em] bg-emerald-500/10 text-emerald-400">
+                        <span className="px-1.5 py-0.5 rounded font-mono text-[0.59375rem] uppercase tracking-[0.14em] bg-status-completed-bg text-status-completed-fg">
                             {t("overridden")}
                         </span>
                     )}
                     {hasPreview && !hasDub && (
-                        <span className="px-1.5 py-0.5 rounded font-mono text-[0.59375rem] uppercase tracking-[0.14em] bg-amber-500/10 text-amber-400">
+                        <span className="px-1.5 py-0.5 rounded font-mono text-[0.59375rem] uppercase tracking-[0.14em] bg-accent/10 text-accent">
                             {t("previewingBadge")}
                         </span>
                     )}
@@ -345,7 +345,7 @@ function DialogueWorkbenchModal({
                                 <div className="flex items-center gap-2">
                                     <span className="text-[0.75rem] font-medium text-text-secondary">{t("stepDialogueText")}</span>
                                     {!voiceId && (
-                                        <span className="text-[0.625rem] text-amber-400">{t("needVoiceBindingHint")}</span>
+                                        <span className="text-[0.625rem] text-accent">{t("needVoiceBindingHint")}</span>
                                     )}
                                 </div>
                                 <textarea
@@ -404,7 +404,7 @@ function DialogueWorkbenchModal({
                                         </button>
                                     )}
                                     {audioUrl && (
-                                        <span className="text-[0.625rem] text-emerald-400">{t("generatedTag")}</span>
+                                        <span className="text-[0.625rem] text-status-completed-fg">{t("generatedTag")}</span>
                                     )}
                                 </div>
                             </section>
@@ -415,12 +415,12 @@ function DialogueWorkbenchModal({
                                     <div className="flex items-center gap-2">
                                         <span className="text-[0.75rem] font-medium text-text-secondary">{t("stepOverride")}</span>
                                         {dubbedVideoUrl && !previewVideoUrl && (
-                                            <span className="px-1.5 py-0.5 rounded font-mono text-[0.5625rem] uppercase tracking-[0.14em] bg-emerald-500/10 text-emerald-400">
+                                            <span className="px-1.5 py-0.5 rounded font-mono text-[0.5625rem] uppercase tracking-[0.14em] bg-status-completed-bg text-status-completed-fg">
                                                 {t("overridden")}
                                             </span>
                                         )}
                                         {previewVideoUrl && (
-                                            <span className="px-1.5 py-0.5 rounded font-mono text-[0.5625rem] uppercase tracking-[0.14em] bg-amber-500/10 text-amber-400">
+                                            <span className="px-1.5 py-0.5 rounded font-mono text-[0.5625rem] uppercase tracking-[0.14em] bg-accent/10 text-accent">
                                                 {t("previewVersion")}
                                             </span>
                                         )}
@@ -441,12 +441,12 @@ function DialogueWorkbenchModal({
                                             }}
                                         />
                                         {previewVideoUrl && (
-                                            <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/30 text-[0.5625rem] font-medium text-amber-300">
+                                            <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-accent/20 border border-accent/30 text-[0.5625rem] font-medium text-accent">
                                                 {t("previewVersion")}
                                             </div>
                                         )}
                                         {dubbedVideoUrl && !previewVideoUrl && (
-                                            <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-[0.5625rem] font-medium text-emerald-300">
+                                            <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-status-completed-bg/20 border border-status-completed-border text-[0.5625rem] font-medium text-status-completed-fg">
                                                 {t("dubbedVersion")}
                                             </div>
                                         )}
@@ -520,7 +520,7 @@ function DialogueWorkbenchModal({
                                                 type="button"
                                                 onClick={handleApply}
                                                 disabled={applying}
-                                                className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-md border border-emerald-500/40 bg-emerald-500/10 text-[0.75rem] font-medium text-emerald-300 hover:bg-emerald-500/15 hover:border-emerald-500/60 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                                className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-md border border-status-completed-border bg-status-completed-bg text-[0.75rem] font-medium text-status-completed-fg hover:bg-status-completed-bg/60 hover:border-status-completed-border transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                                             >
                                                 {applying ? <Loader2 size={12} className="animate-spin" /> : <Film size={12} />}
                                                 {t("applyOverride")}
@@ -533,7 +533,7 @@ function DialogueWorkbenchModal({
                                                 type="button"
                                                 onClick={handleRevert}
                                                 disabled={reverting}
-                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-amber-500/30 bg-amber-500/5 text-[0.75rem] text-amber-300 hover:bg-amber-500/10 hover:border-amber-500/50 transition-colors disabled:opacity-40"
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-accent/30 bg-accent/5 text-[0.75rem] text-accent hover:bg-accent/10 hover:border-accent/50 transition-colors disabled:opacity-40"
                                             >
                                                 {reverting ? <Loader2 size={12} className="animate-spin" /> : <Undo2 size={12} />}
                                                 {t("undoOverride")}
@@ -551,11 +551,11 @@ function DialogueWorkbenchModal({
 
                             {/* Error display */}
                             {(audioError || error) && (
-                                <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-red-500/20 bg-red-500/5 text-[0.6875rem] text-red-300">
-                                    <AlertCircle size={12} className="shrink-0 text-red-400" />
+                                <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-status-failed-border bg-status-failed-bg text-[0.6875rem] text-status-failed-fg">
+                                    <AlertCircle size={12} className="shrink-0 text-status-failed-fg" />
                                     <span className="break-words flex-1">{audioError || error}</span>
                                     {error && (
-                                        <button type="button" onClick={() => setError(null)} className="shrink-0 text-red-400/60 hover:text-red-300">×</button>
+                                        <button type="button" onClick={() => setError(null)} className="shrink-0 text-status-failed-fg/60 hover:text-status-failed-fg">×</button>
                                     )}
                                 </div>
                             )}
