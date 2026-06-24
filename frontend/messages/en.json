@@ -805,7 +805,15 @@
   "pipeline": {
     "stepLabel": "Step {number}",
     "stepIndex": "STEP 0{number}",
-    "beta": "Beta"
+    "beta": "Beta",
+    "railArtReady": "Set",
+    "railCast": "{n} characters",
+    "railCastBound": "{n} characters · {m} voiced",
+    "railShots": "{n} shots",
+    "railAssembled": "Exported",
+    "railAssemblyReady": "Ready to assemble",
+    "railAssemblyGated": "Awaiting storyboard",
+    "gatedTooltip": "Complete upstream steps first"
   },
   "assets": {
     "clickToZoom": "Click to zoom",

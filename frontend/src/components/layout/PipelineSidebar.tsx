@@ -3,7 +3,8 @@
 import { motion } from "framer-motion";
 import {
     ChevronRight,
-    ChevronLeft
+    ChevronLeft,
+    Lock
 } from "lucide-react";
 import clsx from "clsx";
 import { useTranslations } from "next-intl";
@@ -15,6 +16,11 @@ interface Step {
     label: string;
     icon: any;
     comingSoon?: boolean;
+    /** Per-step status for the rail's stage model (not a wizard done-check).
+     *  'ready' = has content (teal dot); 'idle' = not started (muted hollow);
+     *  'gated' = blocked by an upstream step (muted + lock, still clickable). */
+    status?: "ready" | "idle" | "gated";
+    statusLabel?: string;
 }
 
 interface PipelineSidebarProps {
@@ -28,9 +34,14 @@ interface PipelineSidebarProps {
      *  belongs to a series, so users can switch episodes without
      *  leaving the pipeline shell. */
     topSlot?: React.ReactNode;
+    /** Real project title for the footer card (replaces the "Project Alpha"
+     *  stub). Sub-label is a short context line (e.g. "EP.03"); omitted →
+     *  falls back to the version stub. */
+    projectLabel?: string;
+    projectSubLabel?: string;
 }
 
-export default function PipelineSidebar({ activeStep, onStepChange, steps, breadcrumbSegments, headerActions, topSlot }: PipelineSidebarProps) {
+export default function PipelineSidebar({ activeStep, onStepChange, steps, breadcrumbSegments, headerActions, topSlot, projectLabel, projectSubLabel }: PipelineSidebarProps) {
     const tc = useTranslations("common");
     const tp = useTranslations("pipeline");
     const handleBack = () => {
@@ -115,7 +126,8 @@ export default function PipelineSidebar({ activeStep, onStepChange, steps, bread
                                 "w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group relative overflow-hidden",
                                 isActive
                                     ? "bg-primary/10 text-primary border border-primary/20"
-                                    : "text-text-secondary hover:text-foreground hover:bg-glass"
+                                    : "text-text-secondary hover:text-foreground hover:bg-glass",
+                                step.status === "gated" && !isActive && "opacity-60"
                             )}
                         >
                             {isActive && (
@@ -143,11 +155,26 @@ export default function PipelineSidebar({ activeStep, onStepChange, steps, bread
                                     )}
                                 </div>
                                 <span className="text-[0.625rem] opacity-50 font-mono">{tp("stepIndex", { number: index + 1 })}</span>
+                                {step.status && (
+                                    <span className="flex items-center gap-1.5 mt-0.5">
+                                        <span className={clsx(
+                                            "h-1.5 w-1.5 rounded-full shrink-0",
+                                            step.status === "ready" && "bg-primary shadow-[var(--glow-primary)]",
+                                            step.status === "idle" && "border border-text-muted/60",
+                                            step.status === "gated" && "border border-text-muted/40"
+                                        )} />
+                                        {step.statusLabel && (
+                                            <span className="text-[0.6rem] text-text-muted font-mono truncate">{step.statusLabel}</span>
+                                        )}
+                                    </span>
+                                )}
                             </div>
 
-                            {isActive && (
+                            {isActive ? (
                                 <ChevronRight size={16} className="ml-auto opacity-50" />
-                            )}
+                            ) : step.status === "gated" ? (
+                                <Lock size={13} className="ml-auto text-text-muted/50" aria-label={tp("gatedTooltip")} />
+                            ) : null}
                         </button>
                     );
                 })}
@@ -157,8 +184,8 @@ export default function PipelineSidebar({ activeStep, onStepChange, steps, bread
                 <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-glass border border-border-subtle">
                     <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-primary to-accent" />
                     <div className="flex flex-col">
-                        <span className="text-sm font-medium text-foreground">Project Alpha</span>
-                        <span className="text-xs text-text-muted">v0.1.0</span>
+                        <span className="text-sm font-medium text-foreground truncate">{projectLabel ?? "Project Alpha"}</span>
+                        <span className="text-xs text-text-muted">{projectSubLabel ?? "v0.1.0"}</span>
                     </div>
                 </div>
             </div>

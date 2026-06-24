@@ -805,7 +805,15 @@
   "pipeline": {
     "stepLabel": "步骤 {number}",
     "stepIndex": "STEP 0{number}",
-    "beta": "Beta"
+    "beta": "Beta",
+    "railArtReady": "已设定",
+    "railCast": "{n} 角色",
+    "railCastBound": "{n} 角色 · {m} 已绑定",
+    "railShots": "{n} 镜",
+    "railAssembled": "已导出",
+    "railAssemblyReady": "待合成",
+    "railAssemblyGated": "待分镜完成",
+    "gatedTooltip": "需先完成上游步骤"
   },
   "assets": {
     "clickToZoom": "点击放大",

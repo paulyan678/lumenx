@@ -61,6 +61,7 @@ export default function ProjectClient({ id, breadcrumbSegments }: { id: string; 
     const [envDialogOpen, setEnvDialogOpen] = useState(false);
     const [promptConfigOpen, setPromptConfigOpen] = useState(false);
     const t = useTranslations("project");
+    const tp = useTranslations("pipeline");
 
     const selectProject = useProjectStore((state) => state.selectProject);
     const currentProject = useProjectStore((state) => state.currentProject);
@@ -86,21 +87,57 @@ export default function ProjectClient({ id, breadcrumbSegments }: { id: string; 
         // Anything else (i2v_legacy, missing) → legacy 9-step path. Old
         // projects without workflow_mode default to legacy for backward
         // compat (spec §3.2).
+        let base;
         if (currentProject?.workflow_mode !== "r2v") {
-            return LEGACY_STEPS;
-        }
-        // Phase 6 — freeform mode: skip Script step, episodes start at
-        // Style. Re-number labels accordingly.
-        if (seriesContentMode === "freeform") {
-            return UNIFIED_STEPS
+            base = LEGACY_STEPS;
+        } else if (seriesContentMode === "freeform") {
+            // Phase 6 — freeform mode: skip Script step, episodes start at
+            // Style. Re-number labels accordingly.
+            base = UNIFIED_STEPS
                 .filter(s => s.id !== "script")
                 .map((s, i) => ({ ...s, label: s.label.replace(/^\d+\./, `${i + 1}.`) }));
+        } else {
+            // Scripted unified flow: Cast is always present (per-episode view
+            // of frame-referenced assets). Series-level shared assets are
+            // managed in SeriesDetailPage.
+            base = UNIFIED_STEPS;
         }
-        // Scripted unified flow: Cast is always present (per-episode view
-        // of frame-referenced assets). Series-level shared assets are
-        // managed in SeriesDetailPage.
-        return UNIFIED_STEPS;
-    }, [currentProject?.workflow_mode, currentProject?.series_id, seriesContentMode]);
+
+        // Per-step stage status (conservative signals from project state —
+        // NOT wizard done-checks; see storyboard-r2v-unified mock). Script
+        // has no field on the episode, so it stays status-less (honest —
+        // don't fabricate a "done" we can't verify). Assembly is soft-gated
+        // (lock + label) when there are no shots yet, but stays CLICKABLE
+        // (no navigation behavior change).
+        const frames = currentProject?.frames ?? [];
+        const chars = currentProject?.characters ?? [];
+        const bound = chars.filter(c => c.voice_id).length;
+        const frameCount = frames.length;
+        const hasArt = !!currentProject?.art_direction;
+        const hasMerged = !!currentProject?.merged_video_url;
+        const statusFor = (id: string): { status?: "ready" | "idle" | "gated"; statusLabel?: string } => {
+            switch (id) {
+                case "art_direction":
+                    return hasArt ? { status: "ready", statusLabel: tp("railArtReady") } : { status: "idle" };
+                case "cast":
+                    return chars.length > 0
+                        ? (bound > 0
+                            ? { status: "ready", statusLabel: tp("railCastBound", { n: chars.length, m: bound }) }
+                            : { status: "ready", statusLabel: tp("railCast", { n: chars.length }) })
+                        : { status: "idle" };
+                case "storyboard_r2v":
+                case "storyboard":
+                    return frameCount > 0 ? { status: "ready", statusLabel: tp("railShots", { n: frameCount }) } : { status: "idle" };
+                case "assembly":
+                    return hasMerged
+                        ? { status: "ready", statusLabel: tp("railAssembled") }
+                        : (frameCount > 0 ? { status: "ready", statusLabel: tp("railAssemblyReady") } : { status: "gated", statusLabel: tp("railAssemblyGated") });
+                default:
+                    return {};
+            }
+        };
+        return base.map(s => ({ ...s, ...statusFor(s.id) }));
+    }, [currentProject, seriesContentMode, tp]);
 
     const handleBackToHome = () => {
         window.location.hash = '';
@@ -183,6 +220,8 @@ export default function ProjectClient({ id, breadcrumbSegments }: { id: string; 
                     activeStep={activeStep}
                     onStepChange={setActiveStep}
                     steps={steps}
+                    projectLabel={currentProject.title}
+                    projectSubLabel={currentProject.episode_number ? `EP.${String(currentProject.episode_number).padStart(2, "0")}` : undefined}
                     breadcrumbSegments={segments}
                     headerActions={settingsActions}
                     topSlot={
