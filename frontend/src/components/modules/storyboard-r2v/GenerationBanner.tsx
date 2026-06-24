@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, CheckCircle2 } from "lucide-react";
+import { Loader2, CheckCircle2, Mic } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 export type BannerState = "idle" | "phase1" | "phase2" | "dialogue" | "summary";
@@ -48,7 +48,7 @@ export function GenerationBanner({
         <AnimatePresence mode="wait">
             {state === "phase1" && (
                 <BannerShell key="phase1">
-                    <Loader2 size={13} className="animate-spin text-primary shrink-0" />
+                    <Loader2 size={14} className="animate-spin text-status-completed-fg shrink-0" strokeWidth={1.8} />
                     <AnimatePresence mode="wait">
                         <motion.span
                             key={captionIndex}
@@ -56,7 +56,7 @@ export function GenerationBanner({
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -4 }}
                             transition={{ duration: 0.25 }}
-                            className="text-xs text-text-secondary"
+                            className="text-[0.8125rem] text-text-secondary"
                         >
                             {phase1Captions[captionIndex]}
                         </motion.span>
@@ -66,8 +66,8 @@ export function GenerationBanner({
 
             {state === "phase2" && (
                 <BannerShell key="phase2">
-                    <Loader2 size={13} className="animate-spin text-status-processing-fg shrink-0" />
-                    <span className="text-xs text-text-secondary">
+                    <Loader2 size={14} className="animate-spin text-status-processing-fg shrink-0" strokeWidth={1.8} />
+                    <span className="text-[0.8125rem] text-text-secondary">
                         {t("bannerRefineProgress", {
                             current: refineProgress?.current ?? 0,
                             total: refineProgress?.total ?? 0,
@@ -78,8 +78,8 @@ export function GenerationBanner({
 
             {state === "dialogue" && (
                 <BannerShell key="dialogue">
-                    <Loader2 size={13} className="animate-spin text-status-processing-fg shrink-0" />
-                    <span className="text-xs text-text-secondary">
+                    <Loader2 size={14} className="animate-spin text-status-processing-fg shrink-0" strokeWidth={1.8} />
+                    <span className="text-[0.8125rem] text-text-secondary">
                         {t("bannerDialogueProgress", {
                             current: dialogueProgress?.current ?? 0,
                             total: dialogueProgress?.total ?? 0,
@@ -102,13 +102,13 @@ export function GenerationBanner({
 function BannerShell({ children }: { children: React.ReactNode }) {
     return (
         <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-            className="overflow-hidden shrink-0"
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+            className="shrink-0 px-4 pt-3 sm:px-6"
         >
-            <div className="flex items-center gap-2.5 h-10 px-6 border-b border-glass-border bg-glass">
+            <div className="flex items-center gap-3 rounded-xl border border-glass-border bg-glass px-4 py-3 shadow-[var(--shadow-rest)]">
                 {children}
             </div>
         </motion.div>
@@ -127,21 +127,25 @@ function SummaryBar({
 
     return (
         <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-            className="overflow-hidden shrink-0"
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+            className="shrink-0 px-4 pt-3 sm:px-6"
         >
-            <div className="flex items-center gap-2.5 h-9 px-6 border-b border-border-subtle bg-glass">
-                <CheckCircle2 size={14} className="text-status-completed-fg shrink-0" />
+            <div className="flex items-center gap-3 rounded-xl border border-glass-border bg-glass px-4 py-3 shadow-[var(--shadow-rest)]">
+                <CheckCircle2 size={15} className="text-status-completed-fg shrink-0" strokeWidth={1.8} />
                 <span className="text-[0.8125rem] text-text-secondary">
-                    {t("bannerFrameCount", { count: summary.frameCount })}
+                    <span className="text-status-completed-fg font-semibold">
+                        {t("bannerFrameCount", { count: summary.frameCount })}
+                    </span>
                     {summary.dialogueReady > 0 && (
-                        <span className="ml-1.5">{t("bannerDialoguePending", { count: summary.dialogueReady })}</span>
+                        <span className="ml-1.5">· {t("bannerDialoguePending", { count: summary.dialogueReady })}</span>
                     )}
                     {summary.dialogueMissing > 0 && (
-                        <span className="ml-1.5 text-accent/80">{t("bannerDialogueMissingVoice", { count: summary.dialogueMissing })}</span>
+                        <span className="ml-1.5 text-accent font-medium">
+                            {t("bannerDialogueMissingVoice", { count: summary.dialogueMissing })}
+                        </span>
                     )}
                 </span>
                 {showCTA && onGenerateDialogue && (
@@ -149,8 +153,9 @@ function SummaryBar({
                         type="button"
                         onClick={onGenerateDialogue}
                         title={t("bannerSynthDialogueTooltip")}
-                        className="ml-2 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[0.75rem] font-medium text-primary bg-primary/10 hover:bg-primary/15 transition-colors"
+                        className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-status-starred-border bg-status-starred-bg px-3 py-1 text-[0.75rem] font-semibold text-status-starred-fg transition-colors duration-fast ease-out-quart hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-starred-border"
                     >
+                        <Mic size={12} aria-hidden="true" />
                         {t("bannerSynthDialogue")}
                     </button>
                 )}

@@ -21,6 +21,7 @@
  */
 import { useMemo, useState } from "react";
 import { Star, Film, Clock, ArrowDown, ArrowUp, RotateCw } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type { VideoTask } from "@/lib/api";
 import SectionShell from "./SectionShell";
 import { usePanelSectionState } from "./usePanelSectionState";
@@ -106,14 +107,6 @@ function groupIntoBatches(tasks: VideoTask[]): BatchSummary[] {
     });
 }
 
-function formatBatchAge(ts: number): string {
-    const ageS = Math.max(0, Math.floor(Date.now() / 1000 - ts));
-    if (ageS < 60) return `${ageS}s ago`;
-    if (ageS < 3600) return `${Math.floor(ageS / 60)}m ago`;
-    if (ageS < 86_400) return `${Math.floor(ageS / 3600)}h ago`;
-    return `${Math.floor(ageS / 86_400)}d ago`;
-}
-
 export default function CandidatesSection({
     shotId,
     tasks,
@@ -132,6 +125,7 @@ export default function CandidatesSection({
     onOpenCompare,
     resolveUrl,
 }: CandidatesSectionProps) {
+    const t = useTranslations("storyboardR2V");
     const [open, setOpen] = usePanelSectionState(shotId, "candidates", true);
     const [filter, setFilter] = useState<FilterMode>("all");
     const [sort, setSort] = useState<SortMode>("time");
@@ -162,14 +156,15 @@ export default function CandidatesSection({
 
     return (
         <SectionShell
-            title={`Candidates (${totalCount})`}
+            title={t("candidates")}
+            subtitle={totalCount > 0 ? t("candidatesCount", { count: totalCount }) : undefined}
             open={open}
             onToggle={() => setOpen(!open)}
             trailing={
                 <>
                     {/* Filter chips */}
                     <FilterChip active={filter === "all"} onClick={() => setFilter("all")}>
-                        All
+                        {t("filterAll")}
                     </FilterChip>
                     <FilterChip
                         active={filter === "starred"}
@@ -182,21 +177,19 @@ export default function CandidatesSection({
                         <FilterChip
                             active={filter === "this-model"}
                             onClick={() => setFilter("this-model")}
-                            title={`Show only candidates from ${activeModel}`}
+                            title={t("filterThisModelTitle", { model: activeModel })}
                         >
                             <Film size={9} aria-hidden="true" />
-                            this model
+                            {t("filterThisModel")}
                         </FilterChip>
                     ) : null}
                     {/* Sort flipper — text label inline so users know what
-                        the click toggles (Issue 12: icon-only version was
-                        opaque; users saw an icon flip but couldn't tell what
-                        changed). Label updates in lockstep with state. */}
+                        the click toggles. Label updates in lockstep with state. */}
                     <button
                         type="button"
                         onClick={() => setSort((s) => (s === "time" ? "model" : "time"))}
-                        title={`Currently sorting by ${sort}. Click to switch to ${sort === "time" ? "model" : "time"}.`}
-                        aria-label={`Sort: ${sort}. Click to switch.`}
+                        title={sort === "time" ? t("sortByModelTitle") : t("sortByTimeTitle")}
+                        aria-label={t("sortAriaLabel", { sort })}
                         className="btn-tip -m-1 inline-flex h-7 items-center gap-1 rounded px-1.5 text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                     >
                         {sort === "time" ? (
@@ -205,41 +198,35 @@ export default function CandidatesSection({
                             <Film size={11} aria-hidden="true" />
                         )}
                         <span className="font-mono text-chrome-sm font-medium uppercase tracking-tight">
-                            sort: {sort}
+                            {t(sort === "time" ? "sortByTime" : "sortByModel")}
                         </span>
                     </button>
                 </>
             }
         >
             {totalCount === 0 ? (
-                // Empty state scaffolds the workflow instead of just
-                // saying "nothing here" (P2-9). Three numbered steps
-                // teach the panel without taking over.
                 <div className="flex flex-col items-center gap-2 px-3 py-5">
                     <div className="font-display text-display-sm font-semibold tracking-tight text-foreground">
-                        No candidates yet
+                        {t("noCandidatesTitle")}
                     </div>
                     <ol className="flex flex-col gap-1 text-center font-mono text-chrome-sm tracking-tight text-text-muted">
-                        <li>① Pick a model above</li>
-                        <li>② Choose how many to generate (×N)</li>
-                        <li>③ Click Generate — takes appear here</li>
+                        <li>{t("noCandidatesHint1")}</li>
+                        <li>{t("noCandidatesHint2")}</li>
+                        <li>{t("noCandidatesHint3")}</li>
                     </ol>
                 </div>
             ) : batches.length === 0 ? (
                 <div className="px-2 py-4 text-center font-mono text-chrome-sm font-medium uppercase text-text-muted">
-                    No matches under current filter
+                    {t("noMatches")}
                 </div>
             ) : (
                 <div className="space-y-2">
                     {/* Compare callout — promoted to display tier when
-                        ≥2 selected (P0-2). This is a "you can do
-                        something now" moment, deserves visual weight.
-                        Wraps to a vertical stack on narrow viewports
-                        so the CTA never overflows. */}
+                        ≥2 selected. */}
                     {compareCount >= 2 ? (
                         <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-status-starred-border bg-status-starred-bg px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] sm:gap-3">
                             <span className="font-display text-display-sm font-semibold tracking-tight text-status-starred-fg">
-                                {compareCount} selected for compare
+                                {t("compareSelected", { count: compareCount })}
                             </span>
                             <button
                                 type="button"
@@ -247,7 +234,7 @@ export default function CandidatesSection({
                                 disabled={!onOpenCompare}
                                 className="inline-flex items-center gap-1.5 rounded-md bg-status-starred-solid px-3 py-1.5 font-display text-display-sm font-semibold text-on-warm shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] transition-all duration-fast ease-out-quart hover:brightness-110 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-starred-border disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                                Compare ×{compareCount} →
+                                {t("compareGo", { count: compareCount })} →
                             </button>
                         </div>
                     ) : null}
@@ -336,10 +323,19 @@ function BatchBlock({
     onRetry?: CandidatesSectionProps["onRetry"];
     onReuseBatchParams?: CandidatesSectionProps["onReuseBatchParams"];
 }) {
+    const t = useTranslations("storyboardR2V");
     const [open, setOpen] = useState(defaultOpen);
     const failedCount = batch.tasks.filter((t) => t.status === "failed").length;
     const runningCount = batch.tasks.filter((t) => t.status === "pending" || t.status === "processing").length;
     const completedCount = batch.tasks.filter((t) => t.status === "completed").length;
+
+    const formatBatchAge = (ts: number): string => {
+        const ageS = Math.max(0, Math.floor(Date.now() / 1000 - ts));
+        if (ageS < 60) return t("batchAgeSeconds", { s: ageS });
+        if (ageS < 3600) return t("batchAgeMinutes", { m: Math.floor(ageS / 60) });
+        if (ageS < 86_400) return t("batchAgeHours", { h: Math.floor(ageS / 3600) });
+        return t("batchAgeDays", { d: Math.floor(ageS / 86_400) });
+    };
 
     // Restructured batch header (P2-2): left = model + take count
     // (body tier, the things that disambiguate this batch). Right =
@@ -398,8 +394,8 @@ function BatchBlock({
                             e.stopPropagation();
                             onReuseBatchParams(batch);
                         }}
-                        title="Reuse params"
-                        aria-label="Reuse batch parameters"
+                        title={t("batchReuse")}
+                        aria-label={t("batchReuse")}
                         className="-m-1 grid h-7 w-7 place-items-center rounded text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                     >
                         <RotateCw size={11} aria-hidden="true" />

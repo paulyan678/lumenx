@@ -19,7 +19,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Dices, X } from "lucide-react";
+import { Dices, X, ChevronRight } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { I2VModelConfig, DurationConfig, ModelParamSupport } from "@/lib/modelCatalog";
 import { usePanelSectionState } from "./usePanelSectionState";
@@ -192,7 +192,7 @@ export default function ParamsSection({
                             onClick={() => setModelOpen(v => !v)}
                             aria-expanded={modelOpen}
                             title={activeModel?.description}
-                            className="inline-flex min-h-[28px] items-center gap-2 rounded-md border border-border-subtle bg-surface-inset px-3 py-1.5 font-mono text-chrome-sm font-medium text-foreground transition-colors duration-fast ease-out-quart hover:border-foreground/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                            className="inline-flex min-h-[28px] items-center gap-2 rounded-[14px] border border-glass-border bg-surface-inset px-3 py-1.5 font-mono text-[0.6875rem] font-medium text-foreground transition-colors duration-fast ease-out-quart hover:border-foreground/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                         >
                             <span className="h-1.5 w-1.5 rounded-full bg-primary shadow-[var(--glow-primary)]" />
                             <span className="truncate">{activeModel?.name ?? params.model}</span>
@@ -273,18 +273,22 @@ export default function ParamsSection({
 
                 {/* Advanced fold */}
                 {hasAdvanced ? (
-                    <div className="rounded-md border border-dashed border-glass-border">
+                    <div className="pt-1">
                         <button
                             type="button"
                             onClick={() => setAdvOpen(!advOpen)}
                             aria-expanded={advOpen}
-                            className="flex w-full min-h-[32px] items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-text-secondary transition-colors duration-fast ease-out-quart hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                            className="group inline-flex items-center gap-1.5 rounded-md py-1 font-mono text-[0.6875rem] font-medium text-primary transition-colors duration-fast ease-out-quart hover:text-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                         >
-                            <span className="font-mono text-chrome-sm font-medium uppercase">
-                                <span aria-hidden="true">{advOpen ? "▼" : "▶"}</span> Advanced
-                            </span>
-                            <span className="font-mono text-chrome-sm tracking-tight text-text-muted">
-                                {countAdvancedParams(modelParams)} params
+                            <ChevronRight
+                                size={12}
+                                strokeWidth={2}
+                                className={`transition-transform duration-fast ${advOpen ? "rotate-90" : ""}`}
+                                aria-hidden="true"
+                            />
+                            <span>{t("advancedParams")}</span>
+                            <span className="ml-0.5 rounded-md bg-primary/10 px-1.5 py-0.5 text-[0.5625rem] text-primary">
+                                {countAdvancedParams(modelParams)}
                             </span>
                         </button>
                         {advOpen ? (
@@ -464,15 +468,10 @@ export default function ParamsSection({
 // ---------- Sub-components ----------
 
 function ParamRow({ label, children }: { label: string; children: React.ReactNode }) {
-    // Below sm the label stacks above the control so cramped widths
-    // (≤480 phones) don't squeeze the input. At ≥sm the original
-    // two-column label / control layout returns.
+    // Mock-aligned: label is a 64px mono uppercase label, control flexes.
     return (
-        <div className="flex flex-col items-start gap-1 sm:flex-row sm:gap-3">
-            {/* Row label — chrome tier, NOT uppercase (Sweep E P2-1:
-                uppercase tracking is reserved for section titles, not
-                every chrome line). */}
-            <span className="font-mono text-chrome-sm font-medium tracking-tight text-text-muted sm:w-24 sm:shrink-0 sm:pt-2">
+        <div className="flex flex-col items-start gap-1.5 sm:flex-row sm:gap-3">
+            <span className="font-mono text-[0.5625rem] font-medium uppercase tracking-[0.1em] text-text-muted w-16 shrink-0 pt-1.5">
                 {label}
             </span>
             <div className="min-w-0 w-full flex-1 sm:w-auto">{children}</div>

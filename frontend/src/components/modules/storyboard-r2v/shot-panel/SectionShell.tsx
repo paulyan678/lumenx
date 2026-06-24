@@ -38,9 +38,9 @@ export default function SectionShell({
     headerOverride,
 }: SectionShellProps) {
     return (
-        <div className="border-b border-glass-border last:border-b-0">
+        <div className="border-b border-glass-border last:border-b-0 py-4">
             {headerOverride ?? (
-                <div className="flex items-center gap-2 px-3 py-2">
+                <div className="flex items-center gap-2 px-3 mb-3">
                     {/* 28x28 visual chevron + 40x40 hit area via -m-1
                         p-2 expansion (WCAG 2.5.5 AA). Visual outline
                         unchanged. */}
@@ -65,11 +65,11 @@ export default function SectionShell({
                         {/* Section title — chrome tier (per type scale),
                             uppercase tracking is RESERVED for section
                             titles (not metadata) per Sweep E (P2-1). */}
-                        <span className="font-mono text-chrome-sm font-medium uppercase text-text-secondary">
+                        <span className="font-mono text-[0.625rem] font-semibold uppercase tracking-[0.16em] text-text-secondary">
                             {title}
                         </span>
                         {subtitle ? (
-                            <span className="truncate font-mono text-chrome-sm tracking-tight text-text-muted">
+                            <span className="truncate font-mono text-[0.625rem] tracking-tight text-text-muted">
                                 {subtitle}
                             </span>
                         ) : null}
@@ -79,7 +79,7 @@ export default function SectionShell({
                     ) : null}
                 </div>
             )}
-            {open ? <div className="px-3 pb-3">{children}</div> : null}
+            {open ? <div className="px-3">{children}</div> : null}
         </div>
     );
 }

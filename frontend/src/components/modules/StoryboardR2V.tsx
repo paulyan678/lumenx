@@ -2,9 +2,8 @@
 
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { motion } from "framer-motion";
-import { Plus, Palette, Film, Loader2, Sparkles, RefreshCw } from "lucide-react";
+import { Plus, Palette, Film, Loader2, Sparkles, PanelBottomOpen, PanelBottomClose } from "lucide-react";
 import StepHeader from "@/components/shared/StepHeader";
-import PreviousEpisodeFramesRail from "./storyboard-r2v/PreviousEpisodeFramesRail";
 import { useTranslations } from "next-intl";
 import { useProjectStore } from "@/store/projectStore";
 import { api, crudApi, type VideoTask, type RefineSSEEvent } from "@/lib/api";
@@ -1761,7 +1760,7 @@ export default function StoryboardR2V() {
                 subtitle={tStep("storyboardSubtitle")}
                 trailing={(
                     <>
-                        {/* 画风 (Art Direction) pill — 上移到顶菜单 */}
+                        {/* Art-direction style pill */}
                         {currentProject?.art_direction?.style_config?.name ? (
                             <button
                                 type="button"
@@ -1777,68 +1776,62 @@ export default function StoryboardR2V() {
                                 <span className="text-foreground">{currentProject.art_direction.style_config.name}</span>
                             </button>
                         ) : null}
-                        {/* Current model name —— 简化的 mono chrome label */}
-                        <span className="hidden lg:inline font-mono text-[0.625rem] uppercase tracking-[0.16em] text-text-muted">
-                            <span>{t("currentModel")}:</span>
-                            <span className="ml-1 text-foreground">{currentModelName}</span>
-                        </span>
                         {/* Open task queue */}
                         <TaskQueueButton
                             inFlightCount={inFlightTaskCount}
                             open={queueOpen}
                             onToggle={() => setQueueOpen(v => !v)}
                         />
+                        {/* Batch generate / smart storyboard CTA */}
+                        <button
+                            type="button"
+                            onClick={() => setGenDialogOpen(true)}
+                            disabled={generating}
+                            className="inline-flex h-8 items-center gap-1.5 rounded-full bg-primary px-4 py-1.5 font-sans text-[0.8125rem] font-semibold text-on-accent shadow-[var(--btn-pri-glow),inset_0_1.5px_0_rgba(255,255,255,0.14)] transition-all duration-fast ease-out-quart hover:bg-primary-hover disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                        >
+                            {generating ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+                            <span>{generating ? t("genInFlight") : t("genShots")}</span>
+                        </button>
                     </>
                 )}
             />
-            {/* Top Toolbar — 简化版：只保留 shot 计数 / + shot / 全展开-全折叠
-                model name + queue button + 画风 已上移到 StepHeader trailing. */}
-            <div className="flex flex-wrap items-center gap-3 px-4 py-2.5 border-b border-glass-border bg-glass shrink-0 sm:px-6">
-                <span className="font-mono text-[0.65625rem] uppercase tracking-[0.16em] text-text-muted">
-                    <span className="text-foreground font-medium">{shots.length}</span>
-                    <span className="ml-1.5">{shots.length === 1 ? "shot" : "shots"}</span>
-                    {totalInFlight > 0 ? <span className="ml-2 text-primary">· {totalInFlight} in flight</span> : null}
-                </span>
-                <motion.button
-                    whileHover={{ scale: 1.04 }}
-                    whileTap={{ scale: 0.96 }}
-                    onClick={() => addShot(shots.length - 1)}
-                    className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
-                >
-                    <Plus size={13} strokeWidth={2} />
-                    {t("addShot")}
-                </motion.button>
-                <button
-                    type="button"
-                    onClick={() => setGenDialogOpen(true)}
-                    disabled={generating}
-                    className="inline-flex h-7 items-center gap-1.5 rounded px-2.5 font-mono text-[0.65625rem] uppercase tracking-[0.14em] font-medium text-primary border border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors disabled:opacity-40"
-                >
-                    {generating
-                        ? <Loader2 size={11} className="animate-spin" />
-                        : shots.length > 0
-                            ? <RefreshCw size={11} />
-                            : <Sparkles size={11} />
-                    }
-                    {generating ? t("genInFlight") : shots.length > 0 ? "重新生成" : "✨ 智能分镜"}
-                </button>
+            {/* Top Toolbar — mock-aligned: count on the left, expand/collapse pills on the right */}
+            <div className="flex flex-wrap items-center gap-3 px-4 py-3 border-b border-glass-border bg-glass/50 shrink-0 sm:px-6">
+                <div className="flex items-center gap-3">
+                    <span className="font-mono text-[0.65625rem] uppercase tracking-[0.16em] text-text-muted">
+                        <span className="text-foreground font-medium">{shots.length}</span>
+                        <span className="ml-1.5">{shots.length === 1 ? t("shot") : t("shots")}</span>
+                        {totalInFlight > 0 ? <span className="ml-2 text-status-processing-fg">· {totalInFlight} {t("inFlightShort")}</span> : null}
+                    </span>
+                    <motion.button
+                        whileHover={{ scale: 1.04 }}
+                        whileTap={{ scale: 0.96 }}
+                        onClick={() => addShot(shots.length - 1)}
+                        className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+                    >
+                        <Plus size={13} strokeWidth={2} />
+                        {t("addShot")}
+                    </motion.button>
+                </div>
                 {shots.length > 1 ? (
-                    <div className="ml-auto flex items-center gap-1">
+                    <div className="ml-auto flex items-center gap-2">
                         <button
                             type="button"
                             onClick={expandAllShots}
                             title={t("expandAll")}
-                            className="-m-1 inline-flex h-7 items-center gap-1 rounded px-1.5 font-mono text-chrome-sm font-medium text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                            className="inline-flex h-7 items-center gap-1.5 rounded-full border border-glass-border bg-black/20 px-3 font-mono text-chrome-sm font-medium text-text-secondary transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                         >
-                            ▾▾ {t("expandAll")}
+                            <PanelBottomOpen size={12} strokeWidth={1.8} />
+                            {t("expandAll")}
                         </button>
                         <button
                             type="button"
                             onClick={collapseAllShots}
                             title={t("collapseAll")}
-                            className="-m-1 inline-flex h-7 items-center gap-1 rounded px-1.5 font-mono text-chrome-sm font-medium text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                            className="inline-flex h-7 items-center gap-1.5 rounded-full border border-glass-border bg-black/20 px-3 font-mono text-chrome-sm font-medium text-text-secondary transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                         >
-                            ▴▴ {t("collapseAll")}
+                            <PanelBottomClose size={12} strokeWidth={1.8} />
+                            {t("collapseAll")}
                         </button>
                     </div>
                 ) : null}
@@ -1853,11 +1846,7 @@ export default function StoryboardR2V() {
                 onGenerateDialogue={handleBatchDialogue}
             />
 
-            <PreviousEpisodeFramesRail
-                scriptId={currentProject?.id ?? null}
-                seriesId={currentProject?.series_id ?? null}
-            />
-            <div className="flex-1 overflow-y-auto px-3 py-4 space-y-3 sm:px-6">
+            <div className="flex-1 overflow-y-auto px-4 py-5 space-y-4 sm:px-7">
                 {shots.length === 0 && (
                     <div className="h-full min-h-[300px] flex flex-col items-center justify-center text-center px-6">
                         <div className="rounded-2xl border border-glass-border bg-glass p-8 max-w-lg">

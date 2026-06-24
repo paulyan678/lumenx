@@ -44,6 +44,7 @@ export default function TaskQueuePanel({
     onCancel,
     onRetry,
 }: TaskQueuePanelProps) {
+    const t = useTranslations("storyboardR2V");
     const [tab, setTab] = useState<TabKey>("active");
 
     const buckets = useMemo(() => {
@@ -84,12 +85,11 @@ export default function TaskQueuePanel({
                     // Always: flex layout, glass surface, slide-in entry.
                     "flex h-full shrink-0 flex-col border-l border-glass-border bg-surface",
                     "motion-safe:animate-[queuePanelIn_280ms_cubic-bezier(0.22,1,0.36,1)_both]",
-                    // ≥xl (1280): push column — old behavior. Static
-                    // flex sibling, 360px wide, compresses main area.
-                    "xl:static xl:w-[360px] xl:shadow-none xl:z-auto",
+                    // ≥xl (1280): push column — mock queue width 344px.
+                    "xl:static xl:w-[344px] xl:shadow-none xl:z-auto",
                     // md–lg (768–1279): overlay panel. Floats over main
                     // content rather than pushing it, since narrow
-                    // viewports can't spare 360px of horizontal real
+                    // viewports can't spare 344px of horizontal real
                     // estate without the shot list becoming unusable.
                     "absolute inset-y-0 right-0 z-30 w-[340px] max-w-[min(340px,calc(100vw-48px))]",
                     "shadow-[-12px_0_32px_-12px_rgba(0,0,0,0.55)]",
@@ -101,8 +101,8 @@ export default function TaskQueuePanel({
             >
             <SidePanelHeader
                 icon={<ListChecks />}
-                title="Task queue"
-                subtitle={`${tasks.length} total`}
+                title={t("queueTitle")}
+                subtitle={t("queueTotal", { count: tasks.length })}
                 trailing={(
                     <button
                         type="button"
@@ -118,11 +118,11 @@ export default function TaskQueuePanel({
             <div role="tablist" className="flex shrink-0 border-b border-glass-border px-3 py-1.5">
                 {(
                     [
-                        ["active", "Active", buckets.active.length, "text-status-processing-fg"],
-                        ["done", "Done", buckets.done.length, "text-status-completed-fg"],
-                        ["failed", "Failed", buckets.failed.length, "text-status-failed-fg"],
+                        ["active", "queueActive", buckets.active.length, "text-status-processing-fg"],
+                        ["done", "queueDone", buckets.done.length, "text-status-completed-fg"],
+                        ["failed", "queueFailed", buckets.failed.length, "text-status-failed-fg"],
                     ] as Array<[TabKey, string, number, string]>
-                ).map(([key, label, count, colorClass]) => (
+                ).map(([key, labelKey, count, colorClass]) => (
                     <button
                         key={key}
                         type="button"
@@ -135,7 +135,7 @@ export default function TaskQueuePanel({
                                 : "text-text-muted hover:text-foreground"
                         }`}
                     >
-                        {label}
+                        {t(labelKey)}
                         {count > 0 ? (
                             <span className={`ml-1.5 ${colorClass}`}>{count}</span>
                         ) : null}
@@ -147,10 +147,10 @@ export default function TaskQueuePanel({
                 {visibleTasks.length === 0 ? (
                     <div className="grid h-full place-items-center px-3 text-center font-mono text-chrome-sm font-medium uppercase text-text-muted">
                         {tab === "active"
-                            ? "No tasks running."
+                            ? t("queueEmptyActive")
                             : tab === "done"
-                                ? "No completed tasks yet."
-                                : "No failed tasks."}
+                                ? t("queueEmptyDone")
+                                : t("queueEmptyFailed")}
                     </div>
                 ) : (
                     <ul className="space-y-1">

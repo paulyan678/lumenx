@@ -71,7 +71,7 @@ export default function DialogueAudioRow({
             <button
                 type="button"
                 onClick={() => setModalOpen(true)}
-                className="w-full rounded-lg border border-glass-border bg-glass/50 px-3 py-2 text-left hover:border-foreground/30 hover:bg-glass/70 transition-colors group"
+                className="w-full rounded-[14px] border border-glass-border bg-black/20 px-3.5 py-2.5 text-left hover:border-foreground/30 hover:bg-hover-bg/30 transition-colors group"
             >
                 <div className="flex items-center gap-2">
                     <Mic size={12} className="text-text-muted shrink-0" />
