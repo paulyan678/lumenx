@@ -1955,6 +1955,11 @@ export default function StoryboardR2V() {
                             /* PR-3c · 闭环生成: ShotCard 内全宽生成行 + count selector.
                                canGenerate: direct_r2v 需 prompt; t2i_i2v 还需 first frame. */
                             generateCount={paramsState.count}
+                            genSummary={`${
+                                shot.tabMode === "direct_r2v"
+                                    ? (VIDEO_R2V_MODELS.find(m => m.id === videoConfig.r2vModel)?.name ?? videoConfig.r2vModel ?? "")
+                                    : (VIDEO_I2V_MODELS.find(m => m.id === videoConfig.model)?.name ?? videoConfig.model ?? "")
+                            } · ${paramsState.duration}s`}
                             canGenerate={
                                 shot.prompt.trim().length > 0
                                 && (

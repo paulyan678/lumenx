@@ -139,6 +139,9 @@ interface ShotCardProps {
      *  传入 current count + handlers + canGenerate gate.
      *  Spec: r2v-workflow-v3-unified.md §4.3.1 / Q12. */
     generateCount?: number;
+    /** At-a-glance "model · duration" summary shown in the generation row,
+     *  visible even when the attached ShotPanel is collapsed (calm-default). */
+    genSummary?: string;
     canGenerate?: boolean;
     onSetGenerateCount?: (count: number) => void;
     onGenerateBatch?: (count: number) => void;
@@ -175,6 +178,7 @@ export default function ShotCard({
     expanded,
     onToggleExpanded,
     generateCount = 1,
+    genSummary,
     canGenerate = true,
     onSetGenerateCount,
     onGenerateBatch,
@@ -896,6 +900,12 @@ export default function ShotCard({
                             </div>
 
                             <div className="flex items-center gap-2">
+                            {genSummary && (
+                                <span className="inline-flex items-center gap-1.5 shrink-0 font-mono text-[0.6875rem] text-text-secondary">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-primary shadow-[var(--glow-primary)]" />
+                                    {genSummary}
+                                </span>
+                            )}
                             <div className="flex items-center gap-1 shrink-0">
                                 {[1, 2, 4, 6].map((n) => {
                                     const active = generateCount === n;
