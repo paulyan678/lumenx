@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="atelier-dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>R2V Workflow Refactor · Before / After</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Space+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0c0b0e; --surface:#131116; --inset:#0a090c; --elevated:#1b1920;
+    --primary:#34d8c4; --accent:#ffa94d; --failed:#f87171; --completed:#34d8c4;
+    --text:#ece9e1; --text-2:#a8a29b; --muted:#6b6660; --border:rgba(236,233,225,0.06);
+    --shadow:0 8px 28px -12px rgba(0,0,0,0.6);
+    --font-display:Fraunces,Georgia,serif; --font-sans:Space Grotesk,system-ui,sans-serif; --font-mono:JetBrains Mono,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{font-size:112.5%}
+  body{font-family:var(--font-sans);background:var(--bg);color:var(--text);line-height:1.5;min-height:100vh;
+    background-image:radial-gradient(ellipse 80% 50% at 0% 0%,rgba(52,216,196,0.06),transparent),radial-gradient(ellipse 60% 40% at 100% 0%,rgba(255,169,77,0.05),transparent);background-attachment:fixed}
+  .wrap{max-width:1180px;margin:0 auto;padding:48px 28px 80px}
+  header.pg{margin-bottom:40px}
+  .eyebrow{font-family:var(--font-mono);font-size:0.625rem;font-weight:500;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+  .eyebrow .acc{color:var(--primary);font-weight:600}
+  h1{font-family:var(--font-display);font-size:2.125rem;font-weight:600;letter-spacing:-0.02em;line-height:1.05;margin-bottom:14px}
+  .lede{color:var(--text-2);font-size:0.9375rem;max-width:62ch}
+  .tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+  .tag{font-family:var(--font-mono);font-size:0.625rem;letter-spacing:0.06em;padding:4px 10px;border-radius:99px;border:1px solid var(--border);background:var(--surface);color:var(--text-2)}
+  .tag b{color:var(--primary)}
+  .sec{margin-top:44px}
+  .sec-h{font-family:var(--font-mono);font-size:0.6875rem;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-2);margin-bottom:16px;display:flex;align-items:center;gap:10px}
+  .sec-h::after{content:"";flex:1;height:1px;background:var(--border)}
+  .mock-frame{border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--inset);box-shadow:var(--shadow);margin-bottom:8px}
+  .mock-frame iframe{display:block;width:100%;height:640px;border:0;background:var(--bg)}
+  .mock-cap{font-family:var(--font-mono);font-size:0.625rem;color:var(--muted);text-align:center;padding:8px}
+  .mock-cap a{color:var(--primary);text-decoration:none}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:760px){.grid{grid-template-columns:1fr}}
+  .stage{border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:18px 20px}
+  .stage .n{font-family:var(--font-mono);font-size:0.625rem;color:var(--primary);letter-spacing:0.12em;margin-bottom:6px}
+  .stage h3{font-family:var(--font-display);font-size:1.0625rem;font-weight:600;margin-bottom:12px}
+  .ba{display:grid;grid-template-columns:1fr;gap:10px}
+  .ba-row{display:flex;gap:10px;align-items:flex-start}
+  .ba-l{font-family:var(--font-mono);font-size:0.5625rem;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;min-width:52px;padding-top:2px}
+  .ba-l.bef{color:var(--failed)} .ba-l.aft{color:var(--primary)}
+  .ba-t{font-size:0.8125rem;color:var(--text-2);line-height:1.55}
+  .ba-t code{font-family:var(--font-mono);font-size:0.6875rem;background:var(--inset);padding:1px 5px;border-radius:4px;color:var(--text)}
+  .commit{font-family:var(--font-mono);font-size:0.5625rem;color:var(--muted);margin-top:10px;border-top:1px solid var(--border);padding-top:8px}
+  .noop{border-left:2px solid var(--accent);padding:12px 16px;background:var(--inset);border-radius:0 8px 8px 0;font-size:0.8125rem;color:var(--text-2);margin-bottom:10px}
+  .noop b{color:var(--accent)}
+  .note{font-size:0.75rem;color:var(--muted);margin-top:32px;padding:14px 18px;border:1px dashed var(--border);border-radius:10px;line-height:1.6}
+  .note b{color:var(--text-2)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="pg">
+    <div class="eyebrow">R2V WORKFLOW · <span class="acc">前端重构</span> · Before / After</div>
+    <h1>R2V 工作台全面前端重构</h1>
+    <p class="lede">把 unified mock 落进真实代码：修多主题 bug、状态色 token 化、i18n parity、模型下拉、生成条、侧栏阶段状态。全程门禁绿、原子提交、可随时回退。</p>
+    <div class="tags">
+      <span class="tag">回退锚点 <b>pre-r2v-refactor</b></span>
+      <span class="tag">里程碑 <b>r2v-refactor-foundation</b></span>
+      <span class="tag">软门槛 tag <b>pre-dialogue-refactor</b> · <b>pre-rail-refactor</b></span>
+      <span class="tag">门禁 typecheck · check:colors · vitest 124/124 · i18n parity</span>
+    </div>
+  </header>
+
+  <div class="sec">
+    <div class="sec-h">After · unified 设计定稿（本次重构的实现目标）</div>
+    <div class="mock-frame">
+      <iframe src="../storyboard-r2v-unified.html" title="R2V unified workbench (after target)"></iframe>
+    </div>
+    <div class="mock-cap">↑ 这是本次重构的实现参照 <a href="../storyboard-r2v-unified.html" target="_blank">在新标签打开 →</a> · 真实 app 在 <code>http://localhost:3008/#/project/&lt;r2v项目&gt;</code></div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-h">Before → After · 7 项实质改动</div>
+    <div class="grid">
+
+      <div class="stage">
+        <div class="n">STAGE 2 · 多主题 bug 修复</div>
+        <h3>硬编码靛蓝 glow → per-theme token</h3>
+        <div class="ba">
+          <div class="ba-row"><span class="ba-l bef">Before</span><span class="ba-t">R2V 子树 7 处把 primary glow 冻结成 bridge/brand 的靛蓝 <code>rgba(100,108,255,..)</code> —— 在 atelier（teal）主题下显错色。</span></div>
+          <div class="ba-row"><span class="ba-l aft">After</span><span class="ba-t">改用 <code>var(--glow-primary)</code> / <code>var(--btn-pri-glow)</code>（atelier=teal、bridge/brand=靛蓝，随主题翻转）。生成按钮 / 选中候选 / pinned take 的辉光现在都正确。</span></div>
+        </div>
+        <div class="commit">commit 75c11f8</div>
+      </div>
+
+      <div class="stage">
+        <div class="n">STAGE 3 · 状态色 token 化</div>
+        <h3>emerald/amber/red → 语义 status/accent</h3>
+        <div class="ba">
+          <div class="ba-row"><span class="ba-l bef">Before</span><span class="ba-t">状态徽标用 Tailwind 调色板（<code>emerald-500</code>/<code>amber-400</code>/<code>red-500</code>）—— 过 check:colors 门禁但不随主题翻转。</span></div>
+          <div class="ba-row"><span class="ba-l aft">After</span><span class="ba-t">emerald→<code>status-completed-*</code>、red→<code>status-failed-*</code>、amber→<code>accent</code>。ready/error/overridden/previewing 徽标全随主题翻转。类别色（char/scene/prop）保留（本就该跨主题稳定）。</span></div>
+        </div>
+        <div class="commit">commit 73e9c8f</div>
+      </div>
+
+      <div class="stage">
+        <div class="n">STAGE 4 · i18n parity 修复</div>
+        <h3>中文 toast → t()（恢复中英切换）</h3>
+        <div class="ba">
+          <div class="ba-row"><span class="ba-l bef">Before</span><span class="ba-t">8 条用户可见 toast 是硬编码中文（如 <code>toast.error("对白批量生成失败，请重试")</code>）—— 英文 locale 下显示中文。</span></div>
+          <div class="ba-row"><span class="ba-l aft">After</span><span class="ba-t">全部提取到 <code>storyboardR2V</code> 命名空间，zh/en 各加 8 键（含 <code>{detail}</code>/<code>{refs}</code> 插值）。parity 175=175，i18n.test.ts 自动守护。</span></div>
+        </div>
+        <div class="commit">commit a59f756</div>
+      </div>
+
+      <div class="stage">
+        <div class="n">STAGE 6 · 模型选择器</div>
+        <h3>pill-wall → 下拉框</h3>
+        <div class="ba">
+          <div class="ba-row"><span class="ba-l bef">Before</span><span class="ba-t">模型用一排 pills（<code>flex-wrap</code>）—— 模型多了就换行成一面墙，视觉杂乱。</span></div>
+          <div class="ba-row"><span class="ba-l aft">After</span><span class="ba-t">改成 tonal 下拉框（触发器 = 当前模型名 + teal 点 + chevron；弹出列表，点外关闭）。<code>handleModelChange</code> 换模型重置逻辑 + 参考图警示未动。</span></div>
+        </div>
+        <div class="commit">commit 6ff0485</div>
+      </div>
+
+      <div class="stage">
+        <div class="n">STAGE 10 · 平静默认 + 生成条</div>
+        <h3>gen-sum 摘要芯片（calm-default 已就位）</h3>
+        <div class="ba">
+          <div class="ba-row"><span class="ba-l bef">Before</span><span class="ba-t">面板默认展开，折叠时看不到将用哪个模型/时长生成。</span></div>
+          <div class="ba-row"><span class="ba-l aft">After</span><span class="ba-t">确认 calm-default（<code>expandedShots</code> 默认空 → 折叠）早已实现；补 <code>genSummary</code> 芯片「<code>● 模型 · 时长s</code>」常驻生成行，折叠也可见。</span></div>
+        </div>
+        <div class="commit">commit 3ab5dd3</div>
+      </div>
+
+      <div class="stage">
+        <div class="n">STAGE 13 · 侧栏阶段状态</div>
+        <h3>per-step 状态行 + 三态点 + 软门槛</h3>
+        <div class="ba">
+          <div class="ba-row"><span class="ba-l bef">Before</span><span class="ba-t">左栏步骤只有序号 + 激活条，无每步进度/状态；底部项目卡是「Project Alpha / v0.1.0」桩。</span></div>
+          <div class="ba-row"><span class="ba-l aft">After</span><span class="ba-t">每步加三态点（teal ready / 灰 idle / 灰+锁 gated）+ 一行状态（「4 角色 · 2 已绑定」「16 镜」「待分镜完成」）。项目卡显示真实标题 + EP.0N。软门槛仍可点（不改导航）。</span></div>
+        </div>
+        <div class="commit">commit 2e21688</div>
+      </div>
+
+      <div class="stage">
+        <div class="n">STAGE 1 · 安全网</div>
+        <h3>绿基线 + 回退锚点</h3>
+        <div class="ba">
+          <div class="ba-row"><span class="ba-l bef">Before</span><span class="ba-t">无重构前的健康基线记录。</span></div>
+          <div class="ba-row"><span class="ba-l aft">After</span><span class="ba-t">tag <code>pre-r2v-refactor</code> = 全量回退锚点（<code>git reset --hard pre-r2v-refactor</code>）。记录基线：typecheck=0 / colors=0 / vitest 124 / i18n 1662。</span></div>
+        </div>
+        <div class="commit">tag pre-r2v-refactor @ 4eb3bab</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-h">验证为 no-op（现有代码已贴近 mock，零回归）</div>
+    <div class="noop"><b>Stage 5 / 7 / 8 / 9 / 12（纯皮）</b>：Candidates/SectionShell/CandidateThumb/GenerationBanner 已有 tonal pill + mono eyebrow + status-starred halation；ParamsSection 的 DurationControl 已支持 slider；T2I 首帧条 / 任务队列 / 步骤布局均已 token 化。无需重画。</div>
+    <div class="noop"><b>Stage 11（对白→工作台 Modal）</b>：DialogueAudioRow 早就是「精简入口按钮 + 点击开 DialogueWorkbenchModal」结构（对白编辑 / 情绪 chips / TTS / 配音覆盖全在 Modal 内），且 Stage 3 已 token 化其徽标。no-op。</div>
+  </div>
+
+  <div class="note">
+    <b>关于实拍截图：</b>本次重构的 R2V-storyboard 专属 delta（模型下拉 / 生成条）只在 <code>workflow_mode === "r2v"</code> 的项目里渲染，而当前 27 个项目全是 <code>i2v_legacy</code>，无 r2v 项目可实拍 R2V 分镜台。上方 mock 即本次重构的实现目标（after 视觉）；侧栏阶段状态（Stage 13）为所有项目共享，可在任意项目的左栏看到真实效果。如需 R2V 分镜台实拍，创建一个 r2v 项目后在 <code>localhost:3008</code> 打开即可。所有改动已通过 typecheck / check:colors / vitest（含 i18n parity）三重门禁，且每阶段原子提交、可单独 revert。
+  </div>
+</div>
+</body>
+</html>
