@@ -137,13 +137,13 @@ export default function PipelineSidebar({ activeStep, onStepChange, steps, bread
                             {!isLast && (
                                 <span
                                     aria-hidden="true"
-                                    className="pointer-events-none absolute left-[25px] top-[38px] bottom-[-8px] w-[1.5px] bg-border-subtle"
+                                    className="pointer-events-none absolute left-[25px] top-[38px] bottom-[-8px] w-[1.5px] bg-foreground/10"
                                 />
                             )}
                             {isActive && (
                                 <motion.div
                                     layoutId="active-pill"
-                                    className="absolute left-0 top-1/2 -translate-y-1/2 h-3/5 w-[3px] rounded-r-sm bg-primary"
+                                    className="absolute left-0 top-1/2 -translate-y-1/2 h-3/5 w-1 rounded-r-sm bg-primary shadow-[var(--glow-primary)]"
                                     initial={{ opacity: 0 }}
                                     animate={{ opacity: 1 }}
                                 />
@@ -183,7 +183,7 @@ export default function PipelineSidebar({ activeStep, onStepChange, steps, bread
                             ) : step.status === "gated" ? (
                                 <Lock size={13} className="ml-auto shrink-0 text-text-muted/50" aria-label={tp("gatedTooltip")} />
                             ) : step.status === "ready" ? (
-                                <Check size={14} strokeWidth={2.4} className="ml-auto shrink-0 text-primary/80" aria-label={tp("doneTooltip")} />
+                                <Check size={16} strokeWidth={2.6} className="ml-auto shrink-0 text-primary" aria-label={tp("doneTooltip")} />
                             ) : step.status ? (
                                 <span
                                     aria-hidden="true"
