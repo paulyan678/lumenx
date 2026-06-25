@@ -567,7 +567,7 @@ export default function ShotCard({
                         <div className="font-display text-[1.625rem] font-semibold leading-none text-text-muted tracking-tight">
                             {String(index + 1).padStart(2, "0")}
                         </div>
-                        <div className="font-mono text-[0.59375rem] uppercase tracking-[0.08em] text-text-muted leading-tight">
+                        <div className="font-mono text-[0.6875rem] uppercase tracking-[0.08em] text-text-muted leading-tight">
                             <span>SHOT</span>
                             {shot.shotSize ? (
                                 <span className="ml-1.5 text-text-secondary font-medium">· {shot.shotSize}</span>
@@ -731,7 +731,7 @@ export default function ShotCard({
                                     }
                                 }}
                                 placeholder={t("promptPlaceholder")}
-                                className="w-full resize-none bg-transparent border-l-2 border-glass-border pl-3.5 pr-8 py-1 text-[13px] leading-relaxed text-foreground placeholder:text-text-muted focus:outline-none focus:border-l-primary/40 focus:bg-glass/30 transition-all duration-200 min-h-[80px] max-h-[260px] overflow-y-auto"
+                                className="w-full resize-none bg-transparent border-l-2 border-glass-border pl-3.5 pr-8 py-1 text-[13px] leading-[1.7] text-foreground placeholder:text-text-muted focus:outline-none focus:border-l-primary/40 focus:bg-glass/30 transition-all duration-200 min-h-[80px] max-h-[260px] overflow-y-auto"
                                 rows={5}
                             />
                             {/* Expand-to-modal icon — top-right,
@@ -1015,7 +1015,7 @@ export default function ShotCard({
                             onClick={onToggleExpanded}
                             aria-expanded={expanded}
                             aria-label={expanded ? t("collapseShot") : t("expandShot")}
-                            className="group/disc flex w-full items-center gap-2.5 border-t border-glass-border px-5 py-2.5 font-mono text-[0.59375rem] uppercase tracking-[0.14em] text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                            className="group/disc flex w-full items-center gap-2.5 border-t border-glass-border px-5 py-2.5 font-mono text-[0.6875rem] uppercase tracking-[0.14em] text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                         >
                             {expanded ? (
                                 <ChevronUp size={13} strokeWidth={2} className="text-text-muted transition-transform duration-fast group-hover/disc:text-text-secondary" aria-hidden="true" />

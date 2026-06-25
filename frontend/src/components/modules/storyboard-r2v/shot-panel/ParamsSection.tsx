@@ -292,7 +292,7 @@ export default function ParamsSection({
                             </span>
                         </button>
                         {advOpen ? (
-                            <div className="space-y-3 border-t border-glass-border px-3 py-3">
+                            <div className="space-y-3 border-t border-glass-border px-0 py-3">
                                 {modelParams.negativePrompt ? (
                                     <ParamRow label="Negative">
                                         <input
@@ -471,7 +471,7 @@ function ParamRow({ label, children }: { label: string; children: React.ReactNod
     // Mock-aligned: label is a 64px mono uppercase label, control flexes.
     return (
         <div className="flex flex-col items-start gap-1.5 sm:flex-row sm:gap-3">
-            <span className="font-mono text-[0.5625rem] font-medium uppercase tracking-[0.1em] text-text-muted w-16 shrink-0 pt-1.5">
+            <span className="font-mono text-[0.6875rem] font-medium uppercase tracking-[0.1em] text-text-muted w-16 shrink-0 pt-1.5">
                 {label}
             </span>
             <div className="min-w-0 w-full flex-1 sm:w-auto">{children}</div>

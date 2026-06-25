@@ -65,7 +65,7 @@ export default function SectionShell({
                         {/* Section title — chrome tier (per type scale),
                             uppercase tracking is RESERVED for section
                             titles (not metadata) per Sweep E (P2-1). */}
-                        <span className="font-mono text-[0.59375rem] font-semibold uppercase tracking-[0.16em] text-text-secondary">
+                        <span className="font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-text-secondary">
                             {title}
                         </span>
                         {subtitle ? (

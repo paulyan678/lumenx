@@ -1748,9 +1748,11 @@ export default function StoryboardR2V() {
         // to main column (not page-wide), so the right TaskQueuePanel can
         // be a true floor-to-ceiling sidebar with its own SidePanelHeader.
         <div className="h-full flex overflow-hidden relative">
+        <div className="atelier-page-bloom" aria-hidden="true" />
+        <div className="atelier-page-grain" aria-hidden="true" />
         {/* Main column — pushed (compressed) when the queue panel opens
             so the queue doesn't overlay content. */}
-        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        <div className="relative z-10 flex-1 flex flex-col overflow-hidden min-w-0">
             {/* Custom page header — aligned to mock wb-head */}
             <header className="shrink-0 px-7 pt-[22px] pb-4">
                 <div className="flex items-start gap-5">
