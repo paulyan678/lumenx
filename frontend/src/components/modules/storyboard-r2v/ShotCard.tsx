@@ -592,7 +592,7 @@ export default function ShotCard({
                             />
                             <button
                                 onClick={() => onSetTabMode("t2i_i2v")}
-                                className={`relative z-10 flex items-center gap-1.5 px-3 py-1.5 text-[0.625rem] font-semibold rounded-full transition-colors duration-200 ${
+                                className={`relative z-10 flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full transition-colors duration-200 ${
                                     isActiveT2I ? "text-foreground" : "text-text-secondary hover:text-text-secondary/80"
                                 }`}
                             >
@@ -601,7 +601,7 @@ export default function ShotCard({
                             </button>
                             <button
                                 onClick={() => onSetTabMode("direct_r2v")}
-                                className={`relative z-10 flex items-center gap-1.5 px-3 py-1.5 text-[0.625rem] font-semibold rounded-full transition-colors duration-200 ${
+                                className={`relative z-10 flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full transition-colors duration-200 ${
                                     !isActiveT2I ? "text-foreground" : "text-text-secondary hover:text-text-secondary/80"
                                 }`}
                             >

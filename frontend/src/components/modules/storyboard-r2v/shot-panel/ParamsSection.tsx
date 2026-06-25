@@ -271,9 +271,10 @@ export default function ParamsSection({
                     </ParamRow>
                 ) : null}
 
-                {/* Advanced fold */}
+                {/* Advanced fold — indented to read as a sub-section of Params,
+                    distinct from the sibling Candidates section below. */}
                 {hasAdvanced ? (
-                    <div className="pt-1">
+                    <div className="pt-1 pl-8">
                         <button
                             type="button"
                             onClick={() => setAdvOpen(!advOpen)}
@@ -292,7 +293,7 @@ export default function ParamsSection({
                             </span>
                         </button>
                         {advOpen ? (
-                            <div className="space-y-3 border-t border-glass-border px-0 py-3">
+                            <div className="space-y-3 border-t border-glass-border pl-0 pr-0 py-3">
                                 {modelParams.negativePrompt ? (
                                     <ParamRow label="Negative">
                                         <input
