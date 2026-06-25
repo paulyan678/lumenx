@@ -562,12 +562,12 @@ export default function ShotCard({
             {/* Floating card body — mock-aligned glass surface */}
             <div className="relative overflow-hidden rounded-[20px] border border-glass-border bg-surface shadow-[0_2px_8px_rgba(0,0,0,0.40),inset_0_1px_0_rgba(255,255,255,0.04)] transition-all duration-base ease-out-quart group-hover:-translate-y-0.5 group-hover:shadow-[0_12px_40px_rgba(0,0,0,0.55)] z-10">
                 {/* Card top — shot no/cap + status badge + tab switcher */}
-                <div className="flex items-center justify-between gap-4 px-5 pt-5 pb-3">
+                <div className="flex items-center justify-between gap-4 px-5 pt-4 pb-3">
                     <div className="flex items-center gap-3 min-w-0">
                         <div className="font-display text-[1.625rem] font-semibold leading-none text-text-muted tracking-tight">
                             {String(index + 1).padStart(2, "0")}
                         </div>
-                        <div className="font-mono text-[0.65625rem] uppercase tracking-[0.13em] text-text-muted leading-tight">
+                        <div className="font-mono text-[0.59375rem] uppercase tracking-[0.08em] text-text-muted leading-tight">
                             <span>SHOT</span>
                             {shot.shotSize ? (
                                 <span className="ml-1.5 text-text-secondary font-medium">· {shot.shotSize}</span>
@@ -613,14 +613,14 @@ export default function ShotCard({
                 </div>
 
                 {/* Main content: Preview + Editor */}
-                <div className="flex">
+                <div className="flex px-5">
                     {/* Left: Preview */}
-                    <div className="group/preview relative w-72 shrink-0 bg-surface-inset flex flex-col items-center justify-center border-r border-border-subtle overflow-hidden rounded-md shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]">
+                    <div className="group/preview relative w-72 shrink-0 bg-surface-inset flex flex-col items-center justify-center overflow-hidden rounded-[14px] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]">
                         {renderPreview()}
                         {/* Selected-take amber halation */}
                         {(shot.isVideoPinned || shot.finalTakeId) && shot.videoUrl ? (
                             <div
-                                className="pointer-events-none absolute inset-0 rounded-sm"
+                                className="pointer-events-none absolute inset-0 rounded-[14px]"
                                 style={{ boxShadow: "inset 0 0 42px -8px rgba(255,169,77,0.28)" }}
                             />
                         ) : null}
@@ -675,7 +675,7 @@ export default function ShotCard({
                     </div>
 
                     {/* Right: Prompt + Controls */}
-                    <div className="flex-1 py-2 pl-5 pr-5 flex flex-col gap-3">
+                    <div className="flex-1 py-0.5 pl-5 pr-0 flex flex-col gap-3">
                         {/* Cast avatar group */}
                         {castAvatars.length > 0 ? (
                             <div className="flex items-center gap-2">
@@ -731,7 +731,7 @@ export default function ShotCard({
                                     }
                                 }}
                                 placeholder={t("promptPlaceholder")}
-                                className="w-full resize-none bg-transparent border-l-2 border-glass-border pl-3.5 pr-8 py-1 text-[13px] leading-relaxed text-foreground placeholder:text-text-muted focus:outline-none focus:border-l-primary/40 focus:bg-glass/30 transition-all duration-200 min-h-[110px] max-h-[260px] overflow-y-auto"
+                                className="w-full resize-none bg-transparent border-l-2 border-glass-border pl-3.5 pr-8 py-1 text-[13px] leading-relaxed text-foreground placeholder:text-text-muted focus:outline-none focus:border-l-primary/40 focus:bg-glass/30 transition-all duration-200 min-h-[80px] max-h-[260px] overflow-y-auto"
                                 rows={5}
                             />
                             {/* Expand-to-modal icon — top-right,
@@ -883,20 +883,17 @@ export default function ShotCard({
                             props={props}
                             onInsertAsset={handleInsertAssetFromChip}
                         />
+                    </div>
+                </div>
 
-                        {/* PR-3c+ · 底部一体化 action 行:
-                            左 = shot actions (@ ↑ ↓ ⊙ ×) -- 之前悬空在 chip
-                                  bar 下方，现移到底部跟生成行同一区域.
-                            右 = generation cluster (count selector + 生成 ×N).
-                            一行解决"所有 shot operations + generate"，
-                            不再两段隔离视觉. */}
-                        <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-t border-glass-border">
+                {/* actions row — full-width per mock (lives outside editor/card-body) */}
+                <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-t border-glass-border">
                             <div className="flex items-center gap-1 shrink-0">
                                 <motion.button
                                     whileHover={{ scale: 1.06 }}
                                     whileTap={{ scale: 0.94 }}
                                     onClick={onOpenDrawer}
-                                    className="ico-btn flex h-8 w-8 items-center justify-center rounded-md text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                                    className="ico-btn flex h-8 w-8 items-center justify-center rounded-[14px] text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                                     title={t("browseAssets")}
                                 >
                                     <AtSign size={15} strokeWidth={1.8} />
@@ -906,7 +903,7 @@ export default function ShotCard({
                                     whileTap={{ scale: 0.94 }}
                                     onClick={onMoveUp}
                                     disabled={index === 0}
-                                    className="ico-btn flex h-8 w-8 items-center justify-center rounded-md text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground disabled:opacity-25 disabled:hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                                    className="ico-btn flex h-8 w-8 items-center justify-center rounded-[14px] text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground disabled:opacity-25 disabled:hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                                     title={t("moveUp")}
                                 >
                                     <ChevronUp size={15} strokeWidth={1.8} />
@@ -916,7 +913,7 @@ export default function ShotCard({
                                     whileTap={{ scale: 0.94 }}
                                     onClick={onMoveDown}
                                     disabled={index === totalShots - 1}
-                                    className="ico-btn flex h-8 w-8 items-center justify-center rounded-md text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground disabled:opacity-25 disabled:hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                                    className="ico-btn flex h-8 w-8 items-center justify-center rounded-[14px] text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground disabled:opacity-25 disabled:hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                                     title={t("moveDown")}
                                 >
                                     <ChevronDown size={15} strokeWidth={1.8} />
@@ -925,7 +922,7 @@ export default function ShotCard({
                                     whileHover={{ scale: 1.06 }}
                                     whileTap={{ scale: 0.94 }}
                                     onClick={onDuplicate}
-                                    className="ico-btn flex h-8 w-8 items-center justify-center rounded-md text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                                    className="ico-btn flex h-8 w-8 items-center justify-center rounded-[14px] text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                                     title={t("duplicateShot")}
                                 >
                                     <Copy size={15} strokeWidth={1.8} />
@@ -935,7 +932,7 @@ export default function ShotCard({
                                         whileHover={{ scale: 1.06 }}
                                         whileTap={{ scale: 0.94 }}
                                         onClick={onRefineFrame}
-                                        className="ico-btn flex h-8 w-8 items-center justify-center rounded-md text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                                        className="ico-btn flex h-8 w-8 items-center justify-center rounded-[14px] text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                                         title={t("refineFrame")}
                                     >
                                         <Sparkles size={15} strokeWidth={1.8} />
@@ -945,7 +942,7 @@ export default function ShotCard({
                                     whileHover={{ scale: 1.06 }}
                                     whileTap={{ scale: 0.94 }}
                                     onClick={onDelete}
-                                    className="ico-btn flex h-8 w-8 items-center justify-center rounded-md text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-status-failed-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                                    className="ico-btn flex h-8 w-8 items-center justify-center rounded-[14px] text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-status-failed-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                                     title={t("deleteShot")}
                                 >
                                     <Trash2 size={15} strokeWidth={1.8} />
@@ -995,7 +992,7 @@ export default function ShotCard({
                                             ? t("needFirstFrameTooltip")
                                             : t("needPromptInputTooltip"))
                                         : t("genVideoCandidatesTooltip", { count: generateCount })}
-                                    className="inline-flex items-center justify-center gap-1.5 rounded-full px-[18px] py-[9px] font-sans text-[0.8125rem] font-semibold tracking-tight transition-all duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 disabled:cursor-not-allowed disabled:opacity-40 bg-primary text-on-accent shadow-[var(--btn-pri-glow),inset_0_1.5px_0_rgba(255,255,255,0.14)] hover:bg-primary-hover hover:-translate-y-px disabled:hover:translate-y-0"
+                                    className="inline-flex items-center justify-center gap-1.5 rounded-full px-[13px] py-[7px] font-sans text-[0.75rem] font-semibold tracking-tight transition-all duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 disabled:cursor-not-allowed disabled:opacity-40 bg-primary text-on-accent shadow-[var(--btn-pri-glow),inset_0_1.5px_0_rgba(255,255,255,0.14)] hover:bg-primary-hover hover:-translate-y-px disabled:hover:translate-y-0"
                                 >
                                     {inFlightCount > 0 ? (
                                         <>
@@ -1018,7 +1015,7 @@ export default function ShotCard({
                             onClick={onToggleExpanded}
                             aria-expanded={expanded}
                             aria-label={expanded ? t("collapseShot") : t("expandShot")}
-                            className="group/disc flex w-full items-center gap-2.5 border-t border-glass-border bg-black/[0.06] px-5 py-2.5 font-mono text-[0.65625rem] uppercase tracking-[0.14em] text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                            className="group/disc flex w-full items-center gap-2.5 border-t border-glass-border px-5 py-2.5 font-mono text-[0.59375rem] uppercase tracking-[0.14em] text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                         >
                             {expanded ? (
                                 <ChevronUp size={13} strokeWidth={2} className="text-text-muted transition-transform duration-fast group-hover/disc:text-text-secondary" aria-hidden="true" />
@@ -1033,8 +1030,6 @@ export default function ShotCard({
                                 <ChevronDown size={13} strokeWidth={2} className="ml-auto text-text-muted/60" aria-hidden="true" />
                             )}
                         </button>
-                    </div>
-                </div>
             </div>
             {/* Focus-editor modal (B5 escape hatch) — opens via the
                 expand icon or Cmd/Ctrl+E. Cancel discards; Save

@@ -177,7 +177,7 @@ export default function ParamsSection({
             onToggle={() => setOpen(!open)}
             subtitle={activeModel ? `${activeModel.name}` : undefined}
             trailing={inFlightCount > 0 ? (
-                <span className="rounded-full bg-primary/20 px-1.5 py-0.5 text-[0.625rem] font-semibold leading-none text-primary">
+                <span className="rounded-full border border-status-processing-border bg-status-processing-bg px-1.5 py-0.5 text-[0.5625rem] font-semibold leading-none text-status-processing-fg">
                     {`${inFlightCount} ${t("inFlightShort")}`}
                 </span>
             ) : undefined}
@@ -204,7 +204,7 @@ export default function ParamsSection({
                             <>
                                 <div className="fixed inset-0 z-[60]" onClick={() => setModelOpen(false)} aria-hidden="true" />
                                 <div
-                                    className="fixed z-[70] max-h-60 min-w-[12rem] overflow-y-auto rounded-md border border-border-subtle bg-elevated p-1 shadow-[var(--shadow-lift)]"
+                                    className="fixed z-[70] max-h-60 min-w-[12rem] overflow-y-auto rounded-[14px] border border-border-subtle bg-elevated p-1 shadow-[var(--shadow-lift)]"
                                     style={{ top: menuPos.top, left: menuPos.left }}
                                 >
                                     {modelList.map((m) => {
@@ -300,7 +300,7 @@ export default function ParamsSection({
                                             value={params.negativePrompt ?? ""}
                                             onChange={(e) => set("negativePrompt", e.target.value)}
                                             placeholder="things to avoid…"
-                                            className="w-full rounded-md border border-glass-border bg-surface-inset px-2.5 py-1.5 font-sans text-body-sm text-foreground placeholder:text-text-muted outline-none transition-colors duration-fast ease-out-quart focus:border-primary/55 focus-visible:ring-2 focus-visible:ring-primary/45"
+                                            className="w-full rounded-lg border border-glass-border bg-surface-inset px-2.5 py-1.5 font-sans text-body-sm text-foreground placeholder:text-text-muted outline-none transition-colors duration-fast ease-out-quart focus:border-primary/55 focus-visible:ring-2 focus-visible:ring-primary/45"
                                         />
                                     </ParamRow>
                                 ) : null}
@@ -329,7 +329,7 @@ export default function ParamsSection({
                                                 }}
                                                 placeholder="random"
                                                 aria-label="Random seed (leave blank for provider default)"
-                                                className="w-32 rounded-md border border-glass-border bg-surface-inset px-2 py-1.5 font-mono text-body-sm text-foreground placeholder:text-text-muted outline-none transition-colors duration-fast ease-out-quart focus:border-primary/55 focus-visible:ring-2 focus-visible:ring-primary/45"
+                                                className="w-32 rounded-lg border border-glass-border bg-surface-inset px-2 py-1.5 font-mono text-body-sm text-foreground placeholder:text-text-muted outline-none transition-colors duration-fast ease-out-quart focus:border-primary/55 focus-visible:ring-2 focus-visible:ring-primary/45"
                                             />
                                             {/* Dice = randomize. Lucide icon for
                                                 visual cohesion with the rest of
@@ -447,7 +447,7 @@ export default function ParamsSection({
                 {errorMessage ? (
                     <div
                         role="alert"
-                        className="rounded-md border border-status-failed-border bg-status-failed-bg px-3 py-2 font-sans text-body-sm text-status-failed-fg"
+                        className="rounded-lg border border-status-failed-border bg-status-failed-bg px-3 py-2 font-sans text-body-sm text-status-failed-fg"
                     >
                         {errorMessage}
                     </div>

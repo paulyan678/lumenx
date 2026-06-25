@@ -75,7 +75,7 @@ html.atelier-dark {
                   radial-gradient(55% 45% at 88% 100%, rgba(255, 169, 77, 0.08), transparent 70%);
   --grain-op: 0.05;
 
-  --font-inter:          'Inter', sans-serif;
+  --font-inter:          'Space Grotesk', sans-serif;
   --font-jetbrains-mono: 'JetBrains Mono', monospace;
   --font-space-grotesk:  'Space Grotesk', sans-serif;
   --font-display:        'Fraunces', Georgia, serif;

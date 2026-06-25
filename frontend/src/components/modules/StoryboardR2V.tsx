@@ -1752,15 +1752,17 @@ export default function StoryboardR2V() {
             so the queue doesn't overlay content. */}
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
             {/* Custom page header — aligned to mock wb-head */}
-            <header className="shrink-0 border-b border-glass-border bg-surface/50 px-6 py-5">
+            <header className="shrink-0 px-7 pt-[22px] pb-4">
                 <div className="flex items-start gap-5">
                     <div className="flex-1 min-w-0">
-                        <div className="font-mono text-[0.65625rem] font-normal uppercase tracking-[0.2em] text-text-muted">
-                            <span className="font-medium text-primary">04</span>
-                            <span className="ml-2">STORYBOARD R2V</span>
+                        <div className="font-mono text-[0.59375rem] font-normal uppercase tracking-[0.22em] text-text-muted">
+                            <span>STEP</span>
+                            <span className="ml-1.5 font-medium text-primary">04</span>
+                            <span className="mx-1.5">·</span>
+                            <span>STORYBOARD R2V</span>
                         </div>
-                        <div className="mt-1 flex flex-wrap items-baseline gap-3">
-                            <h1 className="font-display text-[1.5rem] font-semibold leading-tight tracking-tight text-foreground">
+                        <div className="mt-1.5 flex flex-wrap items-baseline gap-3.5">
+                            <h1 className="font-display text-[2.125rem] font-semibold leading-[1.05] tracking-[-0.02em] text-foreground">
                                 {tStep("storyboardTitle")}
                             </h1>
                             <div className="flex items-center gap-2">
@@ -1773,19 +1775,19 @@ export default function StoryboardR2V() {
                                             );
                                         }}
                                         title={t("artStyleHint")}
-                                        className="inline-flex items-center gap-1.5 rounded-full border border-glass-border bg-surface-inset px-2.5 py-1 font-mono text-[0.625rem] text-text-secondary transition-colors duration-fast ease-out-quart hover:border-foreground/20 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                                        className="inline-flex items-center gap-1.5 rounded-full border border-glass-border bg-surface-inset px-2.5 py-1 font-mono text-[0.59375rem] text-text-secondary transition-colors duration-fast ease-out-quart hover:border-foreground/20 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                                     >
                                         <span className="text-text-muted">{t("artStyleLabel")}</span>
-                                        <span className="text-foreground">{currentProject.art_direction.style_config.name}</span>
+                                        <span className="text-primary">{currentProject.art_direction.style_config.name}</span>
                                     </button>
                                 ) : null}
-                                <span className="inline-flex items-center gap-1.5 rounded-full border border-glass-border bg-surface-inset px-2.5 py-1 font-mono text-[0.625rem] text-text-secondary">
+                                <span className="inline-flex items-center gap-1.5 rounded-full border border-glass-border bg-surface-inset px-2.5 py-1 font-mono text-[0.59375rem] text-text-secondary">
                                     <span className="text-text-muted">{t("currentModel")}</span>
-                                    <span className="text-foreground">{currentModelName}</span>
+                                    <span className="text-primary">{currentModelName}</span>
                                 </span>
                             </div>
                         </div>
-                        <p className="mt-1 text-[0.8125rem] text-text-secondary">{tStep("storyboardSubtitle")}</p>
+                        <p className="mt-1.5 text-[0.8125rem] text-text-secondary">{tStep("storyboardSubtitle")}</p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0 pt-1">
                         <TaskQueueButton
@@ -1856,7 +1858,7 @@ export default function StoryboardR2V() {
                 onGenerateDialogue={handleBatchDialogue}
             />
 
-            <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5 sm:px-7">
+            <div className="flex-1 overflow-y-auto px-5 pt-1.5 pb-10 space-y-5 sm:px-7">
                 {shots.length === 0 && (
                     <div className="h-full min-h-[300px] flex flex-col items-center justify-center text-center px-6">
                         <div className="rounded-2xl border border-glass-border bg-glass p-8 max-w-lg">
@@ -2079,7 +2081,7 @@ export default function StoryboardR2V() {
                             v1 不加 explicit section header / first-frame
                             thumbnail in Step 2 — 看用户反馈再升级 v2. */}
                         {expandedShots.has(shot.id) ? (
-                        <div className="mx-5 mb-4 rounded-xl border border-glass-border bg-surface-inset/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] backdrop-blur-sm motion-safe:animate-[shotPanelIn_220ms_cubic-bezier(0.22,1,0.36,1)_both]">
+                        <div className="mx-5 mb-[18px] motion-safe:animate-[shotPanelIn_220ms_cubic-bezier(0.22,1,0.36,1)_both]">
                             {isI2vTab ? (
                                 <div>
                                     <T2ISubsection

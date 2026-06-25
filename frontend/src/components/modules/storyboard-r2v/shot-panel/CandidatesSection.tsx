@@ -224,7 +224,7 @@ export default function CandidatesSection({
                     {/* Compare callout — promoted to display tier when
                         ≥2 selected. */}
                     {compareCount >= 2 ? (
-                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-status-starred-border bg-status-starred-bg px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] sm:gap-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-[14px] border border-status-starred-border bg-status-starred-bg px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] sm:gap-3">
                             <span className="font-display text-display-sm font-semibold tracking-tight text-status-starred-fg">
                                 {t("compareSelected", { count: compareCount })}
                             </span>
@@ -343,7 +343,7 @@ function BatchBlock({
     // ratio) demoted to title attribute so the row breathes — they
     // matter on the rare 复用 click, not on every scan.
     return (
-        <div className="rounded-md border border-glass-border bg-black/15">
+        <div className="rounded-[14px] border border-glass-border bg-black/15">
             <div className="flex items-center gap-2 px-2 py-2">
                 <button
                     type="button"
@@ -403,7 +403,7 @@ function BatchBlock({
                 ) : null}
             </div>
             {open ? (
-                <div className="flex flex-wrap gap-2 border-t border-glass-border px-2 py-2">
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(152px,1fr))] gap-2.5 border-t border-glass-border p-2.5">
                     {batch.tasks.map((task) => (
                         <CandidateThumb
                             key={task.id}

@@ -87,7 +87,7 @@ export default function CandidateThumb({
     };
 
     return (
-        <div className="flex w-[140px] shrink-0 flex-col gap-1">
+        <div className="flex w-full flex-col gap-1">
             <div
                 role="button"
                 tabIndex={0}
@@ -99,7 +99,7 @@ export default function CandidateThumb({
                         onClick(task, { shift: e.shiftKey, meta: e.metaKey || e.ctrlKey });
                     }
                 }}
-                className={`group relative h-[80px] overflow-hidden rounded-md border bg-black/40 transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-1 focus-visible:ring-offset-black ${
+                className={`group relative aspect-video overflow-hidden rounded-[14px] border bg-black/40 shadow-[var(--shadow-rest)] transition-all duration-base ease-out-quart hover:-translate-y-0.5 hover:shadow-[var(--shadow-lift)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-1 focus-visible:ring-offset-black ${
                     isCompareSelected
                         ? "border-status-starred-border ring-2 ring-status-starred-bg"
                         : isActive
