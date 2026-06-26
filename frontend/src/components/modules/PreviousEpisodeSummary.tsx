@@ -124,8 +124,8 @@ export default function PreviousEpisodeSummary({ scriptId }: PreviousEpisodeSumm
                         <div className="rounded-lg border border-status-failed-border/40 bg-status-failed-bg/50 px-4 py-3 flex items-start gap-2.5">
                             <AlertCircle size={14} className="text-status-failed-fg shrink-0 mt-0.5" />
                             <div>
-                                <p className="text-[12.5px] text-status-failed-fg font-medium">{t("loadFailed")}</p>
-                                <p className="text-[11px] text-status-failed-fg/80 mt-1 break-all">{error}</p>
+                                <p className="text-[0.78125rem] text-status-failed-fg font-medium">{t("loadFailed")}</p>
+                                <p className="text-[0.6875rem] text-status-failed-fg/80 mt-1 break-all">{error}</p>
                             </div>
                         </div>
                     </div>
@@ -165,7 +165,7 @@ export default function PreviousEpisodeSummary({ scriptId }: PreviousEpisodeSumm
                 ) : (
                     <div className="px-5 py-5 space-y-5">
                         {/* Previous episode meta */}
-                        <div className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-[0.16em] text-text-muted">
+                        <div className="flex items-center gap-2 text-[0.6875rem] font-mono uppercase tracking-[0.16em] text-text-muted">
                             <span className="text-primary">PREV</span>
                             <span aria-hidden="true" className="h-px w-2 bg-glass-border" />
                             <span className="truncate text-text-secondary">{data.previous_episode_title || data.previous_episode_id}</span>
@@ -174,12 +174,12 @@ export default function PreviousEpisodeSummary({ scriptId }: PreviousEpisodeSumm
                         {/* AI summary section — collapsed by default, user opts in */}
                         <section className="space-y-2">
                             <div className="flex items-center justify-between gap-2">
-                                <h4 className="font-mono text-[10px] font-medium uppercase tracking-[0.18em] text-text-muted inline-flex items-center gap-1.5">
+                                <h4 className="font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-text-muted inline-flex items-center gap-1.5">
                                     <Sparkles size={11} />
                                     {t("aiSummary")}
                                 </h4>
                                 {data.ai_summary && data.ai_summary_stale && (
-                                    <span className="font-mono text-[9.5px] uppercase tracking-[0.14em] text-amber-300">
+                                    <span className="font-mono text-[0.59375rem] uppercase tracking-[0.14em] text-amber-300">
                                         {t("stale")}
                                     </span>
                                 )}
@@ -201,7 +201,7 @@ export default function PreviousEpisodeSummary({ scriptId }: PreviousEpisodeSumm
                                         value={draft}
                                         onChange={(e) => setDraft(e.target.value)}
                                         rows={6}
-                                        className="w-full bg-transparent text-foreground text-[13px] leading-relaxed resize-none focus:outline-none"
+                                        className="w-full bg-transparent text-foreground text-[0.8125rem] leading-relaxed resize-none focus:outline-none"
                                         placeholder={t("editPlaceholder")}
                                         autoFocus
                                     />
@@ -237,7 +237,7 @@ export default function PreviousEpisodeSummary({ scriptId }: PreviousEpisodeSumm
                                 </div>
                             ) : (
                                 <div className="rounded-lg border border-primary/25 bg-primary/[0.06] px-3.5 py-3 space-y-2 group/summary">
-                                    <p className="text-[13px] leading-relaxed text-foreground whitespace-pre-wrap">
+                                    <p className="text-[0.8125rem] leading-relaxed text-foreground whitespace-pre-wrap">
                                         {data.ai_summary}
                                     </p>
                                     <div className="flex items-center justify-between gap-2">
@@ -267,11 +267,11 @@ export default function PreviousEpisodeSummary({ scriptId }: PreviousEpisodeSumm
 
                         {/* Raw snippet — always shown, zero-cost */}
                         <section className="space-y-2">
-                            <h4 className="font-mono text-[10px] font-medium uppercase tracking-[0.18em] text-text-muted">
+                            <h4 className="font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-text-muted">
                                 {t("rawSnippet")}
                             </h4>
                             <div className="rounded-lg border border-glass-border bg-black/30 px-3.5 py-3">
-                                <p className="text-[12.5px] leading-relaxed text-text-secondary whitespace-pre-wrap font-mono">
+                                <p className="text-[0.78125rem] leading-relaxed text-text-secondary whitespace-pre-wrap font-mono">
                                     …{data.raw_snippet}
                                 </p>
                             </div>
@@ -329,17 +329,17 @@ function NextHookSection({ hookData, generating, editing, draft, saving, onGener
     return (
         <section className="space-y-2 pt-4 border-t border-glass-border">
             <div className="flex items-center justify-between gap-2">
-                <h4 className="font-mono text-[10px] font-medium uppercase tracking-[0.18em] text-pink-300/80 inline-flex items-center gap-1.5">
+                <h4 className="font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-pink-300/80 inline-flex items-center gap-1.5">
                     <Sparkles size={11} />
                     {t("title")}
                 </h4>
                 {hookData.hook && hookData.stale && (
-                    <span className="font-mono text-[9.5px] uppercase tracking-[0.14em] text-amber-300">
+                    <span className="font-mono text-[0.59375rem] uppercase tracking-[0.14em] text-amber-300">
                         {t("stale")}
                     </span>
                 )}
             </div>
-            <p className="text-[11px] text-text-muted leading-relaxed">{t("subtitle")}</p>
+            <p className="text-[0.6875rem] text-text-muted leading-relaxed">{t("subtitle")}</p>
             {!hookData.hook && !editing ? (
                 <WorkflowActionButton
                     variant="secondary"
@@ -357,7 +357,7 @@ function NextHookSection({ hookData, generating, editing, draft, saving, onGener
                         value={draft}
                         onChange={(e) => onDraftChange(e.target.value)}
                         rows={5}
-                        className="w-full bg-transparent text-foreground text-[13px] leading-relaxed resize-none focus:outline-none"
+                        className="w-full bg-transparent text-foreground text-[0.8125rem] leading-relaxed resize-none focus:outline-none"
                         placeholder={t("editPlaceholder")}
                         autoFocus
                     />
@@ -372,7 +372,7 @@ function NextHookSection({ hookData, generating, editing, draft, saving, onGener
                 </div>
             ) : (
                 <div className="rounded-lg border border-pink-300/30 bg-pink-300/[0.06] px-3.5 py-3 space-y-2">
-                    <p className="text-[13px] leading-relaxed text-foreground whitespace-pre-wrap">
+                    <p className="text-[0.8125rem] leading-relaxed text-foreground whitespace-pre-wrap">
                         {hookData.hook}
                     </p>
                     <div className="flex items-center justify-between gap-2">
@@ -396,7 +396,7 @@ function EmptyState({ title, body }: { title: string; body: string }) {
         <div className="flex h-full items-center justify-center px-6 text-center">
             <div className="max-w-xs space-y-2">
                 <p className="font-display text-base font-medium text-foreground">{title}</p>
-                <p className="text-[12px] leading-relaxed text-text-muted">{body}</p>
+                <p className="text-[0.75rem] leading-relaxed text-text-muted">{body}</p>
             </div>
         </div>
     );

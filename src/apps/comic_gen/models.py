@@ -309,6 +309,7 @@ class Character(BaseModel):
     # Picker modal Tabs filter by this field (Q15.5 B).
     voice_origin: str = Field("system", description="Voice source: 'system' | 'clone' | 'design'")
     locked: bool = Field(False, description="Whether this asset is locked from regeneration")
+    starred: bool = Field(False, description="User-starred flag for the asset library shortlist")
     status: GenerationStatus = GenerationStatus.PENDING
 
 class Scene(BaseModel):
@@ -326,6 +327,7 @@ class Scene(BaseModel):
     video_prompt: Optional[str] = Field(None, description="Prompt used for video generation")
     
     locked: bool = Field(False, description="Whether this asset is locked from regeneration")
+    starred: bool = Field(False, description="User-starred flag for the asset library shortlist")
     status: GenerationStatus = GenerationStatus.PENDING
 
 class Prop(BaseModel):
@@ -344,6 +346,7 @@ class Prop(BaseModel):
     video_prompt: Optional[str] = Field(None, description="Prompt used for video generation")
     
     locked: bool = Field(False, description="Whether this asset is locked from regeneration")
+    starred: bool = Field(False, description="User-starred flag for the asset library shortlist")
     status: GenerationStatus = GenerationStatus.PENDING
 
 class StoryboardFrame(BaseModel):
@@ -507,6 +510,9 @@ class PromptConfig(BaseModel):
     storyboard_polish: str = Field("", description="Custom system prompt for storyboard polish (Prompt C)")
     video_polish: str = Field("", description="Custom system prompt for video I2V polish (Prompt D)")
     r2v_polish: str = Field("", description="Custom system prompt for video R2V polish (Prompt E)")
+    entity_extraction: str = Field("", description="Custom system prompt for novel→character/scene/prop extraction (Prompt A)")
+    style_analysis: str = Field("", description="Custom system prompt for novel→visual style recommendations")
+    storyboard_extraction: str = Field("", description="Custom system prompt for script→storyboard extraction (Prompt B)")
     # Polish 调用使用的 LLM 模型。空 = 用 LLMAdapter 默认（qwen3.6-plus）。
     # 显式覆盖时用于切到 vision-capable 或更便宜的模型（qwen3.6-flash、kimi-k2.6 等）。
     polish_model: str = Field("", description="Override LLM model id used for polish calls; empty = use system default")
@@ -588,6 +594,11 @@ class Script(BaseModel):
         description="Hash/marker of THIS episode's original_text when the hook cache was built.",
     )
 
+    # User-starred (featured shortlist) flag. Starred projects get the
+    # amber-halation "featured" treatment in the gallery. Optional + default
+    # False keeps existing projects and the create path unchanged.
+    starred: bool = Field(False, description="User-starred flag for the project gallery featured shortlist")
+
     created_at: float
     updated_at: float
 
@@ -636,3 +647,19 @@ class Series(BaseModel):
 
     created_at: float
     updated_at: float
+
+
+class GlobalAssetLibrary(BaseModel):
+    """Project-independent global asset pool (LumenX Core shared library).
+
+    A single top-level curated container of reusable assets that any
+    project may reference by id. It is the *lowest* layer in the
+    resolver (Episode > Series > Global) — assets here never override a
+    project's or series' own assets, they only add ids that aren't
+    already present locally. Reuses the existing Character/Scene/Prop
+    schema verbatim. Persisted to output/library_assets.json alongside
+    projects.json / series.json."""
+
+    characters: List[Character] = Field(default_factory=list, description="Shared global character assets")
+    scenes: List[Scene] = Field(default_factory=list, description="Shared global scene assets")
+    props: List[Prop] = Field(default_factory=list, description="Shared global prop assets")

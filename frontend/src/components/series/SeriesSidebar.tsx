@@ -149,7 +149,7 @@ export default function SeriesSidebar({
       {/* ── Art Direction (R2V v2 series-level style baseline) ── */}
       <div className="p-3 pb-1 space-y-1">
         <div className="px-3 py-1.5">
-          <span className="text-[10px] font-mono text-text-muted uppercase tracking-wider">
+          <span className="text-[0.625rem] font-mono text-text-muted uppercase tracking-wider">
             {t("styleSection")}
           </span>
         </div>
@@ -186,7 +186,7 @@ export default function SeriesSidebar({
               </span>
               <span
                 className={clsx(
-                  "text-[10px] px-1.5 py-0.5 rounded-md font-mono uppercase tracking-wider",
+                  "text-[0.625rem] px-1.5 py-0.5 rounded-md font-mono uppercase tracking-wider",
                   hasStyle
                     ? isActive
                       ? "bg-primary/20 text-primary"
@@ -204,7 +204,7 @@ export default function SeriesSidebar({
       {/* ── Asset navigation ── */}
       <div className="px-3 pt-2 pb-3 space-y-1 border-t border-glass-border">
         <div className="px-3 py-1.5">
-          <span className="text-[10px] font-mono text-text-muted uppercase tracking-wider">
+          <span className="text-[0.625rem] font-mono text-text-muted uppercase tracking-wider">
             {t("sharedAssets")}
           </span>
         </div>
@@ -260,7 +260,7 @@ export default function SeriesSidebar({
       {/* ── Episode list ── */}
       <div className="flex-1 flex flex-col min-h-0 border-t border-glass-border">
         <div className="px-6 py-2.5 flex items-center justify-between">
-          <span className="text-[10px] font-mono text-text-muted uppercase tracking-wider">
+          <span className="text-[0.625rem] font-mono text-text-muted uppercase tracking-wider">
             {t("episodesCount", { count: episodes.length })}
           </span>
         </div>
@@ -294,7 +294,7 @@ export default function SeriesSidebar({
                 )}
                 <span
                   className={clsx(
-                    "text-[10px] font-mono font-bold px-1.5 py-0.5 rounded",
+                    "text-[0.625rem] font-mono font-bold px-1.5 py-0.5 rounded",
                     isActive
                       ? "bg-primary/20 text-primary"
                       : "bg-glass text-text-secondary"
@@ -305,7 +305,7 @@ export default function SeriesSidebar({
                 <span className="text-sm font-medium flex-1 text-left truncate">
                   {ep.title}
                 </span>
-                <span className="text-[10px] text-text-muted font-mono">
+                <span className="text-[0.625rem] text-text-muted font-mono">
                   {ep.frames?.length || 0}
                 </span>
                 {isActive && (

@@ -149,15 +149,15 @@ export default function VoiceCloneModal({ isOpen, onClose, seriesId, characterNa
                         <div className="rounded-lg border border-glass-border bg-black/20 px-4 py-3">
                             <div className="flex items-center gap-2 mb-1.5">
                                 <Users size={12} className="text-text-muted" />
-                                <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-text-muted">
+                                <span className="font-mono text-[0.625rem] uppercase tracking-[0.16em] text-text-muted">
                                     {t("characterContext")}
                                 </span>
                             </div>
                             {characterName && (
-                                <p className="text-[13px] font-medium text-foreground">{characterName}</p>
+                                <p className="text-[0.8125rem] font-medium text-foreground">{characterName}</p>
                             )}
                             {characterDescription && (
-                                <p className="mt-1 text-[12px] text-text-secondary leading-relaxed line-clamp-3">
+                                <p className="mt-1 text-[0.75rem] text-text-secondary leading-relaxed line-clamp-3">
                                     {characterDescription}
                                 </p>
                             )}
@@ -181,7 +181,7 @@ export default function VoiceCloneModal({ isOpen, onClose, seriesId, characterNa
                                 ? "border-primary bg-primary/10"
                                 : file
                                     ? "border-primary/50 bg-primary/5"
-                                    : "border-glass-border hover:border-white/20 bg-black/30"
+                                    : "border-glass-border hover:border-foreground/30 bg-black/30"
                         } ${inFlight ? "opacity-60 cursor-not-allowed" : ""}`}
                     >
                         <input
@@ -197,23 +197,23 @@ export default function VoiceCloneModal({ isOpen, onClose, seriesId, characterNa
                         {file ? (
                             <div className="flex items-center justify-center gap-2 text-foreground">
                                 <Check size={14} className="text-primary" />
-                                <span className="text-[13px] truncate max-w-[280px]" title={file.name}>{file.name}</span>
-                                <span className="font-mono text-[10px] text-text-muted">
+                                <span className="text-[0.8125rem] truncate max-w-[280px]" title={file.name}>{file.name}</span>
+                                <span className="font-mono text-[0.625rem] text-text-muted">
                                     {(file.size / 1024 / 1024).toFixed(1)}MB
                                 </span>
                             </div>
                         ) : (
                             <div className="flex flex-col items-center gap-2">
                                 <Upload size={20} className="text-text-muted" />
-                                <p className="text-[13px] text-text-secondary">{t("dropHint")}</p>
-                                <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-text-muted">{t("requirements")}</p>
+                                <p className="text-[0.8125rem] text-text-secondary">{t("dropHint")}</p>
+                                <p className="font-mono text-[0.625rem] uppercase tracking-[0.14em] text-text-muted">{t("requirements")}</p>
                             </div>
                         )}
                     </div>
 
                     {/* Label input */}
                     <div>
-                        <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted mb-1">
+                        <label className="block font-mono text-[0.625rem] uppercase tracking-[0.18em] text-text-muted mb-1">
                             {t("labelLabel")}
                         </label>
                         <input
@@ -223,7 +223,7 @@ export default function VoiceCloneModal({ isOpen, onClose, seriesId, characterNa
                             placeholder={t("labelPlaceholder")}
                             disabled={inFlight}
                             maxLength={30}
-                            className="w-full rounded-md border border-glass-border bg-black/30 px-3 py-2 text-[13px] text-foreground placeholder:text-text-muted focus:outline-none focus:border-primary/40 disabled:opacity-60"
+                            className="w-full rounded-md border border-glass-border bg-black/30 px-3 py-2 text-[0.8125rem] text-foreground placeholder:text-text-muted focus:outline-none focus:border-primary/40 disabled:opacity-60"
                         />
                     </div>
 
@@ -253,14 +253,14 @@ export default function VoiceCloneModal({ isOpen, onClose, seriesId, characterNa
                 <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-glass-border">
                     <button
                         onClick={handleClose}
-                        className="inline-flex items-center px-3 py-1.5 rounded-md bg-glass border border-glass-border text-text-secondary hover:text-foreground hover:bg-hover-bg transition-colors text-[12px]"
+                        className="inline-flex items-center px-3 py-1.5 rounded-md bg-glass border border-glass-border text-text-secondary hover:text-foreground hover:bg-hover-bg transition-colors text-[0.75rem]"
                     >
                         {t("cancel")}
                     </button>
                     <button
                         onClick={handleSubmit}
                         disabled={!file || !label.trim() || inFlight || phase === "done"}
-                        className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-md bg-primary text-white border border-[rgba(100,108,255,0.65)] shadow-[inset_0_1.5px_0_rgba(255,255,255,0.14)] hover:bg-[#7a82ff] disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-[12px] font-semibold"
+                        className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-md bg-primary text-white border border-[rgba(100,108,255,0.65)] shadow-[inset_0_1.5px_0_rgba(255,255,255,0.14)] hover:bg-primary-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-[0.75rem] font-semibold"
                     >
                         {phase === "done" ? <Check size={12} /> : null}
                         {phase === "done" ? t("done") : t("submit")}
@@ -278,18 +278,18 @@ export default function VoiceCloneModal({ isOpen, onClose, seriesId, characterNa
                         className="w-full max-w-xs rounded-xl border border-glass-border bg-elevated p-5 shadow-[0_16px_48px_-8px_rgba(0,0,0,0.7)]"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <p className="text-[13px] text-foreground font-medium mb-1">{t("confirmCloseTitle")}</p>
-                        <p className="text-[12px] text-text-secondary mb-4">{t("confirmCloseBody")}</p>
+                        <p className="text-[0.8125rem] text-foreground font-medium mb-1">{t("confirmCloseTitle")}</p>
+                        <p className="text-[0.75rem] text-text-secondary mb-4">{t("confirmCloseBody")}</p>
                         <div className="flex items-center gap-2 justify-end">
                             <button
                                 onClick={() => setConfirmClose(false)}
-                                className="px-3 py-1.5 rounded-md bg-glass border border-glass-border text-text-secondary hover:text-foreground text-[12px] transition-colors"
+                                className="px-3 py-1.5 rounded-md bg-glass border border-glass-border text-text-secondary hover:text-foreground text-[0.75rem] transition-colors"
                             >
                                 {t("confirmCloseStay")}
                             </button>
                             <button
                                 onClick={handleForceClose}
-                                className="px-3 py-1.5 rounded-md bg-status-failed-bg border border-status-failed-border text-status-failed-fg hover:bg-status-failed-bg/80 text-[12px] font-medium transition-colors"
+                                className="px-3 py-1.5 rounded-md bg-status-failed-bg border border-status-failed-border text-status-failed-fg hover:bg-status-failed-bg/80 text-[0.75rem] font-medium transition-colors"
                             >
                                 {t("confirmCloseLeave")}
                             </button>

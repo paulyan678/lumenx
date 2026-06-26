@@ -7,7 +7,7 @@ import { Check, Loader2, Film, AlertTriangle, Layout, Clock, FileText, Download,
 import { useProjectStore } from "@/store/projectStore";
 import { api, type BgmPreset } from "@/lib/api";
 import { getAssetUrl, extractErrorDetail } from "@/lib/utils";
-import StepHeader from "@/components/shared/StepHeader";
+import StepPageHeader, { StepPill } from "@/components/shared/StepPageHeader";
 import SidePanelHeader from "@/components/shared/SidePanelHeader";
 
 type AssemblyPhase = "takes" | "mix" | "export";
@@ -117,22 +117,20 @@ export default function VideoAssembly() {
         // Layout v4: outer horizontal split. StepHeader belongs to main
         // column; right Variants panel is floor-to-ceiling with its own
         // SidePanelHeader.
-        <div className="h-full flex bg-surface overflow-hidden">
+        <div className="h-full flex overflow-hidden">
             {/* Left: main column */}
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-                <StepHeader
-                    stepNumber={4}
-                    icon={<Film />}
-                    englishName="Assembly"
+                <StepPageHeader
+                    stepNumber={5}
+                    englishName="ASSEMBLY"
                     title={tStep("assemblyTitle")}
                     subtitle={tStep("assemblySubtitle")}
-                    trailing={(
-                        <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">
-                            <span className="text-foreground font-medium">{framesReady}</span>
-                            <span className="text-text-muted">/{framesTotal}</span>
-                            <span className="ml-1.5">frames ready</span>
-                        </span>
-                    )}
+                    pills={framesTotal > 0 ? (
+                        <>
+                            <StepPill label={ta("framesLabel")} value={framesTotal} />
+                            <StepPill label={ta("framesReadyLabel")} value={`${framesReady}/${framesTotal}`} />
+                        </>
+                    ) : null}
                 />
                 {/* PR-3k · Phase tabs — Takes / Mix / Export */}
                 <div className="flex items-center gap-1 px-6 pt-2 border-b border-glass-border bg-surface">
@@ -144,7 +142,7 @@ export default function VideoAssembly() {
                         <button
                             key={p.id}
                             onClick={() => setPhase(p.id)}
-                            className={`relative inline-flex items-center gap-1.5 px-3 pb-2 font-mono text-[11px] uppercase tracking-[0.16em] transition-colors ${
+                            className={`relative inline-flex items-center gap-1.5 px-3 pb-2 font-mono text-[0.6875rem] uppercase tracking-[0.16em] transition-colors ${
                                 phase === p.id
                                     ? "text-foreground"
                                     : "text-text-muted hover:text-text-secondary"
@@ -216,7 +214,7 @@ export default function VideoAssembly() {
                                                 </div>
                                             </div>
                                         )}
-                                        <div className="absolute top-2 left-2 bg-surface px-2 py-0.5 rounded text-[10px] font-mono text-foreground">
+                                        <div className="absolute top-2 left-2 bg-surface px-2 py-0.5 rounded text-[0.625rem] font-mono text-foreground">
                                             #{index + 1}
                                         </div>
                                     </div>
@@ -320,7 +318,7 @@ export default function VideoAssembly() {
                                                         controls
                                                     />
                                                     {/* Overlay Info */}
-                                                    <div className="absolute top-2 left-2 bg-surface px-1.5 rounded text-[10px] text-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <div className="absolute top-2 left-2 bg-surface px-1.5 rounded text-[0.625rem] text-foreground opacity-0 group-hover:opacity-100 transition-opacity">
                                                         {video.duration}s
                                                     </div>
                                                 </div>
@@ -329,7 +327,7 @@ export default function VideoAssembly() {
                                                         <div className="text-xs text-text-secondary">
                                                             Variant #{idx + 1}
                                                         </div>
-                                                        <div className="text-[10px] px-1.5 py-0.5 rounded bg-hover-bg text-text-secondary">
+                                                        <div className="text-[0.625rem] px-1.5 py-0.5 rounded bg-hover-bg text-text-secondary">
                                                             {video.model}
                                                         </div>
                                                     </div>
@@ -430,7 +428,7 @@ function MixPhase({
         <div className="flex-1 overflow-y-auto custom-scrollbar p-8 space-y-8">
             {/* BGM picker */}
             <section>
-                <h3 className="mb-3 flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.18em] text-text-muted">
+                <h3 className="mb-3 flex items-center gap-2 font-mono text-[0.6875rem] uppercase tracking-[0.18em] text-text-muted">
                     <Music size={12} className="text-primary" />
                     {ta("mixBgmTitle")}
                     {saving && <Loader2 size={12} className="animate-spin text-primary" />}
@@ -442,7 +440,7 @@ function MixPhase({
                     why the export has no music. */}
                 <div className="mb-3 flex items-start gap-2 rounded-md border border-amber-500/25 bg-amber-500/[0.06] px-3 py-2">
                     <AlertTriangle size={13} className="mt-0.5 shrink-0 text-amber-400/85" aria-hidden="true" />
-                    <p className="text-[11.5px] leading-relaxed text-amber-100/85">
+                    <p className="text-[0.71875rem] leading-relaxed text-amber-100/85">
                         {ta("mixBgmPreviewNotice")}
                     </p>
                 </div>
@@ -452,11 +450,11 @@ function MixPhase({
                         className={`rounded-lg border p-3 text-left transition-colors ${
                             !bgmUrl
                                 ? "border-primary bg-[rgba(100,108,255,0.10)]"
-                                : "border-glass-border bg-glass hover:border-white/15"
+                                : "border-glass-border bg-glass hover:border-foreground/30"
                         }`}
                     >
-                        <p className="text-[13px] font-medium text-foreground">{ta("mixBgmNone")}</p>
-                        <p className="mt-0.5 font-mono text-[9.5px] uppercase tracking-[0.14em] text-text-muted">silent</p>
+                        <p className="text-[0.8125rem] font-medium text-foreground">{ta("mixBgmNone")}</p>
+                        <p className="mt-0.5 font-mono text-[0.59375rem] uppercase tracking-[0.14em] text-text-muted">silent</p>
                     </button>
                     {loading ? (
                         <div className="col-span-3 grid place-items-center py-4 text-text-muted">
@@ -472,11 +470,11 @@ function MixPhase({
                                     className={`rounded-lg border p-3 text-left transition-colors ${
                                         selected
                                             ? "border-primary bg-[rgba(100,108,255,0.10)]"
-                                            : "border-glass-border bg-glass hover:border-white/15"
+                                            : "border-glass-border bg-glass hover:border-foreground/30"
                                     }`}
                                 >
-                                    <p className="text-[13px] font-medium text-foreground truncate">{p.label}</p>
-                                    <p className="mt-0.5 font-mono text-[9.5px] uppercase tracking-[0.14em] text-text-muted">{p.mood}</p>
+                                    <p className="text-[0.8125rem] font-medium text-foreground truncate">{p.label}</p>
+                                    <p className="mt-0.5 font-mono text-[0.59375rem] uppercase tracking-[0.14em] text-text-muted">{p.mood}</p>
                                 </button>
                             );
                         })
@@ -486,14 +484,14 @@ function MixPhase({
 
             {/* Volume sliders */}
             <section>
-                <h3 className="mb-3 flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.18em] text-text-muted">
+                <h3 className="mb-3 flex items-center gap-2 font-mono text-[0.6875rem] uppercase tracking-[0.18em] text-text-muted">
                     <Sliders size={12} className="text-primary" />
                     {ta("mixLevelsTitle")}
                 </h3>
                 <div className="space-y-3 max-w-lg">
                     {(["dialogue", "bgm", "sfx"] as const).map((track) => (
                         <div key={track} className="flex items-center gap-3">
-                            <span className="w-20 font-mono text-[11px] uppercase tracking-[0.16em] text-text-muted">{ta(`mixTrack.${track}`)}</span>
+                            <span className="w-20 font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-text-muted">{ta(`mixTrack.${track}`)}</span>
                             <input
                                 type="range"
                                 min={0}
@@ -503,11 +501,11 @@ function MixPhase({
                                 onChange={(e) => handleVolume(track, Number(e.target.value))}
                                 className="flex-1 accent-primary"
                             />
-                            <span className="w-12 text-right font-mono text-[11px] text-text-secondary">{mix[track] ?? 0}</span>
+                            <span className="w-12 text-right font-mono text-[0.6875rem] text-text-secondary">{mix[track] ?? 0}</span>
                         </div>
                     ))}
                 </div>
-                <p className="mt-3 text-[11px] text-text-muted max-w-lg">
+                <p className="mt-3 text-[0.6875rem] text-text-muted max-w-lg">
                     {ta("mixHint")}
                 </p>
             </section>
@@ -554,7 +552,7 @@ function ExportPhase({
                     <button
                         onClick={onMerge}
                         disabled={isMerging || !allReady}
-                        className="shrink-0 inline-flex items-center gap-2 bg-primary text-white border border-[rgba(100,108,255,0.65)] shadow-[inset_0_1.5px_0_rgba(255,255,255,0.14)] hover:bg-[#7a82ff] disabled:opacity-40 disabled:cursor-not-allowed px-5 py-2.5 rounded-md font-semibold text-[13px]"
+                        className="shrink-0 inline-flex items-center gap-2 bg-primary text-white border border-[rgba(100,108,255,0.65)] shadow-[inset_0_1.5px_0_rgba(255,255,255,0.14)] hover:bg-primary-hover disabled:opacity-40 disabled:cursor-not-allowed px-5 py-2.5 rounded-md font-semibold text-[0.8125rem]"
                     >
                         {isMerging ? <Loader2 size={14} className="animate-spin" /> : <Film size={14} />}
                         {ta("mergeAndProceed")}
@@ -607,7 +605,7 @@ function ExportPhase({
                                 <button
                                     onClick={onDownload}
                                     disabled={isDownloading}
-                                    className="self-start inline-flex items-center gap-2 px-5 py-2.5 rounded-md bg-glass border border-glass-border text-foreground hover:bg-hover-bg transition-colors text-[13px] font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="self-start inline-flex items-center gap-2 px-5 py-2.5 rounded-md bg-glass border border-glass-border text-foreground hover:bg-hover-bg transition-colors text-[0.8125rem] font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     <Download size={14} />
                                     {isDownloading ? ta("downloading") : ta("downloadMP4")}

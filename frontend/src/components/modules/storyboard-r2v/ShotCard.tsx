@@ -19,6 +19,8 @@ import {
     ChevronRight,
     Pin,
     PinOff,
+    Play,
+    Star,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import AssetChipBar from "./AssetChipBar";
@@ -30,6 +32,7 @@ import { PendingTaskAffordance } from "@/components/shared/PendingTaskAffordance
 import PreviewImage from "@/components/shared/preview/PreviewImage";
 import PreviewVideo from "@/components/shared/preview/PreviewVideo";
 import { useProjectStore } from "@/store/projectStore";
+import { selectedVariantUrl } from "@/lib/characterImage";
 
 export interface ShotNode {
     id: string;
@@ -138,6 +141,9 @@ interface ShotCardProps {
      *  传入 current count + handlers + canGenerate gate.
      *  Spec: r2v-workflow-v3-unified.md §4.3.1 / Q12. */
     generateCount?: number;
+    /** At-a-glance "model · duration" summary shown in the generation row,
+     *  visible even when the attached ShotPanel is collapsed (calm-default). */
+    genSummary?: string;
     canGenerate?: boolean;
     onSetGenerateCount?: (count: number) => void;
     onGenerateBatch?: (count: number) => void;
@@ -174,6 +180,7 @@ export default function ShotCard({
     expanded,
     onToggleExpanded,
     generateCount = 1,
+    genSummary,
     canGenerate = true,
     onSetGenerateCount,
     onGenerateBatch,
@@ -235,6 +242,7 @@ export default function ShotCard({
                 if (!char || seen.has(char.id)) continue;
                 seen.add(char.id);
                 const url = char.headshot_image_url || char.image_url || char.full_body_image_url
+                    || selectedVariantUrl(char.reference_sheet)
                     || (char.full_body_asset?.variants?.[0]?.url);
                 if (url) out.push(url);
             }
@@ -266,6 +274,7 @@ export default function ShotCard({
                 char.headshot_image_url ||
                 char.image_url ||
                 char.full_body_image_url ||
+                selectedVariantUrl(char.reference_sheet) ||
                 (char.full_body_asset?.variants?.[0]?.url);
             out.push({ id: char.id, name: char.name, avatarUrl });
         }
@@ -284,13 +293,6 @@ export default function ShotCard({
         const next = Math.min(ta.scrollHeight, 260);
         ta.style.height = `${next}px`;
     }, [shot.prompt]);
-
-    const statusColor: Record<string, string> = {
-        pending: "text-amber-400",
-        processing: "text-sky-400",
-        completed: "text-emerald-400",
-        failed: "text-rose-400",
-    };
 
     const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
         const el = cardRef.current;
@@ -325,10 +327,10 @@ export default function ShotCard({
             if (shot.videoStatus === "failed") {
                 return (
                     <div className="w-full aspect-video flex flex-col items-center justify-center gap-2">
-                        <span className="text-[11px] text-rose-400 font-medium">{t("generationFailed")}</span>
+                        <span className="text-[0.6875rem] text-status-failed-fg font-medium">{t("generationFailed")}</span>
                         <button
                             onClick={onGenerateVideo}
-                            className="text-[11px] text-primary hover:text-primary/80 transition-colors font-medium"
+                            className="text-[0.6875rem] text-primary hover:text-primary/80 transition-colors font-medium"
                         >
                             {t("retry")}
                         </button>
@@ -352,7 +354,7 @@ export default function ShotCard({
                             alt={t("t2iCompleted") || "First frame"}
                             className="w-full h-full"
                         />
-                        <div className="absolute bottom-2 left-2 text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/90 text-white font-medium backdrop-blur-sm pointer-events-none">
+                        <div className="absolute bottom-2 left-2 text-[0.625rem] px-1.5 py-0.5 rounded-full bg-status-completed-bg/90 text-white font-medium backdrop-blur-sm pointer-events-none">
                             {t("generateVideoNext")}
                         </div>
                     </div>
@@ -371,10 +373,10 @@ export default function ShotCard({
             if (shot.t2iStatus === "failed") {
                 return (
                     <div className="w-full aspect-video flex flex-col items-center justify-center gap-2">
-                        <span className="text-[11px] text-rose-400 font-medium">{t("generationFailed")}</span>
+                        <span className="text-[0.6875rem] text-status-failed-fg font-medium">{t("generationFailed")}</span>
                         <button
                             onClick={onGenerateT2I}
-                            className="text-[11px] text-primary hover:text-primary/80 transition-colors font-medium"
+                            className="text-[0.6875rem] text-primary hover:text-primary/80 transition-colors font-medium"
                         >
                             {t("retry")}
                         </button>
@@ -386,12 +388,9 @@ export default function ShotCard({
             // "waiting for a first frame" so the user knows where to
             // act (Issue 15).
             return (
-                <div className="w-full aspect-video flex flex-col items-center justify-center gap-2 text-text-secondary/60">
-                    <div className="w-10 h-10 rounded-xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center">
-                        <ImageIcon size={18} strokeWidth={1.5} />
-                    </div>
-                    <span className="text-[11px] font-medium">{t("generateImageOrUpload")}</span>
-                    <span className="text-[10px] text-text-muted">↓ Step 1</span>
+                <div className="w-full aspect-video flex flex-col items-center justify-center gap-2.5 text-text-muted">
+                    <ImageIcon size={24} strokeWidth={1.6} className="opacity-50" />
+                    <span className="font-mono text-[0.65625rem] uppercase tracking-[0.08em]">{t("generateImageOrUpload")}</span>
                 </div>
             );
         }
@@ -420,10 +419,10 @@ export default function ShotCard({
         if (shot.videoStatus === "failed") {
             return (
                 <div className="w-full aspect-video flex flex-col items-center justify-center gap-2">
-                    <span className="text-[11px] text-rose-400 font-medium">{t("generationFailed")}</span>
+                    <span className="text-[0.6875rem] text-status-failed-fg font-medium">{t("generationFailed")}</span>
                     <button
                         onClick={onGenerateVideo}
-                        className="text-[11px] text-primary hover:text-primary/80 transition-colors font-medium"
+                        className="text-[0.6875rem] text-primary hover:text-primary/80 transition-colors font-medium"
                     >
                         {t("retry")}
                     </button>
@@ -431,11 +430,9 @@ export default function ShotCard({
             );
         }
         return (
-            <div className="w-full aspect-video flex flex-col items-center justify-center gap-2 text-text-secondary/60">
-                <div className="w-10 h-10 rounded-xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center">
-                    <Video size={18} strokeWidth={1.5} />
-                </div>
-                <span className="text-[11px] font-medium">{t("noVideoYet")}</span>
+            <div className="w-full aspect-video flex flex-col items-center justify-center gap-2.5 text-text-muted">
+                <Video size={24} strokeWidth={1.6} className="opacity-50" />
+                <span className="font-mono text-[0.65625rem] uppercase tracking-[0.08em]">{t("noVideoYet")}</span>
             </div>
         );
     };
@@ -450,6 +447,51 @@ export default function ShotCard({
     // the "two Generate buttons" bug report.
     // onGenerateVideo / onGenerateT2I are still wired for the inline
     // retry buttons inside renderPreview when a take fails.
+
+    function ShotStatusBadge({ shot, t }: { shot: ShotNode; t: (key: string, values?: Record<string, number | string>) => string }) {
+        const isProcessing = shot.videoStatus === "processing" || shot.t2iStatus === "processing";
+        const isPending = !isProcessing && (shot.videoStatus === "pending" || shot.t2iStatus === "pending");
+        const isFailed = !isProcessing && !isPending && (shot.videoStatus === "failed" || shot.t2iStatus === "failed");
+        const isStarred = shot.isVideoPinned || shot.finalTakeId;
+        if (isStarred) {
+            return (
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-status-starred-border bg-status-starred-bg px-2.5 py-1 font-mono text-[0.625rem] font-semibold uppercase tracking-[0.1em] text-status-starred-fg">
+                    <span className="h-[5px] w-[5px] rounded-full bg-status-starred-solid" />
+                    {t("statusStarred")}
+                </span>
+            );
+        }
+        if (isProcessing) {
+            return (
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-status-processing-border bg-status-processing-bg px-2.5 py-1 font-mono text-[0.625rem] font-semibold uppercase tracking-[0.1em] text-status-processing-fg">
+                    <span className="h-[5px] w-[5px] rounded-full bg-status-processing-fg animate-pulse" />
+                    {t("statusProcessing")}
+                </span>
+            );
+        }
+        if (isPending) {
+            return (
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-status-pending-border bg-status-pending-bg px-2.5 py-1 font-mono text-[0.625rem] font-semibold uppercase tracking-[0.1em] text-status-pending-fg">
+                    <span className="h-[5px] w-[5px] rounded-full bg-status-pending-fg" />
+                    {t("statusPending")}
+                </span>
+            );
+        }
+        if (isFailed) {
+            return (
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-status-failed-border bg-status-failed-bg px-2.5 py-1 font-mono text-[0.625rem] font-semibold uppercase tracking-[0.1em] text-status-failed-fg">
+                    <span className="h-[5px] w-[5px] rounded-full bg-status-failed-fg" />
+                    {t("statusFailed")}
+                </span>
+            );
+        }
+        return (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-glass-border bg-black/20 px-2.5 py-1 font-mono text-[0.625rem] font-semibold uppercase tracking-[0.1em] text-text-secondary">
+                <span className="h-[5px] w-[5px] rounded-full bg-text-muted" />
+                {t("statusReady")}
+            </span>
+        );
+    }
 
     const handleInsertAssetFromChip = (_type: string, name: string) => {
         const currentPrompt = shot.prompt;
@@ -517,58 +559,92 @@ export default function ShotCard({
                 }}
             />
 
-            {/* Liquid Glass card body */}
-            <div className="relative backdrop-blur-xl bg-white/[0.02] border border-white/[0.06] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] rounded-xl overflow-hidden z-10">
-                {/* Header row: Tab switcher + Shot number */}
-                <div className="flex items-center justify-between px-3 pt-3 pb-2">
-                    {/* Pill Tab Switcher */}
-                    <div className="relative inline-flex items-center p-[3px] bg-black/40 rounded-lg backdrop-blur-sm">
-                        <motion.div
-                            className="absolute top-[3px] bottom-[3px] rounded-md bg-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]"
-                            initial={false}
-                            animate={{
-                                left: isActiveT2I ? 3 : "calc(50% + 1.5px)",
-                                width: "calc(50% - 3px)",
-                            }}
-                            transition={{ type: "spring", stiffness: 350, damping: 32 }}
-                        />
-                        <button
-                            onClick={() => onSetTabMode("t2i_i2v")}
-                            className={`relative z-10 flex items-center gap-1.5 px-3 py-1 text-[11px] font-semibold rounded-md transition-colors duration-200 ${
-                                isActiveT2I ? "text-foreground" : "text-text-secondary hover:text-text-secondary/80"
-                            }`}
-                        >
-                            <ImageIcon size={12} strokeWidth={1.5} />
-                            {t("tabT2iI2v")}
-                        </button>
-                        <button
-                            onClick={() => onSetTabMode("direct_r2v")}
-                            className={`relative z-10 flex items-center gap-1.5 px-3 py-1 text-[11px] font-semibold rounded-md transition-colors duration-200 ${
-                                !isActiveT2I ? "text-foreground" : "text-text-secondary hover:text-text-secondary/80"
-                            }`}
-                        >
-                            <Video size={12} strokeWidth={1.5} />
-                            {t("tabDirectR2v")}
-                        </button>
-                    </div>
-
-                    {/* Shot number badge — expand toggle moved to Action Bar
-                        (bottom-left cluster) for closer reach. */}
-                    <div className="flex items-center gap-2">
-                        <div className="text-[10px] font-mono text-text-muted tabular-nums">
-                            #{String(index + 1).padStart(2, "0")}
+            {/* Floating card body — mock-aligned glass surface */}
+            <div className="relative overflow-hidden rounded-[20px] border border-glass-border bg-surface shadow-[0_8px_30px_-10px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.05)] transition-all duration-base ease-out-quart group-hover:-translate-y-1 group-hover:shadow-[0_16px_50px_-12px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.07)] z-10">
+                {/* Card top — shot no/cap + status badge + tab switcher */}
+                <div className="flex items-center justify-between gap-4 px-5 pt-4 pb-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <div className="font-display text-[1.875rem] font-semibold leading-none text-text-secondary tracking-tight">
+                            {String(index + 1).padStart(2, "0")}
                         </div>
-                        <div className="w-5 h-5 rounded-full bg-white/[0.06] border border-white/[0.08] flex items-center justify-center">
-                            <span className="text-[9px] font-bold text-foreground">{index + 1}</span>
+                        <div className="font-mono text-[0.6875rem] uppercase tracking-[0.08em] text-text-muted leading-tight">
+                            <span>SHOT</span>
+                            {shot.shotSize ? (
+                                <span className="ml-1.5 text-text-secondary font-medium">· {shot.shotSize}</span>
+                            ) : null}
+                            {shot.cameraMovementStructured?.primary ? (
+                                <span className="ml-1.5 text-text-secondary">· {shot.cameraMovementStructured.primary}</span>
+                            ) : null}
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                        <ShotStatusBadge shot={shot} t={t} />
+                        {/* Pill Tab Switcher */}
+                        <div className="relative inline-flex items-center p-[3px] bg-surface-inset rounded-full">
+                            <motion.div
+                                className="absolute top-[3px] bottom-[3px] rounded-full bg-elevated shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]"
+                                initial={false}
+                                animate={{
+                                    left: isActiveT2I ? 3 : "calc(50% + 1.5px)",
+                                    width: "calc(50% - 3px)",
+                                }}
+                                transition={{ type: "spring", stiffness: 350, damping: 32 }}
+                            />
+                            <button
+                                onClick={() => onSetTabMode("t2i_i2v")}
+                                className={`relative z-10 flex items-center gap-1.5 px-3.5 py-1.5 text-[13px] font-semibold rounded-full transition-colors duration-200 ${
+                                    isActiveT2I ? "text-foreground" : "text-text-secondary hover:text-text-secondary/80"
+                                }`}
+                            >
+                                <ImageIcon size={11} strokeWidth={1.6} />
+                                {t("tabT2iI2v")}
+                            </button>
+                            <button
+                                onClick={() => onSetTabMode("direct_r2v")}
+                                className={`relative z-10 flex items-center gap-1.5 px-3.5 py-1.5 text-[13px] font-semibold rounded-full transition-colors duration-200 ${
+                                    !isActiveT2I ? "text-foreground" : "text-text-secondary hover:text-text-secondary/80"
+                                }`}
+                            >
+                                <Video size={11} strokeWidth={1.6} />
+                                {t("tabDirectR2v")}
+                            </button>
                         </div>
                     </div>
                 </div>
 
                 {/* Main content: Preview + Editor */}
-                <div className="flex">
+                <div className="flex px-5">
                     {/* Left: Preview */}
-                    <div className="w-44 shrink-0 bg-black/20 flex flex-col items-center justify-center relative border-r border-white/[0.04]">
+                    <div className="group/preview relative w-72 shrink-0 bg-surface-inset flex flex-col items-center justify-center overflow-hidden rounded-[14px] border border-glass-border shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]">
                         {renderPreview()}
+                        {/* Selected-take amber halation */}
+                        {(shot.isVideoPinned || shot.finalTakeId) && shot.videoUrl ? (
+                            <div
+                                className="pointer-events-none absolute inset-0 rounded-[14px]"
+                                style={{ boxShadow: "inset 0 0 42px -8px rgba(255,169,77,0.28)" }}
+                            />
+                        ) : null}
+                        {/* Hover play overlay — only on completed video */}
+                        {shot.videoUrl ? (
+                            <div className="absolute inset-0 grid place-items-center bg-overlay/20 opacity-0 transition-opacity duration-base group-hover/preview:opacity-100 pointer-events-none">
+                                <div className="grid h-11 w-11 place-items-center rounded-full bg-foreground/90 text-on-accent">
+                                    <Play size={17} fill="currentColor" className="ml-0.5" />
+                                </div>
+                            </div>
+                        ) : null}
+                        {/* Top-left selected chip */}
+                        {(shot.isVideoPinned || shot.finalTakeId) && shot.videoUrl ? (
+                            <div className="absolute top-2.5 left-2.5 z-10 flex items-center gap-1 rounded-full border border-status-starred-border bg-status-starred-bg/90 px-2 py-[3px] backdrop-blur-sm font-mono text-[0.5625rem] font-semibold uppercase tracking-[0.08em] text-status-starred-fg">
+                                <Star size={10} fill="currentColor" aria-hidden="true" />
+                                {t("selectedTake")}
+                            </div>
+                        ) : null}
+                        {/* Duration chip */}
+                        {shot.duration ? (
+                            <div className="absolute bottom-2.5 right-2.5 z-10 rounded-full bg-overlay/70 px-2 py-0.5 backdrop-blur-sm font-mono text-[0.5625rem] text-foreground">
+                                {shot.duration}s
+                            </div>
+                        ) : null}
                         {/* Pinned chip — overlays the hero when the user has
                             manually pinned an active take. Group/peer makes
                             the "Unpin" CTA fade in on hover so the chip stays
@@ -576,9 +652,9 @@ export default function ShotCard({
                             video is actually rendered (no point pinning a
                             "no video" placeholder). */}
                         {shot.isVideoPinned && shot.videoUrl && onUnpinVideo ? (
-                            <div className="group/pin absolute top-1.5 right-1.5 z-10 flex items-center gap-1">
+                            <div className="group/pin absolute top-2.5 right-2.5 z-20 flex items-center gap-1">
                                 <span
-                                    className="inline-flex items-center gap-1 rounded-full border border-primary/55 bg-primary/20 backdrop-blur-sm px-2 py-[2px] font-mono text-[9.5px] uppercase tracking-[0.14em] text-primary shadow-[0_0_10px_-2px_rgba(100,108,255,0.55)]"
+                                    className="inline-flex items-center gap-1 rounded-full border border-primary/55 bg-primary/20 backdrop-blur-sm px-2 py-[2px] font-mono text-[0.59375rem] uppercase tracking-[0.14em] text-primary shadow-[var(--glow-primary)]"
                                     title={t("activeTakePinnedTooltip")}
                                 >
                                     <Pin size={9} aria-hidden="true" strokeWidth={2.2} fill="currentColor" />
@@ -589,7 +665,7 @@ export default function ShotCard({
                                     onClick={(e) => { e.stopPropagation(); onUnpinVideo(); }}
                                     title={t("unpinActiveTakeTooltip")}
                                     aria-label={t("unpinActiveTake")}
-                                    className="opacity-0 transition-opacity duration-fast ease-out-quart group-hover/pin:opacity-100 focus-visible:opacity-100 inline-flex items-center gap-1 rounded-full border border-white/15 bg-black/55 backdrop-blur-sm px-1.5 py-[2px] font-mono text-[9.5px] uppercase tracking-[0.14em] text-white/80 hover:text-foreground hover:border-white/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                                    className="opacity-0 transition-opacity duration-fast ease-out-quart group-hover/pin:opacity-100 focus-visible:opacity-100 inline-flex items-center gap-1 rounded-full border border-foreground/15 bg-black/55 backdrop-blur-sm px-1.5 py-[2px] font-mono text-[0.59375rem] uppercase tracking-[0.14em] text-foreground/80 hover:text-foreground hover:border-foreground/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                                 >
                                     <PinOff size={9} aria-hidden="true" strokeWidth={2.2} />
                                     {t("unpinActiveTakeShort")}
@@ -599,34 +675,25 @@ export default function ShotCard({
                     </div>
 
                     {/* Right: Prompt + Controls */}
-                    <div className="flex-1 p-3 flex flex-col gap-2">
-                        {/* Cast avatar group — at-a-glance view of
-                            which characters are referenced in this
-                            shot's prompt. Derived from [character:X]
-                            tags. Click an avatar to jump to the
-                            Assets step for editing. Borrowed from
-                            火山剧创's "出镜角色" but as a compact
-                            avatar group instead of a verbose list. */}
+                    <div className="flex-1 py-0.5 pl-5 pr-0 flex flex-col gap-3">
+                        {/* Cast avatar group */}
                         {castAvatars.length > 0 ? (
-                            <div className="flex items-center gap-1.5">
-                                <span className="font-mono text-chrome-sm tracking-tight text-text-muted">
+                            <div className="flex items-center gap-2">
+                                <span className="font-mono text-[0.625rem] uppercase tracking-[0.1em] text-text-muted">
                                     {t("shotCast")}
                                 </span>
-                                <div className="flex items-center -space-x-1.5">
+                                <div className="flex items-center -space-x-2">
                                     {castAvatars.slice(0, 3).map((c) => (
                                         <button
                                             key={c.id}
                                             type="button"
                                             onClick={() => {
-                                                // R2V v2: "assets" step id renamed to "cast" for R2V workflow.
-                                                // ShotCard only appears inside StoryboardR2V (R2V-only),
-                                                // so always navigate to the new cast step.
                                                 document.dispatchEvent(
                                                     new CustomEvent("lumenx:navigateStep", { detail: "cast" }),
                                                 );
                                             }}
                                             title={c.name}
-                                            className="grid h-6 w-6 place-items-center overflow-hidden rounded-full border-2 border-surface bg-elevated transition-all duration-fast ease-out-quart hover:z-10 hover:scale-110 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                                            className="grid h-[26px] w-[26px] place-items-center overflow-hidden rounded-full border-2 border-surface bg-elevated transition-all duration-fast ease-out-quart hover:z-10 hover:scale-110 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                                         >
                                             {c.avatarUrl ? (
                                                 <PreviewImage
@@ -636,14 +703,14 @@ export default function ShotCard({
                                                     noLightbox
                                                 />
                                             ) : (
-                                                <span className="font-mono text-[9px] font-medium text-text-secondary">
+                                                <span className="font-mono text-[0.5625rem] font-medium text-text-secondary">
                                                     {c.name.slice(0, 1)}
                                                 </span>
                                             )}
                                         </button>
                                     ))}
                                     {castAvatars.length > 3 ? (
-                                        <span className="grid h-6 w-6 place-items-center rounded-full border-2 border-surface bg-elevated font-mono text-[9px] font-medium text-text-secondary">
+                                        <span className="grid h-[26px] w-[26px] place-items-center rounded-full border-2 border-surface bg-elevated font-mono text-[0.5625rem] font-medium text-text-secondary">
                                             +{castAvatars.length - 3}
                                         </span>
                                     ) : null}
@@ -651,30 +718,20 @@ export default function ShotCard({
                             </div>
                         ) : null}
 
-                        {/* Prompt Editor wrapper — relative so the
-                            expand icon can sit absolute top-right
-                            without taking layout space. */}
+                        {/* Prompt Editor wrapper — with left accent line */}
                         <div className="relative">
                             <textarea
                                 ref={textareaRef}
                                 value={shot.prompt}
                                 onChange={(e) => onUpdatePrompt(e.target.value)}
                                 onKeyDown={(e) => {
-                                    // Cmd/Ctrl + E from inside the
-                                    // textarea opens the focus editor
-                                    // (B5). Cmd is mac, Ctrl is
-                                    // win/linux — handle both.
                                     if (e.key.toLowerCase() === "e" && (e.metaKey || e.ctrlKey)) {
                                         e.preventDefault();
                                         setExpandOpen(true);
                                     }
                                 }}
                                 placeholder={t("promptPlaceholder")}
-                                // rows=5 baseline (B3); auto-grow up
-                                // to max-h-[260px] (≈10 lines, B2).
-                                // pr-8 reserves space for the expand
-                                // icon so it never overlays text.
-                                className="w-full text-sm resize-none leading-relaxed bg-transparent border border-white/[0.06] rounded-lg pl-3 pr-8 py-2.5 text-foreground placeholder:text-text-muted focus:outline-none focus:border-primary/30 focus:bg-white/[0.02] transition-all duration-200 min-h-[110px] max-h-[260px] overflow-y-auto"
+                                className="w-full resize-none bg-transparent border-l-2 border-glass-border pl-3.5 pr-8 py-1 text-[13px] leading-[1.7] text-foreground placeholder:text-text-muted focus:outline-none focus:border-l-primary/40 focus:bg-glass/30 transition-all duration-200 min-h-[80px] max-h-[260px] overflow-y-auto"
                                 rows={5}
                             />
                             {/* Expand-to-modal icon — top-right,
@@ -767,12 +824,12 @@ export default function ShotCard({
 
                         {/* Dialogue text display (read-only — editing via 配音工作台 modal) */}
                         {shot.dialogueStructured?.line && (
-                            <div className="mt-1.5 flex items-start gap-1.5 px-1.5 py-1 -mx-1.5">
-                                <span className="text-[10px] text-text-muted font-medium shrink-0 mt-px">
-                                    {shot.dialogueStructured.speaker}:
+                            <div className="pl-3.5 border-l-2 border-accent/40">
+                                <span className="block font-mono text-[0.5625rem] uppercase tracking-[0.08em] text-text-muted">
+                                    {shot.dialogueStructured.speaker}
                                 </span>
-                                <span className="text-[11px] text-text-secondary italic leading-relaxed">
-                                    「{shot.dialogueStructured.line}」
+                                <span className="block font-display text-[0.90625rem] italic leading-snug text-text-secondary">
+                                    “{shot.dialogueStructured.line}”
                                 </span>
                             </div>
                         )}
@@ -783,10 +840,10 @@ export default function ShotCard({
                                 <button
                                     type="button"
                                     onClick={() => setPromptPreviewOpen(v => !v)}
-                                    className="inline-flex items-center gap-1 text-[11px] text-text-muted hover:text-text-secondary transition-colors"
+                                    className="inline-flex items-center gap-1 text-[0.6875rem] text-text-muted hover:text-text-secondary transition-colors"
                                 >
                                     <Code2 size={12} strokeWidth={1.5} />
-                                    <span>查看最终提示词</span>
+                                    <span>{t("viewFinalPrompt")}</span>
                                     <ChevronRight
                                         size={11}
                                         className={`transition-transform duration-200 ${promptPreviewOpen ? "rotate-90" : ""}`}
@@ -801,15 +858,15 @@ export default function ShotCard({
                                             transition={{ duration: 0.2 }}
                                             className="overflow-hidden"
                                         >
-                                            <div className="mt-1.5 rounded-md border border-white/[0.06] bg-black/20 px-3 py-2 text-[11.5px] leading-relaxed font-mono space-y-2">
+                                            <div className="mt-1.5 rounded-md border border-glass-border bg-black/20 px-3 py-2 text-[0.71875rem] leading-relaxed font-mono space-y-2">
                                                 {/* Final prompt as model receives it (computed real-time) */}
                                                 <p className="text-text-secondary whitespace-pre-wrap">
                                                     {assembledPromptPreview}
                                                 </p>
                                                 {/* Duration is the only field NOT in prompt — show as API param note */}
                                                 {shot.duration && (
-                                                    <p className="text-text-muted border-t border-white/[0.04] pt-1.5">
-                                                        <span className="text-emerald-300/70">时长:</span> {shot.duration}s (API参数，不入提示词)
+                                                    <p className="text-text-muted border-t border-border-subtle pt-1.5">
+                                                        <span className="text-status-completed-fg/70">{t("durationLabel")}:</span> {shot.duration}s {t("durationApiNote")}
                                                     </p>
                                                 )}
                                             </div>
@@ -826,162 +883,153 @@ export default function ShotCard({
                             props={props}
                             onInsertAsset={handleInsertAssetFromChip}
                         />
-
-                        {/* PR-3c+ · 底部一体化 action 行:
-                            左 = shot actions (@ ↑ ↓ ⊙ ×) -- 之前悬空在 chip
-                                  bar 下方，现移到底部跟生成行同一区域.
-                            右 = generation cluster (count selector + 生成 ×N).
-                            一行解决"所有 shot operations + generate"，
-                            不再两段隔离视觉. */}
-                        <div className="mt-2 flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-0.5 shrink-0">
-                                <motion.button
-                                    whileHover={{ scale: 1.08 }}
-                                    whileTap={{ scale: 0.92 }}
-                                    onClick={onOpenDrawer}
-                                    className="p-1.5 rounded-lg hover:bg-white/[0.06] text-text-secondary hover:text-foreground transition-colors"
-                                    title={t("browseAssets")}
-                                >
-                                    <AtSign size={14} strokeWidth={2} />
-                                </motion.button>
-                                <div className="w-px h-3.5 bg-white/[0.06] mx-0.5" />
-                                <motion.button
-                                    whileHover={{ scale: 1.08 }}
-                                    whileTap={{ scale: 0.92 }}
-                                    onClick={onMoveUp}
-                                    disabled={index === 0}
-                                    className="p-1.5 rounded-lg hover:bg-white/[0.06] text-text-secondary hover:text-foreground transition-colors disabled:opacity-20 disabled:hover:bg-transparent"
-                                    title="上移"
-                                >
-                                    <ChevronUp size={14} strokeWidth={1.5} />
-                                </motion.button>
-                                <motion.button
-                                    whileHover={{ scale: 1.08 }}
-                                    whileTap={{ scale: 0.92 }}
-                                    onClick={onMoveDown}
-                                    disabled={index === totalShots - 1}
-                                    className="p-1.5 rounded-lg hover:bg-white/[0.06] text-text-secondary hover:text-foreground transition-colors disabled:opacity-20 disabled:hover:bg-transparent"
-                                    title="下移"
-                                >
-                                    <ChevronDown size={14} strokeWidth={1.5} />
-                                </motion.button>
-                                <motion.button
-                                    whileHover={{ scale: 1.08 }}
-                                    whileTap={{ scale: 0.92 }}
-                                    onClick={onDuplicate}
-                                    className="p-1.5 rounded-lg hover:bg-white/[0.06] text-text-secondary hover:text-foreground transition-colors"
-                                    title={t("duplicateShot")}
-                                >
-                                    <Copy size={13} strokeWidth={1.5} />
-                                </motion.button>
-                                <motion.button
-                                    whileHover={{ scale: 1.08 }}
-                                    whileTap={{ scale: 0.92 }}
-                                    onClick={onDelete}
-                                    className="p-1.5 rounded-lg hover:bg-white/[0.06] text-text-secondary hover:text-rose-400 transition-colors"
-                                    title={t("deleteShot")}
-                                >
-                                    <Trash2 size={13} strokeWidth={1.5} />
-                                </motion.button>
-                                {onRefineFrame && (
-                                    <>
-                                        <div className="w-px h-3.5 bg-white/[0.06] mx-0.5" />
-                                        <motion.button
-                                            whileHover={{ scale: 1.08 }}
-                                            whileTap={{ scale: 0.92 }}
-                                            onClick={onRefineFrame}
-                                            className="p-1.5 rounded-lg hover:bg-white/[0.06] text-text-secondary hover:text-amber-400 transition-colors"
-                                            title="精修此帧"
-                                        >
-                                            <Sparkles size={13} strokeWidth={1.5} />
-                                        </motion.button>
-                                    </>
-                                )}
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-1 shrink-0">
-                                {[1, 2, 4, 6].map((n) => {
-                                    const active = generateCount === n;
-                                    return (
-                                        <button
-                                            key={n}
-                                            type="button"
-                                            onClick={() => onSetGenerateCount?.(n)}
-                                            aria-pressed={active}
-                                            aria-label={`Generate ${n} at a time`}
-                                            title={`每次生成 ${n} 条候选`}
-                                            className={`grid h-9 w-9 place-items-center rounded-md border font-mono text-[11px] font-medium transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 ${
-                                                active
-                                                    ? "border-primary/55 bg-primary/15 text-primary"
-                                                    : "border-glass-border bg-black/20 text-text-secondary hover:border-white/20 hover:text-foreground"
-                                            }`}
-                                        >
-                                            ×{n}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                            <motion.button
-                                whileHover={canGenerate && inFlightCount === 0 ? { scale: 1.005 } : undefined}
-                                whileTap={canGenerate && inFlightCount === 0 ? { scale: 0.995 } : undefined}
-                                type="button"
-                                onClick={() => onGenerateBatch?.(generateCount)}
-                                disabled={!canGenerate || inFlightCount > 0}
-                                title={!canGenerate
-                                    ? (shot.tabMode === "t2i_i2v"
-                                        ? "请先在上方生成或上传首帧"
-                                        : "请先输入提示词")
-                                    : `生成 ${generateCount} 条视频候选`}
-                                className="inline-flex items-center justify-center gap-1.5 rounded-md px-5 py-2 min-w-[140px] font-sans text-[13px] font-semibold tracking-tight transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 disabled:cursor-not-allowed disabled:opacity-40 bg-primary text-white border border-[rgba(100,108,255,0.65)] shadow-[inset_0_1.5px_0_rgba(255,255,255,0.14),inset_0_-1px_0_rgba(60,68,200,0.45),0_4px_14px_-2px_rgba(100,108,255,0.45)] hover:bg-[#7a82ff] hover:border-[rgba(100,108,255,0.85)] disabled:hover:bg-primary disabled:hover:border-[rgba(100,108,255,0.65)]"
-                            >
-                                {inFlightCount > 0 ? (
-                                    <>
-                                        <Loader2 size={14} className="animate-spin" strokeWidth={2} />
-                                        <span>{`生成中 · ${inFlightCount}`}</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Sparkles size={14} strokeWidth={2} />
-                                        <span>{`生成 ×${generateCount}`}</span>
-                                    </>
-                                )}
-                            </motion.button>
-                            </div>
-                        </div>
-
-                        {/* PR-3b · 参数 / Takes disclosure bar — 控制 attached
-                            panel 显隐. Right-aligned 适宜宽度 (跟生成行对齐,
-                            不全宽，避免视觉过重). */}
-                        <div className="mt-2 flex justify-end">
-                            <motion.button
-                                whileHover={{ scale: 1.005 }}
-                                whileTap={{ scale: 0.995 }}
-                                type="button"
-                                onClick={onToggleExpanded}
-                                aria-expanded={expanded}
-                                aria-label={expanded ? t("collapseShot") : t("expandShot")}
-                                className={`inline-flex items-center gap-2 rounded-md border px-3 py-2 font-mono text-[11px] font-medium uppercase tracking-[0.14em] transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 ${
-                                    expanded
-                                        ? "border-primary/40 bg-primary/12 text-primary hover:bg-primary/20"
-                                        : "border-glass-border bg-black/30 text-text-secondary hover:border-white/20 hover:bg-white/[0.06] hover:text-foreground"
-                                }`}
-                            >
-                                {expanded ? (
-                                    <PanelBottomClose size={13} strokeWidth={1.6} aria-hidden="true" />
-                                ) : (
-                                    <PanelBottomOpen size={13} strokeWidth={1.6} aria-hidden="true" />
-                                )}
-                                <span>{expanded ? t("collapseShotShort") : t("expandShotShort")}</span>
-                                {expanded ? (
-                                    <ChevronUp size={12} strokeWidth={2} className="opacity-60" aria-hidden="true" />
-                                ) : (
-                                    <ChevronDown size={12} strokeWidth={2} className="opacity-60" aria-hidden="true" />
-                                )}
-                            </motion.button>
-                        </div>
                     </div>
                 </div>
+
+                {/* actions row — full-width per mock (lives outside editor/card-body) */}
+                <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-t border-border-subtle">
+                            <div className="flex items-center gap-1 shrink-0">
+                                <motion.button
+                                    whileHover={{ scale: 1.06 }}
+                                    whileTap={{ scale: 0.94 }}
+                                    onClick={onOpenDrawer}
+                                    className="ico-btn flex h-8 w-8 items-center justify-center rounded-[14px] text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                                    title={t("browseAssets")}
+                                >
+                                    <AtSign size={15} strokeWidth={1.8} />
+                                </motion.button>
+                                <motion.button
+                                    whileHover={{ scale: 1.06 }}
+                                    whileTap={{ scale: 0.94 }}
+                                    onClick={onMoveUp}
+                                    disabled={index === 0}
+                                    className="ico-btn flex h-8 w-8 items-center justify-center rounded-[14px] text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground disabled:opacity-25 disabled:hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                                    title={t("moveUp")}
+                                >
+                                    <ChevronUp size={15} strokeWidth={1.8} />
+                                </motion.button>
+                                <motion.button
+                                    whileHover={{ scale: 1.06 }}
+                                    whileTap={{ scale: 0.94 }}
+                                    onClick={onMoveDown}
+                                    disabled={index === totalShots - 1}
+                                    className="ico-btn flex h-8 w-8 items-center justify-center rounded-[14px] text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground disabled:opacity-25 disabled:hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                                    title={t("moveDown")}
+                                >
+                                    <ChevronDown size={15} strokeWidth={1.8} />
+                                </motion.button>
+                                <motion.button
+                                    whileHover={{ scale: 1.06 }}
+                                    whileTap={{ scale: 0.94 }}
+                                    onClick={onDuplicate}
+                                    className="ico-btn flex h-8 w-8 items-center justify-center rounded-[14px] text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                                    title={t("duplicateShot")}
+                                >
+                                    <Copy size={15} strokeWidth={1.8} />
+                                </motion.button>
+                                {onRefineFrame && (
+                                    <motion.button
+                                        whileHover={{ scale: 1.06 }}
+                                        whileTap={{ scale: 0.94 }}
+                                        onClick={onRefineFrame}
+                                        className="ico-btn flex h-8 w-8 items-center justify-center rounded-[14px] text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                                        title={t("refineFrame")}
+                                    >
+                                        <Sparkles size={15} strokeWidth={1.8} />
+                                    </motion.button>
+                                )}
+                                <motion.button
+                                    whileHover={{ scale: 1.06 }}
+                                    whileTap={{ scale: 0.94 }}
+                                    onClick={onDelete}
+                                    className="ico-btn flex h-8 w-8 items-center justify-center rounded-[14px] text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-status-failed-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                                    title={t("deleteShot")}
+                                >
+                                    <Trash2 size={15} strokeWidth={1.8} />
+                                </motion.button>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                                {genSummary && (
+                                    <span className="inline-flex items-center gap-1.5 shrink-0 font-mono text-[0.6875rem] text-text-secondary">
+                                        <span className="h-1.5 w-1.5 rounded-full bg-primary shadow-[var(--glow-primary)]" />
+                                        {genSummary}
+                                    </span>
+                                )}
+                                <span className="font-mono text-[0.59375rem] uppercase tracking-[0.1em] text-text-muted hidden sm:inline">
+                                    {t("countLabel")}
+                                </span>
+                                <div className="flex items-center gap-0.5 shrink-0 p-[3px] rounded-full bg-surface-inset">
+                                    {[1, 2, 4, 6].map((n) => {
+                                        const active = generateCount === n;
+                                        return (
+                                            <button
+                                                key={n}
+                                                type="button"
+                                                onClick={() => onSetGenerateCount?.(n)}
+                                                aria-pressed={active}
+                                                aria-label={`Generate ${n} at a time`}
+                                                title={t("genCandidatesEachTooltip", { n })}
+                                                className={`grid h-7 min-w-[28px] place-items-center rounded-full font-mono text-[0.625rem] font-semibold transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 ${
+                                                    active
+                                                        ? "bg-primary text-on-accent"
+                                                        : "text-text-muted hover:text-foreground"
+                                                }`}
+                                            >
+                                                ×{n}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                <motion.button
+                                    whileHover={canGenerate && inFlightCount === 0 ? { scale: 1.02 } : undefined}
+                                    whileTap={canGenerate && inFlightCount === 0 ? { scale: 0.98 } : undefined}
+                                    type="button"
+                                    onClick={() => onGenerateBatch?.(generateCount)}
+                                    disabled={!canGenerate || inFlightCount > 0}
+                                    title={!canGenerate
+                                        ? (shot.tabMode === "t2i_i2v"
+                                            ? t("needFirstFrameTooltip")
+                                            : t("needPromptInputTooltip"))
+                                        : t("genVideoCandidatesTooltip", { count: generateCount })}
+                                    className="inline-flex items-center justify-center gap-1.5 rounded-full px-[13px] py-[7px] font-sans text-[0.75rem] font-semibold tracking-tight transition-all duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 disabled:cursor-not-allowed disabled:opacity-40 bg-primary text-on-accent shadow-[var(--btn-pri-glow),inset_0_1.5px_0_rgba(255,255,255,0.14)] hover:bg-primary-hover hover:-translate-y-px disabled:hover:translate-y-0"
+                                >
+                                    {inFlightCount > 0 ? (
+                                        <>
+                                            <Loader2 size={14} className="animate-spin" strokeWidth={2} />
+                                            <span>{t("genClusterInFlight", { count: inFlightCount })}</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Sparkles size={14} strokeWidth={2} />
+                                            <span>{t("generateBatch", { count: generateCount })}</span>
+                                        </>
+                                    )}
+                                </motion.button>
+                            </div>
+                        </div>
+
+                        {/* Disclosure bar — controls attached panel visibility */}
+                        <button
+                            type="button"
+                            onClick={onToggleExpanded}
+                            aria-expanded={expanded}
+                            aria-label={expanded ? t("collapseShot") : t("expandShot")}
+                            className="group/disc flex w-full items-center gap-2.5 border-t border-border-subtle px-5 py-2.5 font-mono text-[0.6875rem] uppercase tracking-[0.14em] text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                        >
+                            {expanded ? (
+                                <ChevronUp size={13} strokeWidth={2} className="text-text-muted transition-transform duration-fast group-hover/disc:text-text-secondary" aria-hidden="true" />
+                            ) : (
+                                <ChevronDown size={13} strokeWidth={2} className="text-text-muted transition-transform duration-fast group-hover/disc:text-text-secondary" aria-hidden="true" />
+                            )}
+                            <span className="text-foreground font-semibold">{expanded ? t("collapseShotShort") : t("expandShotShort")}</span>
+                            <span className="text-text-muted/80">· {t("panelLabel")}</span>
+                            {expanded ? (
+                                <ChevronUp size={13} strokeWidth={2} className="ml-auto text-text-muted/60" aria-hidden="true" />
+                            ) : (
+                                <ChevronDown size={13} strokeWidth={2} className="ml-auto text-text-muted/60" aria-hidden="true" />
+                            )}
+                        </button>
             </div>
             {/* Focus-editor modal (B5 escape hatch) — opens via the
                 expand icon or Cmd/Ctrl+E. Cancel discards; Save

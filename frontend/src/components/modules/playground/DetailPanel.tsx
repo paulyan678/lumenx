@@ -5,7 +5,8 @@ import { createPortal } from 'react-dom';
 import {
   X,
   Download,
-  Star,
+  Crown,
+  Bookmark,
   Video,
   RotateCcw,
   Trash2,
@@ -14,6 +15,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { API_URL, playgroundApi } from '@/lib/api';
+import { useTranslations } from 'next-intl';
 import { usePlaygroundStore, type PlaygroundGeneration } from './usePlaygroundStore';
 
 // ---------------------------------------------------------------------------
@@ -23,6 +25,7 @@ import { usePlaygroundStore, type PlaygroundGeneration } from './usePlaygroundSt
 interface DetailPanelProps {
   generation: PlaygroundGeneration;
   allGenerations: PlaygroundGeneration[];
+  focusOutputId?: string;
   onClose: () => void;
   onNavigate: (generation: PlaygroundGeneration) => void;
   onRetry?: (generation: PlaygroundGeneration) => void;
@@ -65,23 +68,29 @@ function formatTimestamp(dateStr: string): string {
 export default function DetailPanel({
   generation: generationProp,
   allGenerations,
+  focusOutputId,
   onClose,
   onNavigate,
   onRetry,
   onGenerateVideo,
 }: DetailPanelProps) {
+  const t = useTranslations('playground');
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const updateGeneration = usePlaygroundStore((s) => s.updateGeneration);
   const history = usePlaygroundStore((s) => s.history);
+  const featuredByGen = usePlaygroundStore((s) => s.featuredByGen);
+  const toggleFeatured = usePlaygroundStore((s) => s.toggleFeatured);
 
   // Always read the latest generation from store (so saved_to_library stays in sync)
   const generation = history.find((g) => g.id === generationProp.id) ?? generationProp;
   const saved = generation.outputs[0]?.saved_to_library ?? false;
 
-  // Determine media
-  const output = generation.outputs[0];
+  // Determine media — focus the clicked output of a batch, else the first.
+  const output =
+    generation.outputs.find((o) => o.id === focusOutputId) ?? generation.outputs[0];
+  const featured = output ? featuredByGen[generation.id] === output.id : false;
   const isVideo =
     output?.media_type === 'video' ||
     ['t2v', 'i2v', 'r2v', 'v2v'].includes(generation.mode);
@@ -198,14 +207,14 @@ export default function DetailPanel({
     <>
       {/* Overlay */}
       <div
-        className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm"
+        className="fixed inset-0 z-50 bg-overlay backdrop-blur-md"
         onClick={onClose}
       />
 
       {/* Container */}
-      <div className="fixed inset-4 md:inset-8 z-50 bg-[#0e0e11] border border-white/[0.06] rounded-2xl shadow-2xl flex overflow-hidden">
+      <div className="fixed inset-4 md:inset-8 z-50 bg-surface border border-glass-border rounded-[20px] shadow-2xl flex overflow-hidden">
         {/* ─── LEFT SIDE (Media) ─────────────────────────────────────────── */}
-        <div className="relative w-[60%] h-full bg-[#080809] flex items-center justify-center">
+        <div className="relative w-[60%] h-full bg-surface-inset flex items-center justify-center">
           {mediaUrl ? (
             isVideo ? (
               <video
@@ -221,181 +230,223 @@ export default function DetailPanel({
               />
             )
           ) : (
-            <div className="flex flex-col items-center gap-2 text-white/20">
+            <div className="flex flex-col items-center gap-2 text-text-muted">
               <Video className="w-12 h-12" />
               <span className="font-mono text-xs">No media</span>
             </div>
+          )}
+
+          {/* Amber halation overlay — only when saved to library (mirrors ResultCard) */}
+          {saved && (
+            <div className="atelier-proj-halation pointer-events-none absolute inset-0 z-[1]" />
           )}
 
           {/* Navigation arrows */}
           {hasPrev && (
             <button
               onClick={navigatePrev}
-              className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/[0.06] backdrop-blur-sm border border-white/[0.08] flex items-center justify-center hover:bg-white/[0.12] transition-colors"
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-elevated backdrop-blur-sm border border-glass-border flex items-center justify-center hover:bg-hover-bg transition-colors"
             >
-              <ChevronLeft className="w-5 h-5 text-white/70" />
+              <ChevronLeft className="w-5 h-5 text-foreground/80" />
             </button>
           )}
           {hasNext && (
             <button
               onClick={navigateNext}
-              className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/[0.06] backdrop-blur-sm border border-white/[0.08] flex items-center justify-center hover:bg-white/[0.12] transition-colors"
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-elevated backdrop-blur-sm border border-glass-border flex items-center justify-center hover:bg-hover-bg transition-colors"
             >
-              <ChevronRight className="w-5 h-5 text-white/70" />
+              <ChevronRight className="w-5 h-5 text-foreground/80" />
             </button>
           )}
         </div>
 
-        {/* ─── RIGHT SIDE (Details) ──────────────────────────────────────── */}
-        <div className="relative w-[40%] h-full overflow-y-auto p-6 border-l border-white/[0.06]">
+        {/* ─── RIGHT SIDE (Details) — 3 zones: header / scroll body / pinned footer ─── */}
+        <div className="relative w-[40%] h-full overflow-y-auto border-l border-border-subtle">
           {/* Close button */}
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 w-8 h-8 rounded-lg bg-white/[0.04] border border-white/[0.08] flex items-center justify-center hover:bg-white/[0.10] transition-colors"
+            className="absolute top-4 right-4 z-10 w-8 h-8 rounded-lg bg-glass border border-glass-border flex items-center justify-center hover:bg-hover-bg transition-colors"
           >
-            <X className="w-4 h-4 text-white/60" />
+            <X className="w-4 h-4 text-text-muted" />
           </button>
 
-          {/* Section 1: Title */}
-          <div className="mb-6 pr-10">
-            <h2 className="text-lg font-semibold text-white mb-1">
-              {generation.model_id}
-            </h2>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="font-mono text-[10px] bg-white/[0.06] text-white/60 rounded px-[6px] py-[2px] uppercase">
+          {/* ── Header ── */}
+          <div className="px-6 pt-6 pb-4 border-b border-border-subtle pr-14">
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="font-mono text-[0.5625rem] bg-primary/15 text-primary rounded px-[6px] py-[2px] uppercase tracking-[0.1em]">
                 {MODE_LABELS[generation.mode] || generation.mode}
               </span>
-              <span className="font-mono text-[10px] text-white/30">
+              <span className="font-mono text-[0.5625rem] text-text-muted uppercase tracking-[0.1em]">
                 {generation.id.slice(0, 8)}
               </span>
             </div>
-            <p className="font-mono text-[11px] text-white/30">
+            <h2 className="font-display atelier-display text-xl font-semibold tracking-tight text-foreground leading-tight">
+              {generation.model_id}
+            </h2>
+            <p className="font-mono text-[0.625rem] text-text-muted mt-1.5">
               {formatTimestamp(generation.created_at)}
             </p>
           </div>
 
-          {/* Section 2: Actions */}
-          <div className="flex flex-col gap-2 mb-6">
-            {mediaUrl && (
-              <button
-                onClick={handleDownload}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-white/[0.06] border border-white/[0.08] text-white/80 text-sm font-medium hover:bg-white/[0.10] transition-colors"
-              >
-                <Download className="w-4 h-4" />
-                Download
-              </button>
+          {/* ── Body ── */}
+          <div className="px-6 py-5 space-y-5">
+            {/* Prompt */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-text-muted">
+                  PROMPT
+                </h3>
+                <button
+                  onClick={handleCopyPrompt}
+                  className="flex items-center gap-1 px-2 py-1 rounded text-[0.625rem] text-text-muted hover:text-foreground hover:bg-hover-bg transition-colors"
+                >
+                  <Copy className="w-3 h-3" />
+                  {copied ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+              <div className="rounded-[14px] bg-surface-inset border border-border-subtle p-4 max-h-48 overflow-y-auto">
+                <p className="font-display italic text-[0.9375rem] text-text-secondary leading-relaxed whitespace-pre-wrap break-words">
+                  {generation.prompt ? `“${generation.prompt}”` : '(empty)'}
+                </p>
+              </div>
+            </div>
+
+            {/* Parameters — labeled spec grid; first entry (Size) is a hero row */}
+            {paramEntries.length > 0 && (
+              <div>
+                <h3 className="font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-text-muted mb-2">
+                  {t('detail.parameters')}
+                </h3>
+                <div className="rounded-[14px] bg-surface-inset border border-border-subtle p-4 grid grid-cols-2 gap-x-4 gap-y-3.5">
+                  {paramEntries.map(([label, value], i) => (
+                    <div key={label} className={i === 0 ? 'col-span-2' : ''}>
+                      <div className="font-mono text-[0.625rem] uppercase tracking-[0.08em] text-text-muted mb-1">
+                        {label}
+                      </div>
+                      <div
+                        className={`font-mono text-foreground ${
+                          i === 0 ? 'text-[1.0625rem]' : 'text-sm'
+                        }`}
+                      >
+                        {value}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
-            {output && (
-              <button
-                onClick={handleSaveToLibrary}
-                disabled={saving}
-                className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-wait ${
-                  saved
-                    ? 'bg-white/[0.04] border-green-500/20 text-green-400 hover:border-white/[0.12] hover:text-white/60'
-                    : 'bg-white/[0.06] border-white/[0.08] text-white/80 hover:bg-white/[0.10]'
-                }`}
-              >
-                <Star
-                  className={`w-4 h-4 ${saved ? 'fill-green-400 text-green-400' : ''}`}
-                />
-                {saving ? '处理中...' : saved ? '已收藏（点击取消）' : '收藏到资产库'}
-              </button>
+
+            {/* Negative prompt */}
+            {generation.negative_prompt && (
+              <div>
+                <h3 className="font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-text-muted mb-2">
+                  NEGATIVE PROMPT
+                </h3>
+                <div className="rounded-[14px] bg-surface-inset border border-border-subtle p-4 max-h-28 overflow-y-auto">
+                  <p className="text-[0.8125rem] text-text-secondary leading-relaxed whitespace-pre-wrap break-words">
+                    {generation.negative_prompt}
+                  </p>
+                </div>
+              </div>
             )}
-            {!isVideo && output?.media_path && onGenerateVideo && (
-              <button
-                onClick={() => onGenerateVideo(output.media_path)}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-[#646cff]/10 border border-[#646cff]/20 text-[#646cff] text-sm font-medium hover:bg-[#646cff]/20 transition-colors"
-              >
-                <Video className="w-4 h-4" />
-                Generate Video
-              </button>
+
+            {/* Error display for failed generations */}
+            {generation.status === 'failed' && generation.error && (
+              <div>
+                <h3 className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-status-failed-fg mb-2">
+                  ERROR
+                </h3>
+                <div className="max-h-28 overflow-y-auto rounded-[16px] bg-status-failed-bg border border-status-failed-border p-4">
+                  <p className="text-[0.6875rem] text-status-failed-fg leading-relaxed break-all font-mono">
+                    {generation.error}
+                  </p>
+                </div>
+              </div>
             )}
-            {generation.status === 'failed' && onRetry && (
+          </div>
+
+          {/* ── Actions (flow after content; not pinned to bottom) ── */}
+          <div className="border-t border-border-subtle px-6 py-4 space-y-2.5">
+            {/* Primary: Retry (failed) or Save to library */}
+            {generation.status === 'failed' && onRetry ? (
               <button
                 onClick={() => onRetry(generation)}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm font-medium hover:bg-amber-500/20 transition-colors"
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-primary text-on-accent text-sm font-medium shadow-[var(--glow-primary)] hover:bg-primary-hover transition"
               >
                 <RotateCcw className="w-4 h-4" />
                 Retry
               </button>
+            ) : output ? (
+              <button
+                onClick={handleSaveToLibrary}
+                disabled={saving}
+                className={`w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium transition cursor-pointer disabled:opacity-50 disabled:cursor-wait ${
+                  saved
+                    ? 'bg-primary text-on-accent hover:bg-primary-hover'
+                    : 'bg-primary text-on-accent shadow-[var(--glow-primary)] hover:bg-primary-hover'
+                }`}
+              >
+                <Bookmark className={`w-4 h-4 ${saved ? 'fill-current' : ''}`} />
+                {saving ? t('detail.saving') : saved ? t('detail.savedCancel') : t('detail.saveToLibrary')}
+              </button>
+            ) : null}
+
+            {/* Featured (best-of-batch) toggle — amber only when active */}
+            {output && (
+              <button
+                onClick={() => toggleFeatured(generation.id, output.id)}
+                className={`w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium transition border ${
+                  featured
+                    ? 'bg-status-starred-bg border-status-starred-border text-status-starred-fg'
+                    : 'bg-surface-inset border-glass-border text-text-secondary hover:text-foreground hover:bg-hover-bg'
+                }`}
+                title={t('card.featured')}
+              >
+                <Crown className={`w-4 h-4 ${featured ? 'fill-status-starred-solid' : ''}`} />
+                {t('card.featured')}
+              </button>
             )}
+
+            {output && (
+              <p className="text-[0.625rem] leading-relaxed text-text-muted">
+                {t('detail.markHint')}
+              </p>
+            )}
+
+            {/* Secondary row: Download + Generate Video (neutral ghosts) */}
+            {(mediaUrl || (!isVideo && output?.media_path && onGenerateVideo)) && (
+              <div className="flex gap-2">
+                {mediaUrl && (
+                  <button
+                    onClick={handleDownload}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-full bg-surface-inset border border-glass-border text-text-secondary text-[0.8125rem] font-medium hover:text-foreground hover:bg-hover-bg transition"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download
+                  </button>
+                )}
+                {!isVideo && output?.media_path && onGenerateVideo && (
+                  <button
+                    onClick={() => onGenerateVideo(output.media_path)}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-full bg-surface-inset border border-glass-border text-text-secondary text-[0.8125rem] font-medium hover:text-foreground hover:bg-hover-bg transition"
+                  >
+                    <Video className="w-4 h-4" />
+                    Generate Video
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Delete — subdued, red only on hover */}
             <button
               onClick={handleDelete}
               disabled={deleting}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-red-500/[0.06] border border-red-500/[0.12] text-red-400/80 text-sm font-medium hover:bg-red-500/[0.12] transition-colors"
+              className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-full text-[0.8125rem] font-medium text-text-muted hover:text-status-failed-fg hover:bg-status-failed-bg transition disabled:opacity-40"
             >
               <Trash2 className="w-4 h-4" />
               {deleting ? 'Deleting...' : 'Delete'}
             </button>
           </div>
-
-          {/* Section 3: Prompt */}
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-mono text-[10px] uppercase tracking-[0.18em] text-amber-500/80">
-                PROMPT
-              </h3>
-              <button
-                onClick={handleCopyPrompt}
-                className="flex items-center gap-1 px-2 py-1 rounded text-[10px] text-white/40 hover:text-white/60 hover:bg-white/[0.06] transition-colors"
-              >
-                <Copy className="w-3 h-3" />
-                {copied ? 'Copied' : 'Copy'}
-              </button>
-            </div>
-            <div className="max-h-40 overflow-y-auto rounded-lg bg-white/[0.03] border border-white/[0.06] p-3">
-              <p className="text-[12px] text-white/70 leading-relaxed whitespace-pre-wrap break-words">
-                {generation.prompt || '(empty)'}
-              </p>
-            </div>
-          </div>
-
-          {/* Section 4: Parameters */}
-          {paramEntries.length > 0 && (
-            <div className="mb-6">
-              <h3 className="font-mono text-[10px] uppercase tracking-[0.18em] text-amber-500/80 mb-2">
-                参数
-              </h3>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                {paramEntries.map(([label, value]) => (
-                  <div key={label}>
-                    <p className="text-[10px] text-white/40 mb-0.5">{label}</p>
-                    <p className="text-[12px] text-white font-mono truncate">
-                      {value}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Section 5: Negative prompt */}
-          {generation.negative_prompt && (
-            <div className="mb-6">
-              <h3 className="font-mono text-[10px] uppercase tracking-[0.18em] text-amber-500/80 mb-2">
-                NEGATIVE PROMPT
-              </h3>
-              <div className="max-h-28 overflow-y-auto rounded-lg bg-white/[0.03] border border-white/[0.06] p-3">
-                <p className="text-[12px] text-white/50 leading-relaxed whitespace-pre-wrap break-words">
-                  {generation.negative_prompt}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Error display for failed generations */}
-          {generation.status === 'failed' && generation.error && (
-            <div className="mb-6">
-              <h3 className="font-mono text-[10px] uppercase tracking-[0.18em] text-red-400/80 mb-2">
-                ERROR
-              </h3>
-              <div className="max-h-28 overflow-y-auto rounded-lg bg-red-500/[0.04] border border-red-500/[0.12] p-3">
-                <p className="text-[11px] text-red-300/80 leading-relaxed break-all font-mono">
-                  {generation.error}
-                </p>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </>

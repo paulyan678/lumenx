@@ -168,10 +168,10 @@ export default function CompareModal({ tasks, onClose, resolveUrl }: CompareModa
                 aria-modal="true"
                 aria-label="Compare candidates"
                 onKeyDown={handleTrapTab}
-                className="fixed left-1/2 top-1/2 z-[61] flex h-[88vh] w-[min(1200px,94vw)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[12px] border border-white/10 bg-[#0a0a10] shadow-[0_24px_60px_-22px_rgba(0,0,0,0.9)] motion-safe:animate-[compareModalIn_240ms_cubic-bezier(0.22,1,0.36,1)_both]"
+                className="fixed left-1/2 top-1/2 z-[61] flex h-[88vh] w-[min(1200px,94vw)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[12px] border border-glass-border bg-surface shadow-[0_24px_60px_-22px_rgba(0,0,0,0.9)] motion-safe:animate-[compareModalIn_240ms_cubic-bezier(0.22,1,0.36,1)_both]"
             >
                 {/* Header */}
-                <header className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+                <header className="flex shrink-0 items-center justify-between gap-3 border-b border-glass-border px-4 py-3">
                     <div className="flex items-center gap-2">
                         {/* Display tier — primary modal title (P0-2). */}
                         <div className="font-display text-display font-semibold tracking-tight text-foreground">
@@ -223,7 +223,7 @@ export default function CompareModal({ tasks, onClose, resolveUrl }: CompareModa
                         return (
                             <div
                                 key={task.id}
-                                className="relative overflow-hidden rounded-md border border-white/8 bg-black"
+                                className="relative overflow-hidden rounded-md border border-glass-border bg-black"
                             >
                                 {url ? (
                                     <video
@@ -239,16 +239,16 @@ export default function CompareModal({ tasks, onClose, resolveUrl }: CompareModa
                                         no video url
                                     </div>
                                 )}
-                                <div className="absolute left-2 top-2 inline-flex items-center gap-1.5 rounded bg-black/65 px-1.5 py-[3px] font-mono text-chrome-sm font-medium uppercase text-white">
+                                <div className="absolute left-2 top-2 inline-flex items-center gap-1.5 rounded bg-black/65 px-1.5 py-[3px] font-mono text-chrome-sm font-medium uppercase text-foreground">
                                     #{i + 1}
-                                    <span className="text-white/55">·</span>
-                                    <span className="text-white/90">{task.model || "?"}</span>
+                                    <span className="text-text-secondary">·</span>
+                                    <span className="text-foreground">{task.model || "?"}</span>
                                     {task.is_starred ? (
                                         <span className="text-status-starred-fg" aria-label="Starred">★</span>
                                     ) : null}
                                 </div>
                                 {task.label ? (
-                                    <div className="absolute bottom-2 left-2 rounded bg-black/65 px-1.5 py-[3px] font-mono text-chrome text-white">
+                                    <div className="absolute bottom-2 left-2 rounded bg-black/65 px-1.5 py-[3px] font-mono text-chrome text-foreground">
                                         {task.label}
                                     </div>
                                 ) : null}
@@ -258,12 +258,12 @@ export default function CompareModal({ tasks, onClose, resolveUrl }: CompareModa
                 </div>
 
                 {/* Footer controls */}
-                <footer className="flex shrink-0 items-center gap-3 border-t border-white/10 px-4 py-3">
+                <footer className="flex shrink-0 items-center gap-3 border-t border-glass-border px-4 py-3">
                     <button
                         type="button"
                         onClick={togglePlay}
                         aria-label={isPlaying ? "Pause" : "Play"}
-                        className="grid h-10 w-10 place-items-center rounded-full bg-white/10 text-foreground transition-colors duration-fast ease-out-quart hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                        className="grid h-10 w-10 place-items-center rounded-full bg-elevated text-foreground transition-colors duration-fast ease-out-quart hover:bg-hover-bg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                     >
                         {isPlaying ? <Pause size={14} aria-hidden="true" /> : <Play size={14} aria-hidden="true" />}
                     </button>
@@ -275,7 +275,7 @@ export default function CompareModal({ tasks, onClose, resolveUrl }: CompareModa
                             value={Math.round(progress * 1000)}
                             onChange={(e) => seekTo(parseInt(e.target.value, 10) / 1000)}
                             aria-label="Playback position"
-                            className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-white/10 accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                            className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-elevated accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                         />
                     ) : (
                         <div className="flex-1 text-center font-mono text-chrome-sm font-medium uppercase text-text-muted">

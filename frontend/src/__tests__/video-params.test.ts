@@ -12,8 +12,6 @@ import {
     I2V_MODELS,
     GRID_COLS_CLASS,
     type ModelParamSupport,
-    type VideoParams,
-    type I2VModelConfig,
 } from '@/store/projectStore';
 
 // ── I2V_MODELS 配置完整性 ─────────────────────────────────────────────
@@ -41,9 +39,11 @@ describe('I2V_MODELS 配置', () => {
 
 // ── Wan 2.6 参数 ───────────────────────────────────────────────────────
 
+// wan2.6-i2v is now hidden in the catalog (deprecated in 524f3a1, visible_in:
+// []), so it no longer appears in I2V_MODELS. Read its params directly from the
+// generated catalog to keep the wan2.6 contract documented and tested.
 describe('Wan 2.6 模型参数', () => {
-    const wan26 = I2V_MODELS.find(m => m.id === 'wan2.6-i2v')!;
-    const p = wan26.params;
+    const p = (rawCatalog as any).models['wan2.6-i2v']?.params as ModelParamSupport;
 
     it('支持所有 Wan 系列参数', () => {
         expect(p.resolution).toBeDefined();
@@ -140,19 +140,20 @@ describe('Kling v3 模型参数', () => {
     });
 
     it('不支持 Wan 独有参数', () => {
-        expect(p.resolution).toBeUndefined();
-        expect(p.seed).toBeUndefined();
-        expect(p.promptExtend).toBeUndefined();
-        expect(p.shotType).toBeUndefined();
-        // kling-v3-i2v gained an `audio` capability flag in the Phase 2
-        // catalog (separate from `sound`); the original test predates
-        // that. Documenting the new shape here.
-        expect(p.audio).toBe(true);
+        // Phase 2 per-model catalog params list unsupported flags explicitly as
+        // `false` instead of omitting them, so assert falsy (false | undefined)
+        // for "not supported".
+        expect(p.resolution).toBeFalsy();
+        expect(p.seed).toBeFalsy();
+        expect(p.promptExtend).toBeFalsy();
+        expect(p.shotType).toBeFalsy();
+        // kling-v3-i2v exposes `sound` (asserted above), not `audio`.
+        expect(p.audio).toBeFalsy();
     });
 
     it('不支持 Vidu 独有参数', () => {
-        expect(p.viduAudio).toBeUndefined();
-        expect(p.movementAmplitude).toBeUndefined();
+        expect(p.viduAudio).toBeFalsy();
+        expect(p.movementAmplitude).toBeFalsy();
     });
 });
 
@@ -186,13 +187,15 @@ describe('Vidu Q3 模型参数', () => {
     });
 
     it('不支持 Kling/Wan 独有参数', () => {
-        expect(p.negativePrompt).toBeUndefined();
-        expect(p.promptExtend).toBeUndefined();
-        expect(p.shotType).toBeUndefined();
-        expect(p.audio).toBeUndefined();
-        expect(p.mode).toBeUndefined();
-        expect(p.sound).toBeUndefined();
-        expect(p.cfgScale).toBeUndefined();
+        // Per-model catalog params list unsupported flags explicitly as
+        // `false`; assert falsy (false | undefined) for "not supported".
+        expect(p.negativePrompt).toBeFalsy();
+        expect(p.promptExtend).toBeFalsy();
+        expect(p.shotType).toBeFalsy();
+        expect(p.audio).toBeFalsy();
+        expect(p.mode).toBeFalsy();
+        expect(p.sound).toBeFalsy();
+        expect(p.cfgScale).toBeFalsy();
     });
 });
 
@@ -264,10 +267,12 @@ describe('模型切换参数重置逻辑', () => {
         expect(result.viduAudio).toBe(true);
     });
 
-    it('切换到 Wan 2.6 → promptExtend 默认 true', () => {
-        const result = simulateModelSwitch('wan2.6-i2v');
+    it('切换到 Wan 2.7 → promptExtend 默认 true', () => {
+        // wan2.6 was deprecated/hidden (524f3a1); wan2.7-i2v is the current
+        // visible Wan I2V model. Its resolution default is 1080p.
+        const result = simulateModelSwitch('wan2.7-i2v');
         expect(result.promptExtend).toBe(true);
-        expect(result.resolution).toBe('720p');
+        expect(result.resolution).toBe('1080p');
     });
 
     it('切换到 Wan 2.2 → 无 promptExtend', () => {

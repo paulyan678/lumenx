@@ -117,127 +117,274 @@ logger = get_logger(__name__)
 # Placeholders: {ASSETS} = asset context, {DRAFT} = draft prompt, {SLOTS} = R2V slot context
 
 DEFAULT_STORYBOARD_POLISH_PROMPT = """
-# ROLE
-You are an expert storyboard artist and prompt engineer. Your task is to rewrite a draft prompt into a high-quality image generation prompt, specifically for a multi-reference image workflow.
+# 角色
+你是一名资深分镜师与提示词工程师。你的任务是把一段草稿提示词改写成高质量的图像生成提示词，专用于多参考图（multi-reference）工作流。
 
-# CONTEXT:
-The user has selected specific reference images (assets) to compose a scene.
-You must refer to these assets by their Image ID (e.g., "Image 1", "Image 2") when describing them in the prompt.
+# 背景
+用户已选定若干参考图（素材）来构成一个画面。
+在提示词中描述这些素材时，你必须用它们的 Image ID（如 "Image 1"、"Image 2"）来指代。
 
-# AVAILABLE ASSETS:
+# 可用素材
 {ASSETS}
 
-# RULES:
-1.  **Integrate Assets**: Explicitly mention "Image X" when describing the corresponding character, scene, or prop.
-2.  **Natural Flow**: Do not just concatenate. Write a coherent sentence or paragraph describing the visual scene.
-3.  **Strict Adherence**: DO NOT hallucinate emotions, actions, or plot details not present in the draft. If the draft says "sitting", do NOT add "sadly" or "happily" unless specified. Keep the narrative neutral and accurate.
-4.  **Enhance Detail**: Add visual details (lighting, atmosphere, emotion) based on the draft prompt, but keep the asset references clear.
-5.  **No Explanations**: Return ONLY the polished prompt text.
-6.  **Bilingual Output**:
-    - **Prompt CN**: Fluent Chinese, strictly following the content of the draft.
-    - **Prompt EN**: Natural English description, prioritizing visual atmosphere.
+# 规则
+1.  **整合素材**：描述对应的角色、场景或道具时，显式写出 "Image X"。
+2.  **自然连贯**：不要简单拼接。要写成连贯的句子或段落来描述视觉画面。
+3.  **严格忠实**：不要臆造草稿中不存在的情绪、动作或剧情。若草稿写 "坐着"，不要擅自加 "悲伤地" 或 "开心地"，除非草稿明确写明。保持叙述中性、准确。
+4.  **丰富细节**：可基于草稿补充视觉细节（光线、氛围、情绪），但要保持素材指代清晰。
+5.  **不要解释**：只返回润色后的提示词文本。
+6.  **双语输出**：
+    - **Prompt CN**：流畅中文，严格遵循草稿内容。
+    - **Prompt EN**：自然英文描述，优先体现视觉氛围。
 
-# OUTPUT FORMAT
-Return STRICTLY a JSON object:
+# 输出格式
+严格返回一个 JSON 对象：
 {{
-    "prompt_cn": "Chinese description with Image X references...",
+    "prompt_cn": "含 Image X 指代的中文描述……",
     "prompt_en": "English cinematic description with Image X references..."
 }}
 
-# EXAMPLES
-**Input Draft**: Boy (Image 1) sitting on hospital bed (Image 2).
-**Output**:
+# 示例
+**输入草稿**：男孩（Image 1）坐在病床（Image 2）上。
+**输出**：
 {{
     "prompt_cn": "图像1中的男孩坐在图像2的病床边缘。病房内光线柔和，自然光从侧面照射在男孩身上，勾勒出真实的轮廓。画面构图稳定，质感写实。",
     "prompt_en": "The boy from Image 1 is seated on the edge of the hospital bed in Image 2. Soft natural light illuminates the scene from the side, highlighting the fabric textures of the bedding and the realistic skin tone of the boy. Cinematic composition, high resolution, photorealistic."
 }}
 
-# USER DRAFT PROMPT
+# 用户草稿提示词
 {DRAFT}
 """.strip()
 
-DEFAULT_VIDEO_POLISH_PROMPT = """You are an expert video prompt engineer. Your task is to optimize a draft prompt for an Image-to-Video generation model.
+DEFAULT_VIDEO_POLISH_PROMPT = """你是一名资深视频提示词工程师。你的任务是为「图生视频」（Image-to-Video）模型优化一段草稿提示词。
 
-GUIDELINES:
-1.  **Structure**: Prompt = Motion Description + Camera Movement.
-2.  **Motion Description**: Describe the dynamic action of elements (characters, objects) in the image. Use adjectives to control speed and intensity (e.g., "slowly", "rapidly", "subtle").
-3.  **Camera Movement**: Explicitly state camera moves if needed (e.g., "Zoom in", "Pan left", "Static camera").
-4.  **Clarity**: Be concise but descriptive. Focus on visual movement.
+准则：
+1.  **结构**：提示词 = 运动描述 + 镜头运动。
+2.  **运动描述**：描述图像中各元素（角色、物体）的动态动作。用副词控制速度与强度（如 "缓慢地"、"快速地"、"轻微的"）。
+3.  **镜头运动**：如有需要，显式说明镜头移动（如 "推近"、"向左平移"、"固定镜头"）。
+4.  **清晰**：简洁但具体，聚焦视觉运动。
 
-EXAMPLES:
+示例：
 
-*   **Zoom Out**: "A soft, round animated character with a curious expression wakes up to find their bed is a giant golden corn kernel. Camera zooms out to reveal the room is a massive corn silo, with echoes reverberating, corn kernels piled high like walls, and a beam of warm sunlight streaming from a high window, casting long shadows."
-*   **Pan Left**: "Camera pans left, slowly sweeping across a luxury store window filled with glamorous models and expensive goods. The camera continues panning left, leaving the window to reveal a ragged homeless man shivering in the corner of the adjacent alley."
+*   **拉远（Zoom Out）**："一个柔软圆润的动画角色带着好奇的表情醒来，发现自己的床是一颗巨大的金色玉米粒。镜头拉远，露出整个房间原来是一座巨大的玉米仓，回声四起，玉米粒堆得像墙一样高，一束温暖的阳光从高处的窗户洒入，投下长长的影子。"
+*   **向左平移（Pan Left）**："镜头向左平移，缓缓扫过一扇奢华的橱窗，里面满是光鲜的模特与昂贵商品。镜头继续向左，离开橱窗，露出隔壁巷子角落里一个衣衫褴褛、瑟瑟发抖的流浪汉。"
 
-TASK:
-Rewrite the following draft prompt into a high-quality video generation prompt following the guidelines above.
+任务：
+按上述准则，把下面的草稿提示词改写成高质量的视频生成提示词。
 
-OUTPUT FORMAT:
-Return STRICTLY a JSON object:
+输出格式：
+严格返回一个 JSON 对象：
 {{
     "prompt_cn": "润色后的中文视频提示词，关注运动和镜头",
     "prompt_en": "Polished English video prompt, focusing on motion and camera"
 }}"""
 
-DEFAULT_R2V_POLISH_PROMPT = """# Role
-You are a prompt engineer for the Wan 2.6 Reference-to-Video model.
+DEFAULT_R2V_POLISH_PROMPT = """# 角色
+你是参考生视频（Reference-to-Video）模型的提示词工程师。
 
-# Context
-The R2V (Reference-to-Video) model generates video clips by combining reference character videos with a text prompt.
-The user has uploaded the following reference videos:
+# 背景
+R2V（Reference-to-Video）模型通过把参考角色视频与文本提示词结合来生成视频片段。
+用户已上传以下参考视频：
 {SLOTS}
 
-The user's input prompt may already contain reference tags written as
-[characterN:name] (e.g. [character1:小兔子]). These tags are the canonical
-way to refer to a slot — characterN is the slot id the model needs, and
-:name is a human-readable label that helps both you and the user keep
-track of which actor each slot represents. The model resolves the slot
-by literal match on "characterN" inside the tag, so the :name suffix
-does not interfere — it just adds visible context.
+用户输入的提示词中可能已包含写作 [characterN:name] 的参考标签（例如 [character1:小兔子]）。
+这些标签是指代某个 slot 的规范写法——characterN 是模型需要的 slot 编号，:name 是便于你和
+用户辨认每个 slot 对应哪个角色的可读标签。模型通过对标签内 "characterN" 的字面匹配来解析
+slot，因此 :name 后缀不会干扰——它只是补充可见的上下文。
 
-# Task
-Rewrite the user's input prompt into a structured format strictly following these rules:
+# 任务
+严格遵循以下规则，把用户输入的提示词改写成结构化格式：
 
-1. **PRESERVE [characterN:name] tags exactly as written**. Do NOT strip
-   the brackets, the slot number, or the :name suffix. Whenever you
-   refer to a character that exists in the SLOTS list, write the full
-   tag (e.g. [character1:小兔子]) — never bare "character1" and never
-   the bare name "小兔子" without the tag. If the input has unbracketed
-   character names that match a SLOTS entry, convert them to the full
-   [characterN:name] form on first reference; subsequent references in
-   the same prompt may reuse the full tag.
-   **REUSE the same slot number for every mention of the same actor.**
-   The slot number is fixed per actor by the SLOTS list above —
-   [character1:小兔子] referenced three times stays [character1:小兔子]
-   all three times. Do NOT invent new slot numbers like [character3:小兔子]
-   for an actor that already has a slot. Each slot maps 1:1 to a
-   reference image, so adding a new slot would break the model's
-   expectation of how many references it has.
-2. **STRUCTURE**: Use this format:
-   - Scene setup (environment, lighting, mood)
-   - Character action (what [characterN:name] is doing, their expressions, movements)
-   - Camera movement (if applicable)
-3. **DIALOGUE FORMAT**: If the prompt includes dialogue, format it as:
-   '[character1:name] says: "dialogue content"'
-4. **PRESERVE INTENT**: Keep the original intent and emotional tone.
-5. **ENHANCE**: Add visual details for dramatic effect (lighting, speed descriptors like "slowly", "rapidly").
+1. **原样保留 [characterN:name] 标签**。不要去掉方括号、slot 编号或 :name 后缀。
+   只要指代 SLOTS 列表中存在的角色，就写出完整标签（例如 [character1:小兔子]）——
+   绝不要只写裸的 "character1"，也绝不要只写不带标签的角色名 "小兔子"。如果输入中有
+   未加括号、但能与某个 SLOTS 条目匹配的角色名，首次指代时把它转换为完整的
+   [characterN:name] 形式；同一段提示词中后续指代可复用该完整标签。
+   **同一角色的每次提及都复用同一个 slot 编号。** slot 编号由上面的 SLOTS 列表按角色固定——
+   [character1:小兔子] 被引用三次，三次都保持 [character1:小兔子]。不要为已有 slot 的角色
+   臆造新的 slot 编号（如 [character3:小兔子]）。每个 slot 与一张参考图 1:1 对应，新增 slot
+   会破坏模型对参考图数量的预期。
+2. **结构**：使用如下格式：
+   - 场景设定（环境、光线、氛围）
+   - 角色动作（[characterN:name] 在做什么、表情、动作）
+   - 镜头运动（如适用）
+3. **对白格式**：若提示词包含对白，按如下格式书写：
+   '[character1:name] says: "对白内容"'
+4. **保留意图**：保持原有意图与情绪基调。
+5. **强化**：补充视觉细节以增强戏剧效果（光线、"缓慢地"/"快速地" 等速度副词）。
 
-# Output Format
-Return STRICTLY a JSON object:
+# 输出格式
+严格返回一个 JSON 对象：
 {{
     "prompt_cn": "润色后的中文提示词，保留 [characterN:name] 完整标签",
     "prompt_en": "Polished English prompt, preserving [characterN:name] tags verbatim"
 }}
 
-# Examples
+# 示例
 
-INPUT: 主角从门里跳出来说话
-SLOTS: character1 = "White rabbit / 小兔子", character2 = "Robot dog / 机械狗"
-OUTPUT:
+输入：主角从门里跳出来说话
+SLOTS：character1 = "White rabbit / 小兔子", character2 = "Robot dog / 机械狗"
+输出：
 {{
     "prompt_cn": "[character1:小兔子] 从门里猛然跳出，落地时耳朵竖起，充满活力。房间昏暗，温暖的光线从尘土飞扬的窗户中透入。[character1:小兔子] 兴奋地环顾四周说道：'我正好赶上了！' 镜头随着跳跃略微倾斜。",
     "prompt_en": "[character1:White rabbit] bursts through the door with an exaggerated jump, landing energetically with ears perked up. The room is dimly lit with warm ambient light streaming through dusty windows. [character1:White rabbit] looks around excitedly and says: 'I made it just in time!' Camera follows the jump with a slight tilt."
 }}""".strip()
+
+
+DEFAULT_ENTITY_EXTRACTION_PROMPT = """
+你是一名专业的分镜师与编剧。
+分析下面的小说文本，为漫画/视频制作提取结构化数据。
+
+重要：
+- 所有描述性内容（名称、描述）必须使用中文（简体中文）。
+- 只提取角色（characters）、场景（scenes）和道具（props）。
+
+严格按以下结构输出合法 JSON：
+{
+    "characters": [
+        {
+            "id": "char_001",
+            "name": "角色名（如 '叶墨'、'叶墨 (古装)'）",
+            "description": "外观描述（发型、眼睛、体型、显著特征）。不要包含具体的面部表情（如 悲伤、愤怒）或临时动作（如 奔跑、哭泣）。聚焦于长期固定的外形特征。",
+            "age": "年龄估计（如 '25'）",
+            "gender": "性别",
+            "clothing": "默认服装描述。若某角色服装有显著变化（如 从便装换成婚纱），为每个服装变体单独创建一个角色条目，并取一个有区分度的名字（如 '名字 (服装)'）。",
+            "visual_weight": 5  // 1-5 重要度
+        }
+    ],
+    "scenes": [
+        {
+            "id": "scene_001",
+            "name": "地点名（如 '咖啡店'、'古代遗迹'）",
+            "description": "外观描述（光线、氛围、关键元素）",
+            "visual_weight": 3
+        }
+    ],
+    "props": [
+        {
+            "id": "prop_001",
+            "name": "道具名",
+            "description": "外观描述"
+        }
+    ]
+}
+
+文本：
+{text}
+"""
+
+
+DEFAULT_STYLE_ANALYSIS_PROMPT = """你是一个专业的电影美术指导和视觉风格顾问。
+请根据提供的剧本内容，分析其题材、情绪和氛围，推荐3种截然不同但都适合的视觉风格。
+
+对于每种风格，请提供：
+1. 风格名称（简洁、专业，使用英文）
+2. 风格描述（1-2句话，用中文）
+3. 推荐理由（为什么这个风格适合这个剧本，用中文，50字以内）
+4. Stable Diffusion 正向提示词（详细的风格关键词，英文，逗号分隔，不超过50个词）
+5. Stable Diffusion 负向提示词（避免的视觉元素，英文，逗号分隔，不超过30个词）
+
+IMPORTANT:
+- 你的回复必须是严格的JSON格式。
+- 不要包含任何解释性文字。
+- 所有文本中的引号必须使用转义符号 (例如 \")。
+- 确保JSON完整，不要被截断。
+- 保持内容精炼，避免过长的描述。
+- 严禁重复生成相同的内容，不要陷入循环。
+- 只返回3个推荐风格，不要多也不要少。
+
+CRITICAL STYLE GUIDELINES:
+- 正向提示词必须只描述：光影、色调、材质、艺术媒介、氛围、镜头语言 (e.g., "cinematic lighting, film grain, watercolor texture, dark atmosphere").
+- 严禁描述具体实体：不要包含人物、服装、具体物品、环境细节 (e.g., 禁止 "cracked helmet", "blood stains", "monster", "forest", "sword").
+- 风格必须是通用的，能套用到任何角色或场景上，而不会改变其原本的物理结构。
+
+返回格式：
+{
+  "recommendations": [
+    {
+      "name": "风格名称",
+      "description": "风格描述",
+      "reason": "推荐理由",
+      "positive_prompt": "正向提示词",
+      "negative_prompt": "负向提示词"
+    }
+  ]
+}"""
+
+
+DEFAULT_STORYBOARD_EXTRACTION_PROMPT = """# 角色
+你是一名电影级的分镜师。你的任务是将剧本文本拆解为一系列连续的分镜帧。
+
+# 核心规则
+1. **视觉节拍拆解**: 一行包含多个动作时，拆为多帧。每帧仅含一个主要动作。
+2. **角色可见性**: character_ref_names 只列画面中可见的角色。
+3. **实体约束**: 场景名、角色名、道具名严格匹配已提取实体。
+4. **语言**: 简体中文。
+5. **景别枚举**: 必须从以下选项中选择: 大特写 | 特写 | 近景 | 中景 | 全景 | 远景 | 大远景
+6. **角度枚举**: 必须从以下选项中选择: 平视 | 俯视 | 仰视 | 鸟瞰 | 蚁视 | 过肩 | 荷兰角 | 主观视角
+7. **时长**: 基于动作复杂度估算整数秒（范围 3-10 秒）。简单静态 3-4s，标准动作 5-6s，复杂/情绪镜头 7-10s。
+8. **对白**: 如果帧中有角色说话，dialogue 和 speaker 必须填写。一帧只能有一个说话人——多人对话必须拆为多帧。
+
+# 剧本格式说明
+- **场景标题行**: `1-1 地点名称 [时间] [内/外]`
+- **人物行**: `人物：角色名1，角色名2`
+- **动作描述**: 以 `△` 开头
+- **对话**: `角色名（情绪）：对话内容`，或 `角色名 (V.O.)：` 表示画外音
+
+# 已提取的实体
+{entities_str}
+
+# 输出格式
+返回 JSON 对象 {"frames": [...]}。不要包含 Markdown 标记。
+
+每帧字段:
+{
+    "scene_ref_name": "场景名",
+    "character_ref_names": ["角色名"],
+    "prop_ref_names": ["道具名"],
+    "action_summary": "一句话概括这帧发生什么（含角色动作 + 物理事件 + 神态表情）",
+    "shot_size": "中景",
+    "camera_angle": "平视",
+    "camera_movement": "静止",
+    "dialogue": "台词内容（无对白则为 null）",
+    "speaker": "说话人（无对白则为 null）",
+    "duration": 5
+}
+
+# 示例
+{
+    "frames": [
+        {
+            "scene_ref_name": "卧室",
+            "character_ref_names": ["叶墨"],
+            "prop_ref_names": ["手机"],
+            "action_summary": "手机在床头柜上震动，叶墨烦躁翻身，眉头紧锁，被子滑落",
+            "shot_size": "中景",
+            "camera_angle": "俯视",
+            "camera_movement": "静止",
+            "dialogue": "妈，这才几点啊！",
+            "speaker": "叶墨",
+            "duration": 4
+        },
+        {
+            "scene_ref_name": "卧室",
+            "character_ref_names": ["叶墨"],
+            "prop_ref_names": ["手机"],
+            "action_summary": "叶墨看到来电显示，猛地坐起，表情惊恐",
+            "shot_size": "特写",
+            "camera_angle": "平视",
+            "camera_movement": "快速推镜",
+            "dialogue": "已经来了？",
+            "speaker": "叶墨",
+            "duration": 3
+        }
+    ]
+}
+
+# 剧本内容
+{text}
+"""
+
 
 class ScriptProcessor:
     def __init__(self, api_key: str = None):
@@ -249,9 +396,13 @@ class ScriptProcessor:
     def is_configured(self):
         return self.llm.is_configured
 
-    def parse_novel(self, title: str, text: str) -> Script:
+    def parse_novel(self, title: str, text: str, custom_extraction_prompt: str = "") -> Script:
         """
         Parses the raw novel text into a structured Script object using an LLM.
+
+        custom_extraction_prompt: optional per-project override for the entity
+        extraction system prompt (PromptConfig.entity_extraction). Empty =
+        use the built-in _construct_prompt template.
         """
         logger.info(f"Parsing novel: {title}...")
         
@@ -259,7 +410,7 @@ class ScriptProcessor:
              logger.error("LLM API key not configured.")
              raise ValueError("LLM API Key 未配置。请在 API 配置中设置对应的 API Key 后重试。")
 
-        prompt = self._construct_prompt(text)
+        prompt = self._construct_prompt(text, custom_extraction_prompt)
 
         try:
             content = self.llm.chat(
@@ -580,56 +731,29 @@ class ScriptProcessor:
         
         return script
 
-    def _construct_prompt(self, text: str) -> str:
+    def _construct_prompt(self, text: str, custom_prompt: str = "") -> str:
         """
         Prompt A: Entity Extractor
         Constructs the system prompt for extracting characters, scenes, and props ONLY.
         Frames are generated separately via analyze_to_storyboard (Prompt B).
-        """
-        return f"""
-        You are a professional storyboard artist and scriptwriter.
-        Analyze the following novel text and extract structured data for a comic/video production.
-        
-        IMPORTANT: 
-        - All descriptive content (names, descriptions) MUST be in CHINESE (Simplified Chinese).
-        - Extract ONLY characters, scenes, and props.
-        
-        Output strictly in valid JSON format with the following structure:
-        {{
-            "characters": [
-                {{
-                    "id": "char_001",
-                    "name": "Character Name (e.g. '叶墨', '叶墨 (古装)')",
-                    "description": "Visual description (hair, eyes, build, distinct features). DO NOT include specific facial expressions (e.g. sad, angry) or temporary actions (e.g. running, crying). Focus on permanent physical traits.",
-                    "age": "Age estimate (e.g. '25')",
-                    "gender": "Gender",
-                    "clothing": "Default outfit description. If a character changes outfits significantly (e.g. from casual to wedding dress), create a separate character entry for each outfit variant with a distinct name (e.g. 'Name (Outfit)').",
-                    "visual_weight": 5  // 1-5 importance
-                }}
-            ],
-            "scenes": [
-                {{
-                    "id": "scene_001",
-                    "name": "Location Name (e.g. '咖啡店', '古代遗迹')",
-                    "description": "Visual description (lighting, mood, key elements)",
-                    "visual_weight": 3
-                }}
-            ],
-            "props": [
-                {{
-                    "id": "prop_001",
-                    "name": "Prop Name",
-                    "description": "Visual description"
-                }}
-            ]
-        }}
 
-        Text:
-        {text}
+        custom_prompt: optional override (PromptConfig.entity_extraction). When
+        provided, '{text}' is replaced by the novel content (via str.replace so
+        JSON braces in the template are not parsed); if no placeholder exists the
+        novel content is appended. Empty = use the built-in template below.
         """
+        if custom_prompt and custom_prompt.strip():
+            if "{text}" in custom_prompt:
+                return custom_prompt.replace("{text}", text)
+            return f"{custom_prompt}\n\nText:\n{text}"
+        return DEFAULT_ENTITY_EXTRACTION_PROMPT.replace("{text}", text)
 
-    def analyze_script_for_styles(self, script_text: str) -> List[Dict[str, Any]]:
-        """使用 LLM 分析剧本并推荐视觉风格"""
+    def analyze_script_for_styles(self, script_text: str, custom_style_prompt: str = "") -> List[Dict[str, Any]]:
+        """使用 LLM 分析剧本并推荐视觉风格
+
+        custom_style_prompt: optional per-project override
+        (PromptConfig.style_analysis). Empty = use the built-in system prompt.
+        """
         
         logger.info("Analyzing script for visual style recommendations...")
         
@@ -637,42 +761,10 @@ class ScriptProcessor:
             logger.warning("DASHSCOPE_API_KEY not set. Returning default recommendations.")
             return self._mock_style_recommendations()
         
-        system_prompt = """你是一个专业的电影美术指导和视觉风格顾问。
-请根据提供的剧本内容，分析其题材、情绪和氛围，推荐3种截然不同但都适合的视觉风格。
-
-对于每种风格，请提供：
-1. 风格名称（简洁、专业，使用英文）
-2. 风格描述（1-2句话，用中文）
-3. 推荐理由（为什么这个风格适合这个剧本，用中文，50字以内）
-4. Stable Diffusion 正向提示词（详细的风格关键词，英文，逗号分隔，不超过50个词）
-5. Stable Diffusion 负向提示词（避免的视觉元素，英文，逗号分隔，不超过30个词）
-
-IMPORTANT: 
-- 你的回复必须是严格的JSON格式。
-- 不要包含任何解释性文字。
-- 所有文本中的引号必须使用转义符号 (例如 \")。
-- 确保JSON完整，不要被截断。
-- 保持内容精炼，避免过长的描述。
-- 严禁重复生成相同的内容，不要陷入循环。
-- 只返回3个推荐风格，不要多也不要少。
-
-CRITICAL STYLE GUIDELINES:
-- 正向提示词必须只描述：光影、色调、材质、艺术媒介、氛围、镜头语言 (e.g., "cinematic lighting, film grain, watercolor texture, dark atmosphere").
-- 严禁描述具体实体：不要包含人物、服装、具体物品、环境细节 (e.g., 禁止 "cracked helmet", "blood stains", "monster", "forest", "sword").
-- 风格必须是通用的，能套用到任何角色或场景上，而不会改变其原本的物理结构。
-
-返回格式：
-{
-  "recommendations": [
-    {
-      "name": "风格名称",
-      "description": "风格描述",
-      "reason": "推荐理由",
-      "positive_prompt": "正向提示词",
-      "negative_prompt": "负向提示词"
-    }
-  ]
-}"""
+        if custom_style_prompt and custom_style_prompt.strip():
+            system_prompt = custom_style_prompt
+        else:
+            system_prompt = DEFAULT_STYLE_ANALYSIS_PROMPT
 
         user_prompt = f"剧本内容：\n\n{script_text[:2000]}"  # 限制长度避免 token 限制
         
@@ -816,10 +908,14 @@ CRITICAL STYLE GUIDELINES:
             }
         ]
     
-    def analyze_to_storyboard(self, text: str, entities_json: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def analyze_to_storyboard(self, text: str, entities_json: Dict[str, Any], custom_extraction_prompt: str = "") -> List[Dict[str, Any]]:
         """
         Analyzes script text and generates storyboard frames using Prompt B (Storyboard Director).
         Returns a list of frame dictionaries with visual atoms.
+
+        custom_extraction_prompt: optional override (PromptConfig.storyboard_extraction).
+        Empty = use the built-in DEFAULT_STORYBOARD_EXTRACTION_PROMPT. The template may
+        contain {entities_str} and {text} placeholders, substituted before the call.
         """
         logger.info(f"Analyzing text to storyboard: {text[:100]}...")
         
@@ -838,78 +934,12 @@ CRITICAL STYLE GUIDELINES:
             "props": props_list,
         }, ensure_ascii=False, indent=2)
 
-        system_prompt = f"""# 角色
-你是一名电影级的分镜师。你的任务是将剧本文本拆解为一系列连续的分镜帧。
-
-# 核心规则
-1. **视觉节拍拆解**: 一行包含多个动作时，拆为多帧。每帧仅含一个主要动作。
-2. **角色可见性**: character_ref_names 只列画面中可见的角色。
-3. **实体约束**: 场景名、角色名、道具名严格匹配已提取实体。
-4. **语言**: 简体中文。
-5. **景别枚举**: 必须从以下选项中选择: 大特写 | 特写 | 近景 | 中景 | 全景 | 远景 | 大远景
-6. **角度枚举**: 必须从以下选项中选择: 平视 | 俯视 | 仰视 | 鸟瞰 | 蚁视 | 过肩 | 荷兰角 | 主观视角
-7. **时长**: 基于动作复杂度估算整数秒（范围 3-10 秒）。简单静态 3-4s，标准动作 5-6s，复杂/情绪镜头 7-10s。
-8. **对白**: 如果帧中有角色说话，dialogue 和 speaker 必须填写。一帧只能有一个说话人——多人对话必须拆为多帧。
-
-# 剧本格式说明
-- **场景标题行**: `1-1 地点名称 [时间] [内/外]`
-- **人物行**: `人物：角色名1，角色名2`
-- **动作描述**: 以 `△` 开头
-- **对话**: `角色名（情绪）：对话内容`，或 `角色名 (V.O.)：` 表示画外音
-
-# 已提取的实体
-{entities_str}
-
-# 输出格式
-返回 JSON 对象 {{"frames": [...]}}。不要包含 Markdown 标记。
-
-每帧字段:
-{{
-    "scene_ref_name": "场景名",
-    "character_ref_names": ["角色名"],
-    "prop_ref_names": ["道具名"],
-    "action_summary": "一句话概括这帧发生什么（含角色动作 + 物理事件 + 神态表情）",
-    "shot_size": "中景",
-    "camera_angle": "平视",
-    "camera_movement": "静止",
-    "dialogue": "台词内容（无对白则为 null）",
-    "speaker": "说话人（无对白则为 null）",
-    "duration": 5
-}}
-
-# 示例
-{{
-    "frames": [
-        {{
-            "scene_ref_name": "卧室",
-            "character_ref_names": ["叶墨"],
-            "prop_ref_names": ["手机"],
-            "action_summary": "手机在床头柜上震动，叶墨烦躁翻身，眉头紧锁，被子滑落",
-            "shot_size": "中景",
-            "camera_angle": "俯视",
-            "camera_movement": "静止",
-            "dialogue": "妈，这才几点啊！",
-            "speaker": "叶墨",
-            "duration": 4
-        }},
-        {{
-            "scene_ref_name": "卧室",
-            "character_ref_names": ["叶墨"],
-            "prop_ref_names": ["手机"],
-            "action_summary": "叶墨看到来电显示，猛地坐起，表情惊恐",
-            "shot_size": "特写",
-            "camera_angle": "平视",
-            "camera_movement": "快速推镜",
-            "dialogue": "已经来了？",
-            "speaker": "叶墨",
-            "duration": 3
-        }}
-    ]
-}}
-
-# 剧本内容
-{text}
-"""
+        template = (
+            custom_extraction_prompt
+            if custom_extraction_prompt and custom_extraction_prompt.strip()
+            else DEFAULT_STORYBOARD_EXTRACTION_PROMPT
+        )
+        system_prompt = template.replace("{entities_str}", entities_str).replace("{text}", text)
 
         try:
             content = self.llm.chat(

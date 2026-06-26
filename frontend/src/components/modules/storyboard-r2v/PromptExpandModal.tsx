@@ -125,9 +125,9 @@ export default function PromptExpandModal({
                 aria-modal="true"
                 aria-label={t("promptExpandTitle", { shot: shotLabel })}
                 onKeyDown={handleTrapTab}
-                className="fixed left-1/2 top-1/2 z-[61] flex h-[80vh] w-[min(800px,92vw)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[12px] border border-white/10 bg-[#0a0a10] shadow-[0_24px_60px_-22px_rgba(0,0,0,0.9)] motion-safe:animate-[compareModalIn_240ms_cubic-bezier(0.22,1,0.36,1)_both]"
+                className="fixed left-1/2 top-1/2 z-[61] flex h-[80vh] w-[min(800px,92vw)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[12px] border border-glass-border bg-surface shadow-[0_24px_60px_-22px_rgba(0,0,0,0.9)] motion-safe:animate-[compareModalIn_240ms_cubic-bezier(0.22,1,0.36,1)_both]"
             >
-                <header className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+                <header className="flex shrink-0 items-center justify-between gap-3 border-b border-glass-border px-4 py-3">
                     <div className="flex items-center gap-2">
                         <div className="font-display text-display font-semibold tracking-tight text-foreground">
                             {t("promptExpandTitle", { shot: shotLabel })}
@@ -140,7 +140,7 @@ export default function PromptExpandModal({
                         <button
                             type="button"
                             onClick={() => onSave(draft)}
-                            className="btn-tip inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 font-display text-display-sm font-semibold text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.22),0_4px_12px_-4px_rgba(100,108,255,0.55)] transition-all duration-fast ease-out-quart hover:bg-primary/92 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/65"
+                            className="btn-tip inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 font-display text-display-sm font-semibold text-white shadow-[var(--btn-pri-glow),inset_0_1px_0_0_rgba(255,255,255,0.22)] transition-all duration-fast ease-out-quart hover:bg-primary/92 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/65"
                             title={t("promptExpandSaveHint")}
                         >
                             <Minimize2 size={13} aria-hidden="true" />
@@ -166,7 +166,7 @@ export default function PromptExpandModal({
                         className="flex-1 w-full resize-none rounded-md border border-glass-border bg-black/30 px-4 py-3 font-sans text-body text-foreground leading-relaxed placeholder:text-text-muted outline-none transition-colors duration-fast ease-out-quart focus:border-primary/55 focus-visible:ring-2 focus-visible:ring-primary/45"
                     />
                 </div>
-                <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-white/10 px-4 py-2.5 font-mono text-chrome-sm tracking-tight text-text-muted">
+                <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-glass-border px-4 py-2.5 font-mono text-chrome-sm tracking-tight text-text-muted">
                     <span>{t("promptExpandHotkeys")}</span>
                     <span>{t("promptExpandShortcut")}</span>
                 </footer>

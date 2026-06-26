@@ -27,6 +27,14 @@ export interface ImageAsset {
     variants: ImageVariant[];
 }
 
+/** Character reference sheet container (new schema). Mirrors backend
+ *  AssetUnit: variants live under `image_variants` / selection under
+ *  `selected_image_id` (note: different field names from ImageAsset). */
+export interface AssetUnit {
+    selected_image_id: string | null;
+    image_variants: ImageVariant[];
+}
+
 export interface VideoTask {
     id: string;
     project_id: string;
@@ -60,6 +68,9 @@ export interface Character {
     headshot_image_url?: string;
 
     // New Asset Containers
+    // reference_sheet is the canonical character asset (new schema);
+    // full_body_asset is legacy, kept only as a read fallback.
+    reference_sheet?: AssetUnit;
     full_body_asset?: ImageAsset;
     three_view_asset?: ImageAsset;
     headshot_asset?: ImageAsset;
@@ -71,6 +82,7 @@ export interface Character {
     voice_id?: string;
     voice_name?: string;
     locked?: boolean;
+    starred?: boolean;
     status?: string;
     is_consistent?: boolean;
     full_body_updated_at?: number;
@@ -97,6 +109,7 @@ export interface Scene {
     video_prompt?: string;
     status?: string;
     locked?: boolean;
+    starred?: boolean;
     time_of_day?: string;
     lighting_mood?: string;
     source?: "episode" | "series";
@@ -112,6 +125,7 @@ export interface Prop {
     video_prompt?: string;
     status?: string;
     locked?: boolean;
+    starred?: boolean;
     source?: "episode" | "series";
 }
 
@@ -214,6 +228,7 @@ export interface PromptConfig {
     storyboard_polish: string;
     video_polish: string;
     r2v_polish: string;
+    storyboard_extraction?: string;
 }
 
 export interface Series {
@@ -262,6 +277,8 @@ export interface Project {
     mix_settings?: Record<string, number>;
     series_id?: string;
     episode_number?: number;
+    /** T13 — user-starred (featured) flag; drives the amber-halation card. */
+    starred?: boolean;
 }
 
 interface ProjectStore {
@@ -282,7 +299,7 @@ interface ProjectStore {
 
     // Actions
     setProjects: (projects: Project[]) => void;  // For syncing from backend
-    createProject: (title: string, text: string, skipAnalysis?: boolean, workflowMode?: string) => Promise<void>;
+    createProject: (title: string, text: string, skipAnalysis?: boolean, workflowMode?: string, seriesId?: string) => Promise<void>;
     analyzeProject: (script: string) => Promise<void>;
     analyzeArtStyle: (scriptId: string, text: string) => Promise<void>;
     loadProjects: () => void;
@@ -325,6 +342,65 @@ interface ProjectStore {
     setCurrentSeries: (series: Series | null) => void;
 }
 
+// localStorage keys mirrored from SettingsPage. These hold the user's
+// global default model settings / prompt config. Kept here so newly
+// created projects can be backfilled with those defaults.
+const LS_KEY_DEFAULT_MODEL = 'lumenx_default_model_settings';
+const LS_KEY_DEFAULT_PROMPT = 'lumenx_default_prompt_config';
+
+function readLS<T>(key: string): T | null {
+    if (typeof window === 'undefined') return null;
+    try {
+        const raw = localStorage.getItem(key);
+        return raw ? (JSON.parse(raw) as T) : null;
+    } catch {
+        return null;
+    }
+}
+
+// Backfill the SettingsPage defaults onto a freshly created project.
+// Returns the re-fetched project when any default was applied, else null.
+async function injectDefaultsIntoProject(projectId: string): Promise<Project | null> {
+    const ms = readLS<Partial<FrontendModelSettings>>(LS_KEY_DEFAULT_MODEL);
+    const pc = readLS<{
+        storyboard_polish?: string;
+        video_polish?: string;
+        r2v_polish?: string;
+        entity_extraction?: string;
+        style_analysis?: string;
+        storyboard_extraction?: string;
+    }>(LS_KEY_DEFAULT_PROMPT);
+
+    let applied = false;
+
+    if (ms) {
+        await api.updateModelSettings(
+            projectId,
+            ms.t2i_model,
+            ms.i2i_model,
+            ms.i2v_model,
+            ms.character_aspect_ratio,
+            ms.scene_aspect_ratio,
+            ms.prop_aspect_ratio,
+            ms.storyboard_aspect_ratio,
+            ms.image_model,
+            ms.r2v_model,
+        );
+        applied = true;
+    }
+
+    if (pc) {
+        const hasAny = Object.values(pc).some((v) => typeof v === 'string' && v.trim());
+        if (hasAny) {
+            await api.updatePromptConfig(projectId, pc);
+            applied = true;
+        }
+    }
+
+    if (!applied) return null;
+    return api.getProject(projectId);
+}
+
 export const useProjectStore = create<ProjectStore>()(
     persist(
         (set, get) => ({
@@ -365,10 +441,21 @@ export const useProjectStore = create<ProjectStore>()(
             // Sync projects from backend
             setProjects: (projects: Project[]) => set({ projects }),
 
-            createProject: async (title: string, text: string, skipAnalysis: boolean = false, workflowMode: string = "r2v") => {
+            createProject: async (title: string, text: string, skipAnalysis: boolean = false, workflowMode: string = "r2v", seriesId?: string) => {
                 set({ isLoading: true });
                 try {
-                    const project = await api.createProject(title, text, skipAnalysis, workflowMode);
+                    let project = await api.createProject(title, text, skipAnalysis, workflowMode, seriesId);
+                    // Inject SettingsPage defaults into the new project. These
+                    // are persisted to localStorage by SettingsPage but were
+                    // never wired into creation — so changing defaults had no
+                    // effect. Backfill via the existing per-project endpoints.
+                    try {
+                        const updated = await injectDefaultsIntoProject(project.id);
+                        if (updated) project = { ...project, ...updated, originalText: project.originalText };
+                    } catch (backfillError) {
+                        // Non-fatal: a failed backfill must not block creation.
+                        console.warn('Failed to inject default settings into new project:', backfillError);
+                    }
                     set((state) => ({
                         projects: [...state.projects, project],
                         currentProject: project,
@@ -382,7 +469,7 @@ export const useProjectStore = create<ProjectStore>()(
             },
 
             analyzeProject: async (script: string) => {
-                const { currentProject, updateProject, createProject } = get();
+                const { currentProject, createProject } = get();
                 set({ isAnalyzing: true });
 
                 try {

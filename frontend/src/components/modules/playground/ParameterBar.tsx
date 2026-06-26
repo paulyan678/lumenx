@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { usePlaygroundStore } from './usePlaygroundStore';
 import { getModelParams, getModelDuration } from './playgroundModels';
 import { ChevronDown, Check } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -64,24 +65,24 @@ function ParamDropdown({
 
   return (
     <div className="flex flex-col gap-[6px]">
-      <span className="text-[11px] font-medium text-white/40">{label}</span>
+      <span className="font-mono text-[0.625rem] uppercase tracking-[0.08em] text-text-muted">{label}</span>
       <div ref={containerRef} className="relative">
         <button
           type="button"
           disabled={disabled}
           onClick={() => !disabled && setOpen((o) => !o)}
-          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white text-xs font-medium transition cursor-pointer ${
+          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-[14px] bg-surface-inset border border-border-subtle text-foreground text-xs font-medium transition cursor-pointer ${
             disabled
               ? 'opacity-50 cursor-not-allowed'
-              : 'hover:border-white/[0.15]'
+              : 'hover:border-foreground/30'
           }`}
         >
           <span>{display(value)}</span>
-          {!disabled && <ChevronDown className={`w-3 h-3 text-white/40 transition-transform ${open ? 'rotate-180' : ''}`} />}
+          {!disabled && <ChevronDown className={`w-3 h-3 text-text-muted transition-transform ${open ? 'rotate-180' : ''}`} />}
         </button>
 
         {open && (
-          <div className="absolute top-full mt-1 w-full bg-[#141416] border border-white/[0.08] rounded-lg shadow-xl z-30 max-h-48 overflow-y-auto">
+          <div className="absolute top-full mt-1 w-full bg-elevated atelier-card border border-border-subtle z-30 max-h-48 overflow-y-auto">
             {options.map((opt) => (
               <div
                 key={opt}
@@ -89,12 +90,12 @@ function ParamDropdown({
                   onChange(opt);
                   setOpen(false);
                 }}
-                className="px-3 py-2 text-xs flex items-center justify-between hover:bg-white/[0.06] cursor-pointer"
+                className="px-3 py-2 text-xs flex items-center justify-between hover:bg-hover-bg cursor-pointer"
               >
-                <span className={opt === value ? 'text-white' : 'text-white/60'}>
+                <span className={opt === value ? 'text-foreground' : 'text-text-secondary'}>
                   {display(opt)}
                 </span>
-                {opt === value && <Check className="w-3 h-3 text-[#646cff]" />}
+                {opt === value && <Check className="w-3 h-3 text-primary" />}
               </div>
             ))}
           </div>
@@ -126,15 +127,15 @@ function PillToggle({
 }) {
   return (
     <div className="flex flex-col gap-[6px]">
-      <span className="text-[11px] font-medium text-white/40">{label}</span>
-      <div className="flex gap-0 p-[2px] bg-white/[0.03] rounded-lg border border-white/[0.04]">
+      <span className="font-mono text-[0.625rem] uppercase tracking-[0.08em] text-text-muted">{label}</span>
+      <div className="flex gap-[2px] p-[3px] bg-surface-inset rounded-full atelier-pill-tabs">
         <button
           type="button"
           onClick={() => onChange(true)}
-          className={`flex-1 px-3 py-[6px] rounded-md text-[11px] font-medium text-center cursor-pointer transition-all ${
+          className={`flex-1 rounded-full px-3 py-1.5 text-[0.6875rem] font-medium text-center cursor-pointer transition-all ${
             value
-              ? 'bg-[#646cff] text-white shadow-[0_1px_4px_rgba(100,108,255,0.3)]'
-              : 'text-white/40 hover:text-white/60'
+              ? 'bg-primary text-on-accent'
+              : 'text-text-muted hover:text-foreground hover:bg-hover-bg'
           }`}
         >
           ON
@@ -142,10 +143,10 @@ function PillToggle({
         <button
           type="button"
           onClick={() => onChange(false)}
-          className={`flex-1 px-3 py-[6px] rounded-md text-[11px] font-medium text-center cursor-pointer transition-all ${
+          className={`flex-1 rounded-full px-3 py-1.5 text-[0.6875rem] font-medium text-center cursor-pointer transition-all ${
             !value
-              ? 'bg-[#646cff] text-white shadow-[0_1px_4px_rgba(100,108,255,0.3)]'
-              : 'text-white/40 hover:text-white/60'
+              ? 'bg-primary text-on-accent'
+              : 'text-text-muted hover:text-foreground hover:bg-hover-bg'
           }`}
         >
           OFF
@@ -172,6 +173,7 @@ function DurationStepper({
   step: number;
   onChange: (v: number) => void;
 }) {
+  const t = useTranslations('playground');
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value.replace(/[^0-9]/g, '');
     if (raw === '') return;
@@ -185,13 +187,13 @@ function DurationStepper({
 
   return (
     <div className="flex flex-col gap-[6px]">
-      <span className="text-[11px] font-medium text-white/40">时长</span>
-      <div className="flex items-center gap-0 rounded-lg border border-white/[0.08] bg-white/[0.04] overflow-hidden">
+      <span className="font-mono text-[0.625rem] uppercase tracking-[0.08em] text-text-muted">{t('parameters.duration')}</span>
+      <div className="flex items-center gap-0 rounded-[14px] border border-border-subtle bg-surface-inset overflow-hidden">
         <button
           type="button"
           disabled={value <= min}
           onClick={() => onChange(Math.max(min, value - step))}
-          className="px-3 py-2.5 text-white/60 hover:text-white hover:bg-white/[0.06] transition disabled:opacity-30 disabled:cursor-not-allowed text-sm font-medium shrink-0"
+          className="px-3 py-2.5 text-text-secondary hover:text-foreground hover:bg-hover-bg transition disabled:opacity-30 disabled:cursor-not-allowed text-sm font-medium shrink-0"
         >
           −
         </button>
@@ -202,22 +204,22 @@ function DurationStepper({
             value={value}
             onChange={handleInputChange}
             onBlur={handleBlur}
-            className="w-8 bg-transparent text-center font-mono text-xs font-medium text-white outline-none"
+            className="w-8 bg-transparent text-center font-mono text-xs font-medium text-foreground outline-none"
           />
-          <span className="text-[10px] text-white/40 font-mono">s</span>
+          <span className="text-[0.625rem] text-text-muted font-mono">s</span>
         </div>
         <button
           type="button"
           disabled={value >= max}
           onClick={() => onChange(Math.min(max, value + step))}
-          className="px-3 py-2.5 text-white/60 hover:text-white hover:bg-white/[0.06] transition disabled:opacity-30 disabled:cursor-not-allowed text-sm font-medium shrink-0"
+          className="px-3 py-2.5 text-text-secondary hover:text-foreground hover:bg-hover-bg transition disabled:opacity-30 disabled:cursor-not-allowed text-sm font-medium shrink-0"
         >
           +
         </button>
       </div>
       <div className="flex justify-between px-1">
-        <span className="text-[9px] text-white/20 font-mono">{min}s</span>
-        <span className="text-[9px] text-white/20 font-mono">{max}s</span>
+        <span className="text-[0.5625rem] text-text-muted font-mono">{min}s</span>
+        <span className="text-[0.5625rem] text-text-muted font-mono">{max}s</span>
       </div>
     </div>
   );
@@ -228,6 +230,7 @@ function DurationStepper({
 // ---------------------------------------------------------------------------
 
 export default function ParameterBar() {
+  const t = useTranslations('playground');
   const mode = usePlaygroundStore((s) => s.mode);
   const modelId = usePlaygroundStore((s) => s.modelId);
   const parameters = usePlaygroundStore((s) => s.parameters);
@@ -315,17 +318,17 @@ export default function ParameterBar() {
   // Batch pill renderer (reused for both image and video)
   const batchPills = (
     <div className="flex flex-col gap-[6px]">
-      <span className="text-[11px] font-medium text-white/40">批量生成</span>
-      <div className="flex gap-0 p-[2px] bg-white/[0.03] rounded-lg border border-white/[0.04]">
+      <span className="font-mono text-[0.625rem] uppercase tracking-[0.08em] text-text-muted">{t('parameters.batchSize')}</span>
+      <div className="flex gap-[2px] p-[3px] bg-surface-inset rounded-full atelier-pill-tabs">
         {BATCH_OPTIONS.map((n) => (
           <button
             key={n}
             type="button"
             onClick={() => setBatchSize(n)}
-            className={`flex-1 py-[6px] rounded-md font-mono text-xs font-medium cursor-pointer transition-all text-center ${
+            className={`flex-1 rounded-full px-3 py-1.5 font-mono text-[0.6875rem] font-medium cursor-pointer transition-all text-center ${
               batchSize === n
-                ? 'text-white bg-[#646cff] shadow-[0_1px_4px_rgba(100,108,255,0.3)]'
-                : 'text-white/40 hover:text-white/60'
+                ? 'bg-primary text-on-accent'
+                : 'text-text-muted hover:text-foreground hover:bg-hover-bg'
             }`}
           >
             x{n}
@@ -345,7 +348,7 @@ export default function ParameterBar() {
             {/* Size (image-specific, replaces resolution) */}
             {hasSize && (
               <ParamDropdown
-                label="图像尺寸"
+                label={t('parameters.imageSize')}
                 value={(parameters.size as string) ?? sizeDefault}
                 options={sizeOptions}
                 onChange={(v) => updateParam('size', v)}
@@ -356,7 +359,7 @@ export default function ParameterBar() {
             {/* Quality (GPT-Image-2 specific) */}
             {hasQuality && (
               <ParamDropdown
-                label="画质"
+                label={t('parameters.quality')}
                 value={(parameters.quality as string) ?? qualityDefault}
                 options={qualityOptions}
                 onChange={(v) => updateParam('quality', v)}
@@ -376,7 +379,7 @@ export default function ParameterBar() {
             {/* Ratio */}
             {hasRatio && (
               <ParamDropdown
-                label="画面比例"
+                label={t('parameters.aspectRatio')}
                 value={(parameters.aspect_ratio as string) ?? ratioDefault}
                 options={ratioOptions}
                 onChange={(v) => updateParam('aspect_ratio', v)}
@@ -386,7 +389,7 @@ export default function ParameterBar() {
             {/* Resolution */}
             {hasResolution && (
               <ParamDropdown
-                label="分辨率"
+                label={t('parameters.resolution')}
                 value={(parameters.resolution as string) ?? resolutionDefault}
                 options={resolutionOptions}
                 onChange={(v) => updateParam('resolution', v)}
@@ -397,13 +400,13 @@ export default function ParameterBar() {
             {!hasRatio && !hasResolution && (
               <>
                 <ParamDropdown
-                  label="画面比例"
+                  label={t('parameters.aspectRatio')}
                   value={(parameters.aspect_ratio as string) ?? FALLBACK_RATIOS[0]}
                   options={FALLBACK_RATIOS}
                   onChange={(v) => updateParam('aspect_ratio', v)}
                 />
                 <ParamDropdown
-                  label="分辨率"
+                  label={t('parameters.resolution')}
                   value={(parameters.resolution as string) ?? FALLBACK_RESOLUTIONS[0]}
                   options={FALLBACK_RESOLUTIONS}
                   onChange={(v) => updateParam('resolution', v)}
@@ -414,24 +417,24 @@ export default function ParameterBar() {
             {/* Duration */}
             {durationFixed ? (
               <div className="flex flex-col gap-[6px]">
-                <span className="text-[11px] font-medium text-white/40">时长</span>
-                <div className="w-full flex items-center px-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white/40 text-xs font-medium">
-                  {durationValue}s (固定)
+                <span className="font-mono text-[0.625rem] uppercase tracking-[0.08em] text-text-muted">{t('parameters.duration')}</span>
+                <div className="w-full flex items-center px-3 py-2.5 rounded-[14px] bg-surface-inset border border-border-subtle text-text-muted text-xs font-medium">
+                  {durationValue}s {t('parameters.durationFixedSuffix')}
                 </div>
               </div>
             ) : modelDuration?.type === 'buttons' ? (
               <div className="flex flex-col gap-[6px]">
-                <span className="text-[11px] font-medium text-white/40">时长</span>
-                <div className="flex gap-0 p-[2px] bg-white/[0.03] rounded-lg border border-white/[0.04]">
+                <span className="font-mono text-[0.625rem] uppercase tracking-[0.08em] text-text-muted">{t('parameters.duration')}</span>
+                <div className="flex gap-[2px] p-[3px] bg-surface-inset rounded-full atelier-pill-tabs">
                   {modelDuration.options.map((n) => (
                     <button
                       key={n}
                       type="button"
                       onClick={() => updateParam('duration', n)}
-                      className={`flex-1 py-[6px] rounded-md font-mono text-xs font-medium cursor-pointer transition-all text-center ${
+                      className={`flex-1 rounded-full px-3 py-1.5 font-mono text-[0.6875rem] font-medium cursor-pointer transition-all text-center ${
                         durationValue === n
-                          ? 'text-white bg-[#646cff] shadow-[0_1px_4px_rgba(100,108,255,0.3)]'
-                          : 'text-white/40 hover:text-white/60'
+                          ? 'bg-primary text-on-accent'
+                          : 'text-text-muted hover:text-foreground hover:bg-hover-bg'
                       }`}
                     >
                       {n}s
@@ -461,20 +464,21 @@ export default function ParameterBar() {
           <button
             type="button"
             onClick={() => setShowAdvanced(!showAdvanced)}
-            className="text-[11px] font-medium text-white/40 hover:text-white/60 transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1 text-[0.6875rem] font-medium text-text-muted hover:text-foreground transition-colors cursor-pointer"
           >
-            {showAdvanced ? '▾' : '▸'} 高级参数
+            <ChevronDown className={`w-3 h-3 text-text-muted shrink-0 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
+            {t('parameters.advanced')}
           </button>
 
           {showAdvanced && (
             <div className="grid grid-cols-2 gap-3 mt-3">
               {supportsSeed && (
-                <div className="flex flex-col gap-[6px]">
-                  <span className="text-[11px] font-medium text-white/40">Seed</span>
+                <div className="flex flex-col gap-[6px] atelier-field">
+                  <span className="font-mono text-[0.625rem] uppercase tracking-[0.08em] text-text-muted">Seed</span>
                   <input
                     type="number"
-                    placeholder="随机"
-                    className="bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2.5 text-xs text-white font-mono w-full outline-none focus:border-white/[0.15] transition placeholder:text-white/20"
+                    placeholder={t('parameters.seedPlaceholder')}
+                    className="glass-input w-full text-xs text-foreground font-mono placeholder:text-text-muted bg-surface-inset rounded-[14px]"
                     value={parameters.seed ?? ''}
                     onChange={(e) => {
                       const val = e.target.value;
@@ -486,7 +490,7 @@ export default function ParameterBar() {
 
               {supportsPromptExtend && (
                 <PillToggle
-                  label="提示词扩展"
+                  label={t('parameters.promptExtend')}
                   value={parameters.prompt_extend !== false}
                   onChange={(v) => updateParam('prompt_extend', v)}
                 />
@@ -494,7 +498,7 @@ export default function ParameterBar() {
 
               {supportsWatermark && (
                 <PillToggle
-                  label="水印"
+                  label={t('parameters.watermark')}
                   value={parameters.watermark === true}
                   onChange={(v) => updateParam('watermark', v)}
                 />

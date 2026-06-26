@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Download, Users, MapPin, Package, Check, Loader2, ArrowRight, ArrowLeft, Image as ImageIcon } from 'lucide-react';
 import { api } from '@/lib/api';
 import type { Series, Character, Scene, Prop } from '@/store/projectStore';
+import { characterImageUrl } from '@/lib/characterImage';
 import { useTranslations } from "next-intl";
 
 interface ImportAssetsDialogProps {
@@ -26,12 +27,7 @@ interface SelectableAsset {
 
 function getAssetImageUrl(asset: Character | Scene | Prop, type: AssetTab): string | undefined {
     if (type === "characters") {
-        const char = asset as Character;
-        if (char.full_body_asset?.variants?.length) {
-            const selected = char.full_body_asset.variants.find(v => v.id === char.full_body_asset?.selected_id);
-            return selected?.url || char.full_body_asset.variants[0]?.url;
-        }
-        return char.image_url || char.full_body_image_url;
+        return characterImageUrl(asset as Character);
     }
     if (type === "scenes") {
         const scene = asset as Scene;
@@ -234,7 +230,6 @@ export default function ImportAssetsDialog({ isOpen, onClose, seriesId, onImport
                                     </div>
                                 ) : (
                                     allSeries.map((s) => {
-                                        const assetCount = (s.characters?.length || 0) + (s.scenes?.length || 0) + (s.props?.length || 0);
                                         return (
                                             <button
                                                 key={s.id}
@@ -342,7 +337,7 @@ export default function ImportAssetsDialog({ isOpen, onClose, seriesId, onImport
                                                 <div className="p-2">
                                                     <p className="text-xs font-medium text-foreground truncate">{asset.name}</p>
                                                     {asset.description && (
-                                                        <p className="text-[10px] text-text-secondary mt-0.5 line-clamp-1">{asset.description}</p>
+                                                        <p className="text-[0.625rem] text-text-secondary mt-0.5 line-clamp-1">{asset.description}</p>
                                                     )}
                                                 </div>
                                             </button>

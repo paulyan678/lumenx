@@ -1,6 +1,56 @@
 import { create } from 'zustand';
 
 // ---------------------------------------------------------------------------
+// Featured (best-of-batch) persistence — client-side localStorage only.
+// Map of generationId -> the one outputId marked "featured" within that batch.
+// ---------------------------------------------------------------------------
+
+const FEATURED_LS_KEY = 'lumenx:playground:featured';
+
+function loadFeatured(): Record<string, string> {
+  if (typeof window === 'undefined') return {};
+  try {
+    return JSON.parse(window.localStorage.getItem(FEATURED_LS_KEY) || '{}') as Record<string, string>;
+  } catch {
+    return {};
+  }
+}
+
+function saveFeatured(map: Record<string, string>): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(FEATURED_LS_KEY, JSON.stringify(map));
+  } catch {
+    /* ignore quota / serialization errors */
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Generation queue — client-side concurrency gate. Default concurrency is
+// persisted to localStorage; queued ids use a simple module counter.
+// ---------------------------------------------------------------------------
+
+const CONCURRENCY_LS_KEY = 'lumenx:playground:concurrency';
+const DEFAULT_CONCURRENCY = 3;
+
+function loadConcurrency(): number {
+  if (typeof window === 'undefined') return DEFAULT_CONCURRENCY;
+  const raw = Number(window.localStorage.getItem(CONCURRENCY_LS_KEY));
+  return Number.isFinite(raw) && raw >= 1 && raw <= 8 ? raw : DEFAULT_CONCURRENCY;
+}
+
+function saveConcurrency(n: number): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(CONCURRENCY_LS_KEY, String(n));
+  } catch {
+    /* ignore */
+  }
+}
+
+let queueSeq = 0;
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -42,6 +92,19 @@ export interface PlaygroundTemplate {
   updated_at: string;
 }
 
+export interface QueuedRequest {
+  id: string;
+  mode: PlaygroundMode;
+  modelId: string;
+  prompt: string;
+  negativePrompt?: string;
+  inputMedia: string[];
+  parameters: Record<string, any>;
+  batchSize: number;
+  status: 'pending' | 'dispatching';
+  enqueuedAt: number;
+}
+
 // ---------------------------------------------------------------------------
 // State & Actions
 // ---------------------------------------------------------------------------
@@ -77,12 +140,34 @@ interface PlaygroundState {
   toggleTemplateFavorite: (id: string) => void;
   isTemplateFavorited: (id: string) => boolean;
 
+  // Featured output per generation (best-of-batch); one per batch, localStorage-persisted
+  featuredByGen: Record<string, string>;
+  toggleFeatured: (genId: string, outputId: string) => void;
+  isFeatured: (genId: string, outputId: string) => boolean;
+
+  // Generation queue (client-side concurrency gate)
+  queue: QueuedRequest[];
+  maxConcurrent: number;
+  enqueueRequest: (req: Omit<QueuedRequest, 'id' | 'status' | 'enqueuedAt'>) => void;
+  markDispatching: (id: string) => void;
+  removeFromQueue: (id: string) => void;
+  setMaxConcurrent: (n: number) => void;
+
   // Actions — input setters
   setMode: (mode: PlaygroundMode) => void;
   setModelId: (modelId: string) => void;
   setPrompt: (prompt: string) => void;
   setNegativePrompt: (neg: string) => void;
   setInputMedia: (media: string[]) => void;
+  /** Push a generated result back into the compose panel as reference input,
+   *  switching to the appropriate mode. Image → i2i (default) or i2v when an
+   *  explicit targetMode is given; video → v2v. Respects per-mode model
+   *  preference (same behavior as setMode). */
+  useResultAsReference: (
+    mediaPath: string,
+    mediaType: 'image' | 'video',
+    targetMode?: PlaygroundMode,
+  ) => void;
   setParameters: (params: Record<string, any>) => void;
   setBatchSize: (size: number) => void;
   setShowAdvancedParams: (show: boolean) => void;
@@ -160,6 +245,38 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
   },
   isTemplateFavorited: (id) => get().favoriteTemplateIds.includes(id),
 
+  // -- Featured output (best-of-batch, one per generation) -------------------
+  featuredByGen: loadFeatured(),
+  toggleFeatured: (genId, outputId) => {
+    const next = { ...get().featuredByGen };
+    if (next[genId] === outputId) delete next[genId];
+    else next[genId] = outputId;
+    saveFeatured(next);
+    set({ featuredByGen: next });
+  },
+  isFeatured: (genId, outputId) => get().featuredByGen[genId] === outputId,
+
+  // -- Generation queue (client-side concurrency gate) -----------------------
+  queue: [],
+  maxConcurrent: loadConcurrency(),
+  enqueueRequest: (req) =>
+    set((s) => ({
+      queue: [
+        ...s.queue,
+        { ...req, id: `q${++queueSeq}`, status: 'pending' as const, enqueuedAt: Date.now() },
+      ],
+    })),
+  markDispatching: (id) =>
+    set((s) => ({
+      queue: s.queue.map((q) => (q.id === id ? { ...q, status: 'dispatching' as const } : q)),
+    })),
+  removeFromQueue: (id) => set((s) => ({ queue: s.queue.filter((q) => q.id !== id) })),
+  setMaxConcurrent: (n) => {
+    const clamped = Math.max(1, Math.min(8, Math.round(n)));
+    saveConcurrency(clamped);
+    set({ maxConcurrent: clamped });
+  },
+
   // =========================================================================
   // Actions
   // =========================================================================
@@ -189,15 +306,29 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
 
   setInputMedia: (inputMedia) => set({ inputMedia }),
 
+  useResultAsReference: (mediaPath, mediaType, targetMode) => {
+    const { modelPreferences } = get();
+    const mode: PlaygroundMode =
+      targetMode ?? (mediaType === 'video' ? 'v2v' : 'i2i');
+    const preferredModel = modelPreferences[mode];
+    set({
+      mode,
+      inputMedia: [mediaPath],
+      ...(preferredModel !== undefined ? { modelId: preferredModel } : {}),
+    });
+  },
+
   setParameters: (parameters) => set({ parameters }),
 
   setBatchSize: (batchSize) => set({ batchSize }),
 
   setShowAdvancedParams: (showAdvancedParams) => set({ showAdvancedParams }),
 
-  setShowTemplateModal: (showTemplateModal) => set({ showTemplateModal }),
+  setShowTemplateModal: (showTemplateModal) =>
+    set(showTemplateModal ? { showTemplateModal, showHistoryDrawer: false } : { showTemplateModal }),
 
-  setShowHistoryDrawer: (showHistoryDrawer) => set({ showHistoryDrawer }),
+  setShowHistoryDrawer: (showHistoryDrawer) =>
+    set(showHistoryDrawer ? { showHistoryDrawer, showTemplateModal: false } : { showHistoryDrawer }),
 
   // -- Generation lifecycle --------------------------------------------------
 

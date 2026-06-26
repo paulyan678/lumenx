@@ -764,7 +764,7 @@ function CharacterDetailModal({ asset, type, onClose, onUpdateDescription, onGen
                     <div className="p-6 border-t border-glass-border bg-surface flex gap-4">
                         <button
                             onClick={onClose}
-                            className="flex-1 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-green-500/20"
+                            className="flex-1 py-3 bg-green-600 hover:bg-green-500 text-foreground rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-green-500/20"
                         >
                             <Check size={18} />
                             Done
@@ -786,8 +786,8 @@ function TabButton({ active, onClick, icon, label, count }: any) {
                 }`}
         >
             <span className={active ? "text-primary" : ""}>{icon}</span>
-            <span className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em]">{label}</span>
-            <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded-full border ${
+            <span className="font-mono text-[0.65625rem] font-semibold uppercase tracking-[0.14em]">{label}</span>
+            <span className={`font-mono text-[0.5625rem] px-1.5 py-0.5 rounded-full border ${
                 active
                     ? "text-primary border-primary/40 bg-[rgba(100,108,255,0.08)]"
                     : "text-text-muted border-glass-border bg-black/30"
@@ -825,7 +825,7 @@ function ImageWithRetry({ src, alt, className }: { src: string, alt: string, cla
         <div className={`relative ${className}`}>
             {isLoading && (
                 <div className="absolute inset-0 flex items-center justify-center bg-surface z-10">
-                    <RefreshCw className="animate-spin text-foreground/50" size={24} />
+                    <RefreshCw className="animate-spin text-text-secondary" size={24} />
                 </div>
             )}
             <img
@@ -895,7 +895,7 @@ function AssetCard({ asset, type, isGenerating, onGenerate, onToggleLock, onClic
                 />
             ) : (
                 <div className="w-full h-full flex items-center justify-center bg-glass">
-                    <ImageIcon className="text-foreground/20" size={48} />
+                    <ImageIcon className="text-text-muted" size={48} />
                 </div>
             )}
 
@@ -935,8 +935,8 @@ function AssetCard({ asset, type, isGenerating, onGenerate, onToggleLock, onClic
 
             {/* Bottom Info */}
             <div className="absolute bottom-0 left-0 right-0 p-4 z-30">
-                <h3 className="text-lg font-bold text-white mb-1 truncate">{asset.name}</h3>
-                <p className="text-xs text-white/70 line-clamp-2 mb-3 h-8">
+                <h3 className="text-lg font-bold text-foreground mb-1 truncate">{asset.name}</h3>
+                <p className="text-xs text-foreground/80 line-clamp-2 mb-3 h-8">
                     {asset.description || "No description"}
                 </p>
 
@@ -960,7 +960,7 @@ function AssetCard({ asset, type, isGenerating, onGenerate, onToggleLock, onClic
                             e.stopPropagation();
                             onUpload?.();
                         }}
-                        className="px-2.5 rounded-full bg-glass hover:bg-hover-bg border border-glass-border text-white cursor-pointer transition-colors"
+                        className="px-2.5 rounded-full bg-glass hover:bg-hover-bg border border-glass-border text-foreground cursor-pointer transition-colors"
                         title={tv("uploadAsset")}
                     >
                         <Upload size={14} />

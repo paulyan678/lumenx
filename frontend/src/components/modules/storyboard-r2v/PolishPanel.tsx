@@ -68,7 +68,7 @@ function reasonToI18nKey(reason: PolishErrorReason): string {
 }
 
 /** 解析 axios error 成 PolishErrorState；非 502 / 无 detail 时归类为 api_error。 */
-function parsePolishError(err: any): PolishErrorState {
+function parsePolishError(err: any, t: (key: string) => string): PolishErrorState {
     const detail = err?.response?.data?.detail;
     if (detail && typeof detail === "object" && typeof detail.reason === "string") {
         return {
@@ -81,7 +81,7 @@ function parsePolishError(err: any): PolishErrorState {
     }
     return {
         reason: "api_error",
-        messageZh: "模型调用失败，请重试或检查网络。",
+        messageZh: t("polishErrorApi"),
         messageEn: "Model call failed. Please retry or check your network.",
     };
 }
@@ -126,13 +126,13 @@ export default function PolishPanel({
                 // 200 但缺 key 走错误态
                 setError({
                     reason: "missing_keys",
-                    messageZh: "模型返回了不完整的双语结果，建议重试。",
+                    messageZh: t("polishErrorMissingKeys"),
                     messageEn: "Model returned incomplete bilingual result. Please retry.",
                 });
             }
         } catch (err: any) {
             debugLog.error("Studio", "Polish failed:", err);
-            const parsed = parsePolishError(err);
+            const parsed = parsePolishError(err, t);
             setError(parsed);
             // model_echo 是 warning：仍把后端附带的双语 echo 展示给用户
             // （这样他们能在 feedback 框里参照原文追加要求）
@@ -209,7 +209,7 @@ export default function PolishPanel({
                 <span
                     className={clsx(
                         "inline-flex items-center gap-1.5 font-mono text-chrome-sm font-medium uppercase",
-                        isHardError ? "text-red-200" : isEchoWarning ? "text-amber-100" : "text-primary",
+                        isHardError ? "text-status-failed-fg" : isEchoWarning ? "text-accent" : "text-primary",
                     )}
                 >
                     {isHardError ? (
@@ -236,7 +236,7 @@ export default function PolishPanel({
             {/* Error banner — hard errors only（echo warning 走下面的双语 + 黄色容器，不重复出 banner 行） */}
             {isHardError && error ? (
                 <div className="space-y-2">
-                    <p className="font-sans text-body-sm leading-relaxed text-red-100">
+                    <p className="font-sans text-body-sm leading-relaxed text-status-failed-fg">
                         {t(reasonToI18nKey(error.reason) as any)}
                     </p>
                     <div className="flex items-center gap-1">
@@ -244,7 +244,7 @@ export default function PolishPanel({
                             type="button"
                             onClick={() => runPolish("")}
                             disabled={isPolishing}
-                            className="inline-flex items-center gap-1 rounded border border-red-400/40 bg-red-400/10 px-2.5 py-1 font-mono text-chrome font-medium text-red-100 transition-colors duration-fast ease-out-quart hover:bg-red-400/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300/55 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="inline-flex items-center gap-1 rounded border border-status-failed-border bg-status-failed-bg px-2.5 py-1 font-mono text-chrome font-medium text-status-failed-fg transition-colors duration-fast ease-out-quart hover:bg-status-failed-bg/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-failed-border/55 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             <RefreshCw size={11} aria-hidden="true" />
                             {t("polishRetry")}
@@ -266,7 +266,7 @@ export default function PolishPanel({
 
             {/* Echo warning banner — 单行，紧凑展示，用户主要靠下方 feedback 框迭代 */}
             {isEchoWarning && error ? (
-                <p className="font-sans text-body-sm leading-relaxed text-amber-100">
+                <p className="font-sans text-body-sm leading-relaxed text-accent">
                     {t(reasonToI18nKey(error.reason) as any)}
                 </p>
             ) : null}
@@ -364,8 +364,8 @@ export default function PolishPanel({
             className={clsx(
                 "rounded-md border p-3 space-y-2.5 motion-safe:animate-[shotPanelIn_220ms_cubic-bezier(0.22,1,0.36,1)_both]",
                 isHardError
-                    ? "border-red-400/40 bg-red-400/[0.06]"
-                    : "border-amber-300/40 bg-amber-300/[0.06]",
+                    ? "border-status-failed-border bg-status-failed-bg/[0.06]"
+                    : "border-accent/40 bg-accent/[0.06]",
             )}
         >
             {containerInner}
@@ -440,14 +440,14 @@ function BilingualColumn({
             </div>
             {isLoading ? (
                 <div className="space-y-1 rounded bg-black/30 px-2.5 py-2">
-                    <div className="h-3 w-full animate-pulse rounded bg-white/8" />
-                    <div className="h-3 w-[88%] animate-pulse rounded bg-white/8" />
-                    <div className="h-3 w-[72%] animate-pulse rounded bg-white/8" />
+                    <div className="h-3 w-full animate-pulse rounded bg-elevated" />
+                    <div className="h-3 w-[88%] animate-pulse rounded bg-elevated" />
+                    <div className="h-3 w-[72%] animate-pulse rounded bg-elevated" />
                 </div>
             ) : (
                 <p
                     className={clsx(
-                        "rounded bg-black/30 px-2.5 py-2 text-body-sm leading-relaxed text-foreground/95 whitespace-pre-wrap",
+                        "rounded bg-black/30 px-2.5 py-2 text-body-sm leading-relaxed text-foreground whitespace-pre-wrap",
                         isMono ? "font-mono" : "font-sans",
                     )}
                 >

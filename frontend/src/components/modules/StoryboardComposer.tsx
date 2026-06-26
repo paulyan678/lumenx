@@ -4,14 +4,14 @@ import { useState, useRef, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-    Layout, Image as ImageIcon, Box, Type, Move,
-    ZoomIn, ZoomOut, Layers, Settings, Play,
-    ChevronRight, ChevronLeft, Trash2, Copy, Wand2, Users, FileText, RefreshCw, Loader2, X, Lock, Unlock,
+    Layout, Image as ImageIcon,
+    Trash2, Copy, Wand2, FileText, RefreshCw, Loader2, X, Lock, Unlock,
     Plus, ArrowUp, ArrowDown, Zap, Upload, Film
 } from "lucide-react";
 import { useProjectStore } from "@/store/projectStore";
-import { api, API_URL, crudApi } from "@/lib/api";
-import { getAssetUrl, getAssetUrlWithTimestamp, extractErrorDetail } from "@/lib/utils";
+import { api, crudApi } from "@/lib/api";
+import { getAssetUrlWithTimestamp, extractErrorDetail } from "@/lib/utils";
+import { selectedVariantUrl } from "@/lib/characterImage";
 import StepHeader from "@/components/shared/StepHeader";
 import WorkflowActionButton from "@/components/shared/WorkflowActionButton";
 
@@ -263,7 +263,8 @@ export default function StoryboardComposer() {
                     const char = currentProject.characters?.find((c: any) => c.id === charId);
                     if (char) {
                         // Priority: three_view_asset > full_body_asset > headshot_asset > legacy fields
-                        const charUrl = getSelectedVariantUrl(char.three_view_asset)
+                        const charUrl = selectedVariantUrl(char.reference_sheet)
+                            || getSelectedVariantUrl(char.three_view_asset)
                             || getSelectedVariantUrl(char.full_body_asset)
                             || getSelectedVariantUrl(char.headshot_asset)
                             || char.three_view_image_url
@@ -336,7 +337,7 @@ export default function StoryboardComposer() {
                 subtitle={tStep("storyboardComposerSubtitle")}
                 trailing={(
                     <div className="flex items-center gap-2">
-                        <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">
+                        <span className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-text-muted">
                             <span className="text-foreground font-medium">{currentProject?.frames?.length || 0}</span>
                             <span className="ml-1.5">frames</span>
                         </span>
@@ -407,7 +408,7 @@ export default function StoryboardComposer() {
                                         ) : (
                                             <div className="w-full h-full flex flex-col items-center justify-center text-text-muted gap-2">
                                                 <ImageIcon size={24} className="opacity-20" />
-                                                <span className="text-[10px]">{t("noImage", { defaultMessage: "No Image" })}</span>
+                                                <span className="text-[0.625rem]">{t("noImage", { defaultMessage: "No Image" })}</span>
                                             </div>
                                         )
 
@@ -469,9 +470,9 @@ export default function StoryboardComposer() {
                                         <div className="flex items-start justify-between">
                                             <div className="space-y-1">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="font-mono text-[10px] font-semibold text-text-secondary uppercase tracking-[0.18em]">{t("actionLabel")}</span>
+                                                    <span className="font-mono text-[0.625rem] font-semibold text-text-secondary uppercase tracking-[0.18em]">{t("actionLabel")}</span>
                                                     {frame.camera_movement && (
-                                                        <span className="font-mono text-[9.5px] uppercase tracking-[0.12em] px-1.5 py-0.5 bg-primary/15 text-primary rounded border border-primary/40">
+                                                        <span className="font-mono text-[0.59375rem] uppercase tracking-[0.12em] px-1.5 py-0.5 bg-primary/15 text-primary rounded border border-primary/40">
                                                             {frame.camera_movement}
                                                         </span>
                                                     )}
@@ -484,7 +485,7 @@ export default function StoryboardComposer() {
 
                                         {frame.dialogue && (
                                             <div className="mt-auto pt-3 border-t border-border-subtle">
-                                                <span className="font-mono text-[10px] font-semibold text-text-secondary uppercase tracking-[0.18em] block mb-1">{t("dialogueLabel")}</span>
+                                                <span className="font-mono text-[0.625rem] font-semibold text-text-secondary uppercase tracking-[0.18em] block mb-1">{t("dialogueLabel")}</span>
                                                 <p className="text-sm text-text-secondary italic">"{frame.dialogue}"</p>
                                             </div>
                                         )}
@@ -640,7 +641,7 @@ export default function StoryboardComposer() {
     );
 }
 
-function CreateFrameDialog({ onClose, onCreate, scenes }: { onClose: () => void; onCreate: (data: any) => void; scenes: any[] }) {
+function CreateFrameDialog({ onClose, onCreate, scenes }: { onClose: () => void; onCreate: (data: any) => void | Promise<void>; scenes: any[] }) {
     const [action, setAction] = useState("");
     const [dialogue, setDialogue] = useState("");
     const [sceneId, setSceneId] = useState(scenes[0]?.id || "");
@@ -782,7 +783,7 @@ function ImageWithRetry({ src, alt, className, onClick }: { src: string, alt: st
         <div className={`relative ${className}`}>
             {isLoading && (
                 <div className="absolute inset-0 flex items-center justify-center bg-surface z-10">
-                    <RefreshCw className="animate-spin text-foreground/50" size={24} />
+                    <RefreshCw className="animate-spin text-text-secondary" size={24} />
                 </div>
             )}
             <img
@@ -800,7 +801,7 @@ function ImageWithRetry({ src, alt, className, onClick }: { src: string, alt: st
             {error && retryCount >= 10 && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-red-500/10 backdrop-blur-sm z-20 p-2 text-center">
                     <span className="text-xs text-red-400 font-bold">Failed to load</span>
-                    <span className="text-[10px] text-red-400/70 break-all">{src}</span>
+                    <span className="text-[0.625rem] text-red-400/70 break-all">{src}</span>
                 </div>
             )}
         </div>

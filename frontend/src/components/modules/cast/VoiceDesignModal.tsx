@@ -16,8 +16,6 @@ import { useTranslations } from "next-intl";
 import { api, type CustomVoice } from "@/lib/api";
 import { getAssetUrl } from "@/lib/utils";
 
-const DEFAULT_PREVIEW_TEXT = "你好，这是一段音色测试。请仔细听一听是否符合预期。";
-
 interface VoiceDesignModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -38,8 +36,9 @@ export default function VoiceDesignModal({
     onCreated,
 }: VoiceDesignModalProps) {
     const t = useTranslations("voiceDesign");
+    const defaultPreviewText = t("previewTextDefault");
     const [voicePrompt, setVoicePrompt] = useState("");
-    const [previewText, setPreviewText] = useState(DEFAULT_PREVIEW_TEXT);
+    const [previewText, setPreviewText] = useState(defaultPreviewText);
     const [label, setLabel] = useState("");
     const [phase, setPhase] = useState<Phase>("draft");
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -55,7 +54,7 @@ export default function VoiceDesignModal({
             audioRef.current = null;
         }
         setVoicePrompt("");
-        setPreviewText(DEFAULT_PREVIEW_TEXT);
+        setPreviewText(defaultPreviewText);
         setLabel("");
         setPhase("draft");
         setErrorMsg(null);
@@ -117,7 +116,7 @@ export default function VoiceDesignModal({
         try {
             const { voice_id, preview_url } = await api.designVoicePreview({
                 voice_prompt: voicePrompt.trim(),
-                preview_text: previewText.trim() || DEFAULT_PREVIEW_TEXT,
+                preview_text: previewText.trim() || defaultPreviewText,
             });
             setPreviewVoiceId(voice_id);
             setPreviewUrl(preview_url);
@@ -205,15 +204,15 @@ export default function VoiceDesignModal({
                         <div className="rounded-lg border border-glass-border bg-black/20 px-4 py-3">
                             <div className="flex items-center gap-2 mb-1.5">
                                 <Users size={12} className="text-text-muted" />
-                                <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-text-muted">
+                                <span className="font-mono text-[0.625rem] uppercase tracking-[0.16em] text-text-muted">
                                     {t("characterContext")}
                                 </span>
                             </div>
                             {characterName && (
-                                <p className="text-[13px] font-medium text-foreground">{characterName}</p>
+                                <p className="text-[0.8125rem] font-medium text-foreground">{characterName}</p>
                             )}
                             {characterDescription && (
-                                <p className="mt-1 text-[12px] text-text-secondary leading-relaxed line-clamp-3">
+                                <p className="mt-1 text-[0.75rem] text-text-secondary leading-relaxed line-clamp-3">
                                     {characterDescription}
                                 </p>
                             )}
@@ -223,14 +222,14 @@ export default function VoiceDesignModal({
                     {/* Voice prompt */}
                     <div>
                         <div className="flex items-center justify-between mb-1.5">
-                            <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">
+                            <label className="block font-mono text-[0.625rem] uppercase tracking-[0.18em] text-text-muted">
                                 {t("voicePromptLabel")}
                             </label>
                             {characterDescription?.trim() && (
                                 <button
                                     onClick={handleTranslate}
                                     disabled={inFlight}
-                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-primary/10 border border-primary/30 text-primary hover:bg-primary/15 transition-colors text-[11px] disabled:opacity-40"
+                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-primary/10 border border-primary/30 text-primary hover:bg-primary/15 transition-colors text-[0.6875rem] disabled:opacity-40"
                                 >
                                     {phase === "translating" ? (
                                         <Loader2 size={11} className="animate-spin" />
@@ -248,16 +247,16 @@ export default function VoiceDesignModal({
                             disabled={inFlight}
                             rows={5}
                             maxLength={500}
-                            className="w-full rounded-md border border-glass-border bg-black/30 px-3 py-2.5 text-[13px] text-foreground placeholder:text-text-muted focus:outline-none focus:border-primary/40 disabled:opacity-60 resize-none"
+                            className="w-full rounded-md border border-glass-border bg-black/30 px-3 py-2.5 text-[0.8125rem] text-foreground placeholder:text-text-muted focus:outline-none focus:border-primary/40 disabled:opacity-60 resize-none"
                         />
-                        <p className="mt-1 text-right font-mono text-[10px] text-text-muted">
+                        <p className="mt-1 text-right font-mono text-[0.625rem] text-text-muted">
                             {voicePrompt.length}/500
                         </p>
                     </div>
 
                     {/* Preview text */}
                     <div>
-                        <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted mb-1.5">
+                        <label className="block font-mono text-[0.625rem] uppercase tracking-[0.18em] text-text-muted mb-1.5">
                             {t("previewTextLabel")}
                         </label>
                         <input
@@ -265,7 +264,7 @@ export default function VoiceDesignModal({
                             value={previewText}
                             onChange={(e) => setPreviewText(e.target.value)}
                             disabled={inFlight}
-                            className="w-full rounded-md border border-glass-border bg-black/30 px-3 py-2.5 text-[13px] text-foreground placeholder:text-text-muted focus:outline-none focus:border-primary/40 disabled:opacity-60"
+                            className="w-full rounded-md border border-glass-border bg-black/30 px-3 py-2.5 text-[0.8125rem] text-foreground placeholder:text-text-muted focus:outline-none focus:border-primary/40 disabled:opacity-60"
                         />
                     </div>
 
@@ -273,7 +272,7 @@ export default function VoiceDesignModal({
                     <button
                         onClick={handlePreview}
                         disabled={!voicePrompt.trim() || inFlight}
-                        className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-md bg-glass border border-primary/40 text-primary hover:bg-primary/10 transition-colors text-[13px] font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-md bg-glass border border-primary/40 text-primary hover:bg-primary/10 transition-colors text-[0.8125rem] font-medium disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                         {phase === "previewing" ? (
                             <Loader2 size={13} className="animate-spin" />
@@ -295,7 +294,7 @@ export default function VoiceDesignModal({
                             >
                                 {playing ? <Pause size={13} /> : <Play size={13} />}
                             </button>
-                            <span className="font-mono text-[11px] text-text-muted truncate">
+                            <span className="font-mono text-[0.6875rem] text-text-muted truncate">
                                 voice_id: {previewVoiceId}
                             </span>
                         </div>
@@ -304,7 +303,7 @@ export default function VoiceDesignModal({
                     {/* Label input (only after first preview) */}
                     {(phase === "preview_ready" || phase === "saving" || phase === "done") && (
                         <div>
-                            <label className="block font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted mb-1.5">
+                            <label className="block font-mono text-[0.625rem] uppercase tracking-[0.18em] text-text-muted mb-1.5">
                                 {t("labelLabel")}
                             </label>
                             <input
@@ -314,7 +313,7 @@ export default function VoiceDesignModal({
                                 placeholder={t("labelPlaceholder")}
                                 disabled={inFlight || phase === "done"}
                                 maxLength={30}
-                                className="w-full rounded-md border border-glass-border bg-black/30 px-3 py-2.5 text-[13px] text-foreground placeholder:text-text-muted focus:outline-none focus:border-primary/40 disabled:opacity-60"
+                                className="w-full rounded-md border border-glass-border bg-black/30 px-3 py-2.5 text-[0.8125rem] text-foreground placeholder:text-text-muted focus:outline-none focus:border-primary/40 disabled:opacity-60"
                             />
                         </div>
                     )}
@@ -339,14 +338,14 @@ export default function VoiceDesignModal({
                 <div className="flex items-center justify-end gap-2 px-6 py-3 border-t border-glass-border">
                     <button
                         onClick={handleClose}
-                        className="inline-flex items-center px-3 py-1.5 rounded-md bg-glass border border-glass-border text-text-secondary hover:text-foreground hover:bg-hover-bg transition-colors text-[12px]"
+                        className="inline-flex items-center px-3 py-1.5 rounded-md bg-glass border border-glass-border text-text-secondary hover:text-foreground hover:bg-hover-bg transition-colors text-[0.75rem]"
                     >
                         {t("cancel")}
                     </button>
                     <button
                         onClick={handleAccept}
                         disabled={!previewVoiceId || !label.trim() || inFlight || phase === "done"}
-                        className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-md bg-primary text-white border border-[rgba(100,108,255,0.65)] shadow-[inset_0_1.5px_0_rgba(255,255,255,0.14)] hover:bg-[#7a82ff] disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-[12px] font-semibold"
+                        className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-md bg-primary text-white border border-[rgba(100,108,255,0.65)] shadow-[inset_0_1.5px_0_rgba(255,255,255,0.14)] hover:bg-primary-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-[0.75rem] font-semibold"
                     >
                         {phase === "saving" ? <Loader2 size={12} className="animate-spin" /> : null}
                         {phase === "done" ? <Check size={12} /> : null}
@@ -365,18 +364,18 @@ export default function VoiceDesignModal({
                         className="w-full max-w-xs rounded-xl border border-glass-border bg-elevated p-5 shadow-[0_16px_48px_-8px_rgba(0,0,0,0.7)]"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <p className="text-[13px] text-foreground font-medium mb-1">{t("confirmCloseTitle")}</p>
-                        <p className="text-[12px] text-text-secondary mb-4">{t("confirmCloseBody")}</p>
+                        <p className="text-[0.8125rem] text-foreground font-medium mb-1">{t("confirmCloseTitle")}</p>
+                        <p className="text-[0.75rem] text-text-secondary mb-4">{t("confirmCloseBody")}</p>
                         <div className="flex items-center gap-2 justify-end">
                             <button
                                 onClick={() => setConfirmClose(false)}
-                                className="px-3 py-1.5 rounded-md bg-glass border border-glass-border text-text-secondary hover:text-foreground text-[12px] transition-colors"
+                                className="px-3 py-1.5 rounded-md bg-glass border border-glass-border text-text-secondary hover:text-foreground text-[0.75rem] transition-colors"
                             >
                                 {t("confirmCloseStay")}
                             </button>
                             <button
                                 onClick={handleForceClose}
-                                className="px-3 py-1.5 rounded-md bg-status-failed-bg border border-status-failed-border text-status-failed-fg hover:bg-status-failed-bg/80 text-[12px] font-medium transition-colors"
+                                className="px-3 py-1.5 rounded-md bg-status-failed-bg border border-status-failed-border text-status-failed-fg hover:bg-status-failed-bg/80 text-[0.75rem] font-medium transition-colors"
                             >
                                 {t("confirmCloseLeave")}
                             </button>

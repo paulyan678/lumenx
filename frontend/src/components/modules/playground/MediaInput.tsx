@@ -2,7 +2,8 @@
 
 import { useRef, useState, useCallback } from 'react';
 import { ImagePlus, Film, X } from 'lucide-react';
-import { playgroundApi } from '@/lib/api';
+import { useTranslations } from 'next-intl';
+import { API_URL, playgroundApi } from '@/lib/api';
 import { usePlaygroundStore, type PlaygroundMode } from './usePlaygroundStore';
 import AssetPickerModal from './AssetPickerModal';
 
@@ -11,9 +12,9 @@ import AssetPickerModal from './AssetPickerModal';
 // ---------------------------------------------------------------------------
 
 interface ModeConfig {
-  label: string;
+  labelKey: string;
   accept: string;
-  hint: string;
+  hintKey: string;
   multiple: boolean;
   maxFiles: number;
   icon: 'image' | 'video';
@@ -21,46 +22,57 @@ interface ModeConfig {
 
 const MODE_CONFIG: Partial<Record<PlaygroundMode, ModeConfig>> = {
   t2i: {
-    label: '参考图片（可选）',
+    labelKey: 'media.labelReferenceOptional',
     accept: 'image/*',
-    hint: '上传参考图自动切换为图像编辑模式',
+    hintKey: 't2i',
     multiple: true,
     maxFiles: 9,
     icon: 'image',
   },
   i2i: {
-    label: '参考图片',
+    labelKey: 'compose.mediaReference',
     accept: 'image/*',
-    hint: '支持 JPG / PNG / WebP，建议尺寸不小于 512px',
+    hintKey: 'i2i',
     multiple: false,
     maxFiles: 1,
     icon: 'image',
   },
   i2v: {
-    label: '首帧图片',
+    labelKey: 'compose.mediaFirstFrame',
     accept: 'image/*',
-    hint: '支持 JPG / PNG / WebP，建议尺寸不小于 720px',
+    hintKey: 'i2v',
     multiple: false,
     maxFiles: 1,
     icon: 'image',
   },
   r2v: {
-    label: '参考图片',
+    labelKey: 'compose.mediaReference',
     accept: 'image/*',
-    hint: '支持 JPG / PNG / WebP，最多 9 张参考图',
+    hintKey: 'r2v',
     multiple: true,
     maxFiles: 9,
     icon: 'image',
   },
   v2v: {
-    label: '源视频',
+    labelKey: 'compose.mediaSourceVideo',
     accept: 'video/*',
-    hint: '支持 MP4 / MOV / WebM',
+    hintKey: 'v2v',
     multiple: false,
     maxFiles: 1,
     icon: 'video',
   },
 };
+
+// ---------------------------------------------------------------------------
+// Shared style tokens (Line B — semantic tokens only, theme-safe)
+// ---------------------------------------------------------------------------
+
+// Neutral glass action button (本地上传 / 替换文件 / 从资产库选取). Replaces the
+// old `border-primary/30 text-primary` accent so the panel reads quiet in Line B.
+const ACTION_BTN_CLASS =
+  'flex-1 px-3 py-1.5 rounded-full text-xs border border-border-subtle ' +
+  'text-foreground/80 hover:bg-hover-bg hover:text-foreground ' +
+  'transition-colors disabled:opacity-40';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -75,6 +87,87 @@ function isVideoPath(path: string): boolean {
   return /\.(mp4|mov|webm|avi|mkv)$/i.test(path);
 }
 
+// Resolve a stored media path to a browser-loadable URL. Local `output/...` paths
+// are served via the backend /files static mount; absolute (http(s)/blob/data) and
+// root-relative (/files/...) URLs pass through untouched. The raw path is still kept
+// in store state + the generate payload — only the <img>/<video> src is resolved.
+function resolveMediaSrc(path: string): string {
+  if (/^(https?:|blob:|data:|\/)/i.test(path)) return path;
+  return `${API_URL}/files/${path.replace(/^output\//, '')}`;
+}
+
+// ---------------------------------------------------------------------------
+// Single-reference preview — Line B media-preview-row (thumb + name + meta).
+//
+// Used for maxFiles=1 modes (i2i / i2v first-frame / v2v source video). Mirrors
+// the mockup's `.media-preview-row`: a larger thumbnail on the left, file name +
+// "W × H · FORMAT" meta on the right. Dimensions are read from the loaded media
+// (onLoad / onLoadedMetadata); format is derived from the extension. File size is
+// intentionally omitted — it is not persisted past the upload moment (and is
+// absent entirely for asset-library picks), so showing it would be inconsistent.
+// Keyed by `path` at the call site so dims reset when the reference changes.
+// ---------------------------------------------------------------------------
+
+function SingleRefPreview({
+  path,
+  onRemove,
+}: {
+  path: string;
+  onRemove: () => void;
+}) {
+  const [meta, setMeta] = useState<string | null>(null);
+  const ext = (path.split('.').pop() || '').toUpperCase();
+  const video = isVideoPath(path);
+
+  return (
+    <div className="flex items-center gap-3 p-3 rounded-[14px] bg-surface-inset border border-border-subtle">
+      <div className="group relative w-20 h-20 shrink-0 rounded-[12px] overflow-hidden bg-elevated border border-border-subtle">
+        {video ? (
+          <video
+            src={resolveMediaSrc(path)}
+            className="w-full h-full object-cover"
+            muted
+            onLoadedMetadata={(e) =>
+              setMeta(
+                `${e.currentTarget.videoWidth} × ${e.currentTarget.videoHeight} · ${ext}`
+              )
+            }
+          />
+        ) : (
+          <img
+            src={resolveMediaSrc(path)}
+            alt=""
+            className="w-full h-full object-cover"
+            onLoad={(e) =>
+              setMeta(
+                `${e.currentTarget.naturalWidth} × ${e.currentTarget.naturalHeight} · ${ext}`
+              )
+            }
+          />
+        )}
+
+        {/* Remove badge on hover (functional black corner scrim) */}
+        <button
+          type="button"
+          onClick={onRemove}
+          className="absolute top-1 right-1 w-4 h-4 rounded-full bg-black/70 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+        >
+          <X className="w-3 h-3" />
+        </button>
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="text-sm text-foreground truncate" title={getFileName(path)}>
+          {getFileName(path)}
+        </div>
+        <div className="font-mono text-[0.6875rem] text-text-muted mt-1">
+          {meta ?? ext}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -84,6 +177,7 @@ export default function MediaInput() {
   const modelId = usePlaygroundStore((s) => s.modelId);
   const inputMedia = usePlaygroundStore((s) => s.inputMedia);
   const setInputMedia = usePlaygroundStore((s) => s.setInputMedia);
+  const t = useTranslations('playground');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -98,9 +192,9 @@ export default function MediaInput() {
   if (config && mode === 'r2v' && isSeedance) {
     config = {
       ...config,
-      label: '参考素材（图片/视频/音频）',
+      labelKey: 'media.labelRefMaterialAV',
       accept: 'image/*,video/*,audio/*',
-      hint: 'Seedance 支持图片、视频、音频作为参考素材',
+      hintKey: 'r2vSeedance',
     };
   }
 
@@ -218,44 +312,43 @@ export default function MediaInput() {
   );
 
   // -------------------------------------------------------------------------
-  // Render: empty state
+  // Render: empty state — Line B reference slot (recessed drop target)
+  //
+  // The section label is provided by the parent SectionCard (PlaygroundPage),
+  // so this component renders only the slot + actions to avoid a double header.
   // -------------------------------------------------------------------------
 
   if (!hasMedia) {
     return (
       <div className="space-y-2">
-        <label className="block text-xs font-medium text-white/70">
-          {config.label}
-        </label>
-
         <div
           onClick={handleClick}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           className={`
-            border border-dashed rounded-xl p-6
+            border border-dashed rounded-[14px] p-6 bg-input-bg
             flex flex-col items-center gap-3 text-center cursor-pointer
             transition-colors
             ${
               dragOver
-                ? 'border-[#646cff]/50 bg-[#646cff]/5'
-                : 'border-white/[0.08] hover:border-white/15 hover:bg-white/[0.02]'
+                ? 'border-primary/60 bg-primary/8 shadow-[var(--glow-primary)]'
+                : 'border-border-subtle hover:border-foreground/30 hover:bg-hover-bg'
             }
             ${uploading ? 'pointer-events-none opacity-60' : ''}
           `}
         >
           {config.icon === 'video' ? (
-            <Film className="w-8 h-8 text-white/40" />
+            <Film className="w-8 h-8 text-text-muted" />
           ) : (
-            <ImagePlus className="w-8 h-8 text-white/40" />
+            <ImagePlus className="w-8 h-8 text-text-muted" />
           )}
 
-          <span className="text-xs text-white/60">
-            {uploading ? '上传中...' : '拖拽或点击上传'}
+          <span className="text-xs text-text-secondary">
+            {uploading ? t('media.uploading') : t('media.dragOrClick')}
           </span>
 
-          <span className="text-[11px] text-white/40">{config.hint}</span>
+          <span className="text-[0.6875rem] text-text-muted">{t(`media.hints.${config.hintKey}`)}</span>
         </div>
 
         {/* Action buttons */}
@@ -264,26 +357,16 @@ export default function MediaInput() {
             type="button"
             onClick={handleClick}
             disabled={uploading}
-            className="
-              flex-1 px-3 py-1.5 rounded-lg text-xs
-              border border-white/[0.08] text-white/70
-              hover:bg-white/[0.04] hover:text-white/90
-              transition-colors disabled:opacity-40
-            "
+            className={ACTION_BTN_CLASS}
           >
-            本地上传
+            {t('media.localUpload')}
           </button>
           <button
             type="button"
             onClick={() => setShowAssetPicker(true)}
-            className="
-              flex-1 px-3 py-1.5 rounded-lg text-xs
-              border border-[#646cff]/30 text-[#646cff]
-              hover:bg-[#646cff]/10
-              transition-colors
-            "
+            className={ACTION_BTN_CLASS}
           >
-            从资产库选取
+            {t('media.pickFromLibrary')}
           </button>
         </div>
 
@@ -301,85 +384,91 @@ export default function MediaInput() {
 
   // -------------------------------------------------------------------------
   // Render: has media state
+  //
+  // Multi-reference modes (r2v / t2i, maxFiles>1) → thumbnail tile grid.
+  // Single-reference modes (i2i / i2v / v2v, maxFiles=1) → media-preview-row
+  // (larger thumb + file name + dimensions·format), per the mockup.
   // -------------------------------------------------------------------------
 
   return (
     <div className="space-y-2">
-      <label className="block text-xs font-medium text-white/70">
-        {config.label}
-      </label>
+      {config.multiple ? (
+        <div className="space-y-3">
+          {/* Thumbnail row */}
+          <div className="flex flex-wrap gap-2">
+            {inputMedia.map((path, index) => (
+              <div
+                key={path + index}
+                className="group relative w-[72px] h-[72px] rounded-[14px] overflow-hidden bg-elevated border border-border-subtle"
+              >
+                {isVideoPath(path) ? (
+                  <video
+                    src={resolveMediaSrc(path)}
+                    className="w-full h-full object-cover"
+                    muted
+                  />
+                ) : (
+                  <img
+                    src={resolveMediaSrc(path)}
+                    alt=""
+                    className="w-full h-full object-cover"
+                  />
+                )}
 
-      <div className="border border-solid border-white/[0.08] rounded-xl p-3 space-y-3">
-        {/* Thumbnail row */}
-        <div className="flex flex-wrap gap-2">
-          {inputMedia.map((path, index) => (
-            <div
-              key={path + index}
-              className="group relative w-20 h-[60px] rounded-lg overflow-hidden bg-white/[0.04] border border-white/[0.06]"
-            >
-              {isVideoPath(path) ? (
-                <video
-                  src={path}
-                  className="w-full h-full object-cover"
-                  muted
-                />
-              ) : (
-                <img
-                  src={path}
-                  alt=""
-                  className="w-full h-full object-cover"
-                />
-              )}
+                {/* Remove badge on hover (functional black corner scrim) */}
+                <button
+                  type="button"
+                  onClick={() => handleRemove(index)}
+                  className="
+                    absolute top-1 right-1
+                    w-4 h-4 rounded-full
+                    bg-black/70 text-white
+                    flex items-center justify-center
+                    opacity-0 group-hover:opacity-100
+                    transition-opacity
+                  "
+                >
+                  <X className="w-3 h-3" />
+                </button>
 
-              {/* Remove button on hover */}
+                {/* File name — bottom gradient scrim (functional, theme-agnostic) */}
+                <div className="absolute bottom-0 left-0 right-0 px-1 py-0.5 bg-gradient-to-t from-black/75 to-transparent text-[0.5625rem] text-white truncate">
+                  {getFileName(path)}
+                </div>
+              </div>
+            ))}
+
+            {/* Add more button for r2v */}
+            {canAddMore && (
               <button
                 type="button"
-                onClick={() => handleRemove(index)}
+                onClick={handleClick}
+                disabled={uploading}
                 className="
-                  absolute top-0.5 right-0.5
-                  w-4 h-4 rounded-full
-                  bg-black/70 text-white/80
+                  w-[72px] h-[72px] rounded-[14px] bg-input-bg
+                  border border-dashed border-border-subtle
                   flex items-center justify-center
-                  opacity-0 group-hover:opacity-100
-                  transition-opacity
+                  text-text-muted hover:text-foreground hover:border-foreground/30 hover:bg-hover-bg
+                  transition-colors disabled:opacity-40
                 "
               >
-                <X className="w-3 h-3" />
+                <ImagePlus className="w-5 h-5" />
               </button>
-
-              {/* File name tooltip */}
-              <div className="absolute bottom-0 left-0 right-0 px-1 py-0.5 bg-black/60 text-[9px] text-white/70 truncate">
-                {getFileName(path)}
-              </div>
-            </div>
-          ))}
-
-          {/* Add more button for r2v */}
-          {canAddMore && (
-            <button
-              type="button"
-              onClick={handleClick}
-              disabled={uploading}
-              className="
-                w-20 h-[60px] rounded-lg
-                border border-dashed border-white/[0.08]
-                flex items-center justify-center
-                text-white/30 hover:text-white/50 hover:border-white/15
-                transition-colors disabled:opacity-40
-              "
-            >
-              <ImagePlus className="w-5 h-5" />
-            </button>
-          )}
-        </div>
-
-        {/* File count for r2v */}
-        {config.multiple && (
-          <div className="text-[11px] text-white/40">
-            {inputMedia.length} / {config.maxFiles} 张
+            )}
           </div>
-        )}
-      </div>
+
+          {/* File count for r2v */}
+          <div className="font-mono text-[0.6875rem] text-text-muted">
+            {t('media.fileCount', { current: inputMedia.length, max: config.maxFiles })}
+          </div>
+        </div>
+      ) : (
+        <SingleRefPreview
+          key={inputMedia[0]}
+          path={inputMedia[0]}
+          onRemove={() => handleRemove(0)}
+        />
+      )}
 
       {/* Action buttons */}
       <div className="flex items-center gap-2">
@@ -387,26 +476,16 @@ export default function MediaInput() {
           type="button"
           onClick={handleReplace}
           disabled={uploading}
-          className="
-            flex-1 px-3 py-1.5 rounded-lg text-xs
-            border border-white/[0.08] text-white/70
-            hover:bg-white/[0.04] hover:text-white/90
-            transition-colors disabled:opacity-40
-          "
+          className={ACTION_BTN_CLASS}
         >
-          {uploading ? '上传中...' : '替换文件'}
+          {uploading ? t('media.uploading') : t('media.replaceFile')}
         </button>
         <button
           type="button"
           onClick={() => setShowAssetPicker(true)}
-          className="
-            flex-1 px-3 py-1.5 rounded-lg text-xs
-            border border-[#646cff]/30 text-[#646cff]
-            hover:bg-[#646cff]/10
-            transition-colors
-          "
+          className={ACTION_BTN_CLASS}
         >
-          从资产库选取
+          {t('media.pickFromLibrary')}
         </button>
       </div>
 

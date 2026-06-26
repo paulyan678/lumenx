@@ -49,7 +49,7 @@ export default function SidePanelHeader({
         >
             {icon ? (
                 <div
-                    className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-[#b9bdff]"
+                    className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-primary"
                     style={{
                         background: "rgba(100, 108, 255, 0.06)",
                         border: "1px solid rgba(100, 108, 255, 0.32)",
@@ -63,14 +63,14 @@ export default function SidePanelHeader({
             ) : null}
             <div className="flex min-w-0 flex-1 flex-col gap-0">
                 <span
-                    className="truncate font-sans text-[14px] font-medium leading-tight text-foreground"
+                    className="truncate font-sans text-[0.875rem] font-medium leading-tight text-foreground"
                     style={{ letterSpacing: 0 }}
                 >
                     {title}
                 </span>
                 {subtitle ? (
                     <span
-                        className="truncate font-sans text-[11.5px] font-normal leading-tight text-text-muted"
+                        className="truncate font-sans text-[0.71875rem] font-normal leading-tight text-text-muted"
                         style={{ letterSpacing: 0 }}
                     >
                         {subtitle}

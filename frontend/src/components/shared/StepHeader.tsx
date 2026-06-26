@@ -78,7 +78,7 @@ export default function StepHeader({
             <div className="relative z-[1] flex h-[calc(100%-18px)] items-center gap-4 px-6">
                 {/* Icon chip — 32×32 圆形，flat dark + 紫 1px border + 内顶部 1px 高光 */}
                 <div
-                    className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[#b9bdff]"
+                    className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-primary"
                     style={{
                         background: "rgba(100, 108, 255, 0.06)",
                         border: "1px solid rgba(100, 108, 255, 0.32)",
@@ -94,21 +94,21 @@ export default function StepHeader({
                 {/* Title block */}
                 <div className="flex min-w-0 flex-1 flex-col gap-[2px]">
                     {/* Eyebrow — 英文 chrome：01 — SCRIPT */}
-                    <span className="mb-[1px] inline-flex items-center gap-2 font-mono text-[9.5px] font-normal uppercase leading-tight tracking-[0.2em] text-text-muted">
+                    <span className="mb-[1px] inline-flex items-center gap-2 font-mono text-[0.59375rem] font-normal uppercase leading-tight tracking-[0.2em] text-text-muted">
                         <span className="font-medium text-primary">{stepStr}</span>
                         <span aria-hidden="true" className="h-px w-3 bg-glass-border" />
                         <span>{englishName}</span>
                     </span>
                     {/* 中文标题 — Inter Medium 16px (LumenX display token 上限) */}
                     <span
-                        className="text-[16px] font-medium leading-[1.3] text-foreground"
+                        className="text-[1rem] font-medium leading-[1.3] text-foreground"
                         style={{ letterSpacing: 0 }}
                     >
                         {title}
                     </span>
                     {/* 中文副标题 — body-sm 12px text-secondary */}
                     <span
-                        className="text-[12px] font-normal leading-[1.4] text-text-secondary"
+                        className="text-[0.75rem] font-normal leading-[1.4] text-text-secondary"
                         style={{ letterSpacing: 0 }}
                     >
                         {subtitle}
@@ -157,7 +157,7 @@ export default function StepHeader({
                                     ? "h-[5px] w-[5px] border border-primary bg-primary opacity-70"
                                     : kind === "current"
                                         ? "h-[7px] w-[7px] border border-primary bg-primary"
-                                        : "h-[5px] w-[5px] border border-white/[0.18] bg-transparent opacity-50",
+                                        : "h-[5px] w-[5px] border border-foreground/[0.18] bg-transparent opacity-50",
                             )}
                             style={
                                 kind === "current"

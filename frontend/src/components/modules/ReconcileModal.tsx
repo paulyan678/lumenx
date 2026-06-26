@@ -196,7 +196,7 @@ export default function ReconcileModal({ isOpen, scriptId, onClose, onApplied }:
 
                         {/* Footer */}
                         <footer className="flex items-center gap-2 px-6 py-4 border-t border-glass-border">
-                            <span className="flex-1 font-mono text-[10.5px] uppercase tracking-[0.16em] text-text-muted">
+                            <span className="flex-1 font-mono text-[0.65625rem] uppercase tracking-[0.16em] text-text-muted">
                                 {counts.merge > 0 && <span className="text-primary mr-2">↳ {counts.merge} merge</span>}
                                 {counts.create > 0 && <span className="text-pink-300 mr-2">+ {counts.create} new</span>}
                                 {counts.skip > 0 && <span className="text-text-muted">⊘ {counts.skip} skip</span>}
@@ -246,15 +246,15 @@ function ReconcileRow({ row, onActionChange }: { row: Row; onActionChange: (a: R
             <Icon size={14} className="shrink-0 text-text-muted" />
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                    <span className="font-sans text-[13px] font-medium text-foreground truncate">{row.suggestion.local_name}</span>
+                    <span className="font-sans text-[0.8125rem] font-medium text-foreground truncate">{row.suggestion.local_name}</span>
                     {row.suggestion.suggested_series_id && (
                         <>
-                            <span className="font-mono text-[10px] text-text-muted">→</span>
-                            <span className={`font-sans text-[13px] truncate ${isHighConf ? 'text-foreground' : 'text-text-secondary'}`}>
+                            <span className="font-mono text-[0.625rem] text-text-muted">→</span>
+                            <span className={`font-sans text-[0.8125rem] truncate ${isHighConf ? 'text-foreground' : 'text-text-secondary'}`}>
                                 {row.suggestion.suggested_series_name}
                             </span>
                             <span
-                                className={`font-mono text-[9.5px] px-1.5 py-0.5 rounded-full ${
+                                className={`font-mono text-[0.59375rem] px-1.5 py-0.5 rounded-full ${
                                     isHighConf ? "bg-primary/15 text-primary" :
                                     isMediumConf ? "bg-amber-400/15 text-amber-300" :
                                     "bg-glass text-text-muted"
@@ -265,7 +265,7 @@ function ReconcileRow({ row, onActionChange }: { row: Row; onActionChange: (a: R
                         </>
                     )}
                     {!row.suggestion.suggested_series_id && (
-                        <span className="font-mono text-[9.5px] px-1.5 py-0.5 rounded-full bg-pink-400/15 text-pink-300">
+                        <span className="font-mono text-[0.59375rem] px-1.5 py-0.5 rounded-full bg-pink-400/15 text-pink-300">
                             {t("new")}
                         </span>
                     )}
@@ -276,7 +276,7 @@ function ReconcileRow({ row, onActionChange }: { row: Row; onActionChange: (a: R
                 <select
                     value={row.action}
                     onChange={(e) => onActionChange(e.target.value as Row["action"])}
-                    className="bg-input-bg border border-glass-border rounded px-2 py-1 text-[11.5px] text-foreground focus:outline-none focus:border-primary"
+                    className="bg-input-bg border border-glass-border rounded px-2 py-1 text-[0.71875rem] text-foreground focus:outline-none focus:border-primary"
                 >
                     {row.suggestion.suggested_series_id && (
                         <option value="merge_into_series">{t("actionMerge")}</option>

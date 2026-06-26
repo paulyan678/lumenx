@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, Palette, Wand2, Plus, Check, ChevronRight, Lock, RotateCcw, ArrowUp, AlertTriangle, X, Image as ImageIcon, Pencil } from "lucide-react";
 import { useProjectStore, type StyleConfig, type StylePreset, type StylePresetCategory } from "@/store/projectStore";
 import { api } from "@/lib/api";
-import StepHeader from "@/components/shared/StepHeader";
+import StepPageHeader, { StepPill } from "@/components/shared/StepPageHeader";
 import WorkflowActionButton from "@/components/shared/WorkflowActionButton";
 import { toast } from "@/store/toastStore";
 
@@ -385,12 +385,14 @@ export default function ArtDirection() {
 
     return (
         <div className="flex flex-col h-full w-full overflow-hidden">
-            <StepHeader
+            <StepPageHeader
                 stepNumber={2}
-                icon={<Palette />}
-                englishName="Style"
+                englishName="STYLE"
                 title={tStep("styleTitle")}
                 subtitle={tStep("styleSubtitle")}
+                pills={projectStyle?.name ? (
+                    <StepPill label={ta("styleLabel")} value={projectStyle.name} />
+                ) : null}
             />
 
             {/* Scrollable content — full width */}
@@ -406,7 +408,7 @@ export default function ArtDirection() {
                                         <span className="text-text-secondary">{ta("inheritsBaseline")}</span>{" "}
                                         <span className="font-medium">{seriesBaseline?.name}</span>
                                     </p>
-                                    <p className="text-[11px] text-text-muted mt-0.5">{ta("inheritHint")}</p>
+                                    <p className="text-[0.6875rem] text-text-muted mt-0.5">{ta("inheritHint")}</p>
                                 </div>
                             </div>
                         )}
@@ -418,7 +420,7 @@ export default function ArtDirection() {
                                         <span className="text-amber-200">{ta("previewBannerTitle")}</span>{" "}
                                         <span className="font-medium">{selectedStyle?.name ?? "—"}</span>
                                     </p>
-                                    <p className="text-[11px] text-text-muted mt-0.5">{ta("previewBannerHint")}</p>
+                                    <p className="text-[0.6875rem] text-text-muted mt-0.5">{ta("previewBannerHint")}</p>
                                 </div>
                                 <WorkflowActionButton
                                     variant="ghost"
@@ -438,11 +440,11 @@ export default function ArtDirection() {
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm text-foreground">
                                         <span className="text-amber-200">{ta("overridingBaseline")}</span>{" "}
-                                        <span className="text-text-secondary text-[12px]">
+                                        <span className="text-text-secondary text-[0.75rem]">
                                             ({ta("baselineLabel")}: {seriesBaseline?.name})
                                         </span>
                                     </p>
-                                    <p className="text-[11px] text-text-muted mt-0.5">{ta("overrideHint")}</p>
+                                    <p className="text-[0.6875rem] text-text-muted mt-0.5">{ta("overrideHint")}</p>
                                 </div>
                                 <WorkflowActionButton
                                     variant="secondary"
@@ -460,7 +462,7 @@ export default function ArtDirection() {
                                 <ArrowUp size={16} className="text-purple-300 shrink-0" />
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm text-foreground">{ta("promotePromptTitle")}</p>
-                                    <p className="text-[11px] text-text-muted mt-0.5">{ta("promotePromptHint")}</p>
+                                    <p className="text-[0.6875rem] text-text-muted mt-0.5">{ta("promotePromptHint")}</p>
                                 </div>
                                 <WorkflowActionButton
                                     variant="secondary"
@@ -516,10 +518,10 @@ export default function ArtDirection() {
                     <div className="flex items-center gap-1.5 mb-5 overflow-x-auto pb-1">
                         <button
                             onClick={() => setActiveCategory("all")}
-                            className={`shrink-0 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors ${
+                            className={`shrink-0 px-3 py-1.5 rounded-lg text-[0.75rem] font-medium transition-colors ${
                                 activeCategory === "all"
                                     ? "bg-primary/20 text-primary border border-primary/30"
-                                    : "bg-white/5 text-text-secondary hover:bg-white/10 border border-transparent"
+                                    : "bg-elevated text-text-secondary hover:bg-hover-bg border border-transparent"
                             }`}
                         >
                             全部
@@ -528,10 +530,10 @@ export default function ArtDirection() {
                             <button
                                 key={cat.id}
                                 onClick={() => setActiveCategory(cat.id)}
-                                className={`shrink-0 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors ${
+                                className={`shrink-0 px-3 py-1.5 rounded-lg text-[0.75rem] font-medium transition-colors ${
                                     activeCategory === cat.id
                                         ? "bg-primary/20 text-primary border border-primary/30"
-                                        : "bg-white/5 text-text-secondary hover:bg-white/10 border border-transparent"
+                                        : "bg-elevated text-text-secondary hover:bg-hover-bg border border-transparent"
                                 }`}
                             >
                                 {cat.name_zh}
@@ -577,7 +579,7 @@ export default function ArtDirection() {
             <div className="shrink-0 border-t border-glass-border bg-surface/95 backdrop-blur-md px-8 py-3 flex items-center justify-end gap-3">
                 {selectedStyle ? (
                     <div className="flex items-center gap-2">
-                        <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">
+                        <span className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-text-muted">
                             <span className="text-foreground">{selectedStyle.name}</span>
                             {isModified && (
                                 <>
@@ -585,7 +587,7 @@ export default function ArtDirection() {
                                     <span className="text-amber-300">已修改</span>
                                     <button
                                         onClick={handleRestoreOriginal}
-                                        className="ml-2 text-[9px] text-text-muted hover:text-foreground underline"
+                                        className="ml-2 text-[0.5625rem] text-text-muted hover:text-foreground underline"
                                     >
                                         还原
                                     </button>
@@ -594,7 +596,7 @@ export default function ArtDirection() {
                         </span>
                     </div>
                 ) : (
-                    <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">
+                    <span className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-text-muted">
                         select a style →
                     </span>
                 )}
@@ -680,14 +682,14 @@ export default function ArtDirection() {
                                 {ta("overrideConfirmIntro")}
                             </p>
                             <div className="rounded-lg border border-glass-border bg-glass px-3 py-2 space-y-1">
-                                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">{ta("overrideFromTo")}</p>
-                                <p className="text-[13px] text-foreground">
+                                <p className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-text-muted">{ta("overrideFromTo")}</p>
+                                <p className="text-[0.8125rem] text-foreground">
                                     <span className="text-text-secondary">{seriesBaseline?.name ?? "—"}</span>
                                     <span className="mx-2 text-text-muted">→</span>
                                     <span className="font-medium text-amber-200">{pendingOverrideStyle.name}</span>
                                 </p>
                             </div>
-                            <p className="text-[11.5px] text-text-muted">{ta("overrideConfirmFooter")}</p>
+                            <p className="text-[0.71875rem] text-text-muted">{ta("overrideConfirmFooter")}</p>
                         </div>
                         <footer className="flex items-center justify-end gap-2 px-5 py-3 border-t border-glass-border">
                             <WorkflowActionButton variant="ghost" size="sm" onClick={cancelOverrideConfirm}>
@@ -718,7 +720,7 @@ function AIRecommendationCard({ style, isSelected, onClick }: {
             className={`group relative rounded-xl border overflow-hidden cursor-pointer transition-all ${
                 isSelected
                     ? "border-yellow-400/60 shadow-lg shadow-yellow-500/15 ring-1 ring-yellow-400/30"
-                    : "border-glass-border hover:border-white/20 hover:shadow-sm"
+                    : "border-glass-border hover:border-foreground/30 hover:shadow-sm"
             }`}
         >
             <div className="p-4 space-y-2">
@@ -726,9 +728,9 @@ function AIRecommendationCard({ style, isSelected, onClick }: {
                 <div className="flex items-start gap-2">
                     <div className="shrink-0 mt-0.5 flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-yellow-500/15 border border-yellow-500/20">
                         <Sparkles size={9} className="text-yellow-400" />
-                        <span className="text-[9px] font-medium text-yellow-300">AI</span>
+                        <span className="text-[0.5625rem] font-medium text-yellow-300">AI</span>
                     </div>
-                    <h4 className="text-[13px] font-semibold text-foreground leading-tight line-clamp-1 flex-1">
+                    <h4 className="text-[0.8125rem] font-semibold text-foreground leading-tight line-clamp-1 flex-1">
                         {style.name}
                     </h4>
                     {isSelected && (
@@ -740,14 +742,14 @@ function AIRecommendationCard({ style, isSelected, onClick }: {
 
                 {/* Description */}
                 {style.description && (
-                    <p className="text-[11px] text-text-secondary leading-relaxed line-clamp-2">
+                    <p className="text-[0.6875rem] text-text-secondary leading-relaxed line-clamp-2">
                         {style.description}
                     </p>
                 )}
 
                 {/* Reason */}
                 {(style as any).reason && (
-                    <p className="text-[10px] text-yellow-400/80 leading-relaxed line-clamp-2 border-l-2 border-yellow-400/30 pl-2">
+                    <p className="text-[0.625rem] text-yellow-400/80 leading-relaxed line-clamp-2 border-l-2 border-yellow-400/30 pl-2">
                         {(style as any).reason}
                     </p>
                 )}
@@ -802,12 +804,12 @@ function AIRecommendationModal({ style, isSelected, editing, positivePrompt, neg
                     <div className="flex items-center gap-3">
                         <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-yellow-500/15 border border-yellow-500/20">
                             <Sparkles size={12} className="text-yellow-400" />
-                            <span className="text-[11px] font-medium text-yellow-300">AI</span>
+                            <span className="text-[0.6875rem] font-medium text-yellow-300">AI</span>
                         </div>
                         <div>
-                            <h2 className="text-[18px] font-bold text-foreground">{style.name}</h2>
+                            <h2 className="text-[1.125rem] font-bold text-foreground">{style.name}</h2>
                             {style.description && (
-                                <p className="text-[12px] text-text-muted mt-0.5">{style.description}</p>
+                                <p className="text-[0.75rem] text-text-muted mt-0.5">{style.description}</p>
                             )}
                         </div>
                     </div>
@@ -819,20 +821,20 @@ function AIRecommendationModal({ style, isSelected, editing, positivePrompt, neg
                 {/* Body: left reason + tags | right prompts */}
                 <div className="flex-1 min-h-0 flex overflow-hidden">
                     {/* Left panel: reason + keyword tags */}
-                    <div className="w-[38%] shrink-0 bg-white/[0.02] border-r border-glass-border p-6 flex flex-col justify-center">
+                    <div className="w-[38%] shrink-0 bg-glass border-r border-glass-border p-6 flex flex-col justify-center">
                         {(style as any).reason && (
                             <div className="mb-6">
-                                <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-yellow-400/70 mb-2">{ta("reasonLabel")}</p>
-                                <p className="text-[14px] text-foreground/90 leading-relaxed">
+                                <p className="font-mono text-[0.5625rem] uppercase tracking-[0.18em] text-yellow-400/70 mb-2">{ta("reasonLabel")}</p>
+                                <p className="text-[0.875rem] text-foreground leading-relaxed">
                                     {(style as any).reason}
                                 </p>
                             </div>
                         )}
                         <div>
-                            <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-text-muted mb-3">{ta("keywordsLabel") || "Keywords"}</p>
+                            <p className="font-mono text-[0.5625rem] uppercase tracking-[0.18em] text-text-muted mb-3">{ta("keywordsLabel") || "Keywords"}</p>
                             <div className="flex flex-wrap gap-2">
                                 {keywords.map((kw, i) => (
-                                    <span key={i} className="text-[11px] px-2.5 py-1 rounded-md bg-yellow-500/10 text-yellow-300/90 border border-yellow-500/20">
+                                    <span key={i} className="text-[0.6875rem] px-2.5 py-1 rounded-md bg-yellow-500/10 text-yellow-300/90 border border-yellow-500/20">
                                         {kw}
                                     </span>
                                 ))}
@@ -845,11 +847,11 @@ function AIRecommendationModal({ style, isSelected, editing, positivePrompt, neg
                         {/* Positive prompt */}
                         <div>
                             <div className="flex items-center justify-between mb-2">
-                                <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-primary/70">{ta("positivePromptLabel")}</p>
+                                <p className="font-mono text-[0.5625rem] uppercase tracking-[0.18em] text-primary/70">{ta("positivePromptLabel")}</p>
                                 {!editing && (
                                     <button
                                         onClick={onStartEditing}
-                                        className="flex items-center gap-1 text-[11px] text-text-muted hover:text-foreground transition-colors"
+                                        className="flex items-center gap-1 text-[0.6875rem] text-text-muted hover:text-foreground transition-colors"
                                     >
                                         <Pencil size={10} />
                                         {ta("customizeBtn") || "自定义"}
@@ -860,11 +862,11 @@ function AIRecommendationModal({ style, isSelected, editing, positivePrompt, neg
                                 <textarea
                                     value={positivePrompt}
                                     onChange={(e) => onPositiveChange(e.target.value)}
-                                    className="w-full h-32 rounded-lg border border-glass-border bg-white/5 px-3 py-2.5 text-[12px] text-foreground leading-relaxed resize-none focus:outline-none focus:border-primary/50 custom-scrollbar"
+                                    className="w-full h-32 rounded-lg border border-glass-border bg-elevated px-3 py-2.5 text-[0.75rem] text-foreground leading-relaxed resize-none focus:outline-none focus:border-primary/50 custom-scrollbar"
                                 />
                             ) : (
-                                <div className="rounded-lg border border-glass-border bg-white/[0.02] px-3 py-2.5">
-                                    <p className="text-[12px] text-text-secondary leading-relaxed whitespace-pre-wrap">
+                                <div className="rounded-lg border border-glass-border bg-glass px-3 py-2.5">
+                                    <p className="text-[0.75rem] text-text-secondary leading-relaxed whitespace-pre-wrap">
                                         {positivePrompt}
                                     </p>
                                 </div>
@@ -873,16 +875,16 @@ function AIRecommendationModal({ style, isSelected, editing, positivePrompt, neg
 
                         {/* Negative prompt */}
                         <div>
-                            <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-red-400/70 mb-2">{ta("negativePromptLabel")}</p>
+                            <p className="font-mono text-[0.5625rem] uppercase tracking-[0.18em] text-red-400/70 mb-2">{ta("negativePromptLabel")}</p>
                             {editing ? (
                                 <textarea
                                     value={negativePrompt}
                                     onChange={(e) => onNegativeChange(e.target.value)}
-                                    className="w-full h-24 rounded-lg border border-glass-border bg-white/5 px-3 py-2.5 text-[12px] text-foreground leading-relaxed resize-none focus:outline-none focus:border-red-400/30 custom-scrollbar"
+                                    className="w-full h-24 rounded-lg border border-glass-border bg-elevated px-3 py-2.5 text-[0.75rem] text-foreground leading-relaxed resize-none focus:outline-none focus:border-red-400/30 custom-scrollbar"
                                 />
                             ) : (
-                                <div className="rounded-lg border border-glass-border bg-white/[0.02] px-3 py-2.5">
-                                    <p className="text-[12px] text-text-secondary leading-relaxed whitespace-pre-wrap">
+                                <div className="rounded-lg border border-glass-border bg-glass px-3 py-2.5">
+                                    <p className="text-[0.75rem] text-text-secondary leading-relaxed whitespace-pre-wrap">
                                         {negativePrompt || ta("noNegativePrompt") || "—"}
                                     </p>
                                 </div>
@@ -893,7 +895,7 @@ function AIRecommendationModal({ style, isSelected, editing, positivePrompt, neg
 
                 {/* Footer */}
                 <footer className="flex items-center justify-between px-6 py-3 border-t border-glass-border shrink-0">
-                    <div className="text-[11px] text-text-muted">
+                    <div className="text-[0.6875rem] text-text-muted">
                         {isCustomized && (
                             <span className="text-amber-300">{ta("modifiedLabel") || "已修改"}</span>
                         )}
@@ -936,7 +938,7 @@ export function StylePresetCard({ style, isSelected, onSelect }: any) {
             {style.description && (
                 <p className="text-xs text-text-secondary mb-2">{style.description}</p>
             )}
-            <div className="text-[10px] text-text-muted truncate">
+            <div className="text-[0.625rem] text-text-muted truncate">
                 {style.positive_prompt.substring(0, 50)}...
             </div>
         </motion.div>
@@ -955,11 +957,11 @@ function StylePresetCardV2({ style, isSelected, onClick }: {
             className={`group relative rounded-xl border overflow-hidden cursor-pointer transition-all ${
                 isSelected
                     ? "border-primary shadow-lg shadow-primary/20 ring-1 ring-primary/40"
-                    : "border-glass-border hover:border-white/20 hover:shadow-sm"
+                    : "border-glass-border hover:border-foreground/30 hover:shadow-sm"
             }`}
         >
             {/* Thumbnail */}
-            <div className="relative aspect-[4/3] bg-white/5 overflow-hidden">
+            <div className="relative aspect-[4/3] bg-elevated overflow-hidden">
                 {style.thumbnail ? (
                     <img
                         src={style.thumbnail}
@@ -968,7 +970,7 @@ function StylePresetCardV2({ style, isSelected, onClick }: {
                         style={{ objectPosition: style.object_position || "center" }}
                     />
                 ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-white/5 to-white/[0.02]">
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-glass-border to-glass-border">
                         <ImageIcon size={24} className="text-text-muted/40" />
                     </div>
                 )}
@@ -981,11 +983,11 @@ function StylePresetCardV2({ style, isSelected, onClick }: {
 
             {/* Info strip */}
             <div className="px-3 py-2.5">
-                <h4 className="text-[12px] font-semibold text-foreground leading-tight truncate">
+                <h4 className="text-[0.75rem] font-semibold text-foreground leading-tight truncate">
                     {style.name_zh}
                 </h4>
                 {style.subtitle_zh && (
-                    <p className="text-[10px] text-text-muted mt-0.5 truncate">
+                    <p className="text-[0.625rem] text-text-muted mt-0.5 truncate">
                         {style.subtitle_zh}
                     </p>
                 )}
@@ -1033,8 +1035,8 @@ function PresetDetailModal({ preset, isSelected, editing, positivePrompt, negati
                 {/* Header */}
                 <header className="flex items-center justify-between px-6 py-4 border-b border-glass-border shrink-0">
                     <div>
-                        <h2 className="text-[18px] font-bold text-foreground">{preset.name_zh}</h2>
-                        <p className="text-[12px] text-text-muted mt-0.5">{preset.name}</p>
+                        <h2 className="text-[1.125rem] font-bold text-foreground">{preset.name_zh}</h2>
+                        <p className="text-[0.75rem] text-text-muted mt-0.5">{preset.name}</p>
                     </div>
                     <button
                         onClick={onClose}
@@ -1065,19 +1067,19 @@ function PresetDetailModal({ preset, isSelected, editing, positivePrompt, negati
                     <div className="p-6 space-y-5 overflow-y-auto">
                         {/* Description */}
                         {preset.description && (
-                            <p className="text-[13px] text-text-secondary leading-relaxed">{preset.description}</p>
+                            <p className="text-[0.8125rem] text-text-secondary leading-relaxed">{preset.description}</p>
                         )}
 
                         {/* Tags */}
                         {preset.best_for && preset.best_for.length > 0 && (
                             <div className="flex flex-wrap gap-2">
                                 {preset.best_for.map((tag, i) => (
-                                    <span key={i} className="text-[11px] px-2.5 py-1 rounded-md bg-green-500/10 text-green-300 border border-green-500/20">
+                                    <span key={i} className="text-[0.6875rem] px-2.5 py-1 rounded-md bg-green-500/10 text-green-300 border border-green-500/20">
                                         {tag}
                                     </span>
                                 ))}
                                 {preset.avoid_for?.map((tag, i) => (
-                                    <span key={`avoid-${i}`} className="text-[11px] px-2.5 py-1 rounded-md bg-red-500/10 text-red-300/70 border border-red-500/15 line-through">
+                                    <span key={`avoid-${i}`} className="text-[0.6875rem] px-2.5 py-1 rounded-md bg-red-500/10 text-red-300/70 border border-red-500/15 line-through">
                                         {tag}
                                     </span>
                                 ))}
@@ -1087,32 +1089,32 @@ function PresetDetailModal({ preset, isSelected, editing, positivePrompt, negati
                         {/* Prompts section */}
                         <div className="space-y-4">
                             <div className="flex items-center justify-between">
-                                <p className="text-[11px] uppercase tracking-wider text-text-muted font-medium">提示词</p>
+                                <p className="text-[0.6875rem] uppercase tracking-wider text-text-muted font-medium">提示词</p>
                                 {!editing && (
                                     <button
                                         onClick={onStartEditing}
-                                        className="flex items-center gap-1.5 text-[11px] text-text-muted hover:text-foreground transition-colors"
+                                        className="flex items-center gap-1.5 text-[0.6875rem] text-text-muted hover:text-foreground transition-colors"
                                     >
                                         <Pencil size={12} />
                                         <span>自定义</span>
                                     </button>
                                 )}
                                 {editing && isCustomized && (
-                                    <span className="text-[10px] text-amber-300 font-medium">已修改</span>
+                                    <span className="text-[0.625rem] text-amber-300 font-medium">已修改</span>
                                 )}
                             </div>
 
                             {!editing ? (
                                 <>
                                     <div>
-                                        <p className="text-[10px] text-text-muted mb-1.5">正向</p>
-                                        <p className="text-[13px] text-text-secondary leading-relaxed">
+                                        <p className="text-[0.625rem] text-text-muted mb-1.5">正向</p>
+                                        <p className="text-[0.8125rem] text-text-secondary leading-relaxed">
                                             {preset.positive_prompt}
                                         </p>
                                     </div>
                                     <div>
-                                        <p className="text-[10px] text-text-muted mb-1.5">负向</p>
-                                        <p className="text-[13px] text-text-secondary leading-relaxed">
+                                        <p className="text-[0.625rem] text-text-muted mb-1.5">负向</p>
+                                        <p className="text-[0.8125rem] text-text-secondary leading-relaxed">
                                             {preset.negative_prompt}
                                         </p>
                                     </div>
@@ -1120,21 +1122,21 @@ function PresetDetailModal({ preset, isSelected, editing, positivePrompt, negati
                             ) : (
                                 <>
                                     <div>
-                                        <p className="text-[10px] text-text-muted mb-1.5">正向</p>
+                                        <p className="text-[0.625rem] text-text-muted mb-1.5">正向</p>
                                         <textarea
                                             value={positivePrompt}
                                             onChange={(e) => onPositiveChange(e.target.value)}
                                             rows={5}
-                                            className="w-full bg-input-bg border border-glass-border rounded-lg p-3 text-[13px] text-foreground placeholder-text-muted focus:border-primary focus:outline-none resize-none"
+                                            className="w-full bg-input-bg border border-glass-border rounded-lg p-3 text-[0.8125rem] text-foreground placeholder-text-muted focus:border-primary focus:outline-none resize-none"
                                         />
                                     </div>
                                     <div>
-                                        <p className="text-[10px] text-text-muted mb-1.5">负向</p>
+                                        <p className="text-[0.625rem] text-text-muted mb-1.5">负向</p>
                                         <textarea
                                             value={negativePrompt}
                                             onChange={(e) => onNegativeChange(e.target.value)}
                                             rows={3}
-                                            className="w-full bg-input-bg border border-glass-border rounded-lg p-3 text-[13px] text-foreground placeholder-text-muted focus:border-primary focus:outline-none resize-none"
+                                            className="w-full bg-input-bg border border-glass-border rounded-lg p-3 text-[0.8125rem] text-foreground placeholder-text-muted focus:border-primary focus:outline-none resize-none"
                                         />
                                     </div>
                                 </>
@@ -1144,8 +1146,8 @@ function PresetDetailModal({ preset, isSelected, editing, positivePrompt, negati
                         {/* Sample prompt */}
                         {preset.sample_prompt && !editing && (
                             <div>
-                                <p className="text-[10px] uppercase tracking-wider text-text-muted mb-1.5">示例描述</p>
-                                <p className="text-[13px] text-text-secondary/70 leading-relaxed italic">
+                                <p className="text-[0.625rem] uppercase tracking-wider text-text-muted mb-1.5">示例描述</p>
+                                <p className="text-[0.8125rem] text-text-secondary/70 leading-relaxed italic">
                                     {preset.sample_prompt}
                                 </p>
                             </div>
@@ -1156,13 +1158,13 @@ function PresetDetailModal({ preset, isSelected, editing, positivePrompt, negati
                 {/* Same-category comparison strip */}
                 {sameCategoryPresets.length > 0 && (
                     <div className="border-t border-glass-border px-6 py-3 shrink-0">
-                        <p className="text-[10px] uppercase tracking-wider text-text-muted mb-2">同类风格</p>
+                        <p className="text-[0.625rem] uppercase tracking-wider text-text-muted mb-2">同类风格</p>
                         <div className="flex gap-2.5 overflow-x-auto pb-1">
                             {sameCategoryPresets.slice(0, 5).map(p => (
                                 <button
                                     key={p.id}
                                     onClick={() => onSwitchPreset(p)}
-                                    className="shrink-0 w-24 rounded-lg overflow-hidden border border-glass-border hover:border-white/20 transition-colors"
+                                    className="shrink-0 w-24 rounded-lg overflow-hidden border border-glass-border hover:border-foreground/30 transition-colors"
                                 >
                                     {p.thumbnail ? (
                                         <img
@@ -1172,11 +1174,11 @@ function PresetDetailModal({ preset, isSelected, editing, positivePrompt, negati
                                             style={{ objectPosition: p.object_position || "center" }}
                                         />
                                     ) : (
-                                        <div className="w-full aspect-[16/9] bg-white/5 flex items-center justify-center">
+                                        <div className="w-full aspect-[16/9] bg-elevated flex items-center justify-center">
                                             <ImageIcon size={12} className="text-text-muted/40" />
                                         </div>
                                     )}
-                                    <p className="text-[10px] text-text-muted px-1.5 py-1 truncate">{p.name_zh}</p>
+                                    <p className="text-[0.625rem] text-text-muted px-1.5 py-1 truncate">{p.name_zh}</p>
                                 </button>
                             ))}
                         </div>

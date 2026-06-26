@@ -2,13 +2,13 @@
 
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { motion } from "framer-motion";
-import { Plus, Palette, Film, Loader2, Sparkles, RefreshCw } from "lucide-react";
-import StepHeader from "@/components/shared/StepHeader";
-import PreviousEpisodeFramesRail from "./storyboard-r2v/PreviousEpisodeFramesRail";
+import { Plus, Loader2, Sparkles, PanelBottomOpen, PanelBottomClose } from "lucide-react";
+import StepPageHeader, { StepPill } from "@/components/shared/StepPageHeader";
 import { useTranslations } from "next-intl";
 import { useProjectStore } from "@/store/projectStore";
 import { api, crudApi, type VideoTask, type RefineSSEEvent } from "@/lib/api";
 import { getAssetUrl } from "@/lib/utils";
+import { selectedVariantUrl } from "@/lib/characterImage";
 import { debugLog } from "@/lib/debugLog";
 import type { BatchSummary } from "./storyboard-r2v/shot-panel/CandidatesSection";
 import { getR2vRouteModelId, isR2vImageBased, VIDEO_I2V_MODELS, VIDEO_R2V_MODELS, DEFAULT_I2V_MODEL_ID, DEFAULT_R2V_MODEL_ID } from "@/lib/modelCatalog";
@@ -468,7 +468,7 @@ export default function StoryboardR2V() {
             } else if (stats.no_voice > 0 && stats.skipped === 0) {
                 toast.warning(`${stats.no_voice} 条对白的角色尚未绑定语音`);
             } else if (stats.skipped > 0) {
-                toast.success("所有对白音频已是最新");
+                toast.success(t("dialogueAllUpToDate"));
             } else {
                 toast.warning("未找到可生成的对白");
             }
@@ -476,7 +476,7 @@ export default function StoryboardR2V() {
             if (updated?.frames) updateProject(currentProject.id, { frames: updated.frames });
         } catch (e) {
             debugLog.error("Studio", "batch dialogue audio failed", e);
-            toast.error("对白批量生成失败，请重试");
+            toast.error(t("batchDialogueFailed"));
         } finally {
             setBannerState("summary");
             setDialogueProgress(null);
@@ -549,9 +549,9 @@ export default function StoryboardR2V() {
                 const videoTasks: any[] = (updated as any).video_tasks ?? [];
                 setShots(updated.frames.map((frame: any) => frameToShotNode(frame, videoTasks, defaultMode)));
             }
-            toast.success("精修完成");
+            toast.success(t("refineDoneToast"));
         } catch (err) {
-            toast.error("精修失败");
+            toast.error(t("refineFailedToast"));
             debugLog.warn("Studio", "single frame refine failed", err);
         }
     }, [currentProject, updateProject]);
@@ -758,13 +758,7 @@ export default function StoryboardR2V() {
             // Try character first
             const char = characters.find((c: any) => c.name === name);
             if (char) {
-                const asset = char.full_body_asset;
-                if (asset?.selected_id && asset.variants?.length) {
-                    const selected = asset.variants.find((v: any) => v.id === asset.selected_id);
-                    if (selected) url = selected.url;
-                } else if (asset?.variants?.[0]) {
-                    url = asset.variants[0].url;
-                }
+                url = selectedVariantUrl(char.reference_sheet) || selectedVariantUrl(char.full_body_asset);
             }
             // Try scene
             if (!url) {
@@ -813,7 +807,7 @@ export default function StoryboardR2V() {
             // Check character
             const char = characters.find((c: any) => c.name === name);
             if (char) {
-                hasImage = !!(char.full_body_asset?.variants?.length);
+                hasImage = !!(char.reference_sheet?.image_variants?.length || char.full_body_asset?.variants?.length);
             }
             // Check scene
             if (!hasImage) {
@@ -1018,8 +1012,8 @@ export default function StoryboardR2V() {
             }
         } catch (error: any) {
             debugLog.error("Studio", "Failed to generate video for shot:", error);
-            const detail = error?.response?.data?.detail || error?.message || "未知错误";
-            toast.error(`视频生成失败：${String(detail).slice(0, 150)}`);
+            const detail = error?.response?.data?.detail || error?.message || t("unknownErrorFallback");
+            toast.error(t("videoGenFailedToast", { detail: String(detail).slice(0, 150) }));
             setShots(prev => prev.map((s, i) =>
                 i === index ? { ...s, videoStatus: "failed" } : s
             ));
@@ -1056,7 +1050,7 @@ export default function StoryboardR2V() {
                 let errMsg: string;
                 if (hasTags) {
                     const unresolved = getUnresolvedAssetNames(shot.prompt);
-                    errMsg = `引用的「${unresolved.join("、")}」尚未生成图片，请先到素材步骤生成。`;
+                    errMsg = t("unresolvedRefImages", { refs: unresolved.join("、") });
                 } else {
                     const r2vModelId = params?.model ?? videoConfig.r2vModel;
                     const r2vModel = VIDEO_R2V_MODELS.find(m => m.id === r2vModelId);
@@ -1209,7 +1203,7 @@ export default function StoryboardR2V() {
                     };
                 }));
             } else {
-                toast.error("视频生成失败：任务提交未成功，请检查参数后重试");
+                toast.error(t("videoGenSubmitFailedToast"));
                 setShots(prev => prev.map((s, i) =>
                     i === index ? { ...s, videoStatus: "failed" as const } : s
                 ));
@@ -1217,11 +1211,11 @@ export default function StoryboardR2V() {
         } catch (error: any) {
             debugLog.error("Studio", "Batch generate failed for shot:", error);
             const status = error?.response?.status;
-            const detail = error?.response?.data?.detail || error?.message || "未知错误";
+            const detail = error?.response?.data?.detail || error?.message || t("unknownErrorFallback");
             if (status === 400 && typeof detail === "string") {
                 setShotErrors(prev => ({ ...prev, [shot.id]: detail }));
             }
-            toast.error(`视频生成失败：${String(detail).slice(0, 150)}`);
+            toast.error(t("videoGenFailedToast", { detail: String(detail).slice(0, 150) }));
             setShots(prev => prev.map((s, i) =>
                 i === index ? { ...s, videoStatus: "failed" as const } : s
             ));
@@ -1751,99 +1745,84 @@ export default function StoryboardR2V() {
     );
 
     return (
-        // Layout v4: outer horizontal split. StepHeader belongs to main
-        // column (not page-wide), so the right TaskQueuePanel can be a
-        // true floor-to-ceiling sidebar with its own SidePanelHeader.
+        // Layout v4: outer horizontal split. Custom page header belongs
+        // to main column (not page-wide), so the right TaskQueuePanel can
+        // be a true floor-to-ceiling sidebar with its own SidePanelHeader.
         <div className="h-full flex overflow-hidden relative">
         {/* Main column — pushed (compressed) when the queue panel opens
-            so the queue doesn't overlay content. */}
-        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-            <StepHeader
-                stepNumber={3}
-                icon={<Film />}
-                englishName="Storyboard"
+            so the queue doesn't overlay content. Bloom/grain now global in
+            ProjectClient so the whole pipeline shares one atmosphere. */}
+        <div className="relative z-10 flex-1 flex flex-col overflow-hidden min-w-0">
+            {/* Unified page header (shared StepPageHeader) */}
+            <StepPageHeader
+                stepNumber={4}
+                englishName="STORYBOARD R2V"
                 title={tStep("storyboardTitle")}
                 subtitle={tStep("storyboardSubtitle")}
+                pills={(
+                    <>
+                        {currentProject?.art_direction?.style_config?.name ? (
+                            <StepPill label={t("artStyleLabel")} value={currentProject.art_direction.style_config.name} />
+                        ) : null}
+                        <StepPill label={t("currentModel")} value={currentModelName} />
+                    </>
+                )}
                 trailing={(
                     <>
-                        {/* 画风 (Art Direction) pill — 上移到顶菜单 */}
-                        {currentProject?.art_direction?.style_config?.name ? (
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    document.dispatchEvent(
-                                        new CustomEvent("lumenx:navigateStep", { detail: "art_direction" }),
-                                    );
-                                }}
-                                title={t("artStyleHint")}
-                                className="btn-tip hidden md:inline-flex items-center gap-1.5 rounded-md border border-glass-border bg-black/20 px-2.5 py-1.5 font-mono text-[10.5px] font-medium text-text-secondary transition-colors duration-fast ease-out-quart hover:border-accent/50 hover:bg-accent/10 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/55"
-                            >
-                                <Palette size={11} aria-hidden="true" />
-                                <span className="text-foreground/95">{currentProject.art_direction.style_config.name}</span>
-                            </button>
-                        ) : null}
-                        {/* Current model name —— 简化的 mono chrome label */}
-                        <span className="hidden lg:inline font-mono text-[10px] uppercase tracking-[0.16em] text-text-muted">
-                            <span>{t("currentModel")}:</span>
-                            <span className="ml-1 text-foreground/95">{currentModelName}</span>
-                        </span>
-                        {/* Open task queue */}
                         <TaskQueueButton
                             inFlightCount={inFlightTaskCount}
                             open={queueOpen}
                             onToggle={() => setQueueOpen(v => !v)}
                         />
+                        <button
+                            type="button"
+                            onClick={() => setGenDialogOpen(true)}
+                            disabled={generating}
+                            className="inline-flex h-8 items-center gap-1.5 rounded-full bg-primary px-4 py-1.5 font-sans text-[0.8125rem] font-semibold text-on-accent shadow-[var(--btn-pri-glow),inset_0_1.5px_0_rgba(255,255,255,0.14)] transition-all duration-fast ease-out-quart hover:bg-primary-hover disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                        >
+                            {generating ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+                            <span>{generating ? t("genInFlight") : t("genShots")}</span>
+                        </button>
                     </>
                 )}
             />
-            {/* Top Toolbar — 简化版：只保留 shot 计数 / + shot / 全展开-全折叠
-                model name + queue button + 画风 已上移到 StepHeader trailing. */}
-            <div className="flex flex-wrap items-center gap-3 px-4 py-2.5 border-b border-white/[0.06] bg-white/[0.015] shrink-0 sm:px-6">
-                <span className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-text-muted">
-                    <span className="text-foreground font-medium">{shots.length}</span>
-                    <span className="ml-1.5">{shots.length === 1 ? "shot" : "shots"}</span>
-                    {totalInFlight > 0 ? <span className="ml-2 text-primary">· {totalInFlight} in flight</span> : null}
-                </span>
-                <motion.button
-                    whileHover={{ scale: 1.04 }}
-                    whileTap={{ scale: 0.96 }}
-                    onClick={() => addShot(shots.length - 1)}
-                    className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
-                >
-                    <Plus size={13} strokeWidth={2} />
-                    {t("addShot")}
-                </motion.button>
-                <button
-                    type="button"
-                    onClick={() => setGenDialogOpen(true)}
-                    disabled={generating}
-                    className="inline-flex h-7 items-center gap-1.5 rounded px-2.5 font-mono text-[10.5px] uppercase tracking-[0.14em] font-medium text-primary border border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors disabled:opacity-40"
-                >
-                    {generating
-                        ? <Loader2 size={11} className="animate-spin" />
-                        : shots.length > 0
-                            ? <RefreshCw size={11} />
-                            : <Sparkles size={11} />
-                    }
-                    {generating ? t("genInFlight") : shots.length > 0 ? "重新生成" : "✨ 智能分镜"}
-                </button>
+            {/* Top Toolbar — mock-aligned: count on the left, expand/collapse pills on the right */}
+            <div className="flex flex-wrap items-center gap-3 px-4 py-3 shrink-0 sm:px-6">
+                <div className="flex items-center gap-3">
+                    <span className="font-mono text-[11px] tracking-[0.04em] text-text-secondary">
+                        <span className="text-foreground font-medium">{shots.length}</span>
+                        <span className="ml-1.5 uppercase">{shots.length === 1 ? t("shot") : t("shots")}</span>
+                        {totalInFlight > 0 ? <span className="ml-2 text-status-processing-fg">· {totalInFlight} {t("inFlightShort")}</span> : null}
+                    </span>
+                    <motion.button
+                        whileHover={{ scale: 1.04 }}
+                        whileTap={{ scale: 0.96 }}
+                        onClick={() => addShot(shots.length - 1)}
+                        className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+                    >
+                        <Plus size={13} strokeWidth={2} />
+                        {t("addShot")}
+                    </motion.button>
+                </div>
                 {shots.length > 1 ? (
-                    <div className="ml-auto flex items-center gap-1">
+                    <div className="ml-auto flex items-center gap-2">
                         <button
                             type="button"
                             onClick={expandAllShots}
                             title={t("expandAll")}
-                            className="-m-1 inline-flex h-7 items-center gap-1 rounded px-1.5 font-mono text-chrome-sm font-medium text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                            className="inline-flex h-8 items-center gap-1.5 rounded-full border border-glass-border bg-transparent px-3.5 font-mono text-[13px] uppercase tracking-[0.06em] text-text-secondary transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                         >
-                            ▾▾ {t("expandAll")}
+                            <PanelBottomOpen size={12} strokeWidth={1.8} />
+                            {t("expandAll")}
                         </button>
                         <button
                             type="button"
                             onClick={collapseAllShots}
                             title={t("collapseAll")}
-                            className="-m-1 inline-flex h-7 items-center gap-1 rounded px-1.5 font-mono text-chrome-sm font-medium text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                            className="inline-flex h-8 items-center gap-1.5 rounded-full border border-glass-border bg-transparent px-3.5 font-mono text-[13px] uppercase tracking-[0.06em] text-text-secondary transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                         >
-                            ▴▴ {t("collapseAll")}
+                            <PanelBottomClose size={12} strokeWidth={1.8} />
+                            {t("collapseAll")}
                         </button>
                     </div>
                 ) : null}
@@ -1858,11 +1837,7 @@ export default function StoryboardR2V() {
                 onGenerateDialogue={handleBatchDialogue}
             />
 
-            <PreviousEpisodeFramesRail
-                scriptId={currentProject?.id ?? null}
-                seriesId={currentProject?.series_id ?? null}
-            />
-            <div className="flex-1 overflow-y-auto px-3 py-4 space-y-3 sm:px-6">
+            <div className="flex-1 overflow-y-auto px-5 pt-1.5 pb-10 space-y-5 sm:px-7">
                 {shots.length === 0 && (
                     <div className="h-full min-h-[300px] flex flex-col items-center justify-center text-center px-6">
                         <div className="rounded-2xl border border-glass-border bg-glass p-8 max-w-lg">
@@ -1878,7 +1853,7 @@ export default function StoryboardR2V() {
                                     type="button"
                                     onClick={() => setGenDialogOpen(true)}
                                     disabled={generating}
-                                    className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-md bg-primary text-white border border-[rgba(100,108,255,0.65)] shadow-[inset_0_1.5px_0_rgba(255,255,255,0.14)] hover:bg-[#7a82ff] disabled:opacity-40 transition-colors text-[13px] font-semibold"
+                                    className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-md bg-primary text-white border border-primary/65 shadow-[inset_0_1.5px_0_rgba(255,255,255,0.14)] hover:bg-primary-hover disabled:opacity-40 transition-colors text-[0.8125rem] font-semibold"
                                 >
                                     {generating ? <Loader2 size={13} className="animate-spin" /> : <Wand2 size={13} />}
                                     {generating ? t("genInFlight") : t("emptyCTA")}
@@ -1886,7 +1861,7 @@ export default function StoryboardR2V() {
                                 <button
                                     type="button"
                                     onClick={() => addShot(-1)}
-                                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-md bg-glass border border-glass-border text-text-secondary hover:text-foreground hover:bg-hover-bg transition-colors text-[12px]"
+                                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-md bg-glass border border-glass-border text-text-secondary hover:text-foreground hover:bg-hover-bg transition-colors text-[0.75rem]"
                                 >
                                     <Plus size={12} />
                                     {t("emptyManualAdd")}
@@ -1960,6 +1935,11 @@ export default function StoryboardR2V() {
                             /* PR-3c · 闭环生成: ShotCard 内全宽生成行 + count selector.
                                canGenerate: direct_r2v 需 prompt; t2i_i2v 还需 first frame. */
                             generateCount={paramsState.count}
+                            genSummary={`${
+                                shot.tabMode === "direct_r2v"
+                                    ? (VIDEO_R2V_MODELS.find(m => m.id === videoConfig.r2vModel)?.name ?? videoConfig.r2vModel ?? "")
+                                    : (VIDEO_I2V_MODELS.find(m => m.id === videoConfig.model)?.name ?? videoConfig.model ?? "")
+                            } · ${paramsState.duration}s`}
                             canGenerate={
                                 shot.prompt.trim().length > 0
                                 && (
@@ -1997,7 +1977,7 @@ export default function StoryboardR2V() {
                             const charId = Array.isArray(frame.character_ids) ? frame.character_ids[0] : null;
                             const speaker = charId ? characters.find((c: any) => c.id === charId) : null;
                             return (
-                                <div className="ml-2 mr-1 mt-1.5 md:ml-5">
+                                <div className="mx-5 mb-4">
                                     <DialogueAudioRow
                                         scriptId={currentProject!.id}
                                         frameId={frame.id}
@@ -2080,7 +2060,7 @@ export default function StoryboardR2V() {
                             v1 不加 explicit section header / first-frame
                             thumbnail in Step 2 — 看用户反馈再升级 v2. */}
                         {expandedShots.has(shot.id) ? (
-                        <div className="ml-2 mr-1 mt-1.5 rounded-lg border border-glass-border bg-black/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_2px_12px_-6px_rgba(0,0,0,0.5)] backdrop-blur-[2px] motion-safe:animate-[shotPanelIn_220ms_cubic-bezier(0.22,1,0.36,1)_both] md:ml-5">
+                        <div className="mx-5 mb-[18px] motion-safe:animate-[shotPanelIn_220ms_cubic-bezier(0.22,1,0.36,1)_both]">
                             {isI2vTab ? (
                                 <div>
                                     <T2ISubsection
@@ -2244,7 +2224,7 @@ export default function StoryboardR2V() {
                     whileHover={{ scale: 1.005 }}
                     whileTap={{ scale: 0.995 }}
                     onClick={() => addShot(shots.length - 1)}
-                    className="w-full py-3.5 border border-dashed border-white/[0.08] hover:border-primary/40 rounded-xl text-text-secondary hover:text-primary text-sm font-medium transition-all duration-300 flex items-center justify-center gap-2 bg-white/[0.01] hover:bg-white/[0.03]"
+                    className="w-full py-3.5 border border-dashed border-glass-border hover:border-primary/40 rounded-xl text-text-secondary hover:text-primary text-sm font-medium transition-all duration-300 flex items-center justify-center gap-2 bg-glass hover:bg-hover-bg"
                 >
                     <Plus size={16} strokeWidth={1.5} />
                     {t("addShot")}

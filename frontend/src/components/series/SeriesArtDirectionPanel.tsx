@@ -146,7 +146,7 @@ export default function SeriesArtDirectionPanel({ seriesId, onSaved }: SeriesArt
         >
             {/* Header */}
             <header className="flex shrink-0 items-center gap-3 border-b border-glass-border bg-surface px-8 py-5">
-                <div className="grid h-9 w-9 place-items-center rounded-full border border-[rgba(100,108,255,0.32)] bg-[rgba(100,108,255,0.08)] text-[#b9bdff]">
+                <div className="grid h-9 w-9 place-items-center rounded-full border border-[rgba(100,108,255,0.32)] bg-[rgba(100,108,255,0.08)] text-primary">
                     <Palette size={16} strokeWidth={1.5} />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -191,7 +191,7 @@ export default function SeriesArtDirectionPanel({ seriesId, onSaved }: SeriesArt
                     <>
                         {/* Selected preview */}
                         <section>
-                            <h3 className="mb-3 inline-flex items-center gap-2 font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-text-secondary">
+                            <h3 className="mb-3 inline-flex items-center gap-2 font-mono text-[0.6875rem] font-medium uppercase tracking-[0.18em] text-text-secondary">
                                 <Check size={14} className="text-primary" />
                                 {t("currentSelection")}
                             </h3>
@@ -199,7 +199,7 @@ export default function SeriesArtDirectionPanel({ seriesId, onSaved }: SeriesArt
                                 <div className="rounded-lg border border-primary/40 bg-primary/10 px-4 py-3">
                                     <p className="font-display text-base font-medium text-foreground">{selectedStyle.name}</p>
                                     {selectedStyle.positive_prompt && (
-                                        <p className="mt-2 font-mono text-[11px] text-text-muted line-clamp-2">
+                                        <p className="mt-2 font-mono text-[0.6875rem] text-text-muted line-clamp-2">
                                             <span className="text-primary mr-1">+</span>
                                             {selectedStyle.positive_prompt}
                                         </p>
@@ -217,22 +217,22 @@ export default function SeriesArtDirectionPanel({ seriesId, onSaved }: SeriesArt
                             <div className="flex items-center gap-1.5 mb-4 overflow-x-auto pb-1">
                                 <button
                                     onClick={() => setActiveCategory("all")}
-                                    className={`shrink-0 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors ${
+                                    className={`shrink-0 px-3 py-1.5 rounded-lg text-[0.75rem] font-medium transition-colors ${
                                         activeCategory === "all"
                                             ? "bg-primary/20 text-primary border border-primary/30"
-                                            : "bg-white/5 text-text-secondary hover:bg-white/10 border border-transparent"
+                                            : "bg-elevated text-text-secondary hover:bg-hover-bg border border-transparent"
                                     }`}
                                 >
-                                    全部
+                                    {t("filterAll")}
                                 </button>
                                 {categories.map(cat => (
                                     <button
                                         key={cat.id}
                                         onClick={() => setActiveCategory(cat.id)}
-                                        className={`shrink-0 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors ${
+                                        className={`shrink-0 px-3 py-1.5 rounded-lg text-[0.75rem] font-medium transition-colors ${
                                             activeCategory === cat.id
                                                 ? "bg-primary/20 text-primary border border-primary/30"
-                                                : "bg-white/5 text-text-secondary hover:bg-white/10 border border-transparent"
+                                                : "bg-elevated text-text-secondary hover:bg-hover-bg border border-transparent"
                                         }`}
                                     >
                                         {cat.name_zh}
@@ -250,10 +250,10 @@ export default function SeriesArtDirectionPanel({ seriesId, onSaved }: SeriesArt
                                         className={`group relative rounded-xl border overflow-hidden cursor-pointer transition-all ${
                                             selectedStyle?.id === preset.id
                                                 ? "border-primary shadow-lg shadow-primary/20 ring-1 ring-primary/40"
-                                                : "border-glass-border hover:border-white/20 hover:shadow-sm"
+                                                : "border-glass-border hover:border-foreground/30 hover:shadow-sm"
                                         }`}
                                     >
-                                        <div className="relative aspect-[4/3] bg-white/5 overflow-hidden">
+                                        <div className="relative aspect-[4/3] bg-elevated overflow-hidden">
                                             {preset.thumbnail ? (
                                                 <img
                                                     src={preset.thumbnail}
@@ -262,7 +262,7 @@ export default function SeriesArtDirectionPanel({ seriesId, onSaved }: SeriesArt
                                                     style={{ objectPosition: preset.object_position || "center" }}
                                                 />
                                             ) : (
-                                                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-white/5 to-white/[0.02]">
+                                                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-glass-border to-glass-border">
                                                     <ImageIcon size={24} className="text-text-muted/40" />
                                                 </div>
                                             )}
@@ -273,11 +273,11 @@ export default function SeriesArtDirectionPanel({ seriesId, onSaved }: SeriesArt
                                             )}
                                         </div>
                                         <div className="px-3 py-2.5">
-                                            <h4 className="text-[12px] font-semibold text-foreground leading-tight truncate">
+                                            <h4 className="text-[0.75rem] font-semibold text-foreground leading-tight truncate">
                                                 {preset.name_zh}
                                             </h4>
                                             {preset.subtitle_zh && (
-                                                <p className="text-[10px] text-text-muted mt-0.5 truncate">
+                                                <p className="text-[0.625rem] text-text-muted mt-0.5 truncate">
                                                     {preset.subtitle_zh}
                                                 </p>
                                             )}
@@ -332,6 +332,8 @@ function SeriesPresetModal({ preset, isSelected, editing, positivePrompt, negati
     sameCategoryPresets: StylePreset[];
     onSwitchPreset: (p: StylePreset) => void;
 }) {
+    const t = useTranslations("seriesArtDirection");
+    const tCommon = useTranslations("common");
     const isCustomized = editing && (
         positivePrompt !== preset.positive_prompt ||
         negativePrompt !== preset.negative_prompt
@@ -357,8 +359,8 @@ function SeriesPresetModal({ preset, isSelected, editing, positivePrompt, negati
                 {/* Header */}
                 <header className="flex items-center justify-between px-6 py-4 border-b border-glass-border shrink-0">
                     <div>
-                        <h2 className="text-[18px] font-bold text-foreground">{preset.name_zh}</h2>
-                        <p className="text-[12px] text-text-muted mt-0.5">{preset.name}</p>
+                        <h2 className="text-[1.125rem] font-bold text-foreground">{preset.name_zh}</h2>
+                        <p className="text-[0.75rem] text-text-muted mt-0.5">{preset.name}</p>
                     </div>
                     <button onClick={onClose} className="p-2 rounded-lg hover:bg-hover-bg text-text-muted hover:text-foreground transition-colors">
                         <X size={18} />
@@ -379,53 +381,53 @@ function SeriesPresetModal({ preset, isSelected, editing, positivePrompt, negati
 
                     <div className="p-6 space-y-5 overflow-y-auto">
                         {preset.description && (
-                            <p className="text-[13px] text-text-secondary leading-relaxed">{preset.description}</p>
+                            <p className="text-[0.8125rem] text-text-secondary leading-relaxed">{preset.description}</p>
                         )}
 
                         {preset.best_for && preset.best_for.length > 0 && (
                             <div className="flex flex-wrap gap-2">
                                 {preset.best_for.map((tag, i) => (
-                                    <span key={i} className="text-[11px] px-2.5 py-1 rounded-md bg-green-500/10 text-green-300 border border-green-500/20">{tag}</span>
+                                    <span key={i} className="text-[0.6875rem] px-2.5 py-1 rounded-md bg-green-500/10 text-green-300 border border-green-500/20">{tag}</span>
                                 ))}
                                 {preset.avoid_for?.map((tag, i) => (
-                                    <span key={`avoid-${i}`} className="text-[11px] px-2.5 py-1 rounded-md bg-red-500/10 text-red-300/70 border border-red-500/15 line-through">{tag}</span>
+                                    <span key={`avoid-${i}`} className="text-[0.6875rem] px-2.5 py-1 rounded-md bg-red-500/10 text-red-300/70 border border-red-500/15 line-through">{tag}</span>
                                 ))}
                             </div>
                         )}
 
                         <div className="space-y-4">
                             <div className="flex items-center justify-between">
-                                <p className="text-[11px] uppercase tracking-wider text-text-muted font-medium">提示词</p>
+                                <p className="text-[0.6875rem] uppercase tracking-wider text-text-muted font-medium">{t("promptLabel")}</p>
                                 {!editing && (
-                                    <button onClick={onStartEditing} className="flex items-center gap-1.5 text-[11px] text-text-muted hover:text-foreground transition-colors">
-                                        <Pencil size={12} /><span>自定义</span>
+                                    <button onClick={onStartEditing} className="flex items-center gap-1.5 text-[0.6875rem] text-text-muted hover:text-foreground transition-colors">
+                                        <Pencil size={12} /><span>{t("customize")}</span>
                                     </button>
                                 )}
                                 {editing && isCustomized && (
-                                    <span className="text-[10px] text-amber-300 font-medium">已修改</span>
+                                    <span className="text-[0.625rem] text-amber-300 font-medium">{t("modified")}</span>
                                 )}
                             </div>
 
                             {!editing ? (
                                 <>
                                     <div>
-                                        <p className="text-[10px] text-text-muted mb-1.5">正向</p>
-                                        <p className="text-[13px] text-text-secondary leading-relaxed">{preset.positive_prompt}</p>
+                                        <p className="text-[0.625rem] text-text-muted mb-1.5">{t("positive")}</p>
+                                        <p className="text-[0.8125rem] text-text-secondary leading-relaxed">{preset.positive_prompt}</p>
                                     </div>
                                     <div>
-                                        <p className="text-[10px] text-text-muted mb-1.5">负向</p>
-                                        <p className="text-[13px] text-text-secondary leading-relaxed">{preset.negative_prompt}</p>
+                                        <p className="text-[0.625rem] text-text-muted mb-1.5">{t("negative")}</p>
+                                        <p className="text-[0.8125rem] text-text-secondary leading-relaxed">{preset.negative_prompt}</p>
                                     </div>
                                 </>
                             ) : (
                                 <>
                                     <div>
-                                        <p className="text-[10px] text-text-muted mb-1.5">正向</p>
-                                        <textarea value={positivePrompt} onChange={(e) => onPositiveChange(e.target.value)} rows={5} className="w-full bg-input-bg border border-glass-border rounded-lg p-3 text-[13px] text-foreground focus:border-primary focus:outline-none resize-none" />
+                                        <p className="text-[0.625rem] text-text-muted mb-1.5">{t("positive")}</p>
+                                        <textarea value={positivePrompt} onChange={(e) => onPositiveChange(e.target.value)} rows={5} className="w-full bg-input-bg border border-glass-border rounded-lg p-3 text-[0.8125rem] text-foreground focus:border-primary focus:outline-none resize-none" />
                                     </div>
                                     <div>
-                                        <p className="text-[10px] text-text-muted mb-1.5">负向</p>
-                                        <textarea value={negativePrompt} onChange={(e) => onNegativeChange(e.target.value)} rows={3} className="w-full bg-input-bg border border-glass-border rounded-lg p-3 text-[13px] text-foreground focus:border-primary focus:outline-none resize-none" />
+                                        <p className="text-[0.625rem] text-text-muted mb-1.5">{t("negative")}</p>
+                                        <textarea value={negativePrompt} onChange={(e) => onNegativeChange(e.target.value)} rows={3} className="w-full bg-input-bg border border-glass-border rounded-lg p-3 text-[0.8125rem] text-foreground focus:border-primary focus:outline-none resize-none" />
                                     </div>
                                 </>
                             )}
@@ -436,16 +438,16 @@ function SeriesPresetModal({ preset, isSelected, editing, positivePrompt, negati
                 {/* Same-category strip */}
                 {sameCategoryPresets.length > 0 && (
                     <div className="border-t border-glass-border px-6 py-3 shrink-0">
-                        <p className="text-[10px] uppercase tracking-wider text-text-muted mb-2">同类风格</p>
+                        <p className="text-[0.625rem] uppercase tracking-wider text-text-muted mb-2">{t("similarStyles")}</p>
                         <div className="flex gap-2.5 overflow-x-auto pb-1">
                             {sameCategoryPresets.slice(0, 5).map(p => (
-                                <button key={p.id} onClick={() => onSwitchPreset(p)} className="shrink-0 w-24 rounded-lg overflow-hidden border border-glass-border hover:border-white/20 transition-colors">
+                                <button key={p.id} onClick={() => onSwitchPreset(p)} className="shrink-0 w-24 rounded-lg overflow-hidden border border-glass-border hover:border-foreground/30 transition-colors">
                                     {p.thumbnail ? (
                                         <img src={p.thumbnail} alt={p.name_zh} className="w-full aspect-[16/9] object-cover" style={{ objectPosition: p.object_position || "center" }} />
                                     ) : (
-                                        <div className="w-full aspect-[16/9] bg-white/5 flex items-center justify-center"><ImageIcon size={12} className="text-text-muted/40" /></div>
+                                        <div className="w-full aspect-[16/9] bg-elevated flex items-center justify-center"><ImageIcon size={12} className="text-text-muted/40" /></div>
                                     )}
-                                    <p className="text-[10px] text-text-muted px-1.5 py-1 truncate">{p.name_zh}</p>
+                                    <p className="text-[0.625rem] text-text-muted px-1.5 py-1 truncate">{p.name_zh}</p>
                                 </button>
                             ))}
                         </div>
@@ -453,9 +455,9 @@ function SeriesPresetModal({ preset, isSelected, editing, positivePrompt, negati
                 )}
 
                 <footer className="flex items-center justify-end gap-3 px-6 py-4 border-t border-glass-border shrink-0">
-                    <WorkflowActionButton variant="ghost" onClick={onClose}>取消</WorkflowActionButton>
+                    <WorkflowActionButton variant="ghost" onClick={onClose}>{tCommon("cancel")}</WorkflowActionButton>
                     <WorkflowActionButton variant="primary" leftIcon={<Check />} onClick={onApply}>
-                        {isSelected ? "已选择" : isCustomized ? "应用自定义风格" : "使用此风格"}
+                        {isSelected ? t("selected") : isCustomized ? t("applyCustomStyle") : t("useThisStyle")}
                     </WorkflowActionButton>
                 </footer>
             </motion.div>

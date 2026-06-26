@@ -35,8 +35,8 @@ function formatUploadError(err: T2IUploadError, t: ReturnType<typeof useTranslat
     const base =
         code === "type" ? t("t2iHeroUploadInvalidType") :
         code === "size" ? t("t2iHeroUploadTooLarge") :
-        code === "not_found" ? "镜头还未保存到服务器，先添加描述再上传首帧。" :
-        code === "server" ? "服务端处理失败。" :
+        code === "not_found" ? t("t2iUploadErrNotFound") :
+        code === "server" ? t("t2iUploadErrServer") :
         t("t2iHeroUploadFailed");
     return detail ? `${base}（${detail}）` : base;
 }
@@ -226,7 +226,7 @@ function Hero({
                         {t("t2iHeroEyebrow")}
                     </div>
                     {/* Title — display tier，是 hero 的视觉焦点 */}
-                    <div className="font-display text-display-sm font-semibold text-foreground/95">
+                    <div className="font-display text-display-sm font-semibold text-foreground">
                         {t("t2iHeroTitle")}
                     </div>
                     <p className="max-w-[58ch] font-sans text-body-sm leading-relaxed text-text-secondary">
@@ -240,7 +240,7 @@ function Hero({
                             onClick={onGenerate}
                             disabled={generateDisabled}
                             title={promptIsEmpty ? t("t2iHeroGenerateDisabledTooltip") : t("t2iHeroGenerateEnabledTooltip")}
-                            className="btn-tip inline-flex min-h-[36px] items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 font-display text-display-sm font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_4px_12px_-4px_rgba(100,108,255,0.55)] transition-all duration-fast ease-out-quart hover:bg-primary/92 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="btn-tip inline-flex min-h-[36px] items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 font-display text-display-sm font-semibold text-white shadow-[var(--btn-pri-glow),inset_0_1px_0_rgba(255,255,255,0.22)] transition-all duration-fast ease-out-quart hover:bg-primary/92 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             {generating ? (
                                 <Loader2 size={14} className="animate-spin" aria-hidden="true" />
@@ -423,7 +423,7 @@ function Compact({
                         disabled={promptIsEmpty || generating}
                         aria-label={t("t2iCompactReroll")}
                         title={promptIsEmpty ? t("t2iCompactRerollDisabled") : t("t2iCompactRerollTooltip")}
-                        className="btn-tip inline-flex items-center gap-1 px-1.5 h-7 rounded font-mono text-[10.5px] uppercase tracking-tight text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-text-muted"
+                        className="btn-tip inline-flex items-center gap-1 px-1.5 h-7 rounded font-mono text-[0.65625rem] uppercase tracking-tight text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-text-muted"
                     >
                         <RefreshCw size={11} strokeWidth={1.8} aria-hidden="true" className={generating ? "animate-spin" : undefined} />
                         <span>{t("t2iCompactReroll")}</span>
@@ -464,7 +464,7 @@ function Compact({
                         {menuOpen ? (
                             <div
                                 role="menu"
-                                className="absolute right-0 top-full z-10 mt-1 w-44 overflow-hidden rounded-md border border-glass-border bg-[#0a0a14]/96 shadow-[0_8px_28px_-6px_rgba(0,0,0,0.7)] backdrop-blur-md motion-safe:animate-[shotPanelIn_180ms_cubic-bezier(0.22,1,0.36,1)_both]"
+                                className="absolute right-0 top-full z-10 mt-1 w-44 overflow-hidden rounded-md border border-glass-border bg-surface/96 shadow-[0_8px_28px_-6px_rgba(0,0,0,0.7)] backdrop-blur-md motion-safe:animate-[shotPanelIn_180ms_cubic-bezier(0.22,1,0.36,1)_both]"
                             >
                                 <button
                                     type="button"
@@ -604,7 +604,7 @@ function StepBadge({
             <span
                 aria-hidden="true"
                 className={clsx(
-                    "grid h-5 w-5 place-items-center rounded-full font-mono text-[10px] font-semibold transition-colors duration-fast ease-out-quart",
+                    "grid h-5 w-5 place-items-center rounded-full font-mono text-[0.625rem] font-semibold transition-colors duration-fast ease-out-quart",
                     done
                         ? "bg-status-completed-bg text-status-completed-fg ring-1 ring-status-completed-border"
                         : "bg-primary/20 text-primary ring-1 ring-primary/40",
@@ -612,7 +612,7 @@ function StepBadge({
             >
                 {done ? <Check size={10} strokeWidth={3} /> : num}
             </span>
-            <span className="font-mono text-chrome-sm font-medium uppercase tracking-tight text-foreground/85">
+            <span className="font-mono text-chrome-sm font-medium uppercase tracking-tight text-foreground">
                 {label}
             </span>
         </span>
@@ -657,7 +657,7 @@ function ThumbButton({
                 "group relative h-[54px] w-[96px] shrink-0 overflow-hidden rounded-md border transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-1 focus-visible:ring-offset-black",
                 active
                     ? "border-primary/70 ring-1 ring-primary/40"
-                    : "border-glass-border hover:border-white/30",
+                    : "border-glass-border hover:border-foreground/30",
             )}
         >
             <PreviewImage
@@ -698,7 +698,7 @@ function ThumbButton({
                             onRemove();
                         }
                     }}
-                    className="absolute left-0 top-0 grid h-6 w-6 cursor-pointer place-items-center rounded-full text-white/95 transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-failed-border"
+                    className="absolute left-0 top-0 grid h-6 w-6 cursor-pointer place-items-center rounded-full text-foreground transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-failed-border"
                 >
                     <span className="grid h-4 w-4 place-items-center rounded-full bg-black/75 transition-colors duration-fast ease-out-quart hover:bg-status-failed-fg">
                         <X size={9} aria-hidden="true" />
@@ -734,7 +734,7 @@ function SinglePreview({ url, isStoryboard, onRemove, storyboardBadgeText }: Sin
             <PreviewImage src={url} alt="" className="h-full w-full" />
             {isStoryboard ? (
                 <span
-                    className="pointer-events-none absolute left-1 top-1 inline-flex items-center gap-1 rounded bg-black/65 px-1.5 py-0.5 font-mono text-[10px] font-medium uppercase text-text-secondary"
+                    className="pointer-events-none absolute left-1 top-1 inline-flex items-center gap-1 rounded bg-black/65 px-1.5 py-0.5 font-mono text-[0.625rem] font-medium uppercase text-text-secondary"
                     title={storyboardBadgeText}
                 >
                     <Pin size={9} aria-hidden="true" />
@@ -747,7 +747,7 @@ function SinglePreview({ url, isStoryboard, onRemove, storyboardBadgeText }: Sin
                     onClick={(e) => { e.stopPropagation(); onRemove(); }}
                     aria-label="Delete candidate"
                     title="Delete"
-                    className="absolute left-1 top-1 grid h-6 w-6 cursor-pointer place-items-center rounded-full bg-black/75 text-white/95 transition-colors duration-fast ease-out-quart hover:bg-status-failed-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-failed-border"
+                    className="absolute left-1 top-1 grid h-6 w-6 cursor-pointer place-items-center rounded-full bg-black/75 text-foreground transition-colors duration-fast ease-out-quart hover:bg-status-failed-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-failed-border"
                 >
                     <X size={11} aria-hidden="true" />
                 </button>
@@ -787,7 +787,7 @@ function ActivePreview({
                 )}
                 {isStoryboard ? (
                     <span
-                        className="pointer-events-none absolute left-1 top-1 inline-flex items-center gap-1 rounded bg-black/65 px-1.5 py-0.5 font-mono text-[10px] font-medium uppercase text-text-secondary"
+                        className="pointer-events-none absolute left-1 top-1 inline-flex items-center gap-1 rounded bg-black/65 px-1.5 py-0.5 font-mono text-[0.625rem] font-medium uppercase text-text-secondary"
                         title="From Storyboard stage"
                     >
                         <Pin size={9} aria-hidden="true" />

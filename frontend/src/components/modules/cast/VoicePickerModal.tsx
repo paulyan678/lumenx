@@ -35,12 +35,6 @@ const RECOMMENDED_BY_GENDER: Record<string, string[]> = {
     Female: ["longxiaochun_v2", "longyue_v2", "longfeifei_v2", "longwan_v2"],
 };
 
-// Preview sample text — Q5 A2 fallback when character has no dialogue yet
-const SAMPLE_TEXT_TEMPLATE = (name: string) =>
-    name
-        ? `你好，我是${name}。今天遇到件有趣的事，让我慢慢说给你听。`
-        : "你好，这是音色试听。今天遇到件有趣的事，让我慢慢说给你听。";
-
 interface VoicePickerModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -157,7 +151,13 @@ export default function VoicePickerModal({
         }
     }, [isOpen]);
 
-    const sampleText = previewText || SAMPLE_TEXT_TEMPLATE(characterName);
+    // Preview sample text — Q5 A2 fallback when character has no dialogue yet.
+    // Prefer explicit previewText (Q5 A3); otherwise build from character name.
+    const sampleText =
+        previewText ||
+        (characterName
+            ? t("previewTextNamed", { name: characterName })
+            : t("previewTextDefault"));
 
     // PR-3h · unified preview-by-id (works for both system VoiceMeta and CustomVoice)
     const handlePreviewById = async (voiceId: string) => {
@@ -263,7 +263,7 @@ export default function VoicePickerModal({
                         <button
                             key={tabDef.id}
                             onClick={() => setTab(tabDef.id)}
-                            className={`relative px-3 pb-2 font-mono text-[11px] uppercase tracking-[0.16em] transition-colors ${
+                            className={`relative px-3 pb-2 font-mono text-[0.6875rem] uppercase tracking-[0.16em] transition-colors ${
                                 tab === tabDef.id
                                     ? "text-foreground"
                                     : "text-text-muted hover:text-text-secondary"
@@ -295,7 +295,7 @@ export default function VoicePickerModal({
                             {/* Recommended row */}
                             {recommended.length > 0 && (
                                 <section>
-                                    <h3 className="mb-2 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">
+                                    <h3 className="mb-2 flex items-center gap-2 font-mono text-[0.625rem] uppercase tracking-[0.18em] text-text-muted">
                                         <Sparkles size={11} className="text-primary" />
                                         {t("recommended")}
                                         <span className="text-text-muted/60">· {t("basedOnCharacter", { gender: characterGender || "?" })}</span>
@@ -375,7 +375,7 @@ export default function VoicePickerModal({
 
                 {/* Footer */}
                 <div className="flex items-center justify-between gap-3 px-6 py-3 border-t border-glass-border">
-                    <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-text-muted">
+                    <span className="font-mono text-[0.625rem] uppercase tracking-[0.14em] text-text-muted">
                         {selectedId
                             ? voices.find(v => v.id === selectedId)?.name || selectedId
                             : t("noSelection")}
@@ -383,7 +383,7 @@ export default function VoicePickerModal({
                     <div className="flex items-center gap-2">
                         <button
                             onClick={onClose}
-                            className="inline-flex items-center px-4 py-2 rounded-md bg-glass border border-glass-border text-text-secondary hover:text-foreground hover:bg-hover-bg transition-colors text-[12px]"
+                            className="inline-flex items-center px-4 py-2 rounded-md bg-glass border border-glass-border text-text-secondary hover:text-foreground hover:bg-hover-bg transition-colors text-[0.75rem]"
                         >
                             {t("cancel")}
                         </button>
@@ -398,7 +398,7 @@ export default function VoicePickerModal({
                                 onClose();
                             }}
                             disabled={!selectedId || selectedId === currentVoiceId}
-                            className="inline-flex items-center px-4 py-2 rounded-md bg-primary text-white border border-[rgba(100,108,255,0.65)] shadow-[inset_0_1.5px_0_rgba(255,255,255,0.14)] hover:bg-[#7a82ff] disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-[12px] font-semibold"
+                            className="inline-flex items-center px-4 py-2 rounded-md bg-primary text-white border border-[rgba(100,108,255,0.65)] shadow-[inset_0_1.5px_0_rgba(255,255,255,0.14)] hover:bg-primary-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-[0.75rem] font-semibold"
                         >
                             {t("apply")}
                         </button>
@@ -454,7 +454,7 @@ function VoiceGroup({
     if (!voices.length) return null;
     return (
         <section>
-            <h3 className="mb-2 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">
+            <h3 className="mb-2 flex items-center gap-2 font-mono text-[0.625rem] uppercase tracking-[0.18em] text-text-muted">
                 {label} <span className="text-text-muted/60">({voices.length})</span>
             </h3>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
@@ -495,15 +495,15 @@ function VoiceCard({
             className={`relative cursor-pointer rounded-lg border p-3 transition-colors ${
                 selected
                     ? "border-primary bg-[rgba(100,108,255,0.10)]"
-                    : "border-glass-border bg-glass hover:border-white/15"
+                    : "border-glass-border bg-glass hover:border-foreground/30"
             }`}
         >
             <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13px] font-medium text-foreground" title={voice.name}>
+                    <p className="truncate text-[0.8125rem] font-medium text-foreground" title={voice.name}>
                         {voice.name}
                     </p>
-                    <p className="mt-0.5 font-mono text-[9.5px] uppercase tracking-[0.14em] text-text-muted">
+                    <p className="mt-0.5 font-mono text-[0.59375rem] uppercase tracking-[0.14em] text-text-muted">
                         {voice.gender}
                         {voice.dialect ? ` · ${voice.dialect}` : ""}
                         {voice.lang_primary ? ` · ${voice.lang_primary}` : ""}
@@ -516,7 +516,7 @@ function VoiceCard({
                     className={`shrink-0 inline-flex h-7 w-7 items-center justify-center rounded-md border transition-colors ${
                         playing
                             ? "border-primary bg-primary/15 text-primary"
-                            : "border-glass-border bg-black/30 text-text-secondary hover:border-white/20 hover:text-foreground"
+                            : "border-glass-border bg-black/30 text-text-secondary hover:border-foreground/30 hover:text-foreground"
                     }`}
                 >
                     {previewing ? (
@@ -580,7 +580,7 @@ function CustomVoiceList({
             {/* Create button (always visible at top) */}
             <button
                 onClick={onCreate}
-                className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-dashed border-primary/40 bg-primary/5 px-4 py-3 text-[13px] font-medium text-primary hover:bg-primary/10 hover:border-primary/60 transition-colors"
+                className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-dashed border-primary/40 bg-primary/5 px-4 py-3 text-[0.8125rem] font-medium text-primary hover:bg-primary/10 hover:border-primary/60 transition-colors"
             >
                 {createLabel}
             </button>
@@ -603,15 +603,15 @@ function CustomVoiceList({
                                 className={`relative cursor-pointer rounded-lg border p-3 transition-colors ${
                                     isSelected
                                         ? "border-primary bg-[rgba(100,108,255,0.10)]"
-                                        : "border-glass-border bg-glass hover:border-white/15"
+                                        : "border-glass-border bg-glass hover:border-foreground/30"
                                 }`}
                             >
                                 <div className="flex items-start justify-between gap-2">
                                     <div className="min-w-0 flex-1">
-                                        <p className="truncate text-[13px] font-medium text-foreground" title={cv.label}>
+                                        <p className="truncate text-[0.8125rem] font-medium text-foreground" title={cv.label}>
                                             {cv.label}
                                         </p>
-                                        <p className="mt-0.5 font-mono text-[9.5px] uppercase tracking-[0.14em] text-text-muted">
+                                        <p className="mt-0.5 font-mono text-[0.59375rem] uppercase tracking-[0.14em] text-text-muted">
                                             {cv.origin === "clone" ? t("originClone") : t("originDesign")}
                                             <span className="mx-1 text-text-muted/40">·</span>
                                             {cv.target_model}
@@ -624,7 +624,7 @@ function CustomVoiceList({
                                             className={`inline-flex h-7 w-7 items-center justify-center rounded-md border transition-colors ${
                                                 isPlaying
                                                     ? "border-primary bg-primary/15 text-primary"
-                                                    : "border-glass-border bg-black/30 text-text-secondary hover:border-white/20 hover:text-foreground"
+                                                    : "border-glass-border bg-black/30 text-text-secondary hover:border-foreground/30 hover:text-foreground"
                                             }`}
                                         >
                                             {isPreviewing ? <Loader2 size={12} className="animate-spin" /> : isPlaying ? <Pause size={12} /> : <Play size={12} />}

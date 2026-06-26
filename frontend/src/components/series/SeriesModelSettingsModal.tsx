@@ -204,7 +204,7 @@ export default function SeriesModelSettingsModal({ isOpen, onClose, seriesId, on
                                                     }`}
                                                 >
                                                     <span className="text-sm font-medium text-foreground">{ratio.name}</span>
-                                                    <span className="text-[10px] text-text-secondary">{ratio.description}</span>
+                                                    <span className="text-[0.625rem] text-text-secondary">{ratio.description}</span>
                                                 </button>
                                             ))}
                                         </div>

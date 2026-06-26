@@ -18,6 +18,7 @@
  *     (asset generation can take 20-60s).
  */
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Sparkles, Loader2, Check, RefreshCw, Wand2, Palette, Star } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -39,6 +40,7 @@ function startAssetPoll(
     projectId: string,
     kind: CastKind,
     generationType: string,
+    t: ReturnType<typeof useTranslations<"castWorkbench">>,
     getStore: () => {
         updateProject: (id: string, data: any) => void;
         removeGeneratingTask: (assetId: string, generationType: string) => void;
@@ -60,14 +62,14 @@ function startAssetPoll(
                 const entityPool = (kind === "character" ? fresh.characters : kind === "scene" ? fresh.scenes : fresh.props) || [];
                 const updatedEntity = entityPool.find((e: any) => e.id === entityId);
                 const count = updatedEntity ? readVariants(updatedEntity, kind).length : 0;
-                toast.success(`生成完成`, { body: `已生成 ${count} 张变体` });
+                toast.success(t("toastVariantDone"), { body: t("toastVariantDoneBody", { count }) });
             } else if (status?.status === "failed") {
                 clearInterval(interval);
                 activePolls.delete(entityId);
                 if (progressToastId) toast.dismiss(progressToastId);
                 const { removeGeneratingTask } = getStore();
                 removeGeneratingTask(entityId, generationType);
-                toast.error("生成失败", { body: status?.error || "未知错误" });
+                toast.error(t("toastGenErr"), { body: status?.error || t("toastGenErrUnknown") });
             }
         } catch (err) {
             clearInterval(interval);
@@ -75,7 +77,7 @@ function startAssetPoll(
             if (progressToastId) toast.dismiss(progressToastId);
             const { removeGeneratingTask } = getStore();
             removeGeneratingTask(entityId, generationType);
-            toast.error("轮询异常", { body: "请刷新页面查看结果" });
+            toast.error(t("toastPollErr"), { body: t("toastPollErrBody") });
         }
     }, 2500);
     activePolls.set(entityId, interval);
@@ -121,8 +123,8 @@ const CHARACTER_TEMPLATES: Record<CharacterTemplate, {
     design_sheet: {
         labelKey: "tplDesignSheetLabel",
         descKey: "tplDesignSheetDesc",
-        compositionEn: "",
-        negativeAppend: "",
+        compositionEn: "Composition: professional character design sheet, single unified image with dark cyberpunk-themed background (deep blue-black with subtle neon circuit patterns). Layout divided into labeled panels with thin border frames: - Top left: large dramatic character portrait (bust shot, three-quarter angle, moody rim lighting, glowing blue cybernetic eye) - Center: three full-body standing views (front / side / back) with labels \"正面\" \"侧面\" \"背面\" - Top right: 4 expression close-ups in a row (neutral, smirking, intense focus, combat rage), labeled \"表情特写\" - Bottom left: 3-4 detail close-up panels showing cybernetic eye mechanism, neck circuit tattoo, armor texture, weapon holster, labeled \"细节特写\" - Bottom right: character info panel with dark translucent background containing text fields (name, age, traits, abilities). Cinematic lighting, high detail, concept art quality, game character sheet aesthetic.",
+        negativeAppend: "watermark, UI overlay, signature, low quality, distorted anatomy, multiple separate images",
         comingSoon: true,
         exampleImage: "/assets/templates/design-sheet.png",
     },
@@ -215,6 +217,11 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
     const [applyStyle, setApplyStyle] = useState(true);
     const [galleryFilter, setGalleryFilter] = useState<"all" | "favorited">("all");
     const generating = generatingTasks.some((t) => t.assetId === entityId);
+    // Effective t2i model — drives the "design_sheet" template gating: that
+    // template only works with gpt-image-2, so it stays locked unless the
+    // user has selected gpt-image-2 (override or project default).
+    const selectedModelId = modelOverride || currentProject?.model_settings?.t2i_model || "wan2.1-t2i";
+    const isGptImage2 = selectedModelId === "gpt-image-2";
     const [selectedTemplate, setSelectedTemplate] = useState<CharacterTemplate>("simple");
     const [pendingTemplate, setPendingTemplate] = useState<CharacterTemplate | null>(null);
     const [promptDirty, setPromptDirty] = useState(false);
@@ -267,7 +274,9 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
 
     const handleTemplateSwitch = (tpl: CharacterTemplate) => {
         if (tpl === selectedTemplate) return;
-        if (CHARACTER_TEMPLATES[tpl].comingSoon) return;
+        // design_sheet (comingSoon) is gated on gpt-image-2 — the button
+        // unlocks when isGptImage2, so allow the switch too.
+        if (CHARACTER_TEMPLATES[tpl].comingSoon && !isGptImage2) return;
         if (promptDirty) {
             setPendingTemplate(tpl);
         } else {
@@ -296,6 +305,28 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                 projectTitle: currentProject.title,
             });
             return;
+        }
+        // Refresh project + validate the entity still exists backend-side
+        // before submitting. The store can hold a stale character that was
+        // deleted server-side, which makes generateAsset 404 with
+        // "Character {id} not found". Syncing here both prevents the 404
+        // and self-heals the store so the stale card disappears.
+        try {
+            const fresh = await api.getProject(currentProject.id);
+            const pool = kind === "character" ? fresh.characters : kind === "scene" ? fresh.scenes : fresh.props;
+            if (!Array.isArray(pool) || !pool.some((e: any) => e.id === entity.id)) {
+                toast.error(t("toastEntityGone"), {
+                    projectId: currentProject.id,
+                    projectTitle: currentProject.title,
+                });
+                updateProject(currentProject.id, fresh);
+                onClose();
+                return;
+            }
+            updateProject(currentProject.id, fresh);
+        } catch {
+            // Refresh failed — proceed with cached data; backend will reject
+            // if the entity truly is stale and the poll surfaces the error.
         }
         const effectiveBatchSize = Math.max(1, Math.min(4, batchSize));
         addGeneratingTask(entity.id, kind === "character" ? "reference_sheet" : "all", effectiveBatchSize);
@@ -327,7 +358,7 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                 const capturedEntityId = entity.id;
                 const capturedKind = kind;
                 const capturedProjectId = currentProject.id;
-                startAssetPoll(capturedEntityId, taskId, capturedProjectId, capturedKind, kind === "character" ? "reference_sheet" : "all", () => ({
+                startAssetPoll(capturedEntityId, taskId, capturedProjectId, capturedKind, kind === "character" ? "reference_sheet" : "all", t, () => ({
                     updateProject: useProjectStore.getState().updateProject,
                     removeGeneratingTask: useProjectStore.getState().removeGeneratingTask,
                 }), progressId);
@@ -410,7 +441,7 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
     } as const;
     const accent = accentClasses[kind];
 
-    return (
+    return createPortal((
         <AnimatePresence>
             <motion.div
                 initial={{ opacity: 0 }}
@@ -435,7 +466,7 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                                 <Sparkles size={13} />
                             </span>
                             <div className="min-w-0">
-                                <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-text-muted">
+                                <p className="font-mono text-[0.625rem] uppercase tracking-[0.16em] text-text-muted">
                                     {t(`kind.${kind}`)} · {variants.length} {t("variants")}
                                 </p>
                                 <h2 className="text-display font-medium text-foreground truncate">{entity.name}</h2>
@@ -452,12 +483,12 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                         <div className="hidden md:flex flex-col gap-3 p-4 overflow-y-auto custom-scrollbar bg-surface/50">
                             {/* Entity metadata */}
                             <div>
-                                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted mb-1">
+                                <p className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-text-muted mb-1">
                                     {t(`kind.${kind}`)}
                                 </p>
-                                <p className="text-[14px] font-medium text-foreground">{entity.name}</p>
+                                <p className="text-[0.875rem] font-medium text-foreground">{entity.name}</p>
                                 {entity.description && (
-                                    <p className="mt-1.5 text-[12px] leading-relaxed text-text-secondary">
+                                    <p className="mt-1.5 text-[0.75rem] leading-relaxed text-text-secondary">
                                         {entity.description}
                                     </p>
                                 )}
@@ -477,12 +508,12 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                                 if (appearsIn.length <= 1) return null;
                                 return (
                                     <div className="pt-3 border-t border-glass-border">
-                                        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted mb-1.5">
+                                        <p className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-text-muted mb-1.5">
                                             {t("appearsIn")} ({appearsIn.length})
                                         </p>
                                         <div className="flex flex-wrap gap-1">
                                             {appearsIn.slice(0, 6).map((ep: any) => (
-                                                <span key={ep.id} className="px-1.5 py-0.5 rounded bg-white/5 border border-glass-border text-[10px] text-text-secondary truncate max-w-[110px]">
+                                                <span key={ep.id} className="px-1.5 py-0.5 rounded bg-elevated border border-glass-border text-[0.625rem] text-text-secondary truncate max-w-[110px]">
                                                     {ep.title}
                                                 </span>
                                             ))}
@@ -494,34 +525,34 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                             {/* Style baseline — name + toggle + positive/negative prompts */}
                             <div className="pt-3 border-t border-glass-border">
                                 <div className="flex items-center justify-between">
-                                    <p className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">
+                                    <p className="flex items-center gap-1.5 font-mono text-[0.625rem] uppercase tracking-[0.18em] text-text-muted">
                                         <Palette size={10} /> {t("styleAppliedFrom")}
                                     </p>
                                     {styleName && (
                                         <button
                                             onClick={() => setApplyStyle(!applyStyle)}
-                                            className={`relative w-7 h-4 rounded-full transition-colors ${applyStyle ? "bg-primary/60" : "bg-white/10"}`}
+                                            className={`relative w-7 h-4 rounded-full transition-colors ${applyStyle ? "bg-primary/60" : "bg-elevated"}`}
                                         >
                                             <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${applyStyle ? "left-3.5" : "left-0.5"}`} />
                                         </button>
                                     )}
                                 </div>
-                                <p className="mt-1 text-[12px] text-foreground">{styleName || t("styleNotSet")}</p>
+                                <p className="mt-1 text-[0.75rem] text-foreground">{styleName || t("styleNotSet")}</p>
                                 {!applyStyle && styleName && (
-                                    <p className="text-[10px] text-amber-300/70 mt-0.5">{t("styleDisabledHint")}</p>
+                                    <p className="text-[0.625rem] text-amber-300/70 mt-0.5">{t("styleDisabledHint")}</p>
                                 )}
 
                                 {/* Positive prompt */}
                                 {applyStyle && stylePositive && (
                                     <div className="mt-2.5 rounded-md bg-primary/5 border border-primary/10 px-2.5 py-2">
-                                        <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-primary/70 mb-1">{t("positiveLabel")}</p>
-                                        <p className={`text-[11px] leading-relaxed text-text-secondary ${!positiveExpanded ? "line-clamp-3" : ""}`}>
+                                        <p className="font-mono text-[0.5625rem] uppercase tracking-[0.14em] text-primary/70 mb-1">{t("positiveLabel")}</p>
+                                        <p className={`text-[0.6875rem] leading-relaxed text-text-secondary ${!positiveExpanded ? "line-clamp-3" : ""}`}>
                                             {stylePositive}
                                         </p>
                                         {stylePositive.length > 80 && (
                                             <button
                                                 onClick={() => setPositiveExpanded(!positiveExpanded)}
-                                                className="mt-1 text-[10px] text-primary/60 hover:text-primary/90 transition-colors"
+                                                className="mt-1 text-[0.625rem] text-primary/60 hover:text-primary/90 transition-colors"
                                             >
                                                 {positiveExpanded ? t("collapse") : t("expand")}
                                             </button>
@@ -532,14 +563,14 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                                 {/* Negative prompt */}
                                 {applyStyle && styleNegative && (
                                     <div className="mt-2 rounded-md bg-red-500/5 border border-red-500/10 px-2.5 py-2">
-                                        <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-red-400/70 mb-1">{t("negativeLabel")}</p>
-                                        <p className={`text-[11px] leading-relaxed text-text-secondary ${!negativeExpanded ? "line-clamp-3" : ""}`}>
+                                        <p className="font-mono text-[0.5625rem] uppercase tracking-[0.14em] text-red-400/70 mb-1">{t("negativeLabel")}</p>
+                                        <p className={`text-[0.6875rem] leading-relaxed text-text-secondary ${!negativeExpanded ? "line-clamp-3" : ""}`}>
                                             {styleNegative}
                                         </p>
                                         {styleNegative.length > 80 && (
                                             <button
                                                 onClick={() => setNegativeExpanded(!negativeExpanded)}
-                                                className="mt-1 text-[10px] text-red-400/60 hover:text-red-400/90 transition-colors"
+                                                className="mt-1 text-[0.625rem] text-red-400/60 hover:text-red-400/90 transition-colors"
                                             >
                                                 {negativeExpanded ? t("collapse") : t("expand")}
                                             </button>
@@ -555,13 +586,13 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                             {/* Template selection cards — character only */}
                             {kind === "character" && (
                                 <div className="mb-4">
-                                    <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted mb-2.5">
+                                    <p className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-text-muted mb-2.5">
                                         {t("templateSelectLabel")}
                                     </p>
                                     <div className="flex gap-3">
                                         {(Object.entries(CHARACTER_TEMPLATES) as [CharacterTemplate, typeof CHARACTER_TEMPLATES[CharacterTemplate]][]).map(([key, tpl]) => {
                                             const isActive = selectedTemplate === key;
-                                            const isLocked = tpl.comingSoon;
+                                            const isLocked = !!(tpl.comingSoon && !isGptImage2);
                                             return (
                                                 <button
                                                     key={key}
@@ -572,7 +603,7 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                                                             ? "border-primary/60 ring-1 ring-primary/30 bg-primary/5"
                                                             : isLocked
                                                                 ? "border-glass-border bg-black/20 opacity-50 cursor-not-allowed"
-                                                                : "border-glass-border bg-black/20 hover:border-white/25 hover:bg-white/[0.03]"
+                                                                : "border-glass-border bg-black/20 hover:border-foreground/30 hover:bg-hover-bg"
                                                     }`}
                                                 >
                                                     {/* Example thumbnail area — 4:3 ratio */}
@@ -580,28 +611,28 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                                                         {tpl.exampleImage ? (
                                                             <img src={tpl.exampleImage} alt="" className="w-full h-full object-cover" />
                                                         ) : (
-                                                            <span className="text-[20px] text-text-muted/40">
+                                                            <span className="text-[1.25rem] text-text-muted/40">
                                                                 {isLocked ? "🔒" : "📐"}
                                                             </span>
                                                         )}
                                                     </div>
                                                     {/* Label + description */}
                                                     <div className="px-2.5 py-2">
-                                                        <p className={`text-[11px] font-medium ${isActive ? "text-foreground" : "text-text-secondary"}`}>
+                                                        <p className={`text-[0.6875rem] font-medium ${isActive ? "text-foreground" : "text-text-secondary"}`}>
                                                             {t(tpl.labelKey)}
                                                         </p>
-                                                        <p className="text-[9.5px] text-text-muted mt-0.5 line-clamp-1">
+                                                        <p className="text-[0.59375rem] text-text-muted mt-0.5 line-clamp-1">
                                                             {t(tpl.descKey)}
                                                         </p>
                                                     </div>
                                                     {/* Active indicator */}
                                                     {isActive && (
                                                         <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-primary grid place-items-center">
-                                                            <Check size={9} className="text-white" strokeWidth={3} />
+                                                            <Check size={9} className="text-foreground" strokeWidth={3} />
                                                         </span>
                                                     )}
                                                     {isLocked && (
-                                                        <span className="absolute top-1.5 right-1.5 text-[9px] text-text-muted font-mono uppercase">Soon</span>
+                                                        <span className="absolute top-1.5 right-1.5 text-[0.5625rem] text-text-muted font-mono uppercase">Soon</span>
                                                     )}
                                                 </button>
                                             );
@@ -610,16 +641,16 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                                     {/* Inline confirm when switching with dirty prompt */}
                                     {pendingTemplate && (
                                         <div className="mt-2 flex items-center gap-2 px-2 py-1.5 rounded-md bg-amber-500/10 border border-amber-500/20">
-                                            <span className="text-[11px] text-amber-200/90">{t("tplSwitchConfirm")}</span>
+                                            <span className="text-[0.6875rem] text-amber-200/90">{t("tplSwitchConfirm")}</span>
                                             <button
                                                 onClick={confirmTemplateSwitch}
-                                                className="px-2 py-0.5 rounded text-[11px] font-medium bg-amber-500/20 text-amber-200 hover:bg-amber-500/30 transition-colors"
+                                                className="px-2 py-0.5 rounded text-[0.6875rem] font-medium bg-amber-500/20 text-amber-200 hover:bg-amber-500/30 transition-colors"
                                             >
                                                 {t("tplSwitchYes")}
                                             </button>
                                             <button
                                                 onClick={cancelTemplateSwitch}
-                                                className="px-2 py-0.5 rounded text-[11px] text-text-muted hover:text-text-secondary transition-colors"
+                                                className="px-2 py-0.5 rounded text-[0.6875rem] text-text-muted hover:text-text-secondary transition-colors"
                                             >
                                                 {t("tplSwitchNo")}
                                             </button>
@@ -630,13 +661,13 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
 
                             {/* Prompt textarea */}
                             <div className="flex items-center justify-between mb-2">
-                                <label className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">
+                                <label className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-text-muted">
                                     {t("promptLabel")}
                                 </label>
                                 <button
                                     onClick={handleResetTemplate}
                                     disabled={generating}
-                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] text-text-muted hover:text-foreground transition-colors disabled:opacity-30"
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[0.6875rem] text-text-muted hover:text-foreground transition-colors disabled:opacity-30"
                                     title={t("resetTemplateHint")}
                                 >
                                     <RefreshCw size={11} />
@@ -647,7 +678,7 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                                 value={prompt}
                                 onChange={(e) => { setPrompt(e.target.value); setPromptDirty(true); }}
                                 disabled={generating}
-                                className="w-full min-h-[260px] max-h-[400px] rounded-md border border-glass-border bg-black/30 px-3.5 py-2.5 text-[14px] text-foreground placeholder:text-text-muted focus:outline-none focus:border-primary/40 disabled:opacity-60 resize-y leading-relaxed"
+                                className="w-full min-h-[260px] max-h-[400px] rounded-md border border-glass-border bg-black/30 px-3.5 py-2.5 text-[0.875rem] text-foreground placeholder:text-text-muted focus:outline-none focus:border-primary/40 disabled:opacity-60 resize-y leading-relaxed"
                             />
 
                             {/* Quick tags — immediately below textarea */}
@@ -662,7 +693,7 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                                         key={tag}
                                         onClick={() => setPrompt((p) => p.trimEnd() + (p.endsWith(",") || p.endsWith("，") || !p.trim() ? " " : ", ") + tag)}
                                         disabled={generating}
-                                        className="px-2.5 py-1 rounded border border-glass-border bg-white/[0.03] text-[11px] text-text-muted hover:text-text-secondary hover:border-white/20 hover:bg-white/[0.06] transition-colors disabled:opacity-30"
+                                        className="px-2.5 py-1 rounded border border-glass-border bg-glass text-[0.6875rem] text-text-muted hover:text-text-secondary hover:border-foreground/30 hover:bg-hover-bg transition-colors disabled:opacity-30"
                                     >
                                         + {tag}
                                     </button>
@@ -675,15 +706,15 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                                     <button
                                         type="button"
                                         onClick={() => setFinalPreviewExpanded(!finalPreviewExpanded)}
-                                        className="w-full flex items-center justify-between px-3.5 py-2 hover:bg-white/[0.02] transition-colors rounded-t-md"
+                                        className="w-full flex items-center justify-between px-3.5 py-2 hover:bg-hover-bg transition-colors rounded-t-md"
                                     >
-                                        <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-text-muted">{t("finalPromptPreview")}</p>
-                                        <span className="text-[10px] text-text-muted">{finalPreviewExpanded ? t("collapse") : t("expand")}</span>
+                                        <p className="font-mono text-[0.625rem] uppercase tracking-[0.14em] text-text-muted">{t("finalPromptPreview")}</p>
+                                        <span className="text-[0.625rem] text-text-muted">{finalPreviewExpanded ? t("collapse") : t("expand")}</span>
                                     </button>
                                     {finalPreviewExpanded && (
                                         <div className="px-3.5 pb-3 max-h-[200px] overflow-y-auto overscroll-contain">
-                                            <p className="text-[12px] leading-relaxed">
-                                                <span className="text-foreground/90">{prompt.trim()}</span>
+                                            <p className="text-[0.75rem] leading-relaxed">
+                                                <span className="text-foreground">{prompt.trim()}</span>
                                                 {prompt.trim() && <span className="text-text-muted">{", "}</span>}
                                                 <span className="text-primary/60">{stylePositive}</span>
                                             </p>
@@ -694,13 +725,13 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
 
                             {/* Generation config — unified section */}
                             <div className="mt-5 pt-4 border-t border-glass-border space-y-4">
-                                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">
+                                <p className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-text-muted">
                                     {t("generationConfig")}
                                 </p>
 
                                 {/* Batch — full row */}
                                 <div>
-                                    <label className="block font-mono text-[10px] uppercase tracking-[0.16em] text-text-muted mb-2">
+                                    <label className="block font-mono text-[0.625rem] uppercase tracking-[0.16em] text-text-muted mb-2">
                                         {t("batchLabel")}
                                     </label>
                                     <div className="flex items-center gap-2">
@@ -709,10 +740,10 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                                                 key={n}
                                                 onClick={() => setBatchSize(n)}
                                                 disabled={generating}
-                                                className={`px-3 py-1.5 rounded-md border font-mono text-[12px] transition-colors ${
+                                                className={`px-3 py-1.5 rounded-md border font-mono text-[0.75rem] transition-colors ${
                                                     batchSize === n
                                                         ? accent.batchActive
-                                                        : "border-glass-border bg-glass text-text-muted hover:border-white/20 hover:text-text-secondary"
+                                                        : "border-glass-border bg-glass text-text-muted hover:border-foreground/30 hover:text-text-secondary"
                                                 } disabled:opacity-40`}
                                             >
                                                 ×{n}
@@ -723,7 +754,7 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
 
                                 {/* Ratio — full row */}
                                 <div>
-                                    <label className="block font-mono text-[10px] uppercase tracking-[0.16em] text-text-muted mb-2">
+                                    <label className="block font-mono text-[0.625rem] uppercase tracking-[0.16em] text-text-muted mb-2">
                                         {t("aspectRatioLabel")}
                                     </label>
                                     <div className="flex items-center gap-2 flex-wrap">
@@ -732,10 +763,10 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                                                 key={ratio}
                                                 onClick={() => setAspectRatioOverride(ratio === defaultAspectRatio ? null : ratio)}
                                                 disabled={generating}
-                                                className={`px-3 py-1.5 rounded-md border font-mono text-[12px] transition-colors ${
+                                                className={`px-3 py-1.5 rounded-md border font-mono text-[0.75rem] transition-colors ${
                                                     effectiveAspectRatio === ratio
                                                         ? accent.batchActive
-                                                        : "border-glass-border bg-glass text-text-muted hover:border-white/20 hover:text-text-secondary"
+                                                        : "border-glass-border bg-glass text-text-muted hover:border-foreground/30 hover:text-text-secondary"
                                                 } disabled:opacity-40`}
                                             >
                                                 {ratio}
@@ -746,7 +777,7 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
 
                                 {/* Model — full row, chip selected */}
                                 <div>
-                                    <label className="block font-mono text-[10px] uppercase tracking-[0.16em] text-text-muted mb-2">
+                                    <label className="block font-mono text-[0.625rem] uppercase tracking-[0.16em] text-text-muted mb-2">
                                         {t("modelLabel")}
                                     </label>
                                     <GroupedModelGrid
@@ -761,7 +792,7 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                             <button
                                 onClick={handleGenerate}
                                 disabled={generating || !prompt.trim()}
-                                className="mt-5 self-center inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-md bg-primary text-white border border-[rgba(100,108,255,0.65)] shadow-[inset_0_1.5px_0_rgba(255,255,255,0.14)] hover:bg-[#7a82ff] disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-[14px] font-semibold"
+                                className="mt-5 self-center inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-md bg-primary text-white border border-[rgba(100,108,255,0.65)] shadow-[inset_0_1.5px_0_rgba(255,255,255,0.14)] hover:bg-primary-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-[0.875rem] font-semibold"
                             >
                                 {generating ? <Loader2 size={15} className="animate-spin" /> : <Wand2 size={15} />}
                                 {generating
@@ -776,7 +807,7 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                         <div className="flex flex-col p-5 overflow-y-auto custom-scrollbar bg-surface">
                             {/* Gallery header with filter tabs */}
                             <div className="flex items-center justify-between mb-3">
-                                <h3 className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">
+                                <h3 className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-text-muted">
                                     {t("variantsTitle")}
                                     <span className="text-text-muted/60"> ({variants.length})</span>
                                 </h3>
@@ -784,9 +815,9 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                                     <div className="flex items-center gap-1.5">
                                         <button
                                             onClick={() => setGalleryFilter("all")}
-                                            className={`px-2.5 py-1 rounded text-[11px] transition-colors ${
+                                            className={`px-2.5 py-1 rounded text-[0.6875rem] transition-colors ${
                                                 galleryFilter === "all"
-                                                    ? "bg-white/10 text-foreground"
+                                                    ? "bg-elevated text-foreground"
                                                     : "text-text-muted hover:text-text-secondary"
                                             }`}
                                         >
@@ -794,7 +825,7 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                                         </button>
                                         <button
                                             onClick={() => setGalleryFilter("favorited")}
-                                            className={`px-2.5 py-1 rounded text-[11px] transition-colors inline-flex items-center gap-1 ${
+                                            className={`px-2.5 py-1 rounded text-[0.6875rem] transition-colors inline-flex items-center gap-1 ${
                                                 galleryFilter === "favorited"
                                                     ? "bg-amber-500/15 text-amber-300"
                                                     : "text-text-muted hover:text-text-secondary"
@@ -812,13 +843,13 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                                         <div className="mx-auto w-12 h-12 grid place-items-center rounded-full border border-glass-border bg-glass mb-3">
                                             <Sparkles size={18} />
                                         </div>
-                                        <p className="text-[14px] text-foreground">{t("emptyVariantsTitle")}</p>
-                                        <p className="text-[12px] text-text-secondary mt-1">{t("emptyVariantsBody")}</p>
+                                        <p className="text-[0.875rem] text-foreground">{t("emptyVariantsTitle")}</p>
+                                        <p className="text-[0.75rem] text-text-secondary mt-1">{t("emptyVariantsBody")}</p>
                                     </div>
                                 </div>
                             ) : filteredVariants.length === 0 ? (
                                 <div className="flex-1 grid place-items-center text-center text-text-muted">
-                                    <p className="text-[12px]">{t("noFavoritedYet")}</p>
+                                    <p className="text-[0.75rem]">{t("noFavoritedYet")}</p>
                                 </div>
                             ) : (
                                 <div className="columns-2 lg:columns-3 gap-3 space-y-3">
@@ -830,7 +861,7 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                                                 className={`relative rounded-lg overflow-hidden border-2 transition-all break-inside-avoid group ${
                                                     isSelected
                                                         ? accent.variantSelected
-                                                        : "border-glass-border hover:border-white/30"
+                                                        : "border-glass-border hover:border-foreground/30"
                                                 }`}
                                             >
                                                 <div className="cursor-pointer" onClick={() => !isSelected && handleSelectVariant(v.id)}>
@@ -847,14 +878,14 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                                                     className={`absolute top-1.5 left-1.5 p-1 rounded-full transition-all ${
                                                         v.is_favorited
                                                             ? "bg-amber-500/30 text-amber-300"
-                                                            : "bg-black/40 text-white/50 opacity-0 group-hover:opacity-100"
+                                                            : "bg-black/40 text-text-secondary opacity-0 group-hover:opacity-100"
                                                     }`}
                                                 >
                                                     <Star size={12} className={v.is_favorited ? "fill-amber-300" : ""} />
                                                 </button>
                                                 {/* Selected badge */}
                                                 {isSelected && (
-                                                    <div className={`absolute top-1.5 right-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full text-white shadow-md ${accent.selectBadge}`}>
+                                                    <div className={`absolute top-1.5 right-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full text-foreground shadow-md ${accent.selectBadge}`}>
                                                         <Check size={12} strokeWidth={2.6} />
                                                     </div>
                                                 )}
@@ -864,7 +895,7 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                                                         onClick={() => handleSelectVariant(v.id)}
                                                         className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer pt-6 pb-1.5"
                                                     >
-                                                        <p className="w-full text-center text-[10px] uppercase tracking-[0.16em] text-white font-mono">
+                                                        <p className="w-full text-center text-[0.625rem] uppercase tracking-[0.16em] text-foreground font-mono">
                                                             {t("clickToSelect")}
                                                         </p>
                                                     </div>
@@ -877,7 +908,7 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                             {/* Gallery bottom operations — always visible */}
                             {variants.length > 0 && (
                                 <div className="mt-auto pt-4 border-t border-glass-border flex items-center gap-2 flex-wrap">
-                                    <span className="text-[11px] text-text-muted mr-auto">
+                                    <span className="text-[0.6875rem] text-text-muted mr-auto">
                                         {variants.filter(v => v.is_favorited).length > 0
                                             ? t("favoritedCount", { count: variants.filter(v => v.is_favorited).length })
                                             : t("favoritedHint")}
@@ -889,12 +920,12 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
 
                     {/* Footer — status only, no action button (state auto-saves) */}
                     <footer className="flex items-center px-5 py-2.5 border-t border-glass-border">
-                        <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-text-muted">
+                        <span className="font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-text-muted">
                             {selectedId ? t("selectedFooter") : t("noneSelectedFooter")}
                         </span>
                     </footer>
                 </motion.div>
             </motion.div>
         </AnimatePresence>
-    );
+    ), document.body);
 }

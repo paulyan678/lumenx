@@ -8,7 +8,7 @@ import subprocess
 import threading
 import platform
 from urllib.parse import quote
-from .models import Script, GenerationStatus, VideoTask, Character, Scene, StoryboardFrame, Series, PromptConfig, ArtDirection
+from .models import Script, GenerationStatus, VideoTask, Character, Scene, StoryboardFrame, Series, PromptConfig, ArtDirection, GlobalAssetLibrary
 from .llm import ScriptProcessor
 from .assets import AssetGenerator
 from .storyboard import StoryboardGenerator
@@ -47,6 +47,28 @@ def _safe_resolve_path(base_dir: str, untrusted_rel: str) -> str:
         raise ValueError(f"Path escapes base directory: {untrusted_rel}")
     return resolved
 
+
+class LibraryAssetInUseError(Exception):
+    """Raised when a global library asset cannot be hard-deleted because it is
+    still referenced by one or more storyboard frames (design Q2 reference
+    integrity). Carries the referrers so the API can surface them (HTTP 409).
+
+    ``references`` is a list of dicts, each:
+        {"owner_kind": "project"|"series", "owner_id": str,
+         "owner_title": Optional[str], "frame_id": str}
+    """
+
+    def __init__(self, asset_type: str, asset_id: str, references: List[Dict[str, Any]]):
+        self.asset_type = asset_type
+        self.asset_id = asset_id
+        self.references = references
+        super().__init__(
+            f"Library {asset_type} {asset_id} is referenced by "
+            f"{len(references)} storyboard frame(s); refusing to delete "
+            f"(pass force=True to delete anyway)."
+        )
+
+
 class ComicGenPipeline:
     def __init__(self, config: Dict[str, Any] = None):
         self.config = config or {}
@@ -59,9 +81,12 @@ class ComicGenPipeline:
         
         self.data_file = "output/projects.json"
         self.series_data_file = "output/series.json"
+        self.library_data_file = "output/library_assets.json"
         self._save_lock = threading.RLock()  # Reentrant lock to prevent concurrent file writes
         self.scripts: Dict[str, Script] = self._load_data()
         self.series_store: Dict[str, Series] = self._load_series_data()
+        # Project-independent global asset library (lowest resolver layer).
+        self.library_store: GlobalAssetLibrary = self._load_library_data()
         self._repair_series_bindings()
 
         # Extraction preview cache: {project_id: (timestamp, Script)}
@@ -396,16 +421,37 @@ class ComicGenPipeline:
         if repaired:
             self._save_data()
 
-    def create_project(self, title: str, text: str, skip_analysis: bool = False, workflow_mode: str = "i2v_legacy") -> Script:
-        """Step 1: Parse novel and create project."""
+    def create_project(self, title: str, text: str, skip_analysis: bool = False, workflow_mode: str = "i2v_legacy", series_id: Optional[str] = None) -> Script:
+        """Step 1: Parse novel and create project.
+
+        When `series_id` is provided the new project is bound as the next
+        episode of that existing series (episode_number = current max
+        episode number in the series + 1) via the same
+        `add_episode_to_series` mechanism used elsewhere. When `series_id`
+        is None the behavior is the original standalone-project path,
+        bit-for-bit unchanged.
+        """
         if skip_analysis:
             script = self.script_processor.create_draft_script(title, text)
         else:
             script = self.script_processor.parse_novel(title, text)
-        
+
         script.workflow_mode = workflow_mode
         self.scripts[script.id] = script
         self._save_data()
+
+        # Optional series binding (T9). Reuses add_episode_to_series so the
+        # episode_ids / series_id / episode_number wiring matches every
+        # other "attach episode to series" path. add_episode_to_series
+        # mutates the in-memory script in place (same object reference) and
+        # persists both projects.json and series.json.
+        if series_id:
+            series = self.series_store.get(series_id)
+            if not series:
+                raise ValueError("Series not found")
+            existing = self.get_series_episodes(series_id)
+            max_ep = max([ep.episode_number for ep in existing if ep.episode_number] or [0])
+            self.add_episode_to_series(series_id, script.id, episode_number=max_ep + 1)
         return script
     
     def extract_preview(self, script_id: str, text: str) -> Script:
@@ -413,7 +459,8 @@ class ComicGenPipeline:
         existing_script = self.scripts.get(script_id)
         if not existing_script:
             raise ValueError("Script not found")
-        new_script = self.script_processor.parse_novel(existing_script.title, text)
+        custom_extraction = getattr(getattr(existing_script, "prompt_config", None), "entity_extraction", "")
+        new_script = self.script_processor.parse_novel(existing_script.title, text, custom_extraction)
         self._extraction_cache[script_id] = (time.time(), new_script)
         return new_script
 
@@ -428,7 +475,8 @@ class ComicGenPipeline:
         if cached and (time.time() - cached[0]) < 300:
             new_script = cached[1]
         else:
-            new_script = self.script_processor.parse_novel(existing_script.title, text)
+            custom_extraction = getattr(getattr(existing_script, "prompt_config", None), "entity_extraction", "")
+            new_script = self.script_processor.parse_novel(existing_script.title, text, custom_extraction)
         
         # Preserve the original script ID and timestamps
         new_script.id = existing_script.id
@@ -548,7 +596,7 @@ class ComicGenPipeline:
         
         asset_list = []
         target_asset = None
-        
+
         if asset_type == "character":
             asset_list = script.characters
         elif asset_type == "scene":
@@ -557,13 +605,31 @@ class ComicGenPipeline:
             asset_list = script.props
         else:
             raise ValueError(f"Invalid asset_type: {asset_type}")
-        
+
         target_asset = next((a for a in asset_list if a.id == asset_id), None)
+        # Fallback: /projects/{id} returns merged characters (episode +
+        # series + library, see get_project), so the frontend can pass a
+        # series-level asset id for an episode-scoped request. Look it up
+        # on the parent series if not on the episode itself.
+        asset_is_series_level = False
+        if not target_asset and script.series_id:
+            series = self.series_store.get(script.series_id)
+            if series:
+                series_list = (
+                    series.characters if asset_type == "character"
+                    else series.scenes if asset_type == "scene"
+                    else series.props
+                )
+                target_asset = next((a for a in series_list if a.id == asset_id), None)
+                if target_asset:
+                    asset_is_series_level = True
         if not target_asset:
             raise ValueError(f"{asset_type.capitalize()} {asset_id} not found")
-        
+
         target_asset.status = GenerationStatus.PROCESSING
         self._save_data()
+        if asset_is_series_level:
+            self._save_series_data()
         
         try:
             # Generate with Art Direction style injected
@@ -598,7 +664,13 @@ class ComicGenPipeline:
             raise e
         finally:
             self._save_data()
-        
+            # If the asset lives on the parent series (not the episode),
+            # _save_data() (which persists scripts/episodes) won't capture
+            # the variant changes — persist the series too, otherwise the
+            # generated image disappears on the next reload.
+            if asset_is_series_level:
+                self._save_series_data()
+
         return script
 
     def create_asset_generation_task(self, script_id: str, asset_id: str, asset_type: str,
@@ -622,12 +694,28 @@ class ComicGenPipeline:
             asset_list = script.props
         else:
             raise ValueError(f"Invalid asset_type: {asset_type}")
-        
+
         target_asset = next((a for a in asset_list if a.id == asset_id), None)
+        # Fallback to parent series for series-level assets (see generate_asset
+        # for rationale — /projects returns merged characters).
+        asset_is_series_level = False
+        if not target_asset and script.series_id:
+            series = self.series_store.get(script.series_id)
+            if series:
+                series_list = (
+                    series.characters if asset_type == "character"
+                    else series.scenes if asset_type == "scene"
+                    else series.props
+                )
+                target_asset = next((a for a in series_list if a.id == asset_id), None)
+                if target_asset:
+                    asset_is_series_level = True
         if not target_asset:
             raise ValueError(f"{asset_type.capitalize()} {asset_id} not found")
-        
+
         target_asset.status = GenerationStatus.PROCESSING
+        if asset_is_series_level:
+            self._save_series_data()
         
         # Create task
         task_id = str(uuid.uuid4())
@@ -905,7 +993,7 @@ class ComicGenPipeline:
     ) -> Tuple[Optional[object], Optional[str]]:
         """Locate an asset by (id, type) in either the episode's local
         list OR the parent series' shared pool. Returns
-        (asset, source) where source ∈ {"script", "series"} so the
+        (asset, source) where source ∈ {"script", "series", "global"} so the
         caller can mutate the right object and save the right side.
 
         Episode-local always wins (the user explicitly forked this
@@ -926,27 +1014,41 @@ class ComicGenPipeline:
             return local, "script"
         # Fall back to series shared pool if this episode belongs to
         # a series.
-        if not script.series_id:
-            return None, None
-        series = self.series_store.get(script.series_id)
-        if not series:
-            return None, None
+        if script.series_id:
+            series = self.series_store.get(script.series_id)
+            if series:
+                if asset_type == "character":
+                    sh_list = series.characters
+                elif asset_type == "scene":
+                    sh_list = series.scenes
+                else:  # prop
+                    sh_list = series.props
+                shared = next((a for a in sh_list if a.id == asset_id), None)
+                if shared is not None:
+                    return shared, "series"
+            # Series miss → fall through to the global library below.
+        # Fall back to the project-independent global asset library
+        # (lowest layer). Empty by default, so this is a no-op until
+        # the global pool is populated.
         if asset_type == "character":
-            sh_list = series.characters
+            gl_list = self.library_store.characters
         elif asset_type == "scene":
-            sh_list = series.scenes
+            gl_list = self.library_store.scenes
         else:  # prop
-            sh_list = series.props
-        shared = next((a for a in sh_list if a.id == asset_id), None)
-        if shared is not None:
-            return shared, "series"
+            gl_list = self.library_store.props
+        glob = next((a for a in gl_list if a.id == asset_id), None)
+        if glob is not None:
+            return glob, "global"
         return None, None
 
     def _save_after_asset_mutation(self, source: str) -> None:
         """Persist after mutating an asset; pick the right save path
-        based on which container the asset lives in (episode vs series)."""
+        based on which container the asset lives in (episode vs series
+        vs global library)."""
         if source == "series":
             self._save_series_data()
+        elif source == "global":
+            self._save_library_data()
         else:
             self._save_data()
 
@@ -967,6 +1069,35 @@ class ComicGenPipeline:
         target_asset.locked = not target_asset.locked
         self._save_after_asset_mutation(source)
         return script
+
+    def toggle_asset_starred(self, script_id: str, asset_id: str, asset_type: str) -> Script:
+        """Toggle the starred (asset-library shortlist) status of an asset.
+        Mirrors toggle_asset_lock — works on both episode-local and
+        series-shared assets via _find_asset_with_source."""
+        script = self.scripts.get(script_id)
+        if not script:
+            raise ValueError("Script not found")
+
+        target_asset, source = self._find_asset_with_source(script, asset_id, asset_type)
+        if not target_asset:
+            raise ValueError(f"Asset {asset_id} of type {asset_type} not found")
+
+        target_asset.starred = not target_asset.starred
+        self._save_after_asset_mutation(source)
+        return script
+
+    def toggle_project_starred(self, script_id: str) -> Script:
+        """Toggle the user-starred (featured shortlist) flag on a project.
+        Starred projects get the amber-halation 'featured' treatment in the
+        gallery. Mirrors toggle_asset_starred but at the Script level. The
+        read-modify-write is wrapped in _save_lock so the toggle is atomic."""
+        with self._save_lock:
+            script = self.scripts.get(script_id)
+            if not script:
+                raise ValueError("Script not found")
+            script.starred = not script.starred
+            self._save_data()
+            return script
 
     def toggle_frame_lock(self, script_id: str, frame_id: str) -> Script:
         """Toggle the locked status of a frame."""
@@ -1223,8 +1354,14 @@ class ComicGenPipeline:
             "props": [{"id": p.id, "name": p.name, "description": p.description} for p in all_props],
         }
 
+        # Resolve effective storyboard-extraction prompt (Episode → Series → built-in default).
+        series = self.get_series(script.series_id) if getattr(script, "series_id", None) else None
+        storyboard_extraction_prompt = self.get_effective_prompt("storyboard_extraction", script, series)
+
         # Call LLM to analyze text (may raise RuntimeError on parse failure)
-        raw_frames = self.script_processor.analyze_to_storyboard(text, entities_json)
+        raw_frames = self.script_processor.analyze_to_storyboard(
+            text, entities_json, custom_extraction_prompt=storyboard_extraction_prompt
+        )
 
         if not raw_frames:
             raise RuntimeError("AI 分镜分析未返回任何帧数据，请重试。")
@@ -1516,7 +1653,12 @@ class ComicGenPipeline:
         if not script:
             raise ValueError("Script not found")
             
-        script = self.storyboard_generator.generate_storyboard(script)
+        resolved = self.resolve_episode_assets(script)
+        script = self.storyboard_generator.generate_storyboard(
+            script,
+            characters=resolved["characters"],
+            scenes=resolved["scenes"],
+        )
         self._save_data()
         return script
 
@@ -1867,8 +2009,12 @@ class ComicGenPipeline:
             # Update frame with final prompt
             frame.image_prompt = final_prompt
             
+            # Resolve assets across Episode → Series → Global layers so
+            # shared/global characters & scenes are usable when rendering
+            # this frame (frame id references are left unchanged).
+            resolved = self.resolve_episode_assets(script)
             # Find scene for this frame
-            scene = next((s for s in script.scenes if s.id == frame.scene_id), None)
+            scene = next((s for s in resolved["scenes"] if s.id == frame.scene_id), None)
 
             # Get effective size from storyboard_aspect_ratio
             from .assets import ASPECT_RATIO_TO_SIZE
@@ -1883,9 +2029,9 @@ class ComicGenPipeline:
 
             # Call generator
             self.storyboard_generator.generate_frame(
-                frame, 
-                script.characters, 
-                scene, 
+                frame,
+                resolved["characters"],
+                scene,
                 ref_image_path=ref_image_path,
                 ref_image_paths=ref_image_paths,
                 prompt=final_prompt,
@@ -3460,8 +3606,16 @@ class ComicGenPipeline:
             raise ValueError("Script not found")
             
         target_asset = None
+        asset_is_series_level = False
         if asset_type == "character":
             target_asset = next((c for c in script.characters if c.id == asset_id), None)
+            # Fallback to parent series for series-level characters.
+            if not target_asset and script.series_id:
+                series = self.series_store.get(script.series_id)
+                if series:
+                    target_asset = next((c for c in series.characters if c.id == asset_id), None)
+                    if target_asset:
+                        asset_is_series_level = True
             if target_asset:
                 # If generation_type is specified, only select from that specific asset
                 if generation_type == "full_body":
@@ -3478,18 +3632,28 @@ class ComicGenPipeline:
                     if variant:
                         target_asset.headshot_image_url = variant.url
                         target_asset.avatar_url = variant.url  # Sync avatar
+                elif generation_type == "reference_sheet":
+                    # R2V v2: reference_sheet is the canonical asset unit for
+                    # the CastWorkbench flow. Selecting a variant here updates
+                    # selected_image_id + legacy image_url so the rest of the
+                    # app (storyboard reference, etc.) sees the pick.
+                    variant = self._select_variant_in_asset(getattr(target_asset, "reference_sheet", None), variant_id)
+                    if variant:
+                        if target_asset.reference_sheet:
+                            target_asset.reference_sheet.selected_image_id = variant.id
+                        target_asset.image_url = variant.url
                 else:
                     # Legacy fallback: search all assets (for backward compatibility)
                     variant = self._select_variant_in_asset(target_asset.full_body_asset, variant_id)
                     if variant:
                         target_asset.full_body_image_url = variant.url
                         target_asset.image_url = variant.url
-                    
+
                     if not variant:
                         variant = self._select_variant_in_asset(target_asset.three_view_asset, variant_id)
                         if variant:
                             target_asset.three_view_image_url = variant.url
-                    
+
                     if not variant:
                         variant = self._select_variant_in_asset(target_asset.headshot_asset, variant_id)
                         if variant:
@@ -3498,6 +3662,12 @@ class ComicGenPipeline:
                         
         elif asset_type == "scene":
             target_asset = next((s for s in script.scenes if s.id == asset_id), None)
+            if not target_asset and script.series_id:
+                series = self.series_store.get(script.series_id)
+                if series:
+                    target_asset = next((s for s in series.scenes if s.id == asset_id), None)
+                    if target_asset:
+                        asset_is_series_level = True
             if target_asset:
                 variant = self._select_variant_in_asset(target_asset.image_asset, variant_id)
                 if variant:
@@ -3505,6 +3675,12 @@ class ComicGenPipeline:
 
         elif asset_type == "prop":
             target_asset = next((p for p in script.props if p.id == asset_id), None)
+            if not target_asset and script.series_id:
+                series = self.series_store.get(script.series_id)
+                if series:
+                    target_asset = next((p for p in series.props if p.id == asset_id), None)
+                    if target_asset:
+                        asset_is_series_level = True
             if target_asset:
                 variant = self._select_variant_in_asset(target_asset.image_asset, variant_id)
                 if variant:
@@ -3524,8 +3700,10 @@ class ComicGenPipeline:
                     variant = self._select_variant_in_asset(target_asset.image_asset, variant_id)
                     # If sketch, maybe don't update main image_url if rendered exists?
                     # For now, let's assume we only select rendered variants for frames usually.
-        
+
         self._save_data()
+        if asset_is_series_level:
+            self._save_series_data()
         return script
 
     def delete_asset_variant(self, script_id: str, asset_id: str, asset_type: str, variant_id: str) -> Script:
@@ -3705,6 +3883,278 @@ class ComicGenPipeline:
         """Save series data with thread lock."""
         with self._save_lock:
             self._save_series_data_unlocked()
+
+    # ============================================================
+    # Global Asset Library Storage (project-independent shared pool)
+    # ============================================================
+
+    def _load_library_data(self) -> GlobalAssetLibrary:
+        if not os.path.exists(self.library_data_file):
+            return GlobalAssetLibrary()
+        try:
+            with open(self.library_data_file, 'r') as f:
+                data = json.load(f)
+                return GlobalAssetLibrary(**data)
+        except Exception as e:
+            logger.error(f"Failed to load library data: {e}")
+            return GlobalAssetLibrary()
+
+    def _save_library_data_unlocked(self):
+        """Save global library data without acquiring the lock (caller must hold self._save_lock)."""
+        try:
+            os.makedirs(os.path.dirname(self.library_data_file) or ".", exist_ok=True)
+            with open(self.library_data_file, 'w') as f:
+                json.dump(self.library_store.model_dump(), f, indent=2)
+        except Exception as e:
+            logger.error(f"Failed to save library data: {e}")
+
+    def _save_library_data(self):
+        """Save global library data with thread lock."""
+        with self._save_lock:
+            self._save_library_data_unlocked()
+
+    # ------------------------------------------------------------------
+    # Global Asset Library — CRUD + feed channels (LumenX Core shared pool)
+    # ------------------------------------------------------------------
+    # These methods are the single source of truth for mutating the
+    # project-independent library. Both the /library/assets endpoints and
+    # the Playground "录入资产库" flow call them, so the wiring stays
+    # consistent. The library is curated/opt-in (anti-bloat): nothing is
+    # auto-ingested here.
+
+    def _library_list_for_type(self, asset_type: str) -> List:
+        """Return the live list backing the given asset type in the global
+        library (so callers can append/iterate). Raises on unknown type."""
+        if asset_type == "character":
+            return self.library_store.characters
+        elif asset_type == "scene":
+            return self.library_store.scenes
+        elif asset_type == "prop":
+            return self.library_store.props
+        raise ValueError(f"Invalid asset type: {asset_type}")
+
+    def _find_library_asset(self, asset_type: str, asset_id: str):
+        """Locate a global library asset by (type, id). Raises ValueError
+        when the type is invalid or the id is absent."""
+        target_list = self._library_list_for_type(asset_type)
+        asset = next((a for a in target_list if a.id == asset_id), None)
+        if asset is None:
+            raise ValueError(f"Asset {asset_id} of type {asset_type} not found in library")
+        return asset
+
+    def list_library_assets(self) -> GlobalAssetLibrary:
+        """Return the global shared asset pool container (characters /
+        scenes / props). Mirrors get_series for the library scope."""
+        return self.library_store
+
+    def create_library_asset(self, asset_type: str, payload: Dict[str, Any]):
+        """Create a new global library asset of `asset_type`
+        ("character" | "scene" | "prop") from a plain payload dict, persist
+        it, and return the created asset object.
+
+        Mirrors the series quick-create endpoints
+        (create_series_character/scene/prop) but targets the
+        project-independent global pool. Tolerates a partial payload (used
+        by the Playground录入 flow, which calls this directly rather than
+        through a request model). Recognized payload keys: name,
+        description, image_url, persona (characters), voice_id
+        (characters)."""
+        from .models import Character, Scene, Prop, AssetUnit, ImageVariant
+        with self._save_lock:
+            payload = dict(payload or {})
+            name = payload.get("name") or "未命名"
+            description = payload.get("description") or ""
+            image_url = payload.get("image_url")
+            if asset_type == "character":
+                ref_sheet = AssetUnit()
+                if image_url:
+                    variant = ImageVariant(id=f"img_{uuid.uuid4().hex[:12]}", url=image_url)
+                    ref_sheet.image_variants.append(variant)
+                    ref_sheet.selected_image_id = variant.id
+                asset = Character(
+                    id=f"char_{uuid.uuid4().hex[:12]}",
+                    name=name,
+                    description=description,
+                    persona=payload.get("persona") or "",
+                    voice_id=payload.get("voice_id"),
+                    reference_sheet=ref_sheet,
+                )
+            elif asset_type == "scene":
+                asset = Scene(
+                    id=f"scene_{uuid.uuid4().hex[:12]}",
+                    name=name,
+                    description=description,
+                    image_url=image_url,
+                )
+            elif asset_type == "prop":
+                asset = Prop(
+                    id=f"prop_{uuid.uuid4().hex[:12]}",
+                    name=name,
+                    description=description,
+                    image_url=image_url,
+                )
+            else:
+                raise ValueError(f"Invalid asset type: {asset_type}")
+            self._library_list_for_type(asset_type).append(asset)
+            self._save_library_data_unlocked()
+            return asset
+
+    def update_library_asset(self, asset_type: str, asset_id: str, patch: Dict[str, Any]):
+        """Patch attributes of a global library asset and persist. Mirrors
+        update_series_asset_attributes — only sets keys that exist on the
+        asset, and never touches id/status (use create/delete to manage
+        those)."""
+        with self._save_lock:
+            asset = self._find_library_asset(asset_type, asset_id)
+            for key, value in (patch or {}).items():
+                if hasattr(asset, key) and key not in ("id", "status"):
+                    setattr(asset, key, value)
+            self._save_library_data_unlocked()
+            return asset
+
+    def _scan_library_asset_references(self, asset_type: str, asset_id: str) -> List[Dict[str, Any]]:
+        """Find every storyboard frame (across all projects and series) that
+        references the given asset id through the type-appropriate field:
+        scene -> frame.scene_id, character -> frame.character_ids,
+        prop -> frame.prop_ids. Returns a list of referrer descriptors
+        (empty when nothing references it). Used by delete_library_asset for
+        design Q2 reference integrity.
+
+        Note: Series currently hold no frames of their own (their frames live
+        in episode Scripts, which are in self.scripts), so the series loop is
+        a defensive no-op today via getattr — kept so the scan stays correct
+        if Series ever gains a frames list."""
+        references: List[Dict[str, Any]] = []
+
+        def _frame_hits(frame) -> bool:
+            if asset_type == "scene":
+                return getattr(frame, "scene_id", None) == asset_id
+            if asset_type == "character":
+                return asset_id in (getattr(frame, "character_ids", None) or [])
+            if asset_type == "prop":
+                return asset_id in (getattr(frame, "prop_ids", None) or [])
+            return False
+
+        def _scan(owner_kind: str, owner_id: str, owner, frames) -> None:
+            for frame in frames or []:
+                if _frame_hits(frame):
+                    references.append({
+                        "owner_kind": owner_kind,
+                        "owner_id": owner_id,
+                        "owner_title": getattr(owner, "title", None),
+                        "frame_id": getattr(frame, "id", None),
+                    })
+
+        for sid, script in (getattr(self, "scripts", {}) or {}).items():
+            _scan("project", sid, script, getattr(script, "frames", None))
+        for sid, series in (getattr(self, "series_store", {}) or {}).items():
+            _scan("series", sid, series, getattr(series, "frames", None))
+        return references
+
+    def delete_library_asset(self, asset_type: str, asset_id: str, force: bool = False) -> None:
+        """Hard-delete a global library asset.
+
+        Design Q2 (reference integrity): unless ``force`` is True, scan all
+        project/series storyboard frames first; if any still reference this
+        asset (scene_id / character_ids / prop_ids) the delete is refused via
+        ``LibraryAssetInUseError`` (API maps to HTTP 409 and lists referrers).
+        With ``force=True`` the asset is removed anyway, leaving those frame
+        references dangling (the asset resolver simply drops the unknown id).
+
+        Raises ValueError when the asset (or asset type) is absent — this is
+        checked BEFORE the reference scan so a missing id still maps to 404."""
+        with self._save_lock:
+            target_list = self._library_list_for_type(asset_type)
+            if not any(a.id == asset_id for a in target_list):
+                raise ValueError(f"Asset {asset_id} of type {asset_type} not found in library")
+            if not force:
+                refs = self._scan_library_asset_references(asset_type, asset_id)
+                if refs:
+                    raise LibraryAssetInUseError(asset_type, asset_id, refs)
+            kept = [a for a in target_list if a.id != asset_id]
+            if asset_type == "character":
+                self.library_store.characters = kept
+            elif asset_type == "scene":
+                self.library_store.scenes = kept
+            else:  # prop
+                self.library_store.props = kept
+            self._save_library_data_unlocked()
+
+    def promote_asset_to_library(self, source_kind: str, source_id: str, asset_type: str, asset_id: str):
+        """Deep-copy an asset from a Project (episode) or Series into the
+        global library with a fresh id, persist, and return the new asset.
+
+        Reuses the import_assets_from_series deepcopy + new-uuid pattern.
+        The source asset is left intact (D1 活引用: promotion is additive;
+        fork-on-use of the original is a documented follow-up, design Q3).
+        `source_kind` ∈ {"project", "series"}."""
+        import copy
+        if asset_type not in ("character", "scene", "prop"):
+            raise ValueError(f"Invalid asset type: {asset_type}")
+        with self._save_lock:
+            if source_kind == "series":
+                container = self.series_store.get(source_id)
+                if not container:
+                    raise ValueError("Source series not found")
+            elif source_kind == "project":
+                container = self.scripts.get(source_id)
+                if not container:
+                    raise ValueError("Source project not found")
+            else:
+                raise ValueError(f"Invalid source kind: {source_kind}")
+
+            if asset_type == "character":
+                src_list = container.characters
+            elif asset_type == "scene":
+                src_list = container.scenes
+            else:  # prop
+                src_list = container.props
+            source_asset = next((a for a in src_list if a.id == asset_id), None)
+            if source_asset is None:
+                raise ValueError(
+                    f"Asset {asset_id} of type {asset_type} not found in {source_kind} {source_id}"
+                )
+
+            new_asset = copy.deepcopy(source_asset)
+            new_asset.id = str(uuid.uuid4())
+            self._library_list_for_type(asset_type).append(new_asset)
+            self._save_library_data_unlocked()
+            return new_asset
+
+    def fork_library_asset_to_project(self, script_id: str, asset_type: str, library_asset_id: str):
+        """Deep-copy a *global library* asset into a project's local asset list
+        with a fresh id, persist the project, and return the new (now
+        project-owned) asset.
+
+        This is the inverse direction of promote_asset_to_library and the
+        "按需 fork" of design Q3: under D1 活引用 semantics a project references
+        shared library assets live; forking materializes an independent,
+        editable local copy so subsequent edits no longer touch the shared
+        original. The source library asset is left intact (additive).
+
+        Raises ValueError when the project, asset type, or library asset is
+        absent. ``asset_type`` ∈ {"character", "scene", "prop"}."""
+        import copy
+        if asset_type not in ("character", "scene", "prop"):
+            raise ValueError(f"Invalid asset type: {asset_type}")
+        with self._save_lock:
+            script = self.scripts.get(script_id)
+            if not script:
+                raise ValueError(f"Project not found: {script_id}")
+            # _find_library_asset raises ValueError when the id/type is absent.
+            source_asset = self._find_library_asset(asset_type, library_asset_id)
+            new_asset = copy.deepcopy(source_asset)
+            prefix = {"character": "char", "scene": "scene", "prop": "prop"}[asset_type]
+            new_asset.id = f"{prefix}_{uuid.uuid4().hex[:12]}"
+            if asset_type == "character":
+                script.characters.append(new_asset)
+            elif asset_type == "scene":
+                script.scenes.append(new_asset)
+            else:  # prop
+                script.props.append(new_asset)
+            script.updated_at = time.time()
+            self._save_data()
+            return new_asset
 
     def create_series(self, title: str, description: str = "", workflow_mode: str = "i2v_legacy", content_mode: str = "scripted", default_generation_mode: str = "r2v") -> Series:
         """Create a new Series."""
@@ -4104,17 +4554,27 @@ class ComicGenPipeline:
         return episodes
 
     def resolve_episode_assets(self, episode: Script, series: Optional[Series] = None) -> Dict[str, List]:
-        """Merge Episode-local assets with Series shared assets.
-        Episode-local assets take priority (by ID) over Series assets."""
+        """Merge Episode-local assets with Series shared assets and the
+        project-independent global asset library. Priority by ID:
+        Episode > Series > Global (local always wins). The global library
+        is the lowest layer and applies to every project, with or without
+        a parent series. When the global library is empty this behaves
+        identically to the previous two-layer (Episode/Series) merge."""
         if not series:
             # Auto-lookup series if episode has series_id
             if episode.series_id:
                 series = self.series_store.get(episode.series_id)
         if not series:
+            # No parent series — episode-local assets sit on top of the
+            # global library (lowest layer). With an empty library this
+            # yields the episode's own assets (back-compat).
+            ep_char_ids = {c.id for c in episode.characters}
+            ep_scene_ids = {s.id for s in episode.scenes}
+            ep_prop_ids = {p.id for p in episode.props}
             return {
-                "characters": episode.characters,
-                "scenes": episode.scenes,
-                "props": episode.props,
+                "characters": list(episode.characters) + [c for c in self.library_store.characters if c.id not in ep_char_ids],
+                "scenes": list(episode.scenes) + [s for s in self.library_store.scenes if s.id not in ep_scene_ids],
+                "props": list(episode.props) + [p for p in self.library_store.props if p.id not in ep_prop_ids],
             }
         # Build lookup by ID for episode-local assets
         ep_char_ids = {c.id for c in episode.characters}
@@ -4124,6 +4584,17 @@ class ComicGenPipeline:
         merged_characters = list(episode.characters) + [c for c in series.characters if c.id not in ep_char_ids]
         merged_scenes = list(episode.scenes) + [s for s in series.scenes if s.id not in ep_scene_ids]
         merged_props = list(episode.props) + [p for p in series.props if p.id not in ep_prop_ids]
+
+        # Fold the global library underneath as the lowest layer — only
+        # ids absent from both the Episode and Series layers. No-op when
+        # the library is empty (back-compat).
+        merged_char_ids = {c.id for c in merged_characters}
+        merged_scene_ids = {s.id for s in merged_scenes}
+        merged_prop_ids = {p.id for p in merged_props}
+
+        merged_characters += [c for c in self.library_store.characters if c.id not in merged_char_ids]
+        merged_scenes += [s for s in self.library_store.scenes if s.id not in merged_scene_ids]
+        merged_props += [p for p in self.library_store.props if p.id not in merged_prop_ids]
 
         return {
             "characters": merged_characters,
@@ -4243,6 +4714,14 @@ class ComicGenPipeline:
         with self._save_lock:
             series, target_asset = self._find_series_asset(series_id, asset_id, asset_type)
             target_asset.locked = not target_asset.locked
+            self._save_series_data_unlocked()
+            return series
+
+    def toggle_series_asset_starred(self, series_id: str, asset_id: str, asset_type: str) -> Series:
+        """Toggle the starred (library shortlist) status of a Series asset."""
+        with self._save_lock:
+            series, target_asset = self._find_series_asset(series_id, asset_id, asset_type)
+            target_asset.starred = not target_asset.starred
             self._save_series_data_unlocked()
             return series
 
@@ -4382,14 +4861,15 @@ class ComicGenPipeline:
 
     def get_effective_prompt(self, prompt_type: str, episode: Script, series: Optional[Series] = None) -> str:
         """Three-level fallback: Episode -> Series -> system default."""
-        valid_prompt_types = ("storyboard_polish", "video_polish", "r2v_polish")
+        valid_prompt_types = ("storyboard_polish", "video_polish", "r2v_polish", "storyboard_extraction")
         if prompt_type not in valid_prompt_types:
             raise ValueError(f"Invalid prompt_type: {prompt_type}. Must be one of {valid_prompt_types}")
-        from .llm import DEFAULT_STORYBOARD_POLISH_PROMPT, DEFAULT_VIDEO_POLISH_PROMPT, DEFAULT_R2V_POLISH_PROMPT
+        from .llm import DEFAULT_STORYBOARD_POLISH_PROMPT, DEFAULT_VIDEO_POLISH_PROMPT, DEFAULT_R2V_POLISH_PROMPT, DEFAULT_STORYBOARD_EXTRACTION_PROMPT
         defaults = {
             "storyboard_polish": DEFAULT_STORYBOARD_POLISH_PROMPT,
             "video_polish": DEFAULT_VIDEO_POLISH_PROMPT,
             "r2v_polish": DEFAULT_R2V_POLISH_PROMPT,
+            "storyboard_extraction": DEFAULT_STORYBOARD_EXTRACTION_PROMPT,
         }
         episode_value = getattr(episode.prompt_config, prompt_type, "")
         if episode_value.strip():

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Pencil, Plus } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 export type FieldType = "duration" | "shotSize" | "cameraAngle" | "cameraMovement" | "transitionHint";
 
@@ -54,12 +55,12 @@ const FIELD_COLORS: Record<FieldType, { bg: string; border: string; text: string
     },
 };
 
-const FIELD_LABELS: Record<FieldType, string> = {
-    duration: "时长",
-    shotSize: "景别",
-    cameraAngle: "机位",
-    cameraMovement: "运镜",
-    transitionHint: "转场",
+const FIELD_LABEL_KEYS: Record<FieldType, string> = {
+    duration: "fieldDuration",
+    shotSize: "fieldShotSize",
+    cameraAngle: "fieldCameraAngle",
+    cameraMovement: "fieldCameraMovement",
+    transitionHint: "fieldTransition",
 };
 
 interface FieldTagChipProps {
@@ -74,8 +75,9 @@ export default function FieldTagChip({ field, value, editorConfig, onChange }: F
     const chipRef = useRef<HTMLButtonElement>(null);
     const popoverRef = useRef<HTMLDivElement>(null);
 
+    const t = useTranslations("storyboardR2V");
     const colors = FIELD_COLORS[field];
-    const label = FIELD_LABELS[field];
+    const label = t(FIELD_LABEL_KEYS[field]);
     const isEmpty = value === null || value === undefined || value === "";
 
     useEffect(() => {
@@ -111,12 +113,15 @@ export default function FieldTagChip({ field, value, editorConfig, onChange }: F
                 ref={chipRef}
                 type="button"
                 onClick={() => setOpen(v => !v)}
-                className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[12px] font-medium cursor-pointer transition-all duration-150 ease-out group/chip ${
+                className={`inline-flex items-center gap-1 rounded-full border border-glass-border bg-surface-inset px-2.5 py-1 text-[13px] font-medium text-text-secondary cursor-pointer transition-all duration-150 ease-out group/chip hover:border-foreground/20 hover:text-foreground ${
                     isEmpty
-                        ? `border border-dashed border-white/20 bg-white/[0.02] text-text-muted hover:border-white/40 hover:text-text-secondary`
-                        : `border ${colors.border} ${colors.bg} ${colors.text} ${colors.hoverBorder} hover:scale-[1.02]`
+                        ? "border-dashed border-foreground/20 bg-glass text-text-muted hover:border-foreground/30 hover:text-text-secondary"
+                        : ""
                 }`}
             >
+                <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-text-muted">
+                    {label}
+                </span>
                 <span>{displayValue}</span>
                 {isEmpty ? (
                     <Plus size={10} strokeWidth={2.5} className="opacity-60" />
@@ -133,7 +138,7 @@ export default function FieldTagChip({ field, value, editorConfig, onChange }: F
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: -4, scale: 0.96 }}
                         transition={{ duration: 0.15 }}
-                        className="absolute top-full left-0 mt-1.5 z-50 min-w-[180px] rounded-lg border border-white/[0.08] bg-[#0a0a0f]/95 backdrop-blur-xl shadow-xl p-2"
+                        className="absolute top-full left-0 mt-1.5 z-50 min-w-[180px] rounded-lg border border-glass-border bg-surface/95 backdrop-blur-xl shadow-xl p-2"
                     >
                         {editorConfig.type === "duration" ? (
                             <DurationEditor
@@ -179,10 +184,10 @@ function DurationEditor({ min, max, step, value, onChange }: {
                         key={n}
                         type="button"
                         onClick={() => onChange(n)}
-                        className={`rounded-md px-2 py-1.5 text-[12px] font-mono font-medium transition-colors ${
+                        className={`rounded-md px-2 py-1.5 text-[0.75rem] font-mono font-medium transition-colors ${
                             n === value
                                 ? "bg-emerald-500/20 border border-emerald-400/40 text-emerald-200"
-                                : "bg-white/[0.04] border border-white/[0.06] text-text-secondary hover:bg-white/[0.08] hover:text-foreground"
+                                : "bg-glass border border-glass-border text-text-secondary hover:bg-hover-bg hover:text-foreground"
                         }`}
                     >
                         {n}s
@@ -205,7 +210,7 @@ function DurationEditor({ min, max, step, value, onChange }: {
                 onTouchEnd={() => onChange(local)}
                 className="w-full accent-emerald-400"
             />
-            <div className="flex items-center justify-between text-[11px] font-mono text-text-muted">
+            <div className="flex items-center justify-between text-[0.6875rem] font-mono text-text-muted">
                 <span>{min}s</span>
                 <span className="text-emerald-200 font-medium">{local}s</span>
                 <span>{max}s</span>
@@ -218,6 +223,7 @@ function PresetEditor({ presets, allowCustom, value, onChange }: {
     presets: string[]; allowCustom: boolean; value: string;
     onChange: (v: string) => void;
 }) {
+    const t = useTranslations("storyboardR2V");
     const [custom, setCustom] = useState("");
     const inputRef = useRef<HTMLInputElement>(null);
 
@@ -235,10 +241,10 @@ function PresetEditor({ presets, allowCustom, value, onChange }: {
                         key={p}
                         type="button"
                         onClick={() => onChange(p)}
-                        className={`rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
+                        className={`rounded-md px-2 py-1 text-[0.6875rem] font-medium transition-colors ${
                             p === value
                                 ? "bg-primary/20 border border-primary/40 text-primary"
-                                : "bg-white/[0.04] border border-white/[0.06] text-text-secondary hover:bg-white/[0.08] hover:text-foreground"
+                                : "bg-glass border border-glass-border text-text-secondary hover:bg-hover-bg hover:text-foreground"
                         }`}
                     >
                         {p}
@@ -252,8 +258,8 @@ function PresetEditor({ presets, allowCustom, value, onChange }: {
                     value={custom}
                     onChange={(e) => setCustom(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder="自定义…"
-                    className="w-full rounded-md border border-white/[0.08] bg-black/30 px-2.5 py-1.5 text-[11px] text-foreground placeholder:text-text-muted outline-none focus:border-primary/40 transition-colors"
+                    placeholder={t("fieldCustomPlaceholder")}
+                    className="w-full rounded-md border border-glass-border bg-black/30 px-2.5 py-1.5 text-[0.6875rem] text-foreground placeholder:text-text-muted outline-none focus:border-primary/40 transition-colors"
                 />
             )}
         </div>
@@ -279,11 +285,12 @@ export function AddFieldButton({ onAdd }: { onAdd: (field: FieldType) => void })
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [open]);
 
+    const t = useTranslations("storyboardR2V");
     const fields: { key: FieldType; label: string }[] = [
-        { key: "shotSize", label: "景别" },
-        { key: "cameraAngle", label: "机位" },
-        { key: "cameraMovement", label: "运镜" },
-        { key: "transitionHint", label: "转场" },
+        { key: "shotSize", label: t("fieldShotSize") },
+        { key: "cameraAngle", label: t("fieldCameraAngle") },
+        { key: "cameraMovement", label: t("fieldCameraMovement") },
+        { key: "transitionHint", label: t("fieldTransition") },
     ];
 
     return (
@@ -292,7 +299,7 @@ export function AddFieldButton({ onAdd }: { onAdd: (field: FieldType) => void })
                 ref={btnRef}
                 type="button"
                 onClick={() => setOpen(v => !v)}
-                className="inline-flex items-center gap-0.5 rounded-md border border-dashed border-white/15 px-1.5 py-1 text-[11px] text-text-muted hover:border-white/30 hover:text-text-secondary transition-colors cursor-pointer"
+                className="inline-flex items-center gap-0.5 rounded-md border border-dashed border-foreground/15 px-1.5 py-1 text-[0.6875rem] text-text-muted hover:border-foreground/30 hover:text-text-secondary transition-colors cursor-pointer"
             >
                 <Plus size={10} strokeWidth={2.5} />
             </button>
@@ -304,14 +311,14 @@ export function AddFieldButton({ onAdd }: { onAdd: (field: FieldType) => void })
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: -4, scale: 0.96 }}
                         transition={{ duration: 0.12 }}
-                        className="absolute top-full left-0 mt-1 z-50 min-w-[100px] rounded-lg border border-white/[0.08] bg-[#0a0a0f]/95 backdrop-blur-xl shadow-xl p-1"
+                        className="absolute top-full left-0 mt-1 z-50 min-w-[100px] rounded-lg border border-glass-border bg-surface/95 backdrop-blur-xl shadow-xl p-1"
                     >
                         {fields.map(f => (
                             <button
                                 key={f.key}
                                 type="button"
                                 onClick={() => { onAdd(f.key); setOpen(false); }}
-                                className="w-full text-left rounded-md px-2.5 py-1.5 text-[11px] text-text-secondary hover:bg-white/[0.06] hover:text-foreground transition-colors"
+                                className="w-full text-left rounded-md px-2.5 py-1.5 text-[0.6875rem] text-text-secondary hover:bg-hover-bg hover:text-foreground transition-colors"
                             >
                                 {f.label}
                             </button>

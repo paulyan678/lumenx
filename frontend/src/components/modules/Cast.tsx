@@ -25,7 +25,7 @@ import { useProjectStore } from "@/store/projectStore";
 import { api } from "@/lib/api";
 import { getAssetUrl } from "@/lib/utils";
 import { useLightbox } from "@/components/shared/preview/LightboxProvider";
-import StepHeader from "@/components/shared/StepHeader";
+import StepPageHeader, { StepPill } from "@/components/shared/StepPageHeader";
 import PreviewImage from "@/components/shared/preview/PreviewImage";
 import WorkflowActionButton from "@/components/shared/WorkflowActionButton";
 import VoicePickerModal from "./cast/VoicePickerModal";
@@ -169,18 +169,20 @@ export default function Cast() {
 
     return (
         <div className="flex h-full w-full flex-col overflow-hidden">
-            <StepHeader
+            <StepPageHeader
                 stepNumber={3}
-                icon={<Users />}
-                englishName="Cast"
+                englishName="CAST"
                 title={tStep("castTitle")}
                 subtitle={tStep("castSubtitle")}
-                trailing={(
-                    <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-muted">
-                        <span className="text-foreground font-medium">{totalCast}</span>
-                        <span className="ml-1.5">{t("totalCast")}</span>
-                    </span>
-                )}
+                pills={totalCast > 0 ? (
+                    <>
+                        <StepPill label={t("charactersLabel")} value={characters.length} />
+                        <StepPill
+                            label={t("voiceBoundLabel")}
+                            value={(currentProject?.characters ?? []).filter((c: any) => c.voice_id).length}
+                        />
+                    </>
+                ) : null}
             />
 
             {/* Empty state — no entities extracted yet */}
@@ -213,7 +215,7 @@ export default function Cast() {
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`relative inline-flex items-center gap-1.5 px-3 pb-2 font-mono text-[11px] uppercase tracking-[0.16em] transition-colors ${
+                                className={`relative inline-flex items-center gap-1.5 px-3 pb-2 font-mono text-[0.6875rem] uppercase tracking-[0.16em] transition-colors ${
                                     activeTab === tab.id
                                         ? "text-foreground"
                                         : "text-text-muted hover:text-text-secondary"
@@ -526,7 +528,7 @@ function AddCastPlaceholderModal({
                     {/* AI tab hint */}
                     {tab === "ai" && (
                         <div className="rounded-lg bg-primary/[0.06] border border-primary/20 px-3 py-2.5">
-                            <p className="text-[11.5px] text-text-secondary leading-relaxed">
+                            <p className="text-[0.71875rem] text-text-secondary leading-relaxed">
                                 {t("aiTabHint")}
                             </p>
                         </div>
@@ -625,10 +627,10 @@ function CastSection({ kind, icon, title, items, emptyLabel, onAddNew, addLabel,
             {!hideHeader && (
                 <header className="mb-3 flex items-center gap-2">
                     <span className="grid h-6 w-6 place-items-center rounded text-text-muted">{icon}</span>
-                    <h3 className="font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-text-secondary">
+                    <h3 className="font-mono text-[0.6875rem] font-medium uppercase tracking-[0.18em] text-text-secondary">
                         {title}
                     </h3>
-                    <span className="font-mono text-[10px] text-text-muted">({items.length})</span>
+                    <span className="font-mono text-[0.625rem] text-text-muted">({items.length})</span>
                     <div aria-hidden="true" className="ml-3 h-px flex-1 bg-glass-border" />
                     {onAddNew && (
                         <WorkflowActionButton
@@ -650,17 +652,17 @@ function CastSection({ kind, icon, title, items, emptyLabel, onAddNew, addLabel,
                 </div>
             )}
             {items.length === 0 ? (
-                <p className="font-sans text-[12.5px] text-text-muted italic px-1">{emptyLabel}</p>
+                <p className="font-sans text-[0.78125rem] text-text-muted italic px-1">{emptyLabel}</p>
             ) : groups && groups.some(g => g.persona) ? (
                 <div className="space-y-4">
                     {groups.map((group) => (
                         <div key={group.persona ?? "_solo"}>
                             {group.persona && (
                                 <div className="flex items-center gap-2 mb-2 px-1">
-                                    <span className="inline-flex items-center gap-1.5 font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-pink-300/90 bg-pink-300/10 px-2 py-0.5 rounded">
+                                    <span className="inline-flex items-center gap-1.5 font-mono text-[0.625rem] font-medium uppercase tracking-[0.16em] text-pink-300/90 bg-pink-300/10 px-2 py-0.5 rounded">
                                         <Users size={10} /> {t("personaGroup", { persona: group.persona })}
                                     </span>
-                                    <span className="font-mono text-[10px] text-text-muted">
+                                    <span className="font-mono text-[0.625rem] text-text-muted">
                                         {t("personaGroupCount", { count: group.items.length })}
                                     </span>
                                 </div>
@@ -778,8 +780,8 @@ function CastCard({ item, onOpenWorkbench }: { item: CastItem; onOpenWorkbench?:
             },
             chipLabel: t("tabCharacters"),
             hoverAccent: "rgba(167,139,250,0.55)",
-            watermarkIcon: <Users size={48} className="text-white/[0.04]" strokeWidth={1} />,
-            ctaIcon: <Wand2 size={14} strokeWidth={1.75} />,
+            watermarkIcon: <Users size={48} className="text-text-muted" strokeWidth={1} />,
+            ctaIcon: <Wand2 size={22} strokeWidth={1.75} />,
             ctaLabel: t("generateReference"),
         },
         scene: {
@@ -792,8 +794,8 @@ function CastCard({ item, onOpenWorkbench }: { item: CastItem; onOpenWorkbench?:
             },
             chipLabel: t("tabScenes"),
             hoverAccent: "rgba(110,231,183,0.5)",
-            watermarkIcon: <MapPin size={64} className="text-white/[0.035]" strokeWidth={0.75} />,
-            ctaIcon: <Sparkles size={14} strokeWidth={1.75} />,
+            watermarkIcon: <MapPin size={64} className="text-text-muted" strokeWidth={0.75} />,
+            ctaIcon: <Sparkles size={22} strokeWidth={1.75} />,
             ctaLabel: t("generateScene"),
         },
         prop: {
@@ -806,8 +808,8 @@ function CastCard({ item, onOpenWorkbench }: { item: CastItem; onOpenWorkbench?:
             },
             chipLabel: t("tabProps"),
             hoverAccent: "rgba(252,211,77,0.5)",
-            watermarkIcon: <Box size={40} className="text-white/[0.04]" strokeWidth={1} />,
-            ctaIcon: <Layers size={13} strokeWidth={1.75} />,
+            watermarkIcon: <Box size={40} className="text-text-muted" strokeWidth={1} />,
+            ctaIcon: <Layers size={22} strokeWidth={1.75} />,
             ctaLabel: t("generateProp"),
         },
     };
@@ -818,12 +820,12 @@ function CastCard({ item, onOpenWorkbench }: { item: CastItem; onOpenWorkbench?:
     return (
         <>
             <div
-                className={`group/cast-card relative flex flex-col gap-2 ${cardRadius} border border-glass-border bg-glass p-2 transition-[border-color,background-color] duration-fast ease-out-quart hover:border-white/15`}
+                className={`group/cast-card relative flex flex-col gap-2 ${cardRadius} border border-glass-border bg-glass p-2 transition-[border-color,background-color] duration-fast ease-out-quart hover:border-foreground/30`}
             >
                 {/* Kind chip — top-right, near-mono. Sits on TOP of the thumb
                     so it works for both empty and ready states without
                     occluding the image (small + corner-tucked). */}
-                <span className="absolute top-2.5 right-2.5 z-10 pointer-events-none inline-flex items-center rounded-sm border border-white/10 bg-black/40 px-1.5 py-[1px] font-mono text-[8.5px] uppercase tracking-[0.18em] text-text-muted backdrop-blur-sm">
+                <span className="absolute top-2.5 right-2.5 z-10 pointer-events-none inline-flex items-center rounded-sm border border-glass-border bg-black/40 px-1.5 py-[1px] font-mono text-[0.53125rem] uppercase tracking-[0.18em] text-text-muted backdrop-blur-sm">
                     {k.chipLabel}
                 </span>
                 {/* Hover hairline accent — single top edge, animated on group-hover */}
@@ -846,7 +848,7 @@ function CastCard({ item, onOpenWorkbench }: { item: CastItem; onOpenWorkbench?:
                                 }}
                                 aria-label="放大查看"
                                 title="放大查看"
-                                className="absolute left-1.5 top-1.5 z-10 grid h-6 w-6 place-items-center rounded bg-black/55 text-white/80 backdrop-blur opacity-0 group-hover/cast-card:opacity-100 transition-opacity hover:bg-black/75"
+                                className="absolute left-1.5 top-1.5 z-10 grid h-6 w-6 place-items-center rounded bg-black/55 text-foreground/80 backdrop-blur opacity-0 group-hover/cast-card:opacity-100 transition-opacity hover:bg-black/75"
                             >
                                 <Maximize2 size={11} />
                             </button>
@@ -857,9 +859,6 @@ function CastCard({ item, onOpenWorkbench }: { item: CastItem; onOpenWorkbench?:
                             className="relative grid h-full w-full place-items-center bg-black/20 text-text-secondary hover:text-foreground transition-colors overflow-hidden"
                             style={k.emptyPattern}
                         >
-                            <span className="pointer-events-none absolute inset-0 grid place-items-center">
-                                {k.watermarkIcon}
-                            </span>
                             {item.kind === "scene" && (
                                 <>
                                     <span className="pointer-events-none absolute inset-x-0 top-0 h-3 bg-gradient-to-b from-black/30 to-transparent" aria-hidden="true" />
@@ -867,9 +866,9 @@ function CastCard({ item, onOpenWorkbench }: { item: CastItem; onOpenWorkbench?:
                                 </>
                             )}
                             <CornerMarks />
-                            <span className="relative flex flex-col items-center gap-1.5 z-10">
-                                {k.ctaIcon}
-                                <span className="text-[10px] font-medium tracking-wide">{k.ctaLabel}</span>
+                            <span className="relative flex flex-col items-center gap-2 z-10">
+                                <span className="text-text-muted/70">{k.ctaIcon}</span>
+                                <span className="text-[0.625rem] font-medium tracking-wide">{k.ctaLabel}</span>
                             </span>
                         </button>
                     )}
@@ -877,17 +876,17 @@ function CastCard({ item, onOpenWorkbench }: { item: CastItem; onOpenWorkbench?:
                         <div className="absolute inset-0 z-20 grid place-items-center bg-black/60 backdrop-blur-sm rounded-md">
                             <div className="flex flex-col items-center gap-1.5">
                                 <Loader2 size={20} className="animate-spin text-primary" />
-                                <span className="text-[10px] text-text-secondary">生成中...</span>
+                                <span className="text-[0.625rem] text-text-secondary">生成中...</span>
                             </div>
                         </div>
                     )}
                 </div>
                 <div className="space-y-1 px-0.5">
-                    <p className="truncate font-sans text-[13px] font-medium text-foreground" title={item.name}>
+                    <p className="truncate font-sans text-[0.8125rem] font-medium text-foreground" title={item.name}>
                         {item.name}
                     </p>
                     <div className="flex items-center justify-between gap-1">
-                        <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-text-muted">
+                        <span className="font-mono text-[0.625rem] uppercase tracking-[0.12em] text-text-muted">
                             {t("appearancesCount", { count: item.appearances })}
                         </span>
                         <StatusBadge status={item.status} />
@@ -900,14 +899,14 @@ function CastCard({ item, onOpenWorkbench }: { item: CastItem; onOpenWorkbench?:
                     <div className="flex items-center gap-1 px-0.5 opacity-0 group-hover/cast-card:opacity-100 transition-opacity">
                         <button
                             onClick={(e) => { e.stopPropagation(); setPickerOpen(true); }}
-                            className="flex-1 inline-flex items-center gap-1.5 rounded-md border border-glass-border bg-black/30 px-2 py-1 text-[10px] text-text-secondary hover:border-white/20 hover:text-foreground transition-colors min-w-0"
+                            className="flex-1 inline-flex items-center gap-1.5 rounded-md border border-glass-border bg-black/30 px-2 py-1 text-[0.625rem] text-text-secondary hover:border-foreground/30 hover:text-foreground transition-colors min-w-0"
                             title={voiceId ? t("voiceBindChange") : t("voiceBindAdd")}
                         >
                             <Volume2 size={10} className={voiceId ? "text-primary" : "text-text-muted"} />
                             <span className="truncate flex-1 text-left">
                                 {voiceName || (voiceId ? voiceId : t("voiceBindNone"))}
                             </span>
-                            <span className="font-mono text-[8px] text-text-muted shrink-0">▼</span>
+                            <span className="font-mono text-[0.5rem] text-text-muted shrink-0">▼</span>
                         </button>
                         {voiceId && (
                             <button
@@ -916,7 +915,7 @@ function CastCard({ item, onOpenWorkbench }: { item: CastItem; onOpenWorkbench?:
                                 className={`shrink-0 inline-flex h-6 w-6 items-center justify-center rounded-md border transition-colors ${
                                     playing
                                         ? "border-primary bg-primary/15 text-primary"
-                                        : "border-glass-border bg-black/30 text-text-secondary hover:border-white/20 hover:text-foreground"
+                                        : "border-glass-border bg-black/30 text-text-secondary hover:border-foreground/30 hover:text-foreground"
                                 }`}
                             >
                                 {previewing ? <Loader2 size={10} className="animate-spin" /> : playing ? <Pause size={10} /> : <Play size={10} />}
@@ -1013,7 +1012,7 @@ function CharacterHistoryPopover({ seriesId, characterId, onClose }: { seriesId:
                                             EP{app.episode_number ?? "?"} · {app.episode_title}
                                         </p>
                                     </div>
-                                    <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-pink-300">
+                                    <span className="font-mono text-[0.625rem] uppercase tracking-[0.12em] text-pink-300">
                                         {t("appearancesCount", { count: app.frame_count })}
                                     </span>
                                 </div>
@@ -1058,21 +1057,21 @@ function StatusBadge({ status }: { status: "ready" | "pending" | "new" }) {
     const t = useTranslations("cast");
     if (status === "ready") {
         return (
-            <span className="inline-flex items-center rounded-full bg-[rgba(100,108,255,0.12)] px-1.5 py-0.5 font-mono text-[9px] font-medium uppercase tracking-wider text-[#a5aaff]">
+            <span className="inline-flex items-center rounded-full bg-[rgba(100,108,255,0.12)] px-1.5 py-0.5 font-mono text-[0.5625rem] font-medium uppercase tracking-wider text-primary">
                 {t("statusReady")}
             </span>
         );
     }
     if (status === "pending") {
         return (
-            <span className="inline-flex items-center gap-1 rounded-full bg-[rgba(245,158,11,0.12)] px-1.5 py-0.5 font-mono text-[9px] font-medium uppercase tracking-wider text-[#fbbf24]">
+            <span className="inline-flex items-center gap-1 rounded-full bg-[rgba(245,158,11,0.12)] px-1.5 py-0.5 font-mono text-[0.5625rem] font-medium uppercase tracking-wider text-amber-400">
                 <AlertTriangle size={9} aria-hidden="true" />
                 {t("statusPending")}
             </span>
         );
     }
     return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-[rgba(236,72,153,0.14)] px-1.5 py-0.5 font-mono text-[9px] font-medium uppercase tracking-wider text-[#f472b6]">
+        <span className="inline-flex items-center gap-1 rounded-full bg-[rgba(236,72,153,0.14)] px-1.5 py-0.5 font-mono text-[0.5625rem] font-medium uppercase tracking-wider text-pink-400">
             🆕 {t("statusNew")}
         </span>
     );

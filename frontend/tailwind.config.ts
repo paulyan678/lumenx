@@ -23,9 +23,12 @@ const config: Config = {
         "text-muted": "var(--color-text-muted)",
         overlay: "var(--color-overlay)",
         "surface-inset": "var(--color-bg-inset)",
-        primary: "#646cff",
-        secondary: "#535bf2",
-        accent: "#ff0080",
+        primary: "var(--color-primary)",
+        "primary-hover": "var(--color-primary-hover)",
+        secondary: "var(--color-primary-hover)",
+        accent: "var(--color-accent)",
+        "accent-hover": "var(--color-accent-hover)",
+        "on-accent": "var(--color-on-accent)",
         // Storyboard R2V workbench status semantic tokens. Replaces
         // 30+ scattered amber/emerald/red/blue arbitrary tints. Each
         // status carries -fg / -border / -bg variants; starred also
@@ -52,7 +55,7 @@ const config: Config = {
       fontFamily: {
         sans: ["var(--font-inter)", "sans-serif"],
         mono: ["var(--font-jetbrains-mono)", "monospace"],
-        display: ["var(--font-space-grotesk)", "sans-serif"],
+        display: ["var(--font-display)", "var(--font-space-grotesk)", "sans-serif"],
       },
       fontSize: {
         // 3-tier type scale for the Storyboard R2V workbench (and
@@ -65,12 +68,12 @@ const config: Config = {
         //   inline meta. The "you can read this" tier.
         // - display: Space Grotesk semibold for primary CTAs and
         //   focal headings. Reserved.
-        "chrome-sm":  ["10px", { lineHeight: "1.4", letterSpacing: "0.18em" }],
-        "chrome":     ["11px", { lineHeight: "1.4", letterSpacing: "0.18em" }],
-        "body-sm":    ["12px", { lineHeight: "1.45" }],
-        "body":       ["13px", { lineHeight: "1.5" }],
-        "display-sm": ["14px", { lineHeight: "1.3", letterSpacing: "-0.005em" }],
-        "display":    ["16px", { lineHeight: "1.25", letterSpacing: "-0.01em" }],
+        "chrome-sm":  ["0.625rem", { lineHeight: "1.4", letterSpacing: "0.18em" }],
+        "chrome":     ["0.6875rem", { lineHeight: "1.4", letterSpacing: "0.18em" }],
+        "body-sm":    ["0.75rem", { lineHeight: "1.45" }],
+        "body":       ["0.8125rem", { lineHeight: "1.5" }],
+        "display-sm": ["0.875rem", { lineHeight: "1.3", letterSpacing: "-0.005em" }],
+        "display":    ["1rem", { lineHeight: "1.25", letterSpacing: "-0.01em" }],
       },
       transitionTimingFunction: {
         // Ease-out-quart everywhere per impeccable shared laws:

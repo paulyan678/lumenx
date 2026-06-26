@@ -10,9 +10,11 @@ import { useProjectStore } from "@/store/projectStore";
 interface CreateProjectDialogProps {
     isOpen: boolean;
     onClose: () => void;
+    seriesId?: string;
+    seriesTitle?: string;
 }
 
-export default function CreateProjectDialog({ isOpen, onClose }: CreateProjectDialogProps) {
+export default function CreateProjectDialog({ isOpen, onClose, seriesId, seriesTitle }: CreateProjectDialogProps) {
     const [title, setTitle] = useState("");
     const [text, setText] = useState("");
     const [workflowMode, setWorkflowMode] = useState<"r2v" | "i2v_legacy">("r2v");
@@ -30,7 +32,7 @@ export default function CreateProjectDialog({ isOpen, onClose }: CreateProjectDi
 
         setIsCreating(true);
         try {
-            await createProject(title, text, true, workflowMode);
+            await createProject(title, text, true, workflowMode, seriesId);
             // Get the newly created project
             const currentProject = useProjectStore.getState().currentProject;
             if (currentProject) {
@@ -64,7 +66,14 @@ export default function CreateProjectDialog({ isOpen, onClose }: CreateProjectDi
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-2xl font-display font-bold text-foreground">{t("createTitle")}</h2>
+                            <div>
+                                <h2 className="text-2xl font-display font-bold text-foreground">{t("createTitle")}</h2>
+                                {seriesId && (
+                                    <div className="mt-1 font-mono text-[0.6875rem] uppercase tracking-wider text-primary">
+                                        {t("series")} · {seriesTitle}
+                                    </div>
+                                )}
+                            </div>
                             <button
                                 onClick={onClose}
                                 className="p-2 rounded-lg hover:bg-hover-bg text-text-secondary hover:text-foreground transition-colors"
@@ -110,7 +119,7 @@ export default function CreateProjectDialog({ isOpen, onClose }: CreateProjectDi
                                             {t("workflowR2VDesc")}
                                         </p>
                                         {workflowMode === "r2v" && (
-                                            <span className="absolute top-2 right-2 text-[10px] font-medium text-primary bg-primary/20 px-1.5 py-0.5 rounded">
+                                            <span className="absolute top-2 right-2 text-[0.625rem] font-medium text-primary bg-primary/20 px-1.5 py-0.5 rounded">
                                                 {tc("recommended")}
                                             </span>
                                         )}

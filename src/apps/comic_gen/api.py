@@ -35,7 +35,7 @@ import shutil
 import uuid
 import logging
 import traceback
-from .pipeline import ComicGenPipeline
+from .pipeline import ComicGenPipeline, LibraryAssetInUseError
 from .models import (
     ArtDirection,
     PromptConfig,
@@ -46,7 +46,7 @@ from .models import (
     StoryboardFrame,
     VideoTask,
 )
-from .llm import ScriptProcessor, DEFAULT_STORYBOARD_POLISH_PROMPT, DEFAULT_VIDEO_POLISH_PROMPT, DEFAULT_R2V_POLISH_PROMPT
+from .llm import ScriptProcessor, DEFAULT_STORYBOARD_POLISH_PROMPT, DEFAULT_VIDEO_POLISH_PROMPT, DEFAULT_R2V_POLISH_PROMPT, DEFAULT_ENTITY_EXTRACTION_PROMPT, DEFAULT_STYLE_ANALYSIS_PROMPT, DEFAULT_STORYBOARD_EXTRACTION_PROMPT
 from ...utils.oss_utils import OSSImageUploader, sign_oss_urls_in_data
 from ...utils import setup_logging
 from fastapi.responses import JSONResponse
@@ -248,7 +248,7 @@ def diagnose_log_tail(lines: int = 200):
 @app.get("/system/check")
 def check_system():
     """Check system dependencies (ffmpeg, etc.) and configuration."""
-    from utils.system_check import run_system_checks
+    from ...utils.system_check import run_system_checks
     return run_system_checks()
 
 
@@ -340,17 +340,29 @@ class CreateProjectRequest(BaseModel):
     title: str
     text: str
     workflow_mode: str = "r2v"  # "r2v" (default) or "i2v_legacy"
+    # Optional series binding (T9). When set, the new project is created as
+    # the next episode of this series (episode_number = current max + 1).
+    # Omit for a standalone project — behavior unchanged.
+    series_id: Optional[str] = None
 
 
 @app.post("/projects", response_model=Script)
 async def create_project(request: CreateProjectRequest, skip_analysis: bool = False):
-    """Creates a new project from a novel text."""
+    """Creates a new project from a novel text.
+
+    When `series_id` is provided the project is bound as the next episode
+    of that series; omitting it keeps the standalone-project behavior
+    unchanged.
+    """
     # Run in thread pool to avoid blocking event loop during LLM analysis (Python 3.8 compatible)
     loop = asyncio.get_event_loop()
-    result = await loop.run_in_executor(
-        None,  # Use default executor
-        partial(pipeline.create_project, request.title, request.text, skip_analysis, request.workflow_mode)
-    )
+    try:
+        result = await loop.run_in_executor(
+            None,  # Use default executor
+            partial(pipeline.create_project, request.title, request.text, skip_analysis, request.workflow_mode, request.series_id)
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     return signed_response(result)
 
 
@@ -423,6 +435,18 @@ def list_projects():
     """Lists all projects from backend storage."""
     scripts = list(pipeline.scripts.values())
     return signed_response(scripts)
+
+
+@app.post("/projects/{script_id}/toggle_starred")
+def toggle_project_starred(script_id: str):
+    """Toggle the user-starred (featured shortlist) flag on a project."""
+    try:
+        script = pipeline.toggle_project_starred(script_id)
+        return signed_response(script)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ============================================================
@@ -564,6 +588,7 @@ def get_series_prompt_config(series_id: str):
             "storyboard_polish": DEFAULT_STORYBOARD_POLISH_PROMPT,
             "video_polish": DEFAULT_VIDEO_POLISH_PROMPT,
             "r2v_polish": DEFAULT_R2V_POLISH_PROMPT,
+            "storyboard_extraction": DEFAULT_STORYBOARD_EXTRACTION_PROMPT,
         },
     }
 
@@ -672,6 +697,18 @@ def toggle_series_asset_lock(series_id: str, request: ToggleLockRequest):
     """Toggle the locked status of a Series asset."""
     try:
         series = pipeline.toggle_series_asset_lock(series_id, request.asset_id, request.asset_type)
+        return signed_response(series)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/series/{series_id}/assets/toggle_starred")
+def toggle_series_asset_starred(series_id: str, request: ToggleLockRequest):
+    """Toggle the starred (library shortlist) status of a Series asset."""
+    try:
+        series = pipeline.toggle_series_asset_starred(series_id, request.asset_id, request.asset_type)
         return signed_response(series)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -808,6 +845,180 @@ def import_series_assets(series_id: str, request: ImportAssetsRequest):
 
 
 # ============================================================
+# Global Asset Library (project-independent shared pool) — CRUD + promote
+# ============================================================
+# Mirrors the /series/{id}/assets endpoints, one level up: a curated,
+# project-independent pool any project can reference. All mutations route
+# through the ComicGenPipeline.*_library_asset methods so the Playground
+# "录入资产库" flow stays consistent with these endpoints.
+
+class CreateLibraryAssetRequest(BaseModel):
+    asset_type: str                    # "character" | "scene" | "prop"
+    name: str
+    description: Optional[str] = ""
+    persona: Optional[str] = ""        # characters only — grouping label
+    image_url: Optional[str] = None    # optional pre-uploaded master image
+    voice_id: Optional[str] = None     # characters only — TTS voice binding
+
+
+class UpdateLibraryAssetRequest(BaseModel):
+    # Generic patch — only the fields the client actually sends are applied
+    # (PATCH semantics; PUT here is lenient/partial).
+    name: Optional[str] = None
+    description: Optional[str] = None
+    persona: Optional[str] = None
+    image_url: Optional[str] = None
+    voice_id: Optional[str] = None
+    starred: Optional[bool] = None
+    locked: Optional[bool] = None
+    visual_weight: Optional[int] = None
+
+
+class PromoteAssetRequest(BaseModel):
+    source_kind: str   # "project" | "series"
+    source_id: str
+    asset_type: str    # "character" | "scene" | "prop"
+    asset_id: str
+
+
+class ForkFromLibraryRequest(BaseModel):
+    asset_type: str          # "character" | "scene" | "prop"
+    library_asset_id: str    # id of the source asset in the global library
+
+
+@app.get("/library/assets")
+def get_library_assets():
+    """List all assets in the global shared pool."""
+    lib = pipeline.list_library_assets()
+    return signed_response({
+        "characters": [c.model_dump() for c in lib.characters],
+        "scenes": [s.model_dump() for s in lib.scenes],
+        "props": [p.model_dump() for p in lib.props],
+    })
+
+
+@app.post("/library/assets")
+def create_library_asset(request: CreateLibraryAssetRequest):
+    """Create a new asset in the global shared pool."""
+    try:
+        payload = request.model_dump(exclude={"asset_type"})
+        asset = pipeline.create_library_asset(request.asset_type, payload)
+        return signed_response(asset.model_dump())
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/library/assets/upload")
+def upload_library_asset_image(file: UploadFile = File(...)):
+    """Upload an image to use as a global library asset's master image.
+
+    Saves the file under output/uploads/ (served via the /files static mount)
+    and returns {"image_url": <path-or-URL the frontend can load>}. When OSS
+    is configured the returned URL is the (signed) OSS URL; otherwise a local
+    relative path "uploads/<name>" resolvable through the frontend's
+    getAssetUrl helper. The caller then passes this image_url to
+    POST /library/assets (image_url=...) or PATCH /library/assets/{type}/{id}
+    to attach it to a library asset. Mirrors the generic /upload endpoint but
+    returns the {image_url} contract the library UI expects.
+    """
+    try:
+        file_ext = os.path.splitext(file.filename or "")[1]
+        filename = f"{uuid.uuid4()}{file_ext}"
+        file_path = os.path.join("output/uploads", filename)
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        # Prefer OSS when configured (signed), else fall back to local path.
+        oss_url = OSSImageUploader().upload_image(file_path)
+        if oss_url:
+            return signed_response({"image_url": oss_url})
+        return {"image_url": f"uploads/{filename}"}
+    except Exception as e:
+        logger.exception("upload_library_asset_image failed")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.api_route("/library/assets/{asset_type}/{asset_id}", methods=["PUT", "PATCH"])
+def update_library_asset(asset_type: str, asset_id: str, request: UpdateLibraryAssetRequest):
+    """Patch a global library asset (only the provided fields are applied)."""
+    try:
+        patch = request.model_dump(exclude_unset=True)
+        asset = pipeline.update_library_asset(asset_type, asset_id, patch)
+        return signed_response(asset.model_dump())
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/library/assets/{asset_type}/{asset_id}")
+def delete_library_asset(asset_type: str, asset_id: str, force: bool = False):
+    """Delete an asset from the global shared pool.
+
+    Reference-integrity (design Q2): if any storyboard frame in any project or
+    series still references this asset (via scene_id / character_ids /
+    prop_ids), the delete is refused with HTTP 409 and the referrers are
+    listed — unless ``force=true`` is passed, which deletes anyway and leaves
+    those references dangling (the asset resolver simply drops the unknown id).
+    """
+    try:
+        pipeline.delete_library_asset(asset_type, asset_id, force=force)
+        return {"status": "deleted", "asset_type": asset_type, "id": asset_id}
+    except LibraryAssetInUseError as e:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "library_asset_in_use",
+                "message": str(e),
+                "asset_type": e.asset_type,
+                "asset_id": e.asset_id,
+                "references": e.references,
+                "hint": "Pass ?force=true to delete anyway.",
+            },
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/library/assets/promote")
+def promote_asset_to_library(request: PromoteAssetRequest):
+    """Deep-copy an asset from a project or series into the global pool."""
+    try:
+        asset = pipeline.promote_asset_to_library(
+            request.source_kind, request.source_id, request.asset_type, request.asset_id
+        )
+        return signed_response(asset.model_dump())
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/projects/{script_id}/assets/fork_from_library")
+def fork_asset_from_library(script_id: str, request: ForkFromLibraryRequest):
+    """Fork (deep-copy) a global library asset into this project as an
+    independent, editable local copy with a fresh id (design Q3, 按需 fork).
+
+    Under live-reference (D1 活引用) semantics a project references shared
+    library assets directly; this endpoint materializes a project-owned copy
+    so subsequent edits no longer affect the shared original. Returns the new
+    project-local asset.
+    """
+    try:
+        asset = pipeline.fork_library_asset_to_project(
+            script_id, request.asset_type, request.library_asset_id
+        )
+        return signed_response(asset.model_dump())
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================
 # File Import & Episode Splitting
 # ============================================================
 
@@ -893,6 +1104,7 @@ class EnvConfig(ProviderRoutingConfig):
     OSS_BUCKET_NAME: Optional[str] = None
     OSS_ENDPOINT: Optional[str] = None
     OSS_BASE_PATH: Optional[str] = None
+    OSS_ENABLE: bool = True
     KLING_ACCESS_KEY: Optional[str] = None
     KLING_SECRET_KEY: Optional[str] = None
     VIDU_API_KEY: Optional[str] = None
@@ -1033,10 +1245,22 @@ def update_env_config(config: EnvConfig):
         for key, value in raw_config.items():
             if value is None:
                 continue
-            if isinstance(value, ProviderBackend):
+            if isinstance(value, bool):
+                # Booleans (e.g. OSS_ENABLE) persist as "true"/"false" strings so
+                # they round-trip through os.environ and the .env/config.json store.
+                config_dict[key] = "true" if value else "false"
+            elif isinstance(value, ProviderBackend):
                 config_dict[key] = value.value
             else:
                 config_dict[key] = value
+
+        # Secret masking guard: GET /config/env returns secrets masked with the
+        # bullet sentinel. If the frontend re-submits an unchanged secret it will
+        # still contain bullets — skip it so we don't overwrite the real stored
+        # key with the mask. Only genuinely edited (bullet-free) values persist.
+        for field in list(config_dict.keys()):
+            if field in SECRET_FIELDS and _MASK_CHAR in str(config_dict[field]):
+                config_dict.pop(field, None)
 
         # Process endpoint overrides: validate keys against known providers
         from ...utils.endpoints import PROVIDER_DEFAULTS
@@ -1082,7 +1306,7 @@ def get_project(script_id: str):
     """Retrieves a project by ID. When the project belongs to a
     Series, the response merges series-shared characters / scenes /
     props on top of the episode-local lists. Each item carries a
-    `source` field ("series" | "episode") so the frontend can
+    `source` field ("episode" | "series" | "global") so the frontend can
     visually distinguish where the asset lives and route writes
     appropriately (per A2 design decision — shared writes default to
     the series side; local writes stay episode-side; the helper
@@ -1130,6 +1354,32 @@ def get_project(script_id: str):
                     d = pr.model_dump()
                     d["source"] = "series"
                     payload["props"].append(d)
+
+    # Merge the project-independent global asset library underneath as
+    # the lowest layer. Any id not already present from the episode or
+    # series layers is appended with source="global" (read-time only —
+    # never written back to projects.json). When the library is empty
+    # this is a no-op and the response is byte-identical to before.
+    lib = pipeline.library_store
+    if lib.characters or lib.scenes or lib.props:
+        seen_char_ids = {c["id"] for c in payload["characters"]}
+        seen_scene_ids = {s["id"] for s in payload["scenes"]}
+        seen_prop_ids = {p["id"] for p in payload["props"]}
+        for ch in lib.characters:
+            if ch.id not in seen_char_ids:
+                d = ch.model_dump()
+                d["source"] = "global"
+                payload["characters"].append(d)
+        for sc in lib.scenes:
+            if sc.id not in seen_scene_ids:
+                d = sc.model_dump()
+                d["source"] = "global"
+                payload["scenes"].append(d)
+        for pr in lib.props:
+            if pr.id not in seen_prop_ids:
+                d = pr.model_dump()
+                d["source"] = "global"
+                payload["props"].append(d)
     return signed_response(payload)
 
 
@@ -2194,6 +2444,22 @@ def toggle_asset_lock(script_id: str, request: ToggleLockRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/projects/{script_id}/assets/toggle_starred", response_model=Script)
+def toggle_asset_starred(script_id: str, request: ToggleLockRequest):
+    """Toggles the starred (library shortlist) status of an asset."""
+    try:
+        updated_script = pipeline.toggle_asset_starred(
+            script_id,
+            request.asset_id,
+            request.asset_type
+        )
+        return signed_response(updated_script)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 
 @app.post("/projects/{script_id}/assets/update_image", response_model=Script)
 def update_asset_image(script_id: str, request: UpdateAssetImageRequest):
@@ -2352,6 +2618,9 @@ class UpdatePromptConfigRequest(BaseModel):
     storyboard_polish: str = ""
     video_polish: str = ""
     r2v_polish: str = ""
+    entity_extraction: str = ""
+    style_analysis: str = ""
+    storyboard_extraction: str = ""
 
 
 @app.get("/projects/{script_id}/prompt_config")
@@ -2368,6 +2637,7 @@ def get_prompt_config(script_id: str):
                 "storyboard_polish": DEFAULT_STORYBOARD_POLISH_PROMPT,
                 "video_polish": DEFAULT_VIDEO_POLISH_PROMPT,
                 "r2v_polish": DEFAULT_R2V_POLISH_PROMPT,
+                "storyboard_extraction": DEFAULT_STORYBOARD_EXTRACTION_PROMPT,
             }
         }
     except HTTPException:
@@ -2383,10 +2653,16 @@ def update_prompt_config(script_id: str, request: UpdatePromptConfigRequest):
         script = pipeline.get_script(script_id)
         if not script:
             raise HTTPException(status_code=404, detail="Project not found")
+        existing = getattr(script, "prompt_config", None)
+        preserved_polish_model = getattr(existing, "polish_model", "") if existing else ""
         script.prompt_config = PromptConfig(
             storyboard_polish=request.storyboard_polish,
             video_polish=request.video_polish,
             r2v_polish=request.r2v_polish,
+            entity_extraction=request.entity_extraction,
+            style_analysis=request.style_analysis,
+            storyboard_extraction=request.storyboard_extraction,
+            polish_model=preserved_polish_model,
         )
         pipeline._save_data()
         return {"prompt_config": script.prompt_config.model_dump()}
@@ -2394,6 +2670,24 @@ def update_prompt_config(script_id: str, request: UpdatePromptConfigRequest):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/prompt_defaults")
+def get_prompt_defaults():
+    """Return the built-in default system prompts for all configurable prompt keys.
+
+    The frontend uses this to pre-fill the prompt fields and to compute the
+    "delta" on save (a field equal to its default is stored as "" so the
+    built-in default is used instead of pinning a snapshot).
+    """
+    return {
+        "storyboard_polish": DEFAULT_STORYBOARD_POLISH_PROMPT,
+        "video_polish": DEFAULT_VIDEO_POLISH_PROMPT,
+        "r2v_polish": DEFAULT_R2V_POLISH_PROMPT,
+        "entity_extraction": DEFAULT_ENTITY_EXTRACTION_PROMPT,
+        "style_analysis": DEFAULT_STYLE_ANALYSIS_PROMPT,
+        "storyboard_extraction": DEFAULT_STORYBOARD_EXTRACTION_PROMPT,
+    }
 
 
 class BindVoiceRequest(BaseModel):
@@ -3249,10 +3543,11 @@ async def analyze_script_for_styles(script_id: str, request: AnalyzeStyleRequest
             raise HTTPException(status_code=404, detail="Script not found")
 
         # Use LLM to analyze and recommend styles (run in thread pool to avoid blocking, Python 3.8 compatible)
+        custom_style = getattr(getattr(script, "prompt_config", None), "style_analysis", "")
         loop = asyncio.get_event_loop()
         recommendations = await loop.run_in_executor(
             None,  # Use default executor
-            partial(pipeline.script_processor.analyze_script_for_styles, request.script_text)
+            partial(pipeline.script_processor.analyze_script_for_styles, request.script_text, custom_style)
         )
 
         return {"recommendations": recommendations}
@@ -3556,11 +3851,45 @@ def trigger_mulerun_login():
         raise HTTPException(status_code=500, detail=f"启动登录失败: {e}")
 
 
+# Credential-like env fields that must never be returned in plaintext.
+SECRET_FIELDS = {
+    "DASHSCOPE_API_KEY",
+    "ALIBABA_CLOUD_ACCESS_KEY_ID",
+    "ALIBABA_CLOUD_ACCESS_KEY_SECRET",
+    "KLING_ACCESS_KEY",
+    "KLING_SECRET_KEY",
+    "VIDU_API_KEY",
+    "MULEROUTER_API_KEY",
+}
+
+# Bullet sentinel: never appears in a real key, so the save path can detect an
+# unchanged (still-masked) field and avoid overwriting the stored secret.
+_MASK_CHAR = "\u2022"
+
+
+def _mask_secret(value: Optional[str]) -> str:
+    """Return a masked representation (bullets + last 4 chars) for a configured
+    secret, or an empty string when it is unset. Never reveals the full value."""
+    v = (value or "").strip()
+    if not v:
+        return ""
+    if len(v) <= 4:
+        return _MASK_CHAR * len(v)
+    return _MASK_CHAR * 8 + v[-4:]
+
+
 @app.get("/config/env")
 def get_env_config():
-    """Get current environment configuration."""
+    """Get current environment configuration.
+
+    Secrets are masked (bullets + last 4 chars) and never returned in
+    plaintext. `secrets_configured` reports which credential fields are set so
+    the frontend can drive required-field / validation logic without the raw
+    value. Non-secret config (OSS bucket/endpoint/base path, provider modes,
+    endpoint overrides) is returned as-is."""
     try:
         from ...utils.endpoints import PROVIDER_DEFAULTS
+        from ...utils.oss_utils import is_oss_enabled
         endpoint_overrides = {}
         for provider in PROVIDER_DEFAULTS:
             env_key = f"{provider}_BASE_URL"
@@ -3568,22 +3897,31 @@ def get_env_config():
             if value:
                 endpoint_overrides[env_key] = value
 
+        secrets_configured = {
+            field: bool((os.getenv(field, "") or "").strip())
+            for field in SECRET_FIELDS
+        }
+
         return {
-            "DASHSCOPE_API_KEY": os.getenv("DASHSCOPE_API_KEY", ""),
-            "ALIBABA_CLOUD_ACCESS_KEY_ID": os.getenv("ALIBABA_CLOUD_ACCESS_KEY_ID", ""),
-            "ALIBABA_CLOUD_ACCESS_KEY_SECRET": os.getenv("ALIBABA_CLOUD_ACCESS_KEY_SECRET", ""),
+            # Masked secrets — never plaintext.
+            "DASHSCOPE_API_KEY": _mask_secret(os.getenv("DASHSCOPE_API_KEY")),
+            "ALIBABA_CLOUD_ACCESS_KEY_ID": _mask_secret(os.getenv("ALIBABA_CLOUD_ACCESS_KEY_ID")),
+            "ALIBABA_CLOUD_ACCESS_KEY_SECRET": _mask_secret(os.getenv("ALIBABA_CLOUD_ACCESS_KEY_SECRET")),
+            "KLING_ACCESS_KEY": _mask_secret(os.getenv("KLING_ACCESS_KEY")),
+            "KLING_SECRET_KEY": _mask_secret(os.getenv("KLING_SECRET_KEY")),
+            "VIDU_API_KEY": _mask_secret(os.getenv("VIDU_API_KEY")),
+            "MULEROUTER_API_KEY": _mask_secret(os.getenv("MULEROUTER_API_KEY")),
+            # Non-secret config.
             "OSS_BUCKET_NAME": os.getenv("OSS_BUCKET_NAME", ""),
             "OSS_ENDPOINT": os.getenv("OSS_ENDPOINT", ""),
             "OSS_BASE_PATH": os.getenv("OSS_BASE_PATH", ""),
-            "KLING_ACCESS_KEY": os.getenv("KLING_ACCESS_KEY", ""),
-            "KLING_SECRET_KEY": os.getenv("KLING_SECRET_KEY", ""),
-            "VIDU_API_KEY": os.getenv("VIDU_API_KEY", ""),
-            "MULEROUTER_API_KEY": os.getenv("MULEROUTER_API_KEY", ""),
+            "OSS_ENABLE": is_oss_enabled(),
             "MULERUN_CLI_LOGGED_IN": _check_mulerun_cli_status(),
             "KLING_PROVIDER_MODE": _normalize_provider_mode(os.getenv("KLING_PROVIDER_MODE")),
             "VIDU_PROVIDER_MODE": _normalize_provider_mode(os.getenv("VIDU_PROVIDER_MODE")),
             "PIXVERSE_PROVIDER_MODE": _normalize_provider_mode(os.getenv("PIXVERSE_PROVIDER_MODE")),
             "endpoint_overrides": endpoint_overrides,
+            "secrets_configured": secrets_configured,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

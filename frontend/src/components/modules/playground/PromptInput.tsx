@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Copy, Clock } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { usePlaygroundStore } from './usePlaygroundStore';
 import PromptTemplateModal from './PromptTemplateModal';
 import PromptHistoryDrawer from './PromptHistoryDrawer';
@@ -15,6 +16,7 @@ export default function PromptInput() {
   const setNegativePrompt = usePlaygroundStore((s) => s.setNegativePrompt);
   const setShowTemplateModal = usePlaygroundStore((s) => s.setShowTemplateModal);
   const setShowHistoryDrawer = usePlaygroundStore((s) => s.setShowHistoryDrawer);
+  const t = useTranslations('playground');
 
   const [showNegPrompt, setShowNegPrompt] = useState(false);
 
@@ -24,36 +26,36 @@ export default function PromptInput() {
       <textarea
         value={prompt}
         onChange={(e) => setPrompt(e.target.value.slice(0, MAX_LENGTH))}
-        placeholder="描述你想生成的内容..."
-        className="w-full min-h-[120px] max-h-[280px] resize-y p-[14px] border border-white/[0.08] rounded-xl bg-black/30 text-white text-[13px] leading-relaxed placeholder-white/40 focus:border-[#646cff] focus:ring-[3px] focus:ring-[#646cff]/12 outline-none"
+        placeholder={t('prompt.placeholder')}
+        className="w-full min-h-[120px] max-h-[280px] resize-y bg-transparent border-0 rounded-none p-0 text-foreground text-[0.9375rem] leading-[1.65] placeholder-text-muted focus:ring-0"
       />
 
       {/* Toolbar — below the textarea, not overlapping */}
-      <div className="flex items-center gap-[6px] mt-1.5 px-1">
+      <div className="flex items-center gap-[6px] border-t border-border-subtle pt-2.5 mt-3">
         <button
           type="button"
           onClick={() => setShowTemplateModal(true)}
-          className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-white/40 hover:text-white/60 hover:bg-white/[0.06] transition-colors"
+          className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[0.6875rem] font-medium text-text-muted hover:text-foreground hover:bg-hover-bg transition-colors"
         >
           <Copy size={12} />
-          模板
+          {t('prompt.templates')}
         </button>
         <button
           type="button"
           onClick={() => setShowHistoryDrawer(true)}
-          className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-white/40 hover:text-white/60 hover:bg-white/[0.06] transition-colors"
+          className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[0.6875rem] font-medium text-text-muted hover:text-foreground hover:bg-hover-bg transition-colors"
         >
           <Clock size={12} />
-          历史
+          {t('prompt.history')}
         </button>
-        <span className="ml-auto font-mono text-[10px] text-white/30">
+        <span className="ml-auto font-mono text-[0.625rem] text-text-muted">
           {prompt.length} / {MAX_LENGTH}
         </span>
       </div>
 
       {/* Negative prompt toggle */}
       <div
-        className="flex items-center gap-[6px] py-[6px] text-[11px] text-white/40 cursor-pointer hover:text-white/60 mt-2"
+        className="flex items-center gap-[6px] py-[6px] text-[0.6875rem] text-text-muted cursor-pointer hover:text-foreground mt-2"
         onClick={() => setShowNegPrompt((v) => !v)}
       >
         <span
@@ -62,15 +64,15 @@ export default function PromptInput() {
         >
           &#9656;
         </span>
-        <span>负面提示词</span>
+        <span>{t('prompt.negativeLabel')}</span>
       </div>
 
       {showNegPrompt && (
         <textarea
           value={negativePrompt}
           onChange={(e) => setNegativePrompt(e.target.value)}
-          placeholder="不希望出现的内容..."
-          className="w-full min-h-[60px] resize-y p-[10px] border border-white/[0.04] rounded-lg bg-black/30 text-white/60 text-xs placeholder-white/40 focus:border-[#646cff] focus:ring-[3px] focus:ring-[#646cff]/12 outline-none"
+          placeholder={t('prompt.negativePlaceholder')}
+          className="w-full min-h-[60px] resize-y bg-transparent border-0 rounded-none p-0 text-text-secondary text-xs placeholder-text-muted focus:ring-0"
         />
       )}
 

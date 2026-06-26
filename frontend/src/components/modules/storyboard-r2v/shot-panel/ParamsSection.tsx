@@ -17,8 +17,9 @@
  * is delegated via onGenerate(payload) so the host (StoryboardR2V)
  * can manage tasks, queue, and shot-state updates.
  */
-import { useCallback, useMemo } from "react";
-import { Dices, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { Dices, X, ChevronRight } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { I2VModelConfig, DurationConfig, ModelParamSupport } from "@/lib/modelCatalog";
 import { usePanelSectionState } from "./usePanelSectionState";
@@ -87,6 +88,27 @@ export default function ParamsSection({
     const t = useTranslations("storyboardR2V");
     const [open, setOpen] = usePanelSectionState(shotId, "params", true);
     const [advOpen, setAdvOpen] = usePanelSectionState(shotId, "params-advanced", false);
+    const [modelOpen, setModelOpen] = useState(false);
+    const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+    const trigRef = useRef<HTMLButtonElement>(null);
+    // Position the dropdown via a portal (escapes the shot card's stacking
+    // context so it isn't covered by the next shot's frame) + close on
+    // scroll/resize so it never floats away from its trigger.
+    useEffect(() => {
+        if (!modelOpen) { setMenuPos(null); return; }
+        const trig = trigRef.current;
+        if (trig) {
+            const r = trig.getBoundingClientRect();
+            setMenuPos({ top: r.bottom + 4, left: r.left });
+        }
+        const close = () => setModelOpen(false);
+        window.addEventListener("scroll", close, true);
+        window.addEventListener("resize", close);
+        return () => {
+            window.removeEventListener("scroll", close, true);
+            window.removeEventListener("resize", close);
+        };
+    }, [modelOpen]);
 
     const activeModel: I2VModelConfig | undefined = useMemo(
         () => modelList.find((m) => m.id === params.model) ?? modelList[0],
@@ -155,34 +177,58 @@ export default function ParamsSection({
             onToggle={() => setOpen(!open)}
             subtitle={activeModel ? `${activeModel.name}` : undefined}
             trailing={inFlightCount > 0 ? (
-                <span className="rounded-full bg-primary/20 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-primary">
+                <span className="rounded-full border border-status-processing-border bg-status-processing-bg px-1.5 py-0.5 text-[0.5625rem] font-semibold leading-none text-status-processing-fg">
                     {`${inFlightCount} ${t("inFlightShort")}`}
                 </span>
             ) : undefined}
         >
             <div className="space-y-3">
-                {/* Model picker — pills wrap. */}
+                {/* Model picker — dropdown (scales past a pill wall). */}
                 <ParamRow label="Model">
-                    <div className="flex flex-wrap gap-1.5">
-                        {modelList.map((m) => {
-                            const active = params.model === m.id;
-                            return (
-                                <button
-                                    key={m.id}
-                                    type="button"
-                                    onClick={() => handleModelChange(m.id)}
-                                    title={m.description}
-                                    aria-pressed={active}
-                                    className={`min-h-[28px] rounded-full border px-2.5 py-1 font-mono text-chrome-sm font-medium transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 ${
-                                        active
-                                            ? "border-primary/55 bg-primary/15 text-primary"
-                                            : "border-glass-border bg-black/20 text-text-secondary hover:border-white/20 hover:text-foreground"
-                                    }`}
+                    <div className="relative">
+                        <button
+                            ref={trigRef}
+                            type="button"
+                            onClick={() => setModelOpen(v => !v)}
+                            aria-expanded={modelOpen}
+                            title={activeModel?.description}
+                            className="inline-flex min-h-[28px] items-center gap-2 rounded-[14px] border border-glass-border bg-surface-inset px-3 py-1.5 font-mono text-[0.6875rem] font-medium text-foreground transition-colors duration-fast ease-out-quart hover:border-foreground/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                        >
+                            <span className="h-1.5 w-1.5 rounded-full bg-primary shadow-[var(--glow-primary)]" />
+                            <span className="truncate">{activeModel?.name ?? params.model}</span>
+                            <svg className={`h-3.5 w-3.5 shrink-0 text-text-muted transition-transform duration-fast ${modelOpen ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9}>
+                                <path d="m6 9 6 6 6-6" />
+                            </svg>
+                        </button>
+                        {modelOpen && menuPos && createPortal(
+                            <>
+                                <div className="fixed inset-0 z-[60]" onClick={() => setModelOpen(false)} aria-hidden="true" />
+                                <div
+                                    className="fixed z-[70] max-h-60 min-w-[12rem] overflow-y-auto rounded-[14px] border border-border-subtle bg-elevated p-1 shadow-[var(--shadow-lift)]"
+                                    style={{ top: menuPos.top, left: menuPos.left }}
                                 >
-                                    {m.name}
-                                </button>
-                            );
-                        })}
+                                    {modelList.map((m) => {
+                                        const active = params.model === m.id;
+                                        return (
+                                            <button
+                                                key={m.id}
+                                                type="button"
+                                                onClick={() => { handleModelChange(m.id); setModelOpen(false); }}
+                                                title={m.description}
+                                                aria-pressed={active}
+                                                className={`flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left font-mono text-chrome-sm transition-colors duration-fast ease-out-quart hover:bg-hover-bg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 ${
+                                                    active ? "bg-primary/10 text-primary" : "text-text-secondary hover:text-foreground"
+                                                }`}
+                                            >
+                                                <span className={`h-1 w-1 shrink-0 rounded-full ${active ? "bg-primary" : "bg-transparent"}`} />
+                                                <span className="truncate">{m.name}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </>,
+                            document.body
+                        )}
                     </div>
                 </ParamRow>
 
@@ -225,24 +271,30 @@ export default function ParamsSection({
                     </ParamRow>
                 ) : null}
 
-                {/* Advanced fold */}
+                {/* Advanced fold — slight indent (pl-4) to read as a sub-group
+                    of Params, no border/box (keeps it clean). Candidates below
+                    is a sibling section. */}
                 {hasAdvanced ? (
-                    <div className="rounded-md border border-dashed border-glass-border">
+                    <div className="pt-1 pl-4">
                         <button
                             type="button"
                             onClick={() => setAdvOpen(!advOpen)}
                             aria-expanded={advOpen}
-                            className="flex w-full min-h-[32px] items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-text-secondary transition-colors duration-fast ease-out-quart hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                            className="group inline-flex items-center gap-1.5 rounded-md py-1 font-mono text-[0.6875rem] font-medium text-primary transition-colors duration-fast ease-out-quart hover:text-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                         >
-                            <span className="font-mono text-chrome-sm font-medium uppercase">
-                                <span aria-hidden="true">{advOpen ? "▼" : "▶"}</span> Advanced
-                            </span>
-                            <span className="font-mono text-chrome-sm tracking-tight text-text-muted">
-                                {countAdvancedParams(modelParams)} params
+                            <ChevronRight
+                                size={12}
+                                strokeWidth={2}
+                                className={`transition-transform duration-fast ${advOpen ? "rotate-90" : ""}`}
+                                aria-hidden="true"
+                            />
+                            <span>{t("advancedParams")}</span>
+                            <span className="ml-0.5 rounded-md bg-primary/10 px-1.5 py-0.5 text-[0.5625rem] text-primary">
+                                {countAdvancedParams(modelParams)}
                             </span>
                         </button>
                         {advOpen ? (
-                            <div className="space-y-3 border-t border-glass-border px-3 py-3">
+                            <div className="space-y-3 mt-2">
                                 {modelParams.negativePrompt ? (
                                     <ParamRow label="Negative">
                                         <input
@@ -250,7 +302,7 @@ export default function ParamsSection({
                                             value={params.negativePrompt ?? ""}
                                             onChange={(e) => set("negativePrompt", e.target.value)}
                                             placeholder="things to avoid…"
-                                            className="w-full rounded-md border border-glass-border bg-black/30 px-2.5 py-1.5 font-sans text-body-sm text-foreground placeholder:text-text-muted outline-none transition-colors duration-fast ease-out-quart focus:border-primary/55 focus-visible:ring-2 focus-visible:ring-primary/45"
+                                            className="w-full rounded-lg border border-glass-border bg-surface-inset px-2.5 py-1.5 font-sans text-body-sm text-foreground placeholder:text-text-muted outline-none transition-colors duration-fast ease-out-quart focus:border-primary/55 focus-visible:ring-2 focus-visible:ring-primary/45"
                                         />
                                     </ParamRow>
                                 ) : null}
@@ -279,7 +331,7 @@ export default function ParamsSection({
                                                 }}
                                                 placeholder="random"
                                                 aria-label="Random seed (leave blank for provider default)"
-                                                className="w-32 rounded-md border border-glass-border bg-black/30 px-2 py-1.5 font-mono text-body-sm text-foreground placeholder:text-text-muted outline-none transition-colors duration-fast ease-out-quart focus:border-primary/55 focus-visible:ring-2 focus-visible:ring-primary/45"
+                                                className="w-32 rounded-lg border border-glass-border bg-surface-inset px-2 py-1.5 font-mono text-body-sm text-foreground placeholder:text-text-muted outline-none transition-colors duration-fast ease-out-quart focus:border-primary/55 focus-visible:ring-2 focus-visible:ring-primary/45"
                                             />
                                             {/* Dice = randomize. Lucide icon for
                                                 visual cohesion with the rest of
@@ -397,7 +449,7 @@ export default function ParamsSection({
                 {errorMessage ? (
                     <div
                         role="alert"
-                        className="rounded-md border border-status-failed-border bg-status-failed-bg px-3 py-2 font-sans text-body-sm text-status-failed-fg"
+                        className="rounded-lg border border-status-failed-border bg-status-failed-bg px-3 py-2 font-sans text-body-sm text-status-failed-fg"
                     >
                         {errorMessage}
                     </div>
@@ -418,15 +470,10 @@ export default function ParamsSection({
 // ---------- Sub-components ----------
 
 function ParamRow({ label, children }: { label: string; children: React.ReactNode }) {
-    // Below sm the label stacks above the control so cramped widths
-    // (≤480 phones) don't squeeze the input. At ≥sm the original
-    // two-column label / control layout returns.
+    // Mock-aligned: label is a mono uppercase label, control flexes.
     return (
-        <div className="flex flex-col items-start gap-1 sm:flex-row sm:gap-3">
-            {/* Row label — chrome tier, NOT uppercase (Sweep E P2-1:
-                uppercase tracking is reserved for section titles, not
-                every chrome line). */}
-            <span className="font-mono text-chrome-sm font-medium tracking-tight text-text-muted sm:w-24 sm:shrink-0 sm:pt-2">
+        <div className="flex flex-col items-start gap-1.5 sm:flex-row sm:gap-4">
+            <span className="font-mono text-[0.6875rem] font-medium uppercase tracking-[0.1em] text-text-muted w-20 shrink-0 pt-1.5">
                 {label}
             </span>
             <div className="min-w-0 w-full flex-1 sm:w-auto">{children}</div>
@@ -444,7 +491,7 @@ function PillCluster({
     onChange: (v: string) => void;
 }) {
     return (
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap gap-2">
             {options.map((opt) => {
                 const active = String(value) === String(opt);
                 return (
@@ -453,10 +500,10 @@ function PillCluster({
                         type="button"
                         onClick={() => onChange(String(opt))}
                         aria-pressed={active}
-                        className={`min-h-[28px] rounded-md border px-2.5 py-1 font-mono text-chrome-sm font-medium transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 ${
+                        className={`min-h-[28px] rounded-full border px-2.5 py-1 font-mono text-[0.59375rem] font-medium transition-colors duration-fast ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 ${
                             active
-                                ? "border-primary/55 bg-primary/15 text-primary"
-                                : "border-glass-border bg-black/20 text-text-secondary hover:border-white/20 hover:text-foreground"
+                                ? "border-primary/45 bg-primary/14 text-primary"
+                                : "border-glass-border bg-surface-inset text-text-secondary hover:border-foreground/20 hover:text-foreground"
                         }`}
                     >
                         {opt}
@@ -510,7 +557,7 @@ function DurationControl({
                 value={value}
                 onChange={(e) => onChange(parseInt(e.target.value, 10))}
                 aria-label="Duration in seconds (drag to adjust)"
-                className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-white/10 accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-elevated accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
             />
             <div className="flex shrink-0 items-center gap-0.5">
                 <input
@@ -535,7 +582,7 @@ function DurationControl({
                         if (clamped !== value) onChange(clamped);
                     }}
                     aria-label={`Duration in seconds (type a value between ${cfg.min} and ${cfg.max})`}
-                    className="w-12 rounded border border-glass-border bg-black/30 px-1.5 py-0.5 text-right font-mono text-body-sm tabular-nums text-foreground outline-none transition-colors duration-fast ease-out-quart focus:border-primary/55 focus-visible:ring-1 focus-visible:ring-primary/45 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    className="w-12 rounded border border-glass-border bg-surface-inset px-1.5 py-0.5 text-right font-mono text-body-sm tabular-nums text-foreground outline-none transition-colors duration-fast ease-out-quart focus:border-primary/55 focus-visible:ring-1 focus-visible:ring-primary/45 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 />
                 <span className="font-mono text-body-sm text-text-muted">s</span>
             </div>
@@ -565,7 +612,7 @@ function SliderControl({
                 step={step}
                 value={value}
                 onChange={(e) => onChange(parseFloat(e.target.value))}
-                className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-white/10 accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
+                className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-elevated accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
             />
             <span className="w-10 shrink-0 text-right font-mono text-body-sm tabular-nums text-foreground">
                 {value}
@@ -592,7 +639,7 @@ function ToggleControl({
             <span
                 aria-hidden="true"
                 className={`relative h-5 w-9 rounded-full transition-colors duration-fast ease-out-quart ${
-                    value ? "bg-primary" : "bg-white/10"
+                    value ? "bg-primary" : "bg-elevated"
                 }`}
             >
                 <span

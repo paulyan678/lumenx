@@ -86,8 +86,8 @@ export function PendingTaskAffordance({
         }
     };
 
-    const elapsedClass = compact ? "text-[10px]" : "text-[11px]";
-    const statusClass = compact ? "text-[10px]" : "text-[11px]";
+    const elapsedClass = compact ? "text-[0.625rem]" : "text-[0.6875rem]";
+    const statusClass = compact ? "text-[0.625rem]" : "text-[0.6875rem]";
 
     return (
         <div className="flex flex-col items-center justify-center gap-1.5">
@@ -111,7 +111,7 @@ export function PendingTaskAffordance({
                                 void handleCancel();
                             }}
                             disabled={canceling}
-                            className="rounded-md border border-red-300/30 bg-red-400/10 px-2 py-[3px] font-mono text-[9.5px] font-medium uppercase tracking-[0.2em] text-red-200/95 transition-colors hover:bg-red-400/20 disabled:cursor-wait disabled:opacity-60"
+                            className="rounded-md border border-red-300/30 bg-red-400/10 px-2 py-[3px] font-mono text-[0.59375rem] font-medium uppercase tracking-[0.2em] text-red-200/95 transition-colors hover:bg-red-400/20 disabled:cursor-wait disabled:opacity-60"
                         >
                             {canceling ? "Canceling…" : "Cancel"}
                         </button>
@@ -122,14 +122,14 @@ export function PendingTaskAffordance({
                             e.stopPropagation();
                             setDiagnoseOpen(true);
                         }}
-                        className="rounded-md border border-white/15 bg-black/30 px-2 py-[3px] font-mono text-[9.5px] font-medium uppercase tracking-[0.2em] text-text-secondary/95 transition-colors hover:border-primary/45 hover:text-foreground"
+                        className="rounded-md border border-foreground/15 bg-black/30 px-2 py-[3px] font-mono text-[0.59375rem] font-medium uppercase tracking-[0.2em] text-text-secondary/95 transition-colors hover:border-primary/45 hover:text-foreground"
                     >
                         Diagnose
                     </button>
                 </div>
             ) : null}
             {cancelError ? (
-                <span className="font-mono text-[9px] text-red-300/85">
+                <span className="font-mono text-[0.5625rem] text-red-300/85">
                     {cancelError}
                 </span>
             ) : null}
@@ -220,13 +220,13 @@ export function DiagnoseModal({ taskId, elapsedLabel, onClose }: DiagnoseModalPr
             <div
                 role="dialog"
                 aria-label="Diagnose stuck task"
-                className="fixed left-1/2 top-1/2 z-[61] flex w-[min(720px,94vw)] max-h-[85vh] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[12px] border border-white/8 bg-[#141416] shadow-[0_24px_48px_-22px_rgba(0,0,0,0.85),inset_0_1px_0_0_rgba(255,255,255,0.06)]"
+                className="fixed left-1/2 top-1/2 z-[61] flex w-[min(720px,94vw)] max-h-[85vh] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[12px] border border-glass-border bg-elevated shadow-[0_24px_48px_-22px_rgba(0,0,0,0.85),inset_0_1px_0_0_rgba(255,255,255,0.06)]"
             >
                 <div aria-hidden="true" className="h-[2px] shrink-0 bg-gradient-to-r from-amber-300/85 via-amber-300/35 to-transparent" />
-                <header className="flex shrink-0 items-center justify-between gap-3 border-b border-white/6 px-4 py-3">
+                <header className="flex shrink-0 items-center justify-between gap-3 border-b border-glass-border px-4 py-3">
                     <div className="flex items-center gap-2">
                         <AlertTriangle size={14} className="text-amber-300" aria-hidden="true" />
-                        <div className="font-display text-[14px] font-medium tracking-[-0.005em] text-foreground">
+                        <div className="font-display text-[0.875rem] font-medium tracking-[-0.005em] text-foreground">
                             Diagnose stuck task
                         </div>
                     </div>
@@ -234,12 +234,12 @@ export function DiagnoseModal({ taskId, elapsedLabel, onClose }: DiagnoseModalPr
                         type="button"
                         onClick={onClose}
                         aria-label="Close"
-                        className="grid h-7 w-7 place-items-center rounded text-text-muted hover:bg-white/[0.06] hover:text-foreground"
+                        className="grid h-7 w-7 place-items-center rounded text-text-muted hover:bg-hover-bg hover:text-foreground"
                     >
                         <X size={14} aria-hidden="true" />
                     </button>
                 </header>
-                <div className="space-y-3 overflow-y-auto px-4 py-4 text-[12.5px] leading-[1.55] text-text-secondary/95">
+                <div className="space-y-3 overflow-y-auto px-4 py-4 text-[0.78125rem] leading-[1.55] text-text-secondary/95">
                     <Row label="Elapsed">
                         <span className="font-mono">{elapsedLabel}</span>
                     </Row>
@@ -248,7 +248,7 @@ export function DiagnoseModal({ taskId, elapsedLabel, onClose }: DiagnoseModalPr
                             <button
                                 type="button"
                                 onClick={() => copy(taskId, "task")}
-                                className="inline-flex items-center gap-1.5 rounded border border-white/8 bg-black/35 px-2 py-[3px] font-mono text-[10.5px] tracking-tight text-foreground/95 transition-colors hover:border-primary/45"
+                                className="inline-flex items-center gap-1.5 rounded border border-glass-border bg-black/35 px-2 py-[3px] font-mono text-[0.65625rem] tracking-tight text-foreground transition-colors hover:border-primary/45"
                             >
                                 <span className="truncate">{taskId}</span>
                                 {copied === "task" ? <Check size={11} /> : <Copy size={11} />}
@@ -269,7 +269,7 @@ export function DiagnoseModal({ taskId, elapsedLabel, onClose }: DiagnoseModalPr
                             <button
                                 type="button"
                                 onClick={() => copy(health.data.log_file, "log_path")}
-                                className="inline-flex items-center gap-1.5 rounded border border-white/8 bg-black/35 px-2 py-[3px] font-mono text-[10.5px] tracking-tight text-foreground/95 transition-colors hover:border-primary/45"
+                                className="inline-flex items-center gap-1.5 rounded border border-glass-border bg-black/35 px-2 py-[3px] font-mono text-[0.65625rem] tracking-tight text-foreground transition-colors hover:border-primary/45"
                                 title="Copy log path"
                             >
                                 <FileText size={11} aria-hidden="true" />
@@ -286,8 +286,8 @@ export function DiagnoseModal({ taskId, elapsedLabel, onClose }: DiagnoseModalPr
                         on top (just the ERROR rows from the tail —
                         usually the root cause) and the full chronological
                         tail below for context. */}
-                    <div className="rounded-md border border-white/8 bg-black/30">
-                        <div className="flex items-center justify-between gap-2 border-b border-white/6 px-3 py-1.5 font-mono text-[9px] font-medium uppercase tracking-[0.24em] text-text-muted/85">
+                    <div className="rounded-md border border-glass-border bg-black/30">
+                        <div className="flex items-center justify-between gap-2 border-b border-glass-border px-3 py-1.5 font-mono text-[0.5625rem] font-medium uppercase tracking-[0.24em] text-text-muted/85">
                             <span className="inline-flex items-center gap-1.5">
                                 <Terminal size={11} aria-hidden="true" />
                                 Backend log
@@ -298,7 +298,7 @@ export function DiagnoseModal({ taskId, elapsedLabel, onClose }: DiagnoseModalPr
                                     onClick={loadLog}
                                     aria-label="Reload log"
                                     title="Reload"
-                                    className="grid h-6 w-6 place-items-center rounded text-text-muted hover:bg-white/[0.06] hover:text-foreground"
+                                    className="grid h-6 w-6 place-items-center rounded text-text-muted hover:bg-hover-bg hover:text-foreground"
                                 >
                                     <RefreshCw size={11} aria-hidden="true" />
                                 </button>
@@ -308,7 +308,7 @@ export function DiagnoseModal({ taskId, elapsedLabel, onClose }: DiagnoseModalPr
                                         onClick={() => copy(log.data.lines.join("\n"), "log_text")}
                                         aria-label="Copy full log text"
                                         title="Copy full tail"
-                                        className="grid h-6 w-6 place-items-center rounded text-text-muted hover:bg-white/[0.06] hover:text-foreground"
+                                        className="grid h-6 w-6 place-items-center rounded text-text-muted hover:bg-hover-bg hover:text-foreground"
                                     >
                                         {copied === "log_text" ? <Check size={11} /> : <Copy size={11} />}
                                     </button>
@@ -321,11 +321,11 @@ export function DiagnoseModal({ taskId, elapsedLabel, onClose }: DiagnoseModalPr
                             with the full tail right below. */}
                         {log.kind === "ok" && log.data.errors.length > 0 ? (
                             <>
-                                <div className="flex items-center justify-between gap-2 border-b border-red-400/15 bg-red-500/[0.08] px-3 py-1 font-mono text-[9px] font-medium uppercase tracking-[0.22em] text-red-200/95">
+                                <div className="flex items-center justify-between gap-2 border-b border-red-400/15 bg-red-500/[0.08] px-3 py-1 font-mono text-[0.5625rem] font-medium uppercase tracking-[0.22em] text-red-200/95">
                                     <span>① Errors only · {log.data.errors.length} rows</span>
                                     <span className="text-red-200/70 normal-case tracking-tight">root cause is usually here</span>
                                 </div>
-                                <div className="max-h-[120px] overflow-y-auto border-b border-white/8 bg-red-500/[0.05] px-3 py-1.5 font-mono text-[10px] leading-[1.6] text-red-200/95">
+                                <div className="max-h-[120px] overflow-y-auto border-b border-glass-border bg-red-500/[0.05] px-3 py-1.5 font-mono text-[0.625rem] leading-[1.6] text-red-200/95">
                                     {log.data.errors.map((line, i) => (
                                         <div key={i} className="whitespace-pre-wrap break-words">{line}</div>
                                     ))}
@@ -335,10 +335,10 @@ export function DiagnoseModal({ taskId, elapsedLabel, onClose }: DiagnoseModalPr
                         {/* Full chronological tail — gives context
                             around the errors above (what was running,
                             what the request looked like, etc.). */}
-                        <div className="border-b border-white/6 bg-black/20 px-3 py-1 font-mono text-[9px] font-medium uppercase tracking-[0.22em] text-text-muted/85">
+                        <div className="border-b border-glass-border bg-black/20 px-3 py-1 font-mono text-[0.5625rem] font-medium uppercase tracking-[0.22em] text-text-muted/85">
                             ② Full tail · last {log.kind === "ok" ? log.data.returned_lines ?? log.data.lines.length : "200"} lines
                         </div>
-                        <div className="max-h-[280px] overflow-y-auto px-3 py-2 font-mono text-[10px] leading-[1.55] text-text-secondary/95">
+                        <div className="max-h-[280px] overflow-y-auto px-3 py-2 font-mono text-[0.625rem] leading-[1.55] text-text-secondary/95">
                             {log.kind === "loading" ? (
                                 <div className="text-text-muted/85">loading…</div>
                             ) : log.kind === "error" ? (
@@ -357,13 +357,13 @@ export function DiagnoseModal({ taskId, elapsedLabel, onClose }: DiagnoseModalPr
                         </div>
                     </div>
 
-                    <div className="rounded-md border border-dashed border-white/10 bg-black/20 px-3 py-2.5 text-[11.5px] leading-[1.55] text-text-secondary/85">
-                        <div className="mb-1 font-mono text-[9px] font-medium uppercase tracking-[0.28em] text-text-muted/85">
+                    <div className="rounded-md border border-dashed border-glass-border bg-black/20 px-3 py-2.5 text-[0.71875rem] leading-[1.55] text-text-secondary/85">
+                        <div className="mb-1 font-mono text-[0.5625rem] font-medium uppercase tracking-[0.28em] text-text-muted/85">
                             Quick checks
                         </div>
                         <ol className="list-decimal space-y-1 pl-4">
                             <li>Press F5 to refresh — polling may have stalled.</li>
-                            <li>If backend is unreachable, the desktop app or <code className="rounded bg-white/[0.06] px-1 font-mono text-[10.5px]">./start_backend.sh</code> may have stopped. Restart it.</li>
+                            <li>If backend is unreachable, the desktop app or <code className="rounded bg-elevated px-1 font-mono text-[0.65625rem]">./start_backend.sh</code> may have stopped. Restart it.</li>
                             <li>Look at the red rows above for the immediate cause (provider auth, network, model misuse).</li>
                             <li>Backend restart wipes in-memory tasks; a stuck task is automatically marked failed at startup, so retry usually works.</li>
                         </ol>
@@ -383,7 +383,7 @@ export function DiagnoseModal({ taskId, elapsedLabel, onClose }: DiagnoseModalPr
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
     return (
         <div className="flex items-center justify-between gap-3">
-            <span className="font-mono text-[9.5px] font-medium uppercase tracking-[0.24em] text-text-muted/85">
+            <span className="font-mono text-[0.59375rem] font-medium uppercase tracking-[0.24em] text-text-muted/85">
                 {label}
             </span>
             <div className="min-w-0 flex-1 text-right">{children}</div>

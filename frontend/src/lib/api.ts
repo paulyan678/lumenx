@@ -1,27 +1,36 @@
 import axios from "axios";
 import { DEFAULT_I2V_MODEL_ID } from "@/lib/modelCatalog";
 
-// Dynamic API URL detection:
-// 1. In packaged app (Electron): Frontend is served by backend, use same origin
-// 2. In development (port 3008/3009, legacy 3000/3001): Use backend port 17177
+// Dynamic API URL detection (no port enumeration):
+// 1. Explicit override: NEXT_PUBLIC_API_URL (any env / proxy setup).
+// 2. Dev mode (`next dev`, NODE_ENV==='development'): backend runs on a separate
+//    port, so target the same host on the backend port — works for ANY dev port.
+// 3. Production / packaged (Electron): frontend is served by the backend, so use
+//    the same origin.
+const BACKEND_PORT = process.env.NEXT_PUBLIC_BACKEND_PORT || "17177";
+
 const getApiUrl = (): string => {
-    // If running in browser
+    // Explicit override always wins (strip any trailing slash).
+    const override = process.env.NEXT_PUBLIC_API_URL;
+    if (override && override.trim()) {
+        return override.trim().replace(/\/+$/, "");
+    }
+
     if (typeof window !== 'undefined') {
         const { protocol, hostname, port } = window.location;
 
-        // In development mode (port 3008/3009, legacy 3000/3001 = Next.js dev server)
-        // Backend is on a different port
-        if (port === '3008' || port === '3009' || port === '3000' || port === '3001') {
-            return `${protocol}//${hostname}:17177`;
+        // Dev server: backend lives on a different port regardless of which
+        // dev port Next.js picked (3008/3009/3018/...).
+        if (process.env.NODE_ENV === 'development') {
+            return `${protocol}//${hostname}:${BACKEND_PORT}`;
         }
 
-        // In production/packaged mode: Frontend is served by backend
-        // Use same origin
+        // Production / packaged: frontend is served by the backend → same origin.
         return `${protocol}//${hostname}${port ? ':' + port : ''}`;
     }
 
     // SSR fallback
-    return 'http://localhost:17177';
+    return `http://localhost:${BACKEND_PORT}`;
 };
 
 export const API_URL = getApiUrl();
@@ -72,6 +81,7 @@ export interface EnvConfigPayload {
     OSS_BUCKET_NAME?: string;
     OSS_ENDPOINT?: string;
     OSS_BASE_PATH?: string;
+    OSS_ENABLE?: boolean;
     KLING_PROVIDER_MODE?: ProviderMode;
     VIDU_PROVIDER_MODE?: ProviderMode;
     PIXVERSE_PROVIDER_MODE?: ProviderMode;
@@ -79,7 +89,10 @@ export interface EnvConfigPayload {
     KLING_SECRET_KEY?: string;
     VIDU_API_KEY?: string;
     endpoint_overrides?: Record<string, string>;
-    [key: string]: string | Record<string, string> | undefined;
+    // Secrets from GET are masked (bullets + last 4 chars). This map reports
+    // which credential fields are actually configured on the backend.
+    secrets_configured?: Record<string, boolean>;
+    [key: string]: string | Record<string, string> | Record<string, boolean> | boolean | undefined;
 }
 
 // R2V v2 Phase 4 — Cross-episode reconcile types
@@ -198,8 +211,8 @@ export interface RefineSSEEvent {
 }
 
 export const api = {
-    createProject: async (title: string, text: string, skipAnalysis: boolean = false, workflowMode: string = "r2v") => {
-        const res = await axios.post(`${API_URL}/projects`, { title, text, workflow_mode: workflowMode }, {
+    createProject: async (title: string, text: string, skipAnalysis: boolean = false, workflowMode: string = "r2v", seriesId?: string) => {
+        const res = await axios.post(`${API_URL}/projects`, { title, text, workflow_mode: workflowMode, series_id: seriesId }, {
             params: { skip_analysis: skipAnalysis }
         });
         return { ...res.data, originalText: res.data.original_text };
@@ -217,6 +230,13 @@ export const api = {
 
     deleteProject: async (scriptId: string) => {
         const res = await axios.delete(`${API_URL}/projects/${scriptId}`);
+        return res.data;
+    },
+
+    /** Toggle the user-starred (featured) flag on a project. Returns the
+     *  updated Script. No request body — the backend flips the current flag. */
+    toggleProjectStarred: async (scriptId: string) => {
+        const res = await axios.post(`${API_URL}/projects/${scriptId}/toggle_starred`);
         return res.data;
     },
 
@@ -387,6 +407,20 @@ export const api = {
         return res.data;
     },
 
+    /** System dependency report (ffmpeg detection + version) used by
+     *  Settings → About. ffmpeg -version can be slightly slow, so a
+     *  more generous timeout than healthCheck. */
+    checkSystem: async (): Promise<{
+        system_info?: Record<string, unknown>;
+        dependencies?: {
+            ffmpeg?: { available: boolean; message: string; path: string | null };
+        };
+        status?: string;
+    }> => {
+        const res = await axios.get(`${API_URL}/system/check`, { timeout: 10000 });
+        return res.data;
+    },
+
     /** Return last N lines of the backend log + any ERROR-flavored
      *  lines, for the Diagnose UI on stuck tasks. Backend caps at
      *  1000 lines so a runaway client can't drag the server. */
@@ -533,6 +567,22 @@ export const api = {
         return res.data;
     },
 
+    toggleAssetStarred: async (scriptId: string, assetId: string, assetType: string) => {
+        const res = await axios.post(`${API_URL}/projects/${scriptId}/assets/toggle_starred`, {
+            asset_id: assetId,
+            asset_type: assetType
+        });
+        return res.data;
+    },
+
+    toggleSeriesAssetStarred: async (seriesId: string, assetId: string, assetType: string) => {
+        const res = await axios.post(`${API_URL}/series/${seriesId}/assets/toggle_starred`, {
+            asset_id: assetId,
+            asset_type: assetType
+        });
+        return res.data;
+    },
+
     updateAssetImage: async (scriptId: string, assetId: string, assetType: string, imageUrl: string) => {
         const res = await axios.post(`${API_URL}/projects/${scriptId}/assets/update_image`, {
             asset_id: assetId,
@@ -603,8 +653,18 @@ export const api = {
         return res.data;
     },
 
-    updatePromptConfig: async (scriptId: string, config: { storyboard_polish?: string; video_polish?: string; r2v_polish?: string }) => {
+    updatePromptConfig: async (scriptId: string, config: { storyboard_polish?: string; video_polish?: string; r2v_polish?: string; entity_extraction?: string; style_analysis?: string; storyboard_extraction?: string }) => {
         const res = await axios.put(`${API_URL}/projects/${scriptId}/prompt_config`, config);
+        return res.data;
+    },
+
+    /** Phase-2 默认 Prompt — built-in DEFAULT text for all six prompt keys
+     *  (storyboard_polish / video_polish / r2v_polish / entity_extraction /
+     *  style_analysis / storyboard_extraction). Settings pre-fills fields from
+     *  this; on save it stores "" for any field still equal to its default
+     *  (delta semantics → backend uses the built-in). */
+    fetchPromptDefaults: async (): Promise<Record<string, string>> => {
+        const res = await axios.get<Record<string, string>>(`${API_URL}/prompt_defaults`);
         return res.data;
     },
 
@@ -1177,6 +1237,65 @@ export const api = {
         const response = await axios.get(`${API_URL}/series`);
         return response.data;
     },
+    /** Core 全局/共享资产池（跨系列/项目聚合）。后端：GET /library/assets → {characters, scenes, props}。 */
+    listLibraryAssets: async () => {
+        const res = await axios.get(`${API_URL}/library/assets`);
+        return res.data;
+    },
+    /** 新建一条全局/共享资产。后端：POST /library/assets。
+     *  assetType 为单数（"character"|"scene"|"prop"）。data 可含 name/description/persona/image_url/voice_id。 */
+    createLibraryAsset: async (
+        assetType: string,
+        data: { name: string; description?: string; persona?: string; image_url?: string; voice_id?: string },
+    ) => {
+        const res = await axios.post(`${API_URL}/library/assets`, { asset_type: assetType, ...data });
+        return res.data;
+    },
+    /** 上传一张本地图片到全局资产库，返回可被前端加载的 image_url。
+     *  后端契约：POST /library/assets/upload，multipart 字段名 "file" → { image_url }。
+     *  调用方拿到 image_url 后传给 createLibraryAsset。 */
+    uploadLibraryImage: async (file: File): Promise<{ image_url: string }> => {
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await axios.post<{ image_url: string }>(`${API_URL}/library/assets/upload`, formData, {
+            headers: { "Content-Type": "multipart/form-data" },
+        });
+        return res.data;
+    },
+    /** 补丁更新全局资产（仅发送的字段生效，PATCH 语义）。后端：PUT /library/assets/{type}/{id}。assetType 单数。 */
+    updateLibraryAsset: async (
+        assetType: string,
+        assetId: string,
+        patch: {
+            name?: string;
+            description?: string;
+            persona?: string;
+            image_url?: string;
+            voice_id?: string;
+            starred?: boolean;
+            locked?: boolean;
+            visual_weight?: number;
+        },
+    ) => {
+        const res = await axios.put(`${API_URL}/library/assets/${assetType}/${assetId}`, patch);
+        return res.data;
+    },
+    /** 把项目/系列来源资产 deep-copy 提升进全局共享池。后端：POST /library/assets/promote。
+     *  sourceKind: "project"|"series"；assetType 单数。 */
+    promoteAssetToLibrary: async (
+        sourceKind: "project" | "series",
+        sourceId: string,
+        assetType: string,
+        assetId: string,
+    ) => {
+        const res = await axios.post(`${API_URL}/library/assets/promote`, {
+            source_kind: sourceKind,
+            source_id: sourceId,
+            asset_type: assetType,
+            asset_id: assetId,
+        });
+        return res.data;
+    },
     getSeries: async (seriesId: string) => {
         const response = await axios.get(`${API_URL}/series/${seriesId}`);
         return response.data;
@@ -1336,7 +1455,7 @@ export const api = {
         const response = await axios.get(`${API_URL}/series/${seriesId}/prompt_config`);
         return response.data;
     },
-    updateSeriesPromptConfig: async (seriesId: string, config: { storyboard_polish?: string; video_polish?: string; r2v_polish?: string }) => {
+    updateSeriesPromptConfig: async (seriesId: string, config: { storyboard_polish?: string; video_polish?: string; r2v_polish?: string; storyboard_extraction?: string }) => {
         const response = await axios.put(`${API_URL}/series/${seriesId}/prompt_config`, config);
         return response.data;
     },

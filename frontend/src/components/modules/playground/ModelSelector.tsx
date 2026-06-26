@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo } from 'react';
+import { ChevronDown } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { usePlaygroundStore } from './usePlaygroundStore';
 import { getModelsForMode, getModelDisplayInfo, type PlaygroundModelOption } from './playgroundModels';
 
@@ -8,6 +10,7 @@ export default function ModelSelector() {
   const mode = usePlaygroundStore((s) => s.mode);
   const modelId = usePlaygroundStore((s) => s.modelId);
   const setModelId = usePlaygroundStore((s) => s.setModelId);
+  const t = useTranslations('playground');
 
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -62,29 +65,35 @@ export default function ModelSelector() {
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className="flex items-center gap-[10px] px-[14px] py-[10px] border border-white/[0.08] rounded-lg bg-black/30 cursor-pointer w-full text-left transition-colors hover:border-white/[0.15]"
+        className={`flex items-center gap-[10px] w-full text-left cursor-pointer glass-input hover:border-foreground/30 bg-surface-inset rounded-[14px] ${
+          open ? 'shadow-[var(--glow-primary)]' : ''
+        }`}
       >
-        <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
-        <span className="flex-1 text-[13px] font-medium text-white truncate">
-          {selected?.displayName ?? 'Select model'}
+        <span className="w-2 h-2 rounded-full bg-primary shrink-0" />
+        <span className="flex-1 text-[0.8125rem] font-medium text-foreground truncate">
+          {selected?.displayName ?? t('model.selectPlaceholder')}
         </span>
-        <span className="font-mono text-[10px] text-white/40 uppercase tracking-wider shrink-0">
+        <span className="font-mono text-[0.625rem] text-text-muted uppercase tracking-wider shrink-0">
           {selected?.family ?? ''}
         </span>
-        <span className="text-white/40 text-xs shrink-0">&#9662;</span>
+        <ChevronDown
+          className={`w-3 h-3 text-text-muted shrink-0 transition-transform ${
+            open ? 'rotate-180' : ''
+          }`}
+        />
       </button>
 
       {open && (
-        <div className="absolute top-full mt-1 w-full bg-[#141416] border border-white/[0.08] rounded-lg shadow-xl z-20 max-h-60 overflow-y-auto">
+        <div className="absolute top-full mt-1 w-full bg-elevated atelier-card border border-glass-border rounded-lg shadow-xl z-20 max-h-60 overflow-y-auto">
           {availableModels.length === 0 && (
-            <div className="px-3 py-2 text-[12px] text-white/40">当前模式无可用模型</div>
+            <div className="px-3 py-2 text-[0.75rem] text-text-muted">{t('model.noModels')}</div>
           )}
           {groupedModels.map((group, gi) => (
             <div key={group.family}>
-              {gi > 0 && <div className="border-t border-white/[0.04] mx-2" />}
+              {gi > 0 && <div className="border-t border-border-subtle mx-2" />}
               {groupedModels.length > 1 && (
                 <div className="px-3 pt-2 pb-1">
-                  <span className="font-mono text-[9px] text-white/30 uppercase tracking-[0.15em]">
+                  <span className="font-mono text-[0.5625rem] text-text-muted uppercase tracking-[0.15em]">
                     {group.family}
                   </span>
                 </div>
@@ -94,20 +103,20 @@ export default function ModelSelector() {
                   key={m.id}
                   type="button"
                   onClick={() => handleSelect(m.id)}
-                  className={`flex items-center gap-[10px] w-full px-3 py-2 text-left transition-colors hover:bg-white/[0.06] ${
-                    m.id === modelId ? 'bg-white/[0.08] text-white' : 'text-white/80'
+                  className={`flex items-center gap-[10px] w-full px-3 py-2 text-left transition-colors hover:bg-hover-bg ${
+                    m.id === modelId ? 'bg-elevated text-foreground' : 'text-foreground/80'
                   }`}
                 >
-                  <span className="flex-1 text-[13px] font-medium truncate">
+                  <span className="flex-1 text-[0.8125rem] font-medium truncate">
                     {m.displayName}
                   </span>
                   {m.recommended && (
-                    <span className="text-[8px] font-mono text-[#646cff] bg-[#646cff]/10 px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0">
-                      推荐
+                    <span className="text-[0.5rem] font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0">
+                      {t('model.recommended')}
                     </span>
                   )}
                   {m.id === modelId && (
-                    <span className="text-[#646cff] shrink-0">✓</span>
+                    <span className="text-primary shrink-0">✓</span>
                   )}
                 </button>
               ))}

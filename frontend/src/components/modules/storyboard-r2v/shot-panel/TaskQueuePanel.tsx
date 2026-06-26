@@ -14,6 +14,7 @@
  * "jump to shot" does.
  */
 import { useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { X, ArrowRight, Loader2, Copy, Check, RefreshCw, ChevronDown, ChevronRight, ListChecks } from "lucide-react";
 import type { VideoTask } from "@/lib/api";
 import PreviewImage from "@/components/shared/preview/PreviewImage";
@@ -43,6 +44,7 @@ export default function TaskQueuePanel({
     onCancel,
     onRetry,
 }: TaskQueuePanelProps) {
+    const t = useTranslations("storyboardR2V");
     const [tab, setTab] = useState<TabKey>("active");
 
     const buckets = useMemo(() => {
@@ -81,14 +83,13 @@ export default function TaskQueuePanel({
                 aria-label="Task queue"
                 className={[
                     // Always: flex layout, glass surface, slide-in entry.
-                    "flex h-full shrink-0 flex-col border-l border-glass-border bg-surface",
+                    "flex h-full shrink-0 flex-col border-l border-glass-border bg-surface/55 backdrop-blur-xl",
                     "motion-safe:animate-[queuePanelIn_280ms_cubic-bezier(0.22,1,0.36,1)_both]",
-                    // ≥xl (1280): push column — old behavior. Static
-                    // flex sibling, 360px wide, compresses main area.
-                    "xl:static xl:w-[360px] xl:shadow-none xl:z-auto",
+                    // ≥xl (1280): push column — mock queue width 344px.
+                    "xl:static xl:w-[344px] xl:shadow-none xl:z-auto",
                     // md–lg (768–1279): overlay panel. Floats over main
                     // content rather than pushing it, since narrow
-                    // viewports can't spare 360px of horizontal real
+                    // viewports can't spare 344px of horizontal real
                     // estate without the shot list becoming unusable.
                     "absolute inset-y-0 right-0 z-30 w-[340px] max-w-[min(340px,calc(100vw-48px))]",
                     "shadow-[-12px_0_32px_-12px_rgba(0,0,0,0.55)]",
@@ -100,8 +101,8 @@ export default function TaskQueuePanel({
             >
             <SidePanelHeader
                 icon={<ListChecks />}
-                title="Task queue"
-                subtitle={`${tasks.length} total`}
+                title={t("queueTitle")}
+                subtitle={t("queueTotal", { count: tasks.length })}
                 trailing={(
                     <button
                         type="button"
@@ -117,11 +118,11 @@ export default function TaskQueuePanel({
             <div role="tablist" className="flex shrink-0 border-b border-glass-border px-3 py-1.5">
                 {(
                     [
-                        ["active", "Active", buckets.active.length, "text-status-processing-fg"],
-                        ["done", "Done", buckets.done.length, "text-status-completed-fg"],
-                        ["failed", "Failed", buckets.failed.length, "text-status-failed-fg"],
+                        ["active", "queueActive", buckets.active.length, "text-status-processing-fg"],
+                        ["done", "queueDone", buckets.done.length, "text-status-completed-fg"],
+                        ["failed", "queueFailed", buckets.failed.length, "text-status-failed-fg"],
                     ] as Array<[TabKey, string, number, string]>
-                ).map(([key, label, count, colorClass]) => (
+                ).map(([key, labelKey, count, colorClass]) => (
                     <button
                         key={key}
                         type="button"
@@ -134,7 +135,7 @@ export default function TaskQueuePanel({
                                 : "text-text-muted hover:text-foreground"
                         }`}
                     >
-                        {label}
+                        {t(labelKey)}
                         {count > 0 ? (
                             <span className={`ml-1.5 ${colorClass}`}>{count}</span>
                         ) : null}
@@ -146,10 +147,10 @@ export default function TaskQueuePanel({
                 {visibleTasks.length === 0 ? (
                     <div className="grid h-full place-items-center px-3 text-center font-mono text-chrome-sm font-medium uppercase text-text-muted">
                         {tab === "active"
-                            ? "No tasks running."
+                            ? t("queueEmptyActive")
                             : tab === "done"
-                                ? "No completed tasks yet."
-                                : "No failed tasks."}
+                                ? t("queueEmptyDone")
+                                : t("queueEmptyFailed")}
                     </div>
                 ) : (
                     <ul className="space-y-1">
@@ -199,6 +200,7 @@ function TaskRow({
     onCancel?: (task: VideoTask) => Promise<void> | void;
     onRetry?: (task: VideoTask) => Promise<void> | void;
 }) {
+    const t = useTranslations("storyboardR2V");
     const [copiedField, setCopiedField] = useState<"providerId" | "providerRequest" | "diagnose" | null>(null);
     const [retrying, setRetrying] = useState(false);
     const isFailed = task.status === "failed";
@@ -234,8 +236,8 @@ function TaskRow({
     // Provider ID display: when provider_name=dashscope, label as "百炼"
     // (user-friendly Chinese name) since that's the console they'll paste into.
     const providerLabel =
-        task.provider_name === "dashscope" ? "百炼"
-            : task.provider_name === "kling" ? "可灵"
+        task.provider_name === "dashscope" ? t("providerDashscope")
+            : task.provider_name === "kling" ? t("providerKling")
                 : task.provider_name === "vidu" ? "Vidu"
                     : task.provider_name === "pixverse" ? "PixVerse"
                         : task.provider_name || "provider";
@@ -280,7 +282,7 @@ function TaskRow({
 
     return (
         <div
-            className="group/row space-y-1.5 rounded-md border border-glass-border bg-glass px-2.5 py-2 transition-colors duration-fast ease-out-quart hover:border-white/15"
+            className="group/row space-y-1.5 rounded-md border border-glass-border bg-glass px-2.5 py-2 transition-colors duration-fast ease-out-quart hover:border-foreground/30"
             title={`Task id: ${task.id}`}
         >
             {/* Header row — chevron + status + shot label + actions */}
@@ -290,7 +292,7 @@ function TaskRow({
                     onClick={() => setExpanded(v => !v)}
                     aria-expanded={expanded}
                     aria-label={expanded ? "Collapse task details" : "Expand task details"}
-                    title={expanded ? "收起" : "展开详情"}
+                    title={expanded ? t("queueCollapse") : t("queueExpandDetails")}
                     className="-m-1 grid h-6 w-6 place-items-center rounded text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                 >
                     {expanded ? <ChevronDown size={12} aria-hidden="true" /> : <ChevronRight size={12} aria-hidden="true" />}
@@ -307,7 +309,7 @@ function TaskRow({
                         <button
                             type="button"
                             aria-label="Jump to shot"
-                            title="跳转到该 shot"
+                            title={t("queueJumpToShot")}
                             onClick={() => onJumpToShot(task.frame_id!)}
                             className="-m-1 grid h-7 w-7 place-items-center rounded text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                         >
@@ -337,13 +339,13 @@ function TaskRow({
                         ) : inputThumbUrl ? (
                             <PreviewImage src={inputThumbUrl} alt="input" className="h-full w-full" alwaysShowMagnify clickToLightbox />
                         ) : (
-                            <div className="grid h-full w-full place-items-center font-mono text-[9px] uppercase text-text-muted">
+                            <div className="grid h-full w-full place-items-center font-mono text-[0.5625rem] uppercase text-text-muted">
                                 no thumb
                             </div>
                         )}
                     </div>
                     <div className="min-w-0 flex-1 space-y-0.5">
-                        <p className="line-clamp-2 font-sans text-body-sm leading-snug text-foreground/90" title={fullPrompt}>
+                        <p className="line-clamp-2 font-sans text-body-sm leading-snug text-foreground" title={fullPrompt}>
                             {promptPreview}
                         </p>
                         <p className="truncate font-mono text-chrome-sm tracking-tight text-text-muted">
@@ -362,7 +364,7 @@ function TaskRow({
                         <div className="flex flex-wrap items-start gap-2">
                             {inputThumbUrl ? (
                                 <div className="space-y-0.5">
-                                    <p className="font-mono text-[9px] uppercase tracking-wider text-text-muted">input</p>
+                                    <p className="font-mono text-[0.5625rem] uppercase tracking-wider text-text-muted">input</p>
                                     <div className="h-[68px] w-[120px] overflow-hidden rounded border border-glass-border bg-black/40">
                                         <PreviewImage src={inputThumbUrl} alt="input" className="h-full w-full" alwaysShowMagnify clickToLightbox />
                                     </div>
@@ -370,7 +372,7 @@ function TaskRow({
                             ) : null}
                             {isCompleted && outputVideoUrl ? (
                                 <div className="space-y-0.5">
-                                    <p className="font-mono text-[9px] uppercase tracking-wider text-text-muted">output</p>
+                                    <p className="font-mono text-[0.5625rem] uppercase tracking-wider text-text-muted">output</p>
                                     <div className="h-[68px] w-[120px] overflow-hidden rounded border border-glass-border bg-black/40">
                                         <PreviewVideo src={outputVideoUrl} alt="output" className="h-full w-full" alwaysShowMagnify clickToLightbox />
                                     </div>
@@ -382,8 +384,8 @@ function TaskRow({
                     {/* Full prompt — preserves whitespace, no clamp */}
                     {fullPrompt ? (
                         <div className="space-y-0.5">
-                            <p className="font-mono text-[9px] uppercase tracking-wider text-text-muted">prompt</p>
-                            <p className="whitespace-pre-wrap rounded border border-glass-border/60 bg-black/30 px-2 py-1.5 font-sans text-body-sm leading-snug text-foreground/90">
+                            <p className="font-mono text-[0.5625rem] uppercase tracking-wider text-text-muted">prompt</p>
+                            <p className="whitespace-pre-wrap rounded border border-glass-border/60 bg-black/30 px-2 py-1.5 font-sans text-body-sm leading-snug text-foreground">
                                 {fullPrompt}
                             </p>
                         </div>
@@ -402,7 +404,7 @@ function TaskRow({
                     {/* Failure — full error text wrap */}
                     {isFailed && task.error ? (
                         <div className="space-y-0.5">
-                            <p className="font-mono text-[9px] uppercase tracking-wider text-status-failed-fg/80">error</p>
+                            <p className="font-mono text-[0.5625rem] uppercase tracking-wider text-status-failed-fg/80">error</p>
                             <p className="whitespace-pre-wrap rounded border border-status-failed-border/40 bg-status-failed-bg/60 px-2 py-1.5 font-mono text-chrome-sm leading-snug text-status-failed-fg">
                                 ⚠ {task.error}
                             </p>
@@ -412,17 +414,17 @@ function TaskRow({
                     {/* Provider IDs — full + copy buttons */}
                     {task.provider_task_id || task.provider_request_id ? (
                         <div className="space-y-1 rounded border border-glass-border/60 bg-black/30 px-2 py-1.5">
-                            <p className="font-mono text-[9px] uppercase tracking-wider text-text-muted">{providerLabel} ids</p>
+                            <p className="font-mono text-[0.5625rem] uppercase tracking-wider text-text-muted">{providerLabel} ids</p>
                             {task.provider_task_id ? (
                                 <div className="flex items-center gap-1.5">
                                     <span className="font-mono text-chrome-sm text-text-muted">task:</span>
-                                    <code className="min-w-0 flex-1 truncate font-mono text-chrome-sm text-foreground/90" title={task.provider_task_id}>
+                                    <code className="min-w-0 flex-1 truncate font-mono text-chrome-sm text-foreground" title={task.provider_task_id}>
                                         {task.provider_task_id}
                                     </code>
                                     <button
                                         type="button"
                                         onClick={() => void handleCopy("providerId", task.provider_task_id!)}
-                                        title="复制 task ID"
+                                        title={t("queueCopyTaskId")}
                                         aria-label="Copy task ID"
                                         className="-m-1 grid h-6 w-6 place-items-center rounded text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                                     >
@@ -433,13 +435,13 @@ function TaskRow({
                             {task.provider_request_id ? (
                                 <div className="flex items-center gap-1.5">
                                     <span className="font-mono text-chrome-sm text-text-muted">req:</span>
-                                    <code className="min-w-0 flex-1 truncate font-mono text-chrome-sm text-foreground/90" title={task.provider_request_id}>
+                                    <code className="min-w-0 flex-1 truncate font-mono text-chrome-sm text-foreground" title={task.provider_request_id}>
                                         {task.provider_request_id}
                                     </code>
                                     <button
                                         type="button"
                                         onClick={() => void handleCopy("providerRequest", task.provider_request_id!)}
-                                        title="复制 request ID"
+                                        title={t("queueCopyRequestId")}
                                         aria-label="Copy request ID"
                                         className="-m-1 grid h-6 w-6 place-items-center rounded text-text-muted transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                                     >
@@ -462,11 +464,11 @@ function TaskRow({
                             <button
                                 type="button"
                                 onClick={() => void handleCopy("diagnose", diagnoseBlob)}
-                                title="复制完整诊断信息"
+                                title={t("queueCopyDiagnose")}
                                 className="inline-flex min-h-[24px] items-center gap-1 rounded border border-glass-border bg-black/30 px-2 py-[2px] font-mono text-chrome-sm font-medium text-text-secondary transition-colors duration-fast ease-out-quart hover:bg-hover-bg hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55"
                             >
                                 {copiedField === "diagnose" ? <Check size={10} /> : <Copy size={10} />}
-                                {copiedField === "diagnose" ? "已复制" : "复制诊断"}
+                                {copiedField === "diagnose" ? t("queueCopied") : t("queueCopyDiagnoseShort")}
                             </button>
                             {isFailed && onRetry ? (
                                 <button

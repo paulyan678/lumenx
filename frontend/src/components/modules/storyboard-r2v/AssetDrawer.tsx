@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, User, MapPin, Package } from "lucide-react";
 import { useTranslations } from "next-intl";
 import PreviewImage from "@/components/shared/preview/PreviewImage";
+import { selectedVariantUrl } from "@/lib/characterImage";
 
 interface AssetDrawerProps {
     isOpen: boolean;
@@ -16,6 +17,8 @@ interface AssetDrawerProps {
 
 function getAssetThumbnail(item: any, type: "character" | "scene" | "prop"): string | null {
     if (type === "character") {
+        const refUrl = selectedVariantUrl(item.reference_sheet);
+        if (refUrl) return refUrl;
         const asset = item.full_body_asset || item.headshot_asset;
         if (asset?.selected_id && asset.variants?.length) {
             const selected = asset.variants.find((v: any) => v.id === asset.selected_id);
@@ -57,10 +60,10 @@ export default function AssetDrawer({ isOpen, onClose, characters, scenes, props
                         animate={{ x: 0 }}
                         exit={{ x: "100%" }}
                         transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                        className="fixed inset-y-0 right-0 w-80 z-50 bg-[#0f0f14] border-l border-white/[0.06] shadow-2xl flex flex-col"
+                        className="fixed inset-y-0 right-0 w-80 z-50 bg-surface border-l border-glass-border shadow-2xl flex flex-col"
                     >
                         {/* Header */}
-                        <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06] bg-white/[0.02] backdrop-blur-xl shrink-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                        <div className="flex items-center justify-between px-4 py-3 border-b border-glass-border bg-glass backdrop-blur-xl shrink-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
                             <h3 className="text-sm font-semibold text-foreground">{t("assetLibrary")}</h3>
                             <button
                                 onClick={onClose}
@@ -84,7 +87,7 @@ export default function AssetDrawer({ isOpen, onClose, characters, scenes, props
                                         <div>
                                             <div className="flex items-center gap-1.5 mb-2">
                                                 <User size={12} className="text-blue-400" />
-                                                <span className="text-[11px] font-medium text-text-secondary uppercase tracking-wide">{t("characters")}</span>
+                                                <span className="text-[0.6875rem] font-medium text-text-secondary uppercase tracking-wide">{t("characters")}</span>
                                             </div>
                                             <div className="grid grid-cols-2 gap-2">
                                                 {characters.map((c: any, i: number) => {
@@ -96,16 +99,16 @@ export default function AssetDrawer({ isOpen, onClose, characters, scenes, props
                                                                 onSelectAsset(`character${i + 1}`, c.name);
                                                                 onClose();
                                                             }}
-                                                            className="flex flex-col items-center gap-1.5 p-2 rounded-xl border border-white/[0.06] bg-white/[0.02] hover:border-white/[0.12] hover:bg-white/[0.04] transition-all duration-200 group"
+                                                            className="flex flex-col items-center gap-1.5 p-2 rounded-xl border border-glass-border bg-glass hover:border-foreground/30 hover:bg-hover-bg transition-all duration-200 group"
                                                         >
-                                                            <div className="w-12 h-12 rounded-lg bg-white/[0.03] overflow-hidden flex items-center justify-center">
+                                                            <div className="w-12 h-12 rounded-lg bg-glass overflow-hidden flex items-center justify-center">
                                                                 {thumb ? (
                                                                     <PreviewImage src={thumb} alt={c.name} className="w-full h-full" noLightbox />
                                                                 ) : (
                                                                     <User size={16} className="text-text-secondary/40" />
                                                                 )}
                                                             </div>
-                                                            <span className="text-[11px] text-foreground group-hover:text-primary truncate w-full text-center">{c.name}</span>
+                                                            <span className="text-[0.6875rem] text-foreground group-hover:text-primary truncate w-full text-center">{c.name}</span>
                                                         </button>
                                                     );
                                                 })}
@@ -118,7 +121,7 @@ export default function AssetDrawer({ isOpen, onClose, characters, scenes, props
                                         <div>
                                             <div className="flex items-center gap-1.5 mb-2">
                                                 <MapPin size={12} className="text-green-400" />
-                                                <span className="text-[11px] font-medium text-text-secondary uppercase tracking-wide">{t("scenes")}</span>
+                                                <span className="text-[0.6875rem] font-medium text-text-secondary uppercase tracking-wide">{t("scenes")}</span>
                                             </div>
                                             <div className="grid grid-cols-2 gap-2">
                                                 {scenes.map((s: any) => {
@@ -130,16 +133,16 @@ export default function AssetDrawer({ isOpen, onClose, characters, scenes, props
                                                                 onSelectAsset("scene", s.name);
                                                                 onClose();
                                                             }}
-                                                            className="flex flex-col items-center gap-1.5 p-2 rounded-xl border border-white/[0.06] bg-white/[0.02] hover:border-white/[0.12] hover:bg-white/[0.04] transition-all duration-200 group"
+                                                            className="flex flex-col items-center gap-1.5 p-2 rounded-xl border border-glass-border bg-glass hover:border-foreground/30 hover:bg-hover-bg transition-all duration-200 group"
                                                         >
-                                                            <div className="w-12 h-12 rounded-lg bg-white/[0.03] overflow-hidden flex items-center justify-center">
+                                                            <div className="w-12 h-12 rounded-lg bg-glass overflow-hidden flex items-center justify-center">
                                                                 {thumb ? (
                                                                     <PreviewImage src={thumb} alt={s.name} className="w-full h-full" noLightbox />
                                                                 ) : (
                                                                     <MapPin size={16} className="text-text-secondary/40" />
                                                                 )}
                                                             </div>
-                                                            <span className="text-[11px] text-foreground group-hover:text-primary truncate w-full text-center">{s.name}</span>
+                                                            <span className="text-[0.6875rem] text-foreground group-hover:text-primary truncate w-full text-center">{s.name}</span>
                                                         </button>
                                                     );
                                                 })}
@@ -152,7 +155,7 @@ export default function AssetDrawer({ isOpen, onClose, characters, scenes, props
                                         <div>
                                             <div className="flex items-center gap-1.5 mb-2">
                                                 <Package size={12} className="text-orange-400" />
-                                                <span className="text-[11px] font-medium text-text-secondary uppercase tracking-wide">{t("props")}</span>
+                                                <span className="text-[0.6875rem] font-medium text-text-secondary uppercase tracking-wide">{t("props")}</span>
                                             </div>
                                             <div className="grid grid-cols-2 gap-2">
                                                 {props.map((p: any) => {
@@ -164,16 +167,16 @@ export default function AssetDrawer({ isOpen, onClose, characters, scenes, props
                                                                 onSelectAsset("prop", p.name);
                                                                 onClose();
                                                             }}
-                                                            className="flex flex-col items-center gap-1.5 p-2 rounded-xl border border-white/[0.06] bg-white/[0.02] hover:border-white/[0.12] hover:bg-white/[0.04] transition-all duration-200 group"
+                                                            className="flex flex-col items-center gap-1.5 p-2 rounded-xl border border-glass-border bg-glass hover:border-foreground/30 hover:bg-hover-bg transition-all duration-200 group"
                                                         >
-                                                            <div className="w-12 h-12 rounded-lg bg-white/[0.03] overflow-hidden flex items-center justify-center">
+                                                            <div className="w-12 h-12 rounded-lg bg-glass overflow-hidden flex items-center justify-center">
                                                                 {thumb ? (
                                                                     <PreviewImage src={thumb} alt={p.name} className="w-full h-full" noLightbox />
                                                                 ) : (
                                                                     <Package size={16} className="text-text-secondary/40" />
                                                                 )}
                                                             </div>
-                                                            <span className="text-[11px] text-foreground group-hover:text-primary truncate w-full text-center">{p.name}</span>
+                                                            <span className="text-[0.6875rem] text-foreground group-hover:text-primary truncate w-full text-center">{p.name}</span>
                                                         </button>
                                                     );
                                                 })}

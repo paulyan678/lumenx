@@ -3,6 +3,7 @@
 import { Image as ImageIcon, Share2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { Character, Scene, Prop } from "@/store/projectStore";
+import { characterImageUrl } from "@/lib/characterImage";
 
 type AssetTab = "characters" | "scenes" | "props";
 
@@ -13,14 +14,7 @@ interface AssetCardProps {
 
 function getImageUrl(asset: Character | Scene | Prop, type: AssetTab): string | undefined {
   if (type === "characters") {
-    const char = asset as Character;
-    if (char.full_body_asset?.variants?.length) {
-      const selected = char.full_body_asset.variants.find(
-        (v) => v.id === char.full_body_asset?.selected_id
-      );
-      return selected?.url || char.full_body_asset.variants[0]?.url;
-    }
-    return char.image_url || char.full_body_image_url;
+    return characterImageUrl(asset as Character);
   }
   if (type === "scenes") {
     const scene = asset as Scene;
@@ -54,7 +48,7 @@ export default function AssetCard({ asset, type }: AssetCardProps) {
     <div className="glass-panel rounded-xl overflow-hidden relative">
       {isShared ? (
         <span
-          className="absolute right-2 top-2 z-10 inline-flex items-center gap-1 rounded-full border border-status-starred-border bg-status-starred-bg px-2 py-[2px] font-mono text-[10px] font-medium uppercase tracking-[0.18em] text-status-starred-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-[2px]"
+          className="absolute right-2 top-2 z-10 inline-flex items-center gap-1 rounded-full border border-status-starred-border bg-status-starred-bg px-2 py-[2px] font-mono text-[0.625rem] font-medium uppercase tracking-[0.18em] text-status-starred-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-[2px]"
           title={t("seriesSharedTooltip")}
         >
           <Share2 size={10} aria-hidden="true" />

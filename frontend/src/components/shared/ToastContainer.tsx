@@ -6,6 +6,7 @@
  */
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle2, AlertCircle, AlertTriangle, Info, Loader2, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useToastStore, type Toast, type ToastKind } from "@/store/toastStore";
 
 const KIND_STYLES: Record<ToastKind, { ring: string; bg: string; icon: JSX.Element; iconClass: string }> = {
@@ -42,6 +43,7 @@ const KIND_STYLES: Record<ToastKind, { ring: string; bg: string; icon: JSX.Eleme
 };
 
 function ToastCard({ toast }: { toast: Toast }) {
+    const tc = useTranslations("common");
     const dismiss = useToastStore((s) => s.dismiss);
     const style = KIND_STYLES[toast.kind];
     return (
@@ -56,22 +58,22 @@ function ToastCard({ toast }: { toast: Toast }) {
             <span className={`mt-0.5 shrink-0 ${style.iconClass}`}>{style.icon}</span>
             <div className="min-w-0 flex-1">
                 {toast.projectTitle && (
-                    <p className="font-mono text-[9.5px] uppercase tracking-[0.16em] text-text-muted mb-0.5 truncate">
+                    <p className="font-mono text-[0.59375rem] uppercase tracking-[0.16em] text-text-muted mb-0.5 truncate">
                         {toast.projectTitle}
                     </p>
                 )}
-                <p className="text-[13px] font-medium text-foreground leading-snug">{toast.title}</p>
+                <p className="text-[0.8125rem] font-medium text-foreground leading-snug">{toast.title}</p>
                 {toast.body && (
                     <div className="mt-0.5">
-                        <p className={`text-[11.5px] text-text-secondary leading-snug ${toast.body.length > 120 ? "line-clamp-3" : ""}`}>
+                        <p className={`text-[0.71875rem] text-text-secondary leading-snug ${toast.body.length > 120 ? "line-clamp-3" : ""}`}>
                             {toast.body}
                         </p>
                         {(toast.kind === "error" && toast.body.length > 40) && (
                             <button
                                 onClick={() => { navigator.clipboard.writeText(toast.body!); }}
-                                className="mt-1 text-[10px] text-text-muted hover:text-foreground transition-colors"
+                                className="mt-1 text-[0.625rem] text-text-muted hover:text-foreground transition-colors"
                             >
-                                复制错误详情
+                                {tc("copyErrorDetails")}
                             </button>
                         )}
                     </div>
@@ -82,7 +84,7 @@ function ToastCard({ toast }: { toast: Toast }) {
                             toast.action!.onClick();
                             dismiss(toast.id);
                         }}
-                        className="mt-1.5 inline-flex items-center px-2 py-0.5 rounded-md bg-foreground/5 border border-glass-border text-[11px] font-medium text-foreground hover:bg-foreground/10 transition-colors"
+                        className="mt-1.5 inline-flex items-center px-2 py-0.5 rounded-md bg-elevated border border-glass-border text-[0.6875rem] font-medium text-foreground hover:bg-hover-bg transition-colors"
                     >
                         {toast.action.label}
                     </button>
@@ -90,7 +92,7 @@ function ToastCard({ toast }: { toast: Toast }) {
             </div>
             <button
                 onClick={() => dismiss(toast.id)}
-                aria-label="Dismiss"
+                aria-label={tc("dismiss")}
                 className="shrink-0 -mr-1 p-1 rounded text-text-muted hover:text-foreground transition-colors"
             >
                 <X size={12} />
