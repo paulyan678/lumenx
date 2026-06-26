@@ -224,7 +224,7 @@
     "tplDetailedLabel": "Detailed Reference",
     "tplDetailedDesc": "Tri-view + multi-angle face close-ups",
     "tplDesignSheetLabel": "Design Sheet",
-    "tplDesignSheetDesc": "Full character design (coming soon)",
+    "tplDesignSheetDesc": "gpt-image-2 only",
     "tplSwitchConfirm": "Switching template will overwrite current prompt",
     "tplSwitchYes": "Confirm",
     "tplSwitchNo": "Cancel",
@@ -240,7 +240,8 @@
     "toastVariantDone": "Generation complete",
     "toastVariantDoneBody": "Generated {count} variants",
     "toastPollErr": "Polling error",
-    "toastPollErrBody": "Refresh the page to see the result"
+    "toastPollErrBody": "Refresh the page to see the result",
+    "toastEntityGone": "This asset no longer exists (may have been deleted). Please refresh and retry."
   },
   "voiceDesign": {
     "title": "Design a new voice",

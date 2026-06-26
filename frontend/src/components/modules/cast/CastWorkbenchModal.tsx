@@ -216,6 +216,11 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
     const [applyStyle, setApplyStyle] = useState(true);
     const [galleryFilter, setGalleryFilter] = useState<"all" | "favorited">("all");
     const generating = generatingTasks.some((t) => t.assetId === entityId);
+    // Effective t2i model — drives the "design_sheet" template gating: that
+    // template only works with gpt-image-2, so it stays locked unless the
+    // user has selected gpt-image-2 (override or project default).
+    const selectedModelId = modelOverride || currentProject?.model_settings?.t2i_model || "wan2.1-t2i";
+    const isGptImage2 = selectedModelId === "gpt-image-2";
     const [selectedTemplate, setSelectedTemplate] = useState<CharacterTemplate>("simple");
     const [pendingTemplate, setPendingTemplate] = useState<CharacterTemplate | null>(null);
     const [promptDirty, setPromptDirty] = useState(false);
@@ -297,6 +302,28 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                 projectTitle: currentProject.title,
             });
             return;
+        }
+        // Refresh project + validate the entity still exists backend-side
+        // before submitting. The store can hold a stale character that was
+        // deleted server-side, which makes generateAsset 404 with
+        // "Character {id} not found". Syncing here both prevents the 404
+        // and self-heals the store so the stale card disappears.
+        try {
+            const fresh = await api.getProject(currentProject.id);
+            const pool = kind === "character" ? fresh.characters : kind === "scene" ? fresh.scenes : fresh.props;
+            if (!Array.isArray(pool) || !pool.some((e: any) => e.id === entity.id)) {
+                toast.error(t("toastEntityGone"), {
+                    projectId: currentProject.id,
+                    projectTitle: currentProject.title,
+                });
+                updateProject(currentProject.id, fresh);
+                onClose();
+                return;
+            }
+            updateProject(currentProject.id, fresh);
+        } catch {
+            // Refresh failed — proceed with cached data; backend will reject
+            // if the entity truly is stale and the poll surfaces the error.
         }
         const effectiveBatchSize = Math.max(1, Math.min(4, batchSize));
         addGeneratingTask(entity.id, kind === "character" ? "reference_sheet" : "all", effectiveBatchSize);
@@ -562,7 +589,7 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                                     <div className="flex gap-3">
                                         {(Object.entries(CHARACTER_TEMPLATES) as [CharacterTemplate, typeof CHARACTER_TEMPLATES[CharacterTemplate]][]).map(([key, tpl]) => {
                                             const isActive = selectedTemplate === key;
-                                            const isLocked = tpl.comingSoon;
+                                            const isLocked = !!(tpl.comingSoon && !isGptImage2);
                                             return (
                                                 <button
                                                     key={key}

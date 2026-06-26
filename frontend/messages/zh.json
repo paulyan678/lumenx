@@ -224,7 +224,7 @@
     "tplDetailedLabel": "详细参考表",
     "tplDetailedDesc": "三视图 + 多角度面部特写",
     "tplDesignSheetLabel": "角色设定图",
-    "tplDesignSheetDesc": "完整设定（即将推出）",
+    "tplDesignSheetDesc": "仅支持 gpt-image-2",
     "tplSwitchConfirm": "切换模板将覆盖当前提示词",
     "tplSwitchYes": "确认切换",
     "tplSwitchNo": "取消",
@@ -240,7 +240,8 @@
     "toastVariantDone": "生成完成",
     "toastVariantDoneBody": "已生成 {count} 张变体",
     "toastPollErr": "轮询异常",
-    "toastPollErrBody": "请刷新页面查看结果"
+    "toastPollErrBody": "请刷新页面查看结果",
+    "toastEntityGone": "该资产已不存在（可能已被删除），请刷新页面后重试"
   },
   "voiceDesign": {
     "title": "设计新音色",
