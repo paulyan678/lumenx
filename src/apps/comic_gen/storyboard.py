@@ -2,8 +2,9 @@ import os
 import time
 from typing import Dict, Any, List
 from .models import StoryboardFrame, Character, Scene, Prop, GenerationStatus, ImageAsset, ImageVariant
-from ...models.image import WanxImageModel
+from ...models.newapi import NewAPIImageModel
 from ...utils import get_logger
+from ...utils.newapi_models import IMAGE, get_model_spec, get_selected_model
 from ...utils.oss_utils import is_object_key
 
 logger = get_logger(__name__)
@@ -11,7 +12,7 @@ logger = get_logger(__name__)
 class StoryboardGenerator:
     def __init__(self, config: Dict[str, Any] = None):
         self.config = config or {}
-        self.model = WanxImageModel(self.config.get('model', {}))
+        self.model = NewAPIImageModel(self.config.get('model', {}))
         self.output_dir = self.config.get('output_dir', 'output/storyboard')
 
     def generate_storyboard(self, script: Any, characters: List[Character] = None, scenes: List[Scene] = None) -> Any:
@@ -41,10 +42,12 @@ class StoryboardGenerator:
 
     def generate_frame(self, frame: StoryboardFrame, characters: List[Character], scene: Scene, ref_image_path: str = None, ref_image_paths: List[str] = None, prompt: str = None, batch_size: int = 1, size: str = None, model_name: str = None) -> StoryboardFrame:
         """Generates a storyboard frame image."""
+        selected_model = model_name or get_selected_model(IMAGE)
+        get_model_spec(selected_model, IMAGE)
         frame.status = GenerationStatus.PROCESSING
         
         # Default size for storyboard (landscape)
-        effective_size = size or "1024*576"
+        effective_size = size or "1536x1024"
         
         # Construct a rich prompt using character and scene details
         char_descriptions = []
@@ -178,8 +181,8 @@ class StoryboardGenerator:
                 
                 # Use I2I if reference images are available
                 # Pass collected asset paths to model
-                logger.info(f"[Storyboard] Calling model.generate with {len(asset_ref_paths)} reference images using model {model_name or 'default'}")
-                self.model.generate(prompt, output_path, ref_image_paths=asset_ref_paths, size=effective_size, model_name=model_name)
+                logger.info(f"[Storyboard] Calling New API with {len(asset_ref_paths)} reference images")
+                self.model.generate(prompt, output_path, ref_image_paths=asset_ref_paths, size=effective_size, model_name=selected_model)
                 
                 # Store relative path for frontend serving
                 rel_path = os.path.relpath(output_path, "output")

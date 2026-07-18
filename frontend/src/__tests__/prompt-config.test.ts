@@ -40,10 +40,6 @@ function substituteStoryboardPlaceholders(template: string, assets: string, draf
     return template.replace("{ASSETS}", assets).replace("{DRAFT}", draft);
 }
 
-function substituteR2VPlaceholders(template: string, slots: string): string {
-    return template.replace("{SLOTS}", slots);
-}
-
 describe('substituteStoryboardPlaceholders', () => {
     it('should replace both {ASSETS} and {DRAFT}', () => {
         const template = "Assets: {ASSETS}\nDraft: {DRAFT}";
@@ -64,41 +60,11 @@ describe('substituteStoryboardPlaceholders', () => {
     });
 });
 
-describe('substituteR2VPlaceholders', () => {
-    it('should replace {SLOTS} with slot context', () => {
-        const template = "Reference videos:\n{SLOTS}\n\nRewrite the prompt.";
-        const slots = "- character1: White rabbit\n- character2: Robot dog";
-        const result = substituteR2VPlaceholders(template, slots);
-        expect(result).toContain("- character1: White rabbit");
-        expect(result).toContain("- character2: Robot dog");
-    });
-
-    it('should handle empty slots', () => {
-        const template = "Slots: {SLOTS}";
-        const result = substituteR2VPlaceholders(template, "No reference videos provided.");
-        expect(result).toBe("Slots: No reference videos provided.");
-    });
-});
-
 // ── Video polish payload with script_id ──
 
 function buildVideoPolishPayload(draftPrompt: string, feedback: string = "", scriptId: string = "") {
     return {
         draft_prompt: draftPrompt,
-        feedback: feedback,
-        script_id: scriptId,
-    };
-}
-
-function buildR2VPolishPayload(
-    draftPrompt: string,
-    slots: { description: string }[],
-    feedback: string = "",
-    scriptId: string = "",
-) {
-    return {
-        draft_prompt: draftPrompt,
-        slots: slots,
         feedback: feedback,
         script_id: scriptId,
     };
@@ -125,30 +91,15 @@ describe('buildVideoPolishPayload with scriptId', () => {
     });
 });
 
-describe('buildR2VPolishPayload with scriptId', () => {
-    it('should include script_id when provided', () => {
-        const slots = [{ description: "warrior" }];
-        const payload = buildR2VPolishPayload("prompt", slots, "", "project-456");
-        expect(payload.script_id).toBe("project-456");
-    });
-
-    it('should default script_id to empty string', () => {
-        const payload = buildR2VPolishPayload("prompt", []);
-        expect(payload.script_id).toBe("");
-    });
-});
-
 // ── PromptConfig update payload ──
 
 function buildPromptConfigPayload(config: {
     storyboard_polish?: string;
     video_polish?: string;
-    r2v_polish?: string;
 }) {
     return {
         storyboard_polish: config.storyboard_polish ?? "",
         video_polish: config.video_polish ?? "",
-        r2v_polish: config.r2v_polish ?? "",
     };
 }
 
@@ -158,7 +109,6 @@ describe('buildPromptConfigPayload', () => {
         expect(payload).toEqual({
             storyboard_polish: "",
             video_polish: "",
-            r2v_polish: "",
         });
     });
 
@@ -168,19 +118,16 @@ describe('buildPromptConfigPayload', () => {
         });
         expect(payload.video_polish).toBe("Custom video prompt");
         expect(payload.storyboard_polish).toBe("");
-        expect(payload.r2v_polish).toBe("");
     });
 
     it('should handle all fields provided', () => {
         const payload = buildPromptConfigPayload({
             storyboard_polish: "A",
             video_polish: "B",
-            r2v_polish: "C",
         });
         expect(payload).toEqual({
             storyboard_polish: "A",
             video_polish: "B",
-            r2v_polish: "C",
         });
     });
 });
@@ -206,7 +153,6 @@ describe('getCustomPrompt (backend helper mirror)', () => {
             prompt_config: {
                 storyboard_polish: "Custom storyboard",
                 video_polish: "",
-                r2v_polish: "Custom R2V",
             }
         },
         "proj-2": {}

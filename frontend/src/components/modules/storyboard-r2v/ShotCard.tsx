@@ -7,7 +7,6 @@ import {
     ChevronUp,
     ChevronDown,
     Copy,
-    Video,
     ImageIcon,
     AtSign,
     Maximize2,
@@ -37,7 +36,7 @@ import { selectedVariantUrl } from "@/lib/characterImage";
 export interface ShotNode {
     id: string;
     prompt: string;
-    tabMode: "t2i_i2v" | "direct_r2v";
+    tabMode: "t2i_i2v";
 
     // T2I stage (only for t2i_i2v mode). Single-task fields stay here
     // for backward compat with existing shot drafts and the legacy
@@ -67,12 +66,9 @@ export interface ShotNode {
      *  shipped output". Falls back to latest starred / latest completed /
      *  first frame when null. */
     finalTakeId?: string | null;
-    /** Every video task this shot has spawned, oldest first. Each tab
-     *  (t2i_i2v / direct_r2v) gets its own list — see videoTaskIdsByTab.
-     *  Empty / missing → no history (e.g. legacy shots). */
+    /** Every I2V task this shot has spawned, oldest first. */
     videoTaskIdsByTab?: {
         t2i_i2v?: string[];
-        direct_r2v?: string[];
     };
     imageUrl?: string;
 
@@ -121,7 +117,6 @@ interface ShotCardProps {
     onMoveUp: () => void;
     onMoveDown: () => void;
     onDuplicate: () => void;
-    onSetTabMode: (mode: "t2i_i2v" | "direct_r2v") => void;
     onOpenDrawer: () => void;
     onInsertAsset: (type: string, name: string) => void;
     /** Duration editor config derived from model catalog */
@@ -139,7 +134,7 @@ interface ShotCardProps {
     /** PR-3c · 闭环生成. Generation 移到 ShotCard 内的全宽行 (Action
      *  Bar 之后, disclosure bar 之前), 含 count selector 同行. Host
      *  传入 current count + handlers + canGenerate gate.
-     *  Spec: r2v-workflow-v3-unified.md §4.3.1 / Q12. */
+     *  The host supplies the count and submit handlers. */
     generateCount?: number;
     /** At-a-glance "model · duration" summary shown in the generation row,
      *  visible even when the attached ShotPanel is collapsed (calm-default). */
@@ -172,7 +167,6 @@ export default function ShotCard({
     onMoveUp,
     onMoveDown,
     onDuplicate,
-    onSetTabMode,
     onOpenDrawer,
     onInsertAsset: _onInsertAsset,
     durationEditorConfig,
@@ -199,61 +193,17 @@ export default function ShotCard({
     // currentProjectId — needed by PolishPanel to look up the
     // project's PromptConfig override server-side.
     const currentProjectId = useProjectStore((state) => state.currentProject?.id);
-    // r2vSlots — when R2V tab is active, derive slot context from
-    // @character references in the prompt so the polish system
-    // prompt knows what character1/character2 ID maps to. Dedup by
-    // slot number (first-seen wins) and sort ascending so the list
-    // index aligns with HappyHorse's characterN positional mapping.
-    // Backend polish_r2v_prompt re-numbers with enumerate(slots),
-    // which only matches the prompt's characterN tags when slots
-    // are unique and ordered.
-    const r2vSlots = useCallback((): { description: string }[] => {
-        if (shot.tabMode !== "direct_r2v") return [];
-        const bySlot = new Map<number, string>();
-        const tagPattern = /\[character(\d+):([^\]]+)\]/g;
-        let match;
-        while ((match = tagPattern.exec(shot.prompt)) !== null) {
-            const slotN = parseInt(match[1], 10);
-            if (bySlot.has(slotN)) continue;
-            const name = match[2];
-            const char = characters.find((c: any) => c.name === name);
-            bySlot.set(slotN, char?.description ? `${name}: ${char.description}` : name);
-        }
-        return Array.from(bySlot.entries())
-            .sort((a, b) => a[0] - b[0])
-            .map(([, description]) => ({ description }));
-    }, [shot.tabMode, shot.prompt, characters])();
-
     // polishImageUrls — feed vision-capable polish (Issue 13) with the
     // images the polish actually needs to "see":
     //   • i2v: the active first frame (T2I selection if any, else the
     //     Storyboard render). No frame yet → empty → text-only polish.
-    //   • r2v: each referenced character's avatar/headshot/full body
-    //     image, dedup'd by id. No references → empty → text-only.
+    // The active first frame gives the polish model visual context.
     const polishImageUrls = useCallback((): string[] => {
-        if (shot.tabMode === "direct_r2v") {
-            const out: string[] = [];
-            const seen = new Set<string>();
-            const tagPattern = /\[character\d*:([^\]]+)\]/g;
-            let m;
-            while ((m = tagPattern.exec(shot.prompt)) !== null) {
-                const [, name] = m;
-                const char = characters.find((c: any) => c.name === name);
-                if (!char || seen.has(char.id)) continue;
-                seen.add(char.id);
-                const url = char.headshot_image_url || char.image_url || char.full_body_image_url
-                    || selectedVariantUrl(char.reference_sheet)
-                    || (char.full_body_asset?.variants?.[0]?.url);
-                if (url) out.push(url);
-            }
-            return out.slice(0, 4); // cap at 4 to keep payload reasonable
-        }
-        // i2v: prefer active T2I image; fall back to storyboard frame.
         const active = (shot.t2iImageUrls && shot.t2iImageUrls.length > 0)
             ? shot.t2iImageUrls[Math.max(0, Math.min(shot.t2iSelectedIndex ?? 0, shot.t2iImageUrls.length - 1))]
             : (shot.t2iImageUrl || shot.imageUrl);
         return active ? [active] : [];
-    }, [shot.tabMode, shot.prompt, shot.t2iImageUrls, shot.t2iSelectedIndex, shot.t2iImageUrl, shot.imageUrl, characters])();
+    }, [shot.t2iImageUrls, shot.t2iSelectedIndex, shot.t2iImageUrl, shot.imageUrl])();
 
     // castAvatars — character avatar group for the "Cast:" row above
     // the prompt textarea (L5 borrow from 火山剧创's 出镜角色). De-
@@ -303,99 +253,6 @@ export default function ShotCard({
     }, []);
 
     const renderPreview = () => {
-        if (shot.tabMode === "t2i_i2v") {
-            if (shot.videoUrl) {
-                return (
-                    <PreviewVideo
-                        src={shot.videoUrl}
-                        alt={t("generatedVideo") || "Generated video"}
-                        className="w-full aspect-video"
-                    />
-                );
-            }
-            if (shot.videoStatus === "processing" || shot.videoStatus === "pending") {
-                return (
-                    <div className="w-full aspect-video flex items-center justify-center">
-                        <PendingTaskAffordance
-                            statusLabel={shot.videoStatus === "pending" ? t("queued") : t("generatingVideo")}
-                            taskId={shot.videoTaskId}
-                            onCancel={onCancelVideo}
-                        />
-                    </div>
-                );
-            }
-            if (shot.videoStatus === "failed") {
-                return (
-                    <div className="w-full aspect-video flex flex-col items-center justify-center gap-2">
-                        <span className="text-[0.6875rem] text-status-failed-fg font-medium">{t("generationFailed")}</span>
-                        <button
-                            onClick={onGenerateVideo}
-                            className="text-[0.6875rem] text-primary hover:text-primary/80 transition-colors font-medium"
-                        >
-                            {t("retry")}
-                        </button>
-                    </div>
-                );
-            }
-            if (shot.t2iImageUrl) {
-                // Fixed: was rendering raw `<img src={shot.t2iImageUrl}>` —
-                // shot.t2iImageUrl is a relative path (e.g. "uploads/t2i_xxx.jpg")
-                // which the browser resolved against the current origin → 404 →
-                // broken icon + "Generated frame" alt fallback. PreviewImage
-                // routes through getAssetUrl() (Issue 14).
-                //
-                // Issue 15: bottom badge label changed to "next: generate
-                // video →" so the user knows the first frame is in place and
-                // the next step is downstream, not another image gen.
-                return (
-                    <div className="w-full aspect-video relative">
-                        <PreviewImage
-                            src={shot.t2iImageUrl}
-                            alt={t("t2iCompleted") || "First frame"}
-                            className="w-full h-full"
-                        />
-                        <div className="absolute bottom-2 left-2 text-[0.625rem] px-1.5 py-0.5 rounded-full bg-status-completed-bg/90 text-white font-medium backdrop-blur-sm pointer-events-none">
-                            {t("generateVideoNext")}
-                        </div>
-                    </div>
-                );
-            }
-            if (shot.t2iStatus === "processing" || shot.t2iStatus === "pending") {
-                return (
-                    <div className="w-full aspect-video flex items-center justify-center">
-                        <PendingTaskAffordance
-                            statusLabel={shot.t2iStatus === "pending" ? t("queued") : t("t2iGenerating")}
-                            taskId={shot.t2iTaskId}
-                        />
-                    </div>
-                );
-            }
-            if (shot.t2iStatus === "failed") {
-                return (
-                    <div className="w-full aspect-video flex flex-col items-center justify-center gap-2">
-                        <span className="text-[0.6875rem] text-status-failed-fg font-medium">{t("generationFailed")}</span>
-                        <button
-                            onClick={onGenerateT2I}
-                            className="text-[0.6875rem] text-primary hover:text-primary/80 transition-colors font-medium"
-                        >
-                            {t("retry")}
-                        </button>
-                    </div>
-                );
-            }
-            // I2V tab, no first frame yet — the active CTA is in the
-            // Step 1 panel below (Hero state), not here. Just signal
-            // "waiting for a first frame" so the user knows where to
-            // act (Issue 15).
-            return (
-                <div className="w-full aspect-video flex flex-col items-center justify-center gap-2.5 text-text-muted">
-                    <ImageIcon size={24} strokeWidth={1.6} className="opacity-50" />
-                    <span className="font-mono text-[0.65625rem] uppercase tracking-[0.08em]">{t("generateImageOrUpload")}</span>
-                </div>
-            );
-        }
-
-        // Direct R2V mode
         if (shot.videoUrl) {
             return (
                 <PreviewVideo
@@ -420,10 +277,37 @@ export default function ShotCard({
             return (
                 <div className="w-full aspect-video flex flex-col items-center justify-center gap-2">
                     <span className="text-[0.6875rem] text-status-failed-fg font-medium">{t("generationFailed")}</span>
-                    <button
-                        onClick={onGenerateVideo}
-                        className="text-[0.6875rem] text-primary hover:text-primary/80 transition-colors font-medium"
-                    >
+                    <button onClick={onGenerateVideo} className="text-[0.6875rem] text-primary hover:text-primary/80 transition-colors font-medium">
+                        {t("retry")}
+                    </button>
+                </div>
+            );
+        }
+        if (shot.t2iImageUrl) {
+            return (
+                <div className="w-full aspect-video relative">
+                    <PreviewImage src={shot.t2iImageUrl} alt={t("t2iCompleted") || "First frame"} className="w-full h-full" />
+                    <div className="absolute bottom-2 left-2 text-[0.625rem] px-1.5 py-0.5 rounded-full bg-status-completed-bg/90 text-white font-medium backdrop-blur-sm pointer-events-none">
+                        {t("generateVideoNext")}
+                    </div>
+                </div>
+            );
+        }
+        if (shot.t2iStatus === "processing" || shot.t2iStatus === "pending") {
+            return (
+                <div className="w-full aspect-video flex items-center justify-center">
+                    <PendingTaskAffordance
+                        statusLabel={shot.t2iStatus === "pending" ? t("queued") : t("t2iGenerating")}
+                        taskId={shot.t2iTaskId}
+                    />
+                </div>
+            );
+        }
+        if (shot.t2iStatus === "failed") {
+            return (
+                <div className="w-full aspect-video flex flex-col items-center justify-center gap-2">
+                    <span className="text-[0.6875rem] text-status-failed-fg font-medium">{t("generationFailed")}</span>
+                    <button onClick={onGenerateT2I} className="text-[0.6875rem] text-primary hover:text-primary/80 transition-colors font-medium">
                         {t("retry")}
                     </button>
                 </div>
@@ -431,8 +315,8 @@ export default function ShotCard({
         }
         return (
             <div className="w-full aspect-video flex flex-col items-center justify-center gap-2.5 text-text-muted">
-                <Video size={24} strokeWidth={1.6} className="opacity-50" />
-                <span className="font-mono text-[0.65625rem] uppercase tracking-[0.08em]">{t("noVideoYet")}</span>
+                <ImageIcon size={24} strokeWidth={1.6} className="opacity-50" />
+                <span className="font-mono text-[0.65625rem] uppercase tracking-[0.08em]">{t("generateImageOrUpload")}</span>
             </div>
         );
     };
@@ -495,37 +379,7 @@ export default function ShotCard({
 
     const handleInsertAssetFromChip = (_type: string, name: string) => {
         const currentPrompt = shot.prompt;
-        // Each unique character gets one fixed slot number throughout this
-        // prompt: slot N → reference_image_urls[N-1] in HappyHorse R2V, so
-        // referencing the same actor twice must reuse the same slot —
-        // otherwise the model would expect two separate reference images.
-        // Examples:
-        //   first @小兔子 → [character1:小兔子]
-        //   then @小狗 → [character2:小狗]
-        //   then @小兔子 again → [character1:小兔子]   (reuse, NOT [character3:…])
-        const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const existingTagRe = new RegExp(`\\[character(\\d+):${escapedName}\\]`);
-        const existingMatch = currentPrompt.match(existingTagRe);
-
-        let slot: number;
-        if (existingMatch) {
-            slot = parseInt(existingMatch[1], 10);
-        } else {
-            // Map of (slot → name) already in the prompt; first-seen wins
-            // per slot so accidental dup tags don't inflate the count.
-            const usedSlotByName = new Map<number, string>();
-            const slotRe = /\[character(\d+):([^\]]+)\]/g;
-            let m;
-            while ((m = slotRe.exec(currentPrompt)) !== null) {
-                const slotN = parseInt(m[1], 10);
-                if (!usedSlotByName.has(slotN)) {
-                    usedSlotByName.set(slotN, m[2]);
-                }
-            }
-            const usedSlots = Array.from(usedSlotByName.keys());
-            slot = usedSlots.length > 0 ? Math.max(...usedSlots) + 1 : 1;
-        }
-        const tag = `[character${slot}:${name}]`;
+        const tag = `[character:${name}]`;
 
         const textarea = textareaRef.current;
         if (textarea) {
@@ -541,8 +395,6 @@ export default function ShotCard({
             onUpdatePrompt(currentPrompt + " " + tag);
         }
     };
-
-    const isActiveT2I = shot.tabMode === "t2i_i2v";
 
     return (
         <div
@@ -579,35 +431,9 @@ export default function ShotCard({
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                         <ShotStatusBadge shot={shot} t={t} />
-                        {/* Pill Tab Switcher */}
-                        <div className="relative inline-flex items-center p-[3px] bg-surface-inset rounded-full">
-                            <motion.div
-                                className="absolute top-[3px] bottom-[3px] rounded-full bg-elevated shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]"
-                                initial={false}
-                                animate={{
-                                    left: isActiveT2I ? 3 : "calc(50% + 1.5px)",
-                                    width: "calc(50% - 3px)",
-                                }}
-                                transition={{ type: "spring", stiffness: 350, damping: 32 }}
-                            />
-                            <button
-                                onClick={() => onSetTabMode("t2i_i2v")}
-                                className={`relative z-10 flex items-center gap-1.5 px-3.5 py-1.5 text-[13px] font-semibold rounded-full transition-colors duration-200 ${
-                                    isActiveT2I ? "text-foreground" : "text-text-secondary hover:text-text-secondary/80"
-                                }`}
-                            >
-                                <ImageIcon size={11} strokeWidth={1.6} />
-                                {t("tabT2iI2v")}
-                            </button>
-                            <button
-                                onClick={() => onSetTabMode("direct_r2v")}
-                                className={`relative z-10 flex items-center gap-1.5 px-3.5 py-1.5 text-[13px] font-semibold rounded-full transition-colors duration-200 ${
-                                    !isActiveT2I ? "text-foreground" : "text-text-secondary hover:text-text-secondary/80"
-                                }`}
-                            >
-                                <Video size={11} strokeWidth={1.6} />
-                                {t("tabDirectR2v")}
-                            </button>
+                        <div className="inline-flex items-center gap-1.5 rounded-full bg-surface-inset px-3.5 py-1.5 text-[13px] font-semibold text-foreground">
+                            <ImageIcon size={11} strokeWidth={1.6} />
+                            {t("tabT2iI2v")}
                         </div>
                     </div>
                 </div>
@@ -748,16 +574,10 @@ export default function ShotCard({
                             </button>
                         </div>
 
-                        {/* AI Polish — bilingual prompt rewrite using
-                            the project's polish system prompt
-                            (storyboard_polish / video_polish /
-                            r2v_polish from PromptConfig). Routes to
-                            the right API by tabMode. */}
+                        {/* AI polish uses the active approved chat model. */}
                         <PolishPanel
                             prompt={shot.prompt}
-                            tabMode={shot.tabMode}
                             scriptId={currentProjectId ?? ""}
-                            slots={r2vSlots}
                             imageUrls={polishImageUrls}
                             onApply={onUpdatePrompt}
                         />

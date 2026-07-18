@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, FileText, RotateCcw, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTranslations } from "next-intl";
+import { DEFAULT_ACTIVE_MODELS, getApprovedModels, normalizeActiveModel } from '@/lib/newApiModels';
 
 interface SeriesPromptConfigModalProps {
     isOpen: boolean;
@@ -16,7 +17,6 @@ interface SeriesPromptConfigModalProps {
 interface PromptDefaults {
     storyboard_polish: string;
     video_polish: string;
-    r2v_polish: string;
 }
 
 const SECTIONS = [
@@ -30,17 +30,14 @@ const SECTIONS = [
         label: 'Video I2V Polish (Prompt D)',
         description: 'System prompt for Image-to-Video prompt polishing. No dynamic placeholders needed.',
     },
-    {
-        key: 'r2v_polish' as const,
-        label: 'Video R2V Polish (Prompt E)',
-        description: 'System prompt for Reference-to-Video prompt polishing. Placeholder: {SLOTS} (character slot context).',
-    },
 ];
+
+const CHAT_MODELS = getApprovedModels('chat');
 
 export default function SeriesPromptConfigModal({ isOpen, onClose, seriesId, onSaved }: SeriesPromptConfigModalProps) {
     const t = useTranslations("series");
     const tc = useTranslations("common");
-    const [config, setConfig] = useState({ storyboard_polish: '', video_polish: '', r2v_polish: '', polish_model: '' });
+    const [config, setConfig] = useState<{ storyboard_polish: string; video_polish: string; polish_model: string }>({ storyboard_polish: '', video_polish: '', polish_model: DEFAULT_ACTIVE_MODELS.chat });
     const [defaults, setDefaults] = useState<PromptDefaults | null>(null);
     const [expandedDefault, setExpandedDefault] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -54,8 +51,15 @@ export default function SeriesPromptConfigModal({ isOpen, onClose, seriesId, onS
             setExpandedDefault(null);
             api.getSeriesPromptConfig(seriesId)
                 .then((data) => {
-                    setConfig(data.prompt_config);
-                    setDefaults(data.defaults);
+                    setConfig({
+                        storyboard_polish: data.prompt_config?.storyboard_polish ?? '',
+                        video_polish: data.prompt_config?.video_polish ?? '',
+                        polish_model: normalizeActiveModel('chat', data.prompt_config?.polish_model),
+                    });
+                    setDefaults({
+                        storyboard_polish: data.defaults?.storyboard_polish ?? '',
+                        video_polish: data.defaults?.video_polish ?? '',
+                    });
                 })
                 .catch((err) => {
                     console.error("Failed to load series prompt config:", err);
@@ -134,9 +138,6 @@ export default function SeriesPromptConfigModal({ isOpen, onClose, seriesId, onS
                                     {t("seriesPromptEmptyHint")}
                                 </div>
 
-                                {/* Issue 13: polish 用的 LLM 模型。系列级覆盖 → 项目级覆盖
-                                    → 系统默认。三个推荐选项都是 vision-capable，能让带
-                                    首帧/参考图的润色更准确。 */}
                                 <div className="space-y-2">
                                     <div>
                                         <h3 className="text-sm font-bold text-foreground">{t("polishModelTitle")}</h3>
@@ -145,14 +146,13 @@ export default function SeriesPromptConfigModal({ isOpen, onClose, seriesId, onS
                                         </p>
                                     </div>
                                     <select
-                                        value={config.polish_model || "qwen3.7-plus"}
+                                        value={config.polish_model}
                                         onChange={(e) => setConfig(prev => ({ ...prev, polish_model: e.target.value }))}
                                         className="w-full bg-input-bg border border-glass-border rounded-lg px-3 py-2 text-sm text-text-secondary focus:outline-none focus:border-purple-500/50"
                                     >
-                                        <option value="qwen3.7-plus">qwen3.7-plus · 通义千问 3.7 Plus（最新）</option>
-                                        <option value="qwen3.6-plus">qwen3.6-plus · 通义千问 3.6 Plus（视觉）</option>
-                                        <option value="qwen3.6-flash">qwen3.6-flash · 通义千问 3.6 Flash（更快）</option>
-                                        <option value="kimi-k2.6">kimi-k2.6 · Moonshot Kimi K2.6（视觉）</option>
+                                        {CHAT_MODELS.map((model) => (
+                                            <option key={model.id} value={model.id}>{model.name} · {model.id}</option>
+                                        ))}
                                     </select>
                                     <div className="border-b border-border-subtle pt-1" />
                                 </div>
@@ -195,9 +195,7 @@ export default function SeriesPromptConfigModal({ isOpen, onClose, seriesId, onS
                                             </div>
                                         )}
 
-                                        {section.key !== 'r2v_polish' && (
-                                            <div className="border-b border-border-subtle" />
-                                        )}
+                                        <div className="border-b border-border-subtle" />
                                     </div>
                                 ))}
                             </>

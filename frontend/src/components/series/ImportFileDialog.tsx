@@ -21,7 +21,8 @@ interface EpisodePreview {
 
 interface PreviewResult {
     episodes: EpisodePreview[];
-    text: string;
+    import_id?: string;
+    text?: string;
 }
 
 type Step = 1 | 2 | 3;
@@ -135,6 +136,7 @@ export default function ImportFileDialog({ isOpen, onClose, onSuccess }: ImportF
             const result = await api.importFileConfirm({
                 title: seriesTitle.trim(),
                 description: description.trim() || undefined,
+                import_id: previewResult.import_id,
                 text: previewResult.text,
                 episodes: previewResult.episodes,
             });

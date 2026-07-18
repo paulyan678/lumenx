@@ -1,5 +1,5 @@
 """
-Storyboard Schema v2 — Prompt Assembly & Dialogue-TTS Sync.
+Storyboard Schema v2 — Prompt Assembly & Dialogue Metadata Sync.
 
 Pure functions with no side effects (no I/O, no pipeline/api imports).
 """
@@ -77,8 +77,9 @@ def inject_reference_tags(
 ) -> str:
     """Inject [characterN:name] tags into visual description.
 
-    HappyHorse R2V uses `characterN` as a generic reference-image slot
-    identifier — it does NOT distinguish characters from scenes/props.
+    The storyboard prompt format uses `characterN` as a generic visual
+    reference slot identifier; it does not distinguish characters from
+    scenes or props.
     character1 = first ref image, character2 = second, etc.
 
     Numbering order: characters first (by frame.character_ids order),
@@ -174,8 +175,8 @@ def enrich_prompt_with_dialogue(
 ) -> str:
     """Append a natural-language speaking cue to the video prompt.
 
-    Video models (e.g. HappyHorse) need explicit lip/mouth action in the
-    visual description to generate mouth movement.  We derive a short
+    Video prompts need explicit lip/mouth action in the visual description
+    to request mouth movement. We derive a short
     Chinese sentence from the frame's dialogue and weave it into the tail
     of the prompt so it reads as part of the visual narrative — NOT as a
     separate labelled metadata section.
@@ -207,7 +208,7 @@ def enrich_prompt_with_dialogue(
     return f"{clean}。{cue}"
 
 
-def sync_dialogue_to_tts(frame: StoryboardFrame) -> None:
+def sync_dialogue_metadata(frame: StoryboardFrame) -> None:
     """Sync dialogue_structured emotion/delivery into dialogue_instructions,
     and keep legacy dialogue/speaker fields in sync."""
     if not frame.dialogue_structured:
@@ -218,7 +219,7 @@ def sync_dialogue_to_tts(frame: StoryboardFrame) -> None:
     frame.dialogue = ds.line
     frame.speaker = ds.speaker
 
-    # Build TTS instructions from emotion + delivery
+    # Build dialogue-performance instructions from emotion + delivery
     instr_parts = []
     if ds.emotion:
         instr_parts.append(f"情绪：{ds.emotion}")

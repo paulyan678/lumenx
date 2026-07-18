@@ -3,6 +3,11 @@
 import { useState, useEffect } from "react";
 import EnvConfigDialog from "@/components/project/EnvConfigDialog";
 import { api } from "@/lib/api";
+import {
+  configuredSecretFields,
+  getNewApiValidationErrors,
+  normalizeActiveModel,
+} from "@/lib/newApiModels";
 
 export default function EnvConfigChecker() {
   const [isEnvDialogOpen, setIsEnvDialogOpen] = useState(false);
@@ -20,9 +25,16 @@ export default function EnvConfigChecker() {
   const checkEnvConfig = async () => {
     try {
       const config = await api.getEnvConfig();
-      // 空值和空字符串都视为未配置
-      const dashscopeKey = config.DASHSCOPE_API_KEY?.trim();
-      const hasRequired = dashscopeKey && dashscopeKey.length > 0;
+      const errors = getNewApiValidationErrors(
+        config.NEWAPI_BASE_URL ?? "",
+        {
+          chat: normalizeActiveModel("chat", config.NEWAPI_CHAT_MODEL),
+          image: normalizeActiveModel("image", config.NEWAPI_IMAGE_MODEL),
+          video: normalizeActiveModel("video", config.NEWAPI_VIDEO_MODEL),
+        },
+        configuredSecretFields(config as Record<string, unknown>),
+      );
+      const hasRequired = errors.length === 0;
       
       if (!hasRequired) {
         setEnvRequired(true);

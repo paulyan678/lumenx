@@ -1,28 +1,7 @@
-# API Reference Staging Notes
+# API reference
 
-`docs/api-reference/` in this repository is a **repo-local evidence area**, not the long-term canonical vendor-doc archive.
+LumenX supports a single AI Provider: New API.
 
-Use this folder for:
+- [New API contract](newapi.md) — exact models, model-specific credentials, capabilities, endpoints, and security rules.
 
-- temporary raw-document captures when only the LumenX repo is available
-- implementation evidence attached to a model onboarding PR
-- local review of vendor request/response examples while updating `model_catalog`
-
-Do not assume files here replace the recommended external raw-doc archive repo.
-
-## Recommended interpretation
-
-- **Best case**: the same source page is also archived in the dedicated vendor-doc repo
-- **Repo-only case**: this folder is the local staging mirror until the external archive and Context Hub package are updated
-
-## Minimum metadata to keep in each staged doc
-
-- original source URL
-- capture date
-- provider / family / model scope
-- any version or release note visible in the source
-
-## Related docs
-
-- [Model onboarding implementation](/Users/hoshinoren/Documents/code/project/video_gen/gitlab/tron-comic/docs/model-onboarding-implementation.md)
-- [Model docs and catalog architecture plan](/Users/hoshinoren/Documents/code/project/video_gen/gitlab/tron-comic/docs/plans/2026-04-03-model-docs-and-catalog-architecture.md)
+The files in this directory describe only contracts implemented by the application. Unsupported Provider families and unverified workflows should not be staged as selectable product capabilities.

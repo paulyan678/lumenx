@@ -5,6 +5,58 @@
       "type": "object"
     },
     "defaults": {
+      "properties": {
+        "canonical_model_settings": {
+          "additionalProperties": false,
+          "properties": {
+            "chat_model": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "image_model": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "video_model": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "chat_model",
+            "image_model",
+            "video_model"
+          ],
+          "type": "object"
+        },
+        "model_settings": {
+          "additionalProperties": false,
+          "properties": {
+            "chat_model": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "image_model": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "video_model": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "chat_model",
+            "image_model",
+            "video_model"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "model_settings",
+        "canonical_model_settings"
+      ],
       "type": "object"
     },
     "families": {

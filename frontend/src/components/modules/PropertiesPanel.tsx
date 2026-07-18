@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useTranslations } from "next-intl";
-import { Settings, Sliders, Image as ImageIcon, Type, FileText, Users, Layout, Video, Mic, Music, Film, Info, Paintbrush, Wand2, Sparkles } from "lucide-react";
+import { Settings, Sliders, Image as ImageIcon, Type, FileText, Users, Layout, Video, Music, Film, Info, Paintbrush, Wand2, Sparkles } from "lucide-react";
 import { useProjectStore } from "@/store/projectStore";
 import { useState, useEffect } from "react";
 import { api, API_URL } from "@/lib/api";
@@ -30,8 +30,6 @@ export default function PropertiesPanel({ activeStep }: PropertiesPanelProps) {
                 return <StoryboardInspector />;
             case "motion":
                 return <MotionInspector />;
-            case "audio":
-                return <AudioInspector project={currentProject} />;
             case "mix":
                 return <MixInspector />;
             case "export":
@@ -113,14 +111,11 @@ function AssetsInspector({ project }: { project: any }) {
             else if (type === 'scene') updatePayload.scene_aspect_ratio = ratio;
             else if (type === 'prop') updatePayload.prop_aspect_ratio = ratio;
 
-            const updated = await api.updateModelSettings(
-                currentProject.id,
-                undefined, undefined, undefined,
-                type === 'character' ? ratio : undefined,
-                type === 'scene' ? ratio : undefined,
-                type === 'prop' ? ratio : undefined,
-                undefined
-            );
+            const updated = await api.updateModelSettings(currentProject.id, {
+                character_aspect_ratio: type === 'character' ? ratio : undefined,
+                scene_aspect_ratio: type === 'scene' ? ratio : undefined,
+                prop_aspect_ratio: type === 'prop' ? ratio : undefined,
+            });
             updateProject(currentProject.id, updated);
         } catch (error) {
             console.error('Failed to update aspect ratio:', error);
@@ -824,34 +819,6 @@ function MotionInspector() {
                         <input type="range" className="w-full h-1 bg-glass rounded-lg appearance-none cursor-pointer" />
                     </div>
                 </div>
-            </div>
-        </div>
-    );
-}
-
-function AudioInspector({ project }: { project: any }) {
-    const tp = useTranslations("properties");
-    const assignedCount = project?.characters?.filter((c: any) => c.voice_id).length || 0;
-    const totalCount = project?.characters?.length || 0;
-
-    return (
-        <div className="space-y-6">
-            <div className="space-y-3">
-                <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-                    <Mic size={14} /> {tp("audioStatus")}
-                </h3>
-                <div className="flex items-center gap-2">
-                    <div className="flex-1 h-2 bg-glass rounded-full overflow-hidden">
-                        <div
-                            className="h-full bg-green-500 transition-all duration-500"
-                            style={{ width: `${(assignedCount / totalCount) * 100}%` }}
-                        />
-                    </div>
-                    <span className="text-xs font-mono text-text-secondary">{assignedCount}/{totalCount}</span>
-                </div>
-                <p className="text-xs text-text-muted">
-                    {assignedCount === totalCount ? "All characters casted." : "Some characters need voices."}
-                </p>
             </div>
         </div>
     );

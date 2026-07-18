@@ -1,9 +1,9 @@
-import rawCatalog from '@/generated/modelCatalog.json';
+import {
+  DEFAULT_ACTIVE_MODELS,
+  getApprovedModel,
+  getApprovedModels,
+} from '@/lib/newApiModels';
 import type { PlaygroundMode } from './usePlaygroundStore';
-
-// ---------------------------------------------------------------------------
-// Public types
-// ---------------------------------------------------------------------------
 
 export interface PlaygroundModelOption {
   id: string;
@@ -31,278 +31,71 @@ export interface PlaygroundModelOption {
   maxReferenceImages: number;
 }
 
-// ---------------------------------------------------------------------------
-// Internal catalog typing
-// ---------------------------------------------------------------------------
-
-interface CatalogDuration {
-  type: string;
-  min?: number;
-  max?: number;
-  step?: number;
-  default?: number;
-  value?: number;
-  options?: number[];
+function modeCapability(mode: PlaygroundMode): 'image' | 'video' {
+  return mode === 't2i' || mode === 'i2i' ? 'image' : 'video';
 }
 
-interface CatalogModel {
-  id: string;
-  display_name: string;
-  description: string;
-  family: string;
-  status: string;
-  capabilities: string[];
-  duration?: CatalogDuration | null;
-  params?: Record<string, unknown>;
-  inputs?: {
-    reference_images?: { max?: number };
-  };
-  ui: {
-    selection_group: string;
-    visible_in: string[];
-    recommended?: boolean;
-    order?: number;
-    badges?: string[];
-  };
-}
-
-const catalog = rawCatalog as { models: Record<string, CatalogModel> };
-const allModels = Object.entries(catalog.models);
-
-// ---------------------------------------------------------------------------
-// Family priority maps (lower number = higher priority)
-// ---------------------------------------------------------------------------
-
-const VIDEO_MODES = new Set<string>(['t2v', 'i2v', 'r2v', 'v2v']);
-
-const VIDEO_FAMILY_PRIORITY: Record<string, number> = {
-  happyhorse: 1,
-  seedance: 2,
-  kling: 3,
-  pixverse: 4,
-  wan: 5,
-  vidu: 6,
-};
-
-const IMAGE_FAMILY_PRIORITY: Record<string, number> = {
-  'gpt-image': 1,
-  wan: 2,
-  qwen: 3,
-};
-
-const FALLBACK_PRIORITY = 999;
-
-function getFamilyPriority(family: string, mode: PlaygroundMode): number {
-  const map = VIDEO_MODES.has(mode) ? VIDEO_FAMILY_PRIORITY : IMAGE_FAMILY_PRIORITY;
-  return map[family] ?? FALLBACK_PRIORITY;
-}
-
-// ---------------------------------------------------------------------------
-// Duration normalizer
-// ---------------------------------------------------------------------------
-
-function normalizeDuration(
-  raw: CatalogDuration | null | undefined,
-): PlaygroundModelOption['duration'] {
-  if (!raw) return null;
-
-  if (raw.type === 'slider') {
-    return {
-      type: 'slider',
-      min: raw.min ?? 1,
-      max: raw.max ?? 15,
-      step: raw.step ?? 1,
-      default: raw.default ?? 5,
-    };
-  }
-
-  if (raw.type === 'buttons') {
-    return {
-      type: 'buttons',
-      options: raw.options ?? [],
-      default: raw.default ?? (raw.options?.[0] ?? 5),
-    };
-  }
-
-  if (raw.type === 'fixed') {
-    return {
-      type: 'fixed',
-      value: raw.value ?? 5,
-    };
-  }
-
-  return null;
-}
-
-// ---------------------------------------------------------------------------
-// Params normalizer
-// ---------------------------------------------------------------------------
-
-function normalizeParams(
-  raw: Record<string, unknown> | undefined,
-): PlaygroundModelOption['params'] {
-  if (!raw) return {};
-
-  const result: PlaygroundModelOption['params'] = {};
-
-  // resolution
-  const res = raw.resolution;
-  if (res && typeof res === 'object' && 'options' in (res as object)) {
-    const r = res as { options?: string[]; default?: string };
-    if (r.options) {
-      result.resolution = {
-        options: r.options,
-        default: r.default ?? r.options[0] ?? '',
-      };
-    }
-  }
-
-  // ratio — catalog uses both "ratio" and "aspectRatio"
-  const ratio = raw.ratio ?? raw.aspectRatio;
-  if (ratio && typeof ratio === 'object' && 'options' in (ratio as object)) {
-    const r = ratio as { options?: string[]; default?: string };
-    if (r.options) {
-      result.ratio = {
-        options: r.options,
-        default: r.default ?? r.options[0] ?? '',
-      };
-    }
-  }
-
-  // size (image models use size instead of resolution)
-  const size = raw.size;
-  if (size && typeof size === 'object' && 'options' in (size as object)) {
-    const s = size as { options?: string[]; default?: string };
-    if (s.options) {
-      result.size = {
-        options: s.options,
-        default: s.default ?? s.options[0] ?? '',
-      };
-    }
-  }
-
-  // quality (GPT-Image-2)
-  const quality = raw.quality;
-  if (quality && typeof quality === 'object' && 'options' in (quality as object)) {
-    const q = quality as { options?: string[]; default?: string };
-    if (q.options) {
-      result.quality = {
-        options: q.options,
-        default: q.default ?? q.options[0] ?? '',
-      };
-    }
-  }
-
-  // boolean flags
-  if (typeof raw.seed === 'boolean') result.seed = raw.seed;
-  if (typeof raw.negativePrompt === 'boolean') result.negativePrompt = raw.negativePrompt;
-  if (typeof raw.promptExtend === 'boolean') result.promptExtend = raw.promptExtend;
-  if (typeof raw.watermark === 'boolean') result.watermark = raw.watermark;
-
-  return result;
-}
-
-// ---------------------------------------------------------------------------
-// Model builder
-// ---------------------------------------------------------------------------
-
-function toOption(model: CatalogModel): PlaygroundModelOption {
-  return {
-    id: model.id,
-    displayName: model.display_name,
-    family: model.family,
-    description: model.description,
-    recommended: model.ui.recommended ?? false,
-    badges: model.ui.badges ?? [],
-    capabilities: model.capabilities,
-    duration: normalizeDuration(model.duration),
-    params: normalizeParams(model.params),
-    maxReferenceImages: model.inputs?.reference_images?.max ?? 0,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
-
-/**
- * Return all models whose capabilities include the given mode, sorted by
- * family priority, then recommended-first, then ui.order descending (newer
- * versions first), then alphabetically by display name.
- *
- * Filtering: exclude deprecated/planned models. Include hidden models that
- * have the required capability (they are hidden from Studio but available in
- * Playground — e.g. HappyHorse T2V, Wan 2.7 VideoEdit).
- */
 export function getModelsForMode(mode: PlaygroundMode): PlaygroundModelOption[] {
-  return allModels
-    .filter(([, model]) => {
-      if (model.status === 'deprecated' || model.status === 'planned') return false;
-      if (!model.capabilities.includes(mode)) return false;
-      return true;
-    })
-    .sort(([, a], [, b]) => {
-      // 1. Family priority
-      const famA = getFamilyPriority(a.family, mode);
-      const famB = getFamilyPriority(b.family, mode);
-      if (famA !== famB) return famA - famB;
-
-      // 2. Recommended first
-      const recA = a.ui.recommended ? 0 : 1;
-      const recB = b.ui.recommended ? 0 : 1;
-      if (recA !== recB) return recA - recB;
-
-      // 3. ui.order descending (higher order = newer version = comes first)
-      const orderA = a.ui.order ?? 0;
-      const orderB = b.ui.order ?? 0;
-      if (orderA !== orderB) return orderB - orderA;
-
-      // 4. Alphabetical fallback
-      return a.display_name.localeCompare(b.display_name);
-    })
-    .map(([, model]) => toOption(model));
+  const capability = modeCapability(mode);
+  return getApprovedModels(capability)
+    .filter((model) => model.capabilities.includes(mode))
+    .map((model) => ({
+      id: model.id,
+      displayName: model.name,
+      family: 'newapi',
+      description: model.description,
+      recommended: model.id === DEFAULT_ACTIVE_MODELS[capability],
+      badges: ['New API'],
+      capabilities: [...model.capabilities],
+      duration: capability === 'video'
+        ? { type: 'slider' as const, min: 4, max: 15, step: 1, default: 5 }
+        : null,
+      params: capability === 'video'
+        ? {
+            resolution: { options: ['720p', '1080p'], default: '720p' },
+            ratio: { options: ['16:9', '9:16', '1:1'], default: '16:9' },
+            seed: true,
+            watermark: true,
+          }
+        : {
+            size: {
+              options: ['1536x1024', '1024x1024', '1024x1536'],
+              default: '1536x1024',
+            },
+            quality: { options: ['auto', 'high', 'medium', 'low'], default: 'auto' },
+          },
+      maxReferenceImages: mode === 'i2i' ? 16 : 0,
+    }));
 }
 
-/**
- * Return the default (recommended or first) model ID for a mode.
- */
 export function getDefaultModelForMode(mode: PlaygroundMode): string {
+  const capability = modeCapability(mode);
+  const preferred = DEFAULT_ACTIVE_MODELS[capability];
   const models = getModelsForMode(mode);
-  const recommended = models.find((m) => m.recommended);
-  return recommended?.id ?? models[0]?.id ?? '';
+  return models.some((model) => model.id === preferred) ? preferred : models[0]?.id ?? '';
 }
 
-/**
- * Lightweight display-info lookup — works for any model ID, regardless of
- * mode or status.
- */
 export function getModelDisplayInfo(
   modelId: string,
 ): { displayName: string; family: string } | null {
-  const model = catalog.models[modelId];
-  if (!model) return null;
-  return { displayName: model.display_name, family: model.family };
+  const model = getApprovedModel(modelId);
+  return model ? { displayName: model.name, family: 'newapi' } : null;
 }
 
-/**
- * Return the normalized params for a model, or null if the model is unknown.
- */
 export function getModelParams(
   modelId: string,
 ): PlaygroundModelOption['params'] | null {
-  const model = catalog.models[modelId];
+  const model = getApprovedModel(modelId);
   if (!model) return null;
-  return normalizeParams(model.params);
+  const mode: PlaygroundMode = model.capability === 'image' ? 't2i' : 'i2v';
+  return getModelsForMode(mode).find((candidate) => candidate.id === modelId)?.params ?? null;
 }
 
-/**
- * Return the normalized duration config for a model (null when the model has
- * no duration knob, e.g. image models).
- */
 export function getModelDuration(
   modelId: string,
 ): PlaygroundModelOption['duration'] {
-  const model = catalog.models[modelId];
-  if (!model) return null;
-  return normalizeDuration(model.duration);
+  const model = getApprovedModel(modelId);
+  return model?.capability === 'video'
+    ? { type: 'slider', min: 4, max: 15, step: 1, default: 5 }
+    : null;
 }

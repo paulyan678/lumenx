@@ -2,11 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, X, Image, Video, Layout, Check, User, Building, Box, Loader2 } from 'lucide-react';
+import { Settings, X, Image, Video, Layout, Check, User, Building, Box, Loader2, MessageSquare } from 'lucide-react';
 import { ASPECT_RATIOS } from '@/store/projectStore';
 import {
     SERIES_IMAGE_MODELS,
     SERIES_I2V_MODELS,
+    SERIES_CHAT_MODELS,
     resolveModelSettings,
 } from '@/lib/modelCatalog';
 import { api } from '@/lib/api';
@@ -24,8 +25,8 @@ export default function SeriesModelSettingsModal({ isOpen, onClose, seriesId, on
     const t = useTranslations("models");
     const tc = useTranslations("common");
     const defaultSettings = resolveModelSettings(undefined, 'series_settings');
-    const [t2iModel, setT2iModel] = useState(defaultSettings.t2i_model);
-    const [i2iModel, setI2iModel] = useState(defaultSettings.i2i_model);
+    const [chatModel, setChatModel] = useState(defaultSettings.chat_model);
+    const [imageModel, setImageModel] = useState(defaultSettings.image_model);
     const [i2vModel, setI2vModel] = useState(defaultSettings.i2v_model);
     const [characterAspectRatio, setCharacterAspectRatio] = useState(defaultSettings.character_aspect_ratio);
     const [sceneAspectRatio, setSceneAspectRatio] = useState(defaultSettings.scene_aspect_ratio);
@@ -42,8 +43,8 @@ export default function SeriesModelSettingsModal({ isOpen, onClose, seriesId, on
             api.getSeriesModelSettings(seriesId)
                 .then((data) => {
                     const resolvedSettings = resolveModelSettings(data, 'series_settings');
-                    setT2iModel(resolvedSettings.t2i_model);
-                    setI2iModel(resolvedSettings.i2i_model);
+                    setChatModel(resolvedSettings.chat_model);
+                    setImageModel(resolvedSettings.image_model);
                     setI2vModel(resolvedSettings.i2v_model);
                     setCharacterAspectRatio(resolvedSettings.character_aspect_ratio);
                     setSceneAspectRatio(resolvedSettings.scene_aspect_ratio);
@@ -62,8 +63,11 @@ export default function SeriesModelSettingsModal({ isOpen, onClose, seriesId, on
         setIsSaving(true);
         try {
             await api.updateSeriesModelSettings(seriesId, {
-                t2i_model: t2iModel,
-                i2i_model: i2iModel,
+                chat_model: chatModel,
+                image_model: imageModel,
+                t2i_model: imageModel,
+                i2i_model: imageModel,
+                video_model: i2vModel,
                 i2v_model: i2vModel,
                 character_aspect_ratio: characterAspectRatio,
                 scene_aspect_ratio: sceneAspectRatio,
@@ -127,6 +131,16 @@ export default function SeriesModelSettingsModal({ isOpen, onClose, seriesId, on
                             </div>
                         ) : (
                             <>
+                                <div className="space-y-3">
+                                    <div className="flex items-center gap-2 text-sm font-bold text-foreground">
+                                        <MessageSquare size={16} className="text-primary" />
+                                        <span>{t("chatModel")}</span>
+                                    </div>
+                                    <GroupedModelGrid models={SERIES_CHAT_MODELS} selectedId={chatModel} onSelect={setChatModel} />
+                                </div>
+
+                                <div className="border-t border-glass-border" />
+
                                 {/* Assets Section */}
                                 <div className="space-y-5">
                                     <div className="flex items-center gap-2 text-sm font-bold text-foreground">
@@ -138,8 +152,8 @@ export default function SeriesModelSettingsModal({ isOpen, onClose, seriesId, on
                                         <label className="text-xs text-text-secondary">{t("model")}</label>
                                         <GroupedModelGrid
                                             models={SERIES_IMAGE_MODELS}
-                                            selectedId={t2iModel}
-                                            onSelect={(id) => setT2iModel(id)}
+                                            selectedId={imageModel}
+                                            onSelect={setImageModel}
                                         />
                                     </div>
 
@@ -180,15 +194,6 @@ export default function SeriesModelSettingsModal({ isOpen, onClose, seriesId, on
                                     <div className="flex items-center gap-2 text-sm font-bold text-foreground">
                                         <Layout size={16} className="text-blue-400" />
                                         <span>{t("storyboardI2I")}</span>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <label className="text-xs text-text-secondary">{t("model")}</label>
-                                        <GroupedModelGrid
-                                            models={SERIES_IMAGE_MODELS}
-                                            selectedId={i2iModel}
-                                            onSelect={(id) => setI2iModel(id)}
-                                        />
                                     </div>
 
                                     <div className="space-y-2">

@@ -26,7 +26,8 @@ When the user asks to do any of the following in this repository:
 
 - onboard a new model into LumenX
 - update model docs, model versions, defaults, or parameters
-- refresh Wan / Kling / Vidu / PixVerse model support
+- update the approved New API chat, image, or video model set
+- change New API model IDs, capabilities, or model-specific credential routing
 - run the LumenX model onboarding workflow
 - review whether a model change is catalog-only or also needs runtime / UI work
 - use `/lumenx-model-onboarding`
@@ -64,7 +65,7 @@ If both Claude and Codex guidance exist, preserve behavior parity unless the use
 
 ## Overview
 
-The AI Comic Generator is a complete AI-powered comic video production platform that supports the full workflow from script to finished video. It uses Next.js frontend with FastAPI backend, integrating AI services like Qwen from Alibaba Cloud.
+The AI Comic Generator is a complete AI-powered comic video production platform that supports the full workflow from script to finished video. It uses a Next.js frontend with a FastAPI backend and routes all AI inference through one New API-compatible provider.
 
 ## Architecture
 
@@ -77,7 +78,8 @@ The AI Comic Generator is a complete AI-powered comic video production platform 
 
 ### Backend
 - Framework: FastAPI (Python 3.11+)
-- AI integration: Alibaba Cloud Qwen/Wanx services via DashScope
+- AI integration: New API only, using exact model IDs and model-specific API keys
+- Optional cloud storage: Alibaba Cloud OSS (independent from AI provider routing)
 - Data validation: Pydantic
 - File storage: Local + Alibaba Cloud OSS
 
@@ -120,7 +122,7 @@ src/
 ```bash
 # Copy environment template
 cp .env.example .env
-# Edit .env and add your Alibaba Cloud API keys
+# Edit .env and add the New API base URL and per-model API keys
 ```
 
 ### Backend Development
@@ -226,7 +228,8 @@ User project data is stored in `~/.tron/comic/`:
 - Follow existing component structure patterns
 
 ### Configuration
-- API keys can be configured via `.env` file or app settings dialog
+- New API model-specific keys can be configured via `.env` or the app settings dialog
+- AI requests must use the selected model's exact key; shared-key and cross-model fallback are not supported
 - OSS configuration is optional but recommended for cloud storage
 - Model settings can be changed per project via `update_model_settings`
 
@@ -234,7 +237,7 @@ User project data is stored in `~/.tron/comic/`:
 
 ### Common Issues
 - FFmpeg not found: Install FFmpeg and ensure it's in PATH
-- API keys missing: Configure via app settings or .env file
+- API keys missing: Configure the selected New API model's key via app settings or `.env`
 - OSS errors: Verify credentials and bucket permissions
 - Video merge failures: Check if video files exist and have proper paths
 

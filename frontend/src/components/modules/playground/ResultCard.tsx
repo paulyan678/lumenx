@@ -18,8 +18,6 @@ interface ResultCardProps {
 const MODE_LABELS: Record<string, string> = {
   t2v: 'T2V',
   i2v: 'I2V',
-  r2v: 'R2V',
-  v2v: 'V2V',
   t2i: 'T2I',
   i2i: 'I2I',
 };
@@ -127,7 +125,7 @@ function CompletedCard({ generation, outputIndex, onGenerateVideo, onOpenDetail 
   const { prompt, model_id, mode, outputs, created_at } = generation;
   const t = useTranslations('playground');
   const output = outputs[outputIndex];
-  const isVideo = output?.media_type === 'video' || ['t2v', 'i2v', 'r2v', 'v2v'].includes(mode);
+  const isVideo = output?.media_type === 'video' || ['t2v', 'i2v'].includes(mode);
   const [saving, setSaving] = useState(false);
 
   const saved = output?.saved_to_library ?? false;

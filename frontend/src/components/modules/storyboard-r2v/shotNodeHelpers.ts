@@ -12,7 +12,7 @@ import { T2I_HISTORY_LIMIT, type ShotNode } from "./ShotCard";
 /** Bring a shot from disk (localStorage draft) into the v2 shape.
  *  Idempotent — calling on an already-v2 shot returns identity. */
 export function migrateShotNode(shot: ShotNode): ShotNode {
-    let next = shot;
+    let next: ShotNode = { ...shot, tabMode: "t2i_i2v" };
     // t2iImageUrls: seed from legacy single-image field if needed.
     if (!Array.isArray(next.t2iImageUrls)) {
         const seed = typeof next.t2iImageUrl === "string" && next.t2iImageUrl
@@ -29,12 +29,9 @@ export function migrateShotNode(shot: ShotNode): ShotNode {
     }
     // videoTaskIdsByTab: default empty buckets.
     if (!next.videoTaskIdsByTab) {
-        // Backfill: legacy single videoTaskId belongs to the shot's
-        // current tabMode so the candidates panel sees it instead of
-        // pretending there's no history.
-        const buckets: { t2i_i2v?: string[]; direct_r2v?: string[] } = {};
+        const buckets: { t2i_i2v?: string[] } = {};
         if (next.videoTaskId) {
-            buckets[next.tabMode] = [next.videoTaskId];
+            buckets.t2i_i2v = [next.videoTaskId];
         }
         next = { ...next, videoTaskIdsByTab: buckets };
     }
@@ -140,7 +137,7 @@ export function getActiveT2IImageUrl(shot: ShotNode): string | undefined {
  *  script's video_tasks array). Idempotent on dup ids. */
 export function appendVideoTaskId(
     shot: ShotNode,
-    tabMode: "t2i_i2v" | "direct_r2v",
+    tabMode: "t2i_i2v",
     taskId: string,
 ): ShotNode {
     if (!taskId) return shot;
@@ -169,12 +166,11 @@ export function appendVideoTaskId(
  *  checked frame.video_url) caused hero to go blank after refine when
  *  the backend hadn't persisted frame.video_url yet.
  *
- *  `defaultTabMode` lets callers override the fallback ("direct_r2v")
- *  when they have more context (e.g. project-level i2v default). */
+ *  Stale workbench modes always migrate to the supported I2V flow. */
 export function frameToShotNode(
     frame: any,
     videoTasks: any[],
-    defaultTabMode: "t2i_i2v" | "direct_r2v" = "direct_r2v",
+    defaultTabMode: "t2i_i2v" = "t2i_i2v",
 ): ShotNode {
     const frameTasks = (videoTasks ?? []).filter((t: any) => t.frame_id === frame.id);
     const inFlightTask = frameTasks.find((t: any) =>
@@ -201,7 +197,7 @@ export function frameToShotNode(
     return migrateShotNode({
         id: frame.id,
         prompt: frame.visual_description || frame.action_description || "",
-        tabMode: (frame.workbench_tab_mode as "t2i_i2v" | "direct_r2v" | undefined) ?? defaultTabMode,
+        tabMode: defaultTabMode,
         videoUrl,
         videoStatus,
         videoTaskId,
@@ -225,7 +221,7 @@ export function frameToShotNode(
 /** Per-tab task id list, with legacy single-id fallback. */
 export function videoTaskIdsForTab(
     shot: ShotNode,
-    tabMode: "t2i_i2v" | "direct_r2v",
+    tabMode: "t2i_i2v",
 ): string[] {
     const direct = shot.videoTaskIdsByTab?.[tabMode];
     if (Array.isArray(direct)) return direct;

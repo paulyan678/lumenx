@@ -1,4 +1,9 @@
 import { create } from 'zustand';
+import {
+  DEFAULT_ACTIVE_MODELS,
+  isApprovedModelForCapability,
+  normalizeActiveModel,
+} from '@/lib/newApiModels';
 
 // ---------------------------------------------------------------------------
 // Featured (best-of-batch) persistence — client-side localStorage only.
@@ -50,11 +55,39 @@ function saveConcurrency(n: number): void {
 
 let queueSeq = 0;
 
+const MODEL_PREFERENCES_LS_KEY = 'lumenx:playground:model-preferences';
+
+function loadModelPreferences(): Partial<Record<PlaygroundMode, string>> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(MODEL_PREFERENCES_LS_KEY) || '{}') as Record<string, unknown>;
+    const result: Partial<Record<PlaygroundMode, string>> = {};
+    for (const mode of ['t2i', 'i2i', 't2v', 'i2v'] as const) {
+      const capability = mode === 't2i' || mode === 'i2i' ? 'image' : 'video';
+      if (typeof parsed[mode] === 'string' && isApprovedModelForCapability(parsed[mode] as string, capability)) {
+        result[mode] = parsed[mode] as string;
+      }
+    }
+    return result;
+  } catch {
+    return {};
+  }
+}
+
+function saveModelPreferences(preferences: Partial<Record<PlaygroundMode, string>>): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(MODEL_PREFERENCES_LS_KEY, JSON.stringify(preferences));
+  } catch {
+    /* ignore quota / privacy-mode failures */
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export type PlaygroundMode = 't2i' | 'i2i' | 't2v' | 'i2v' | 'r2v' | 'v2v';
+export type PlaygroundMode = 't2i' | 'i2i' | 't2v' | 'i2v';
 
 export interface PlaygroundOutput {
   id: string;
@@ -160,9 +193,8 @@ interface PlaygroundState {
   setNegativePrompt: (neg: string) => void;
   setInputMedia: (media: string[]) => void;
   /** Push a generated result back into the compose panel as reference input,
-   *  switching to the appropriate mode. Image → i2i (default) or i2v when an
-   *  explicit targetMode is given; video → v2v. Respects per-mode model
-   *  preference (same behavior as setMode). */
+   *  switching an image to i2i (default) or i2v. Video-to-video is not
+   *  supported by the approved New API catalog. */
   useResultAsReference: (
     mediaPath: string,
     mediaType: 'image' | 'video',
@@ -199,7 +231,7 @@ interface PlaygroundState {
 // ---------------------------------------------------------------------------
 
 const DEFAULT_MODE: PlaygroundMode = 't2i';
-const DEFAULT_MODEL_ID = '';
+const DEFAULT_MODEL_ID = DEFAULT_ACTIVE_MODELS.image;
 const DEFAULT_PROMPT = '';
 const DEFAULT_BATCH_SIZE = 1;
 
@@ -218,7 +250,7 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
   batchSize: DEFAULT_BATCH_SIZE,
 
   // -- Model preferences ----------------------------------------------------
-  modelPreferences: {},
+  modelPreferences: loadModelPreferences(),
 
   // -- History ---------------------------------------------------------------
   history: [],
@@ -285,18 +317,23 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
 
   setMode: (mode) => {
     const { modelPreferences } = get();
-    const preferredModel = modelPreferences[mode];
+    const capability = mode === 't2i' || mode === 'i2i' ? 'image' : 'video';
+    const preferredModel = normalizeActiveModel(capability, modelPreferences[mode]);
     set({
       mode,
-      ...(preferredModel !== undefined ? { modelId: preferredModel } : {}),
+      modelId: preferredModel,
     });
   },
 
   setModelId: (modelId) => {
     const { mode, modelPreferences } = get();
+    const capability = mode === 't2i' || mode === 'i2i' ? 'image' : 'video';
+    if (!isApprovedModelForCapability(modelId, capability)) return;
+    const nextPreferences = { ...modelPreferences, [mode]: modelId };
+    saveModelPreferences(nextPreferences);
     set({
       modelId,
-      modelPreferences: { ...modelPreferences, [mode]: modelId },
+      modelPreferences: nextPreferences,
     });
   },
 
@@ -307,14 +344,15 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
   setInputMedia: (inputMedia) => set({ inputMedia }),
 
   useResultAsReference: (mediaPath, mediaType, targetMode) => {
+    if (mediaType === 'video') return;
     const { modelPreferences } = get();
-    const mode: PlaygroundMode =
-      targetMode ?? (mediaType === 'video' ? 'v2v' : 'i2i');
-    const preferredModel = modelPreferences[mode];
+    const mode: PlaygroundMode = targetMode ?? 'i2i';
+    const capability = mode === 't2i' || mode === 'i2i' ? 'image' : 'video';
+    const preferredModel = normalizeActiveModel(capability, modelPreferences[mode]);
     set({
       mode,
       inputMedia: [mediaPath],
-      ...(preferredModel !== undefined ? { modelId: preferredModel } : {}),
+      modelId: preferredModel,
     });
   },
 
@@ -398,7 +436,9 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
       patch.mode = template.default_mode;
     }
     if (template.default_model_id != null) {
-      patch.modelId = template.default_model_id;
+      const nextMode = patch.mode ?? get().mode;
+      const capability = nextMode === 't2i' || nextMode === 'i2i' ? 'image' : 'video';
+      patch.modelId = normalizeActiveModel(capability, template.default_model_id);
     }
     if (
       template.default_parameters != null &&

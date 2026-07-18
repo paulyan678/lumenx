@@ -1,16 +1,23 @@
-import os
+"""Strict New API-only catalog routing metadata.
+
+The executable model/key pairing lives in :mod:`src.utils.newapi_models`.
+This module remains as the catalog-family compatibility layer used by the
+catalog loader and diagnostics; it deliberately exposes no provider switch.
+"""
+
 from dataclasses import dataclass, field, replace
 from typing import Dict, Mapping, Optional, Sequence, Tuple
 
 from .model_catalog import build_provider_family_configs, load_generated_model_catalog
 
-SUPPORTED_PROVIDER_BACKENDS = ("dashscope", "vendor", "mulerouter")
+
+SUPPORTED_PROVIDER_BACKENDS = ("newapi",)
 
 
 @dataclass
 class ProviderFamilyConfig:
     model_family: str
-    backend_default: str = "dashscope"
+    backend_default: str = "newapi"
     backend_env_key: Optional[str] = None
     credential_sources: Dict[str, Tuple[str, ...]] = field(default_factory=dict)
     supported_modalities: Tuple[str, ...] = field(default_factory=tuple)
@@ -20,7 +27,7 @@ class ProviderFamilyConfig:
 
 
 class ProviderRegistry:
-    """Data-driven provider routing registry keyed by model family prefix."""
+    """Catalog family registry with a fixed New API backend."""
 
     def __init__(self, families: Optional[Sequence[ProviderFamilyConfig]] = None):
         self._families: Dict[str, ProviderFamilyConfig] = {}
@@ -31,13 +38,27 @@ class ProviderRegistry:
         family = (config.model_family or "").strip().lower()
         if not family:
             raise ValueError("model_family cannot be empty")
+
         backend_default = (config.backend_default or "").strip().lower()
-        if backend_default not in SUPPORTED_PROVIDER_BACKENDS:
-            raise ValueError(f"Unsupported backend_default: {config.backend_default}")
+        if backend_default != "newapi":
+            raise ValueError(
+                f"Unsupported provider backend '{config.backend_default}'. "
+                "LumenX supports New API only."
+            )
+
+        unsupported_sources = set(config.credential_sources) - {"newapi"}
+        if unsupported_sources:
+            providers = ", ".join(sorted(unsupported_sources))
+            raise ValueError(
+                f"Unsupported credential provider(s): {providers}. "
+                "LumenX supports New API only."
+            )
+
         self._families[family] = replace(
             config,
             model_family=family,
-            backend_default=backend_default,
+            backend_default="newapi",
+            backend_env_key=None,
         )
 
     def get_family_config(self, model_name: str) -> ProviderFamilyConfig:
@@ -45,231 +66,54 @@ class ProviderRegistry:
         if not normalized:
             raise ValueError("model_name cannot be empty")
 
-        for family in sorted(self._families.keys(), key=len, reverse=True):
+        for family in sorted(self._families, key=len, reverse=True):
             if normalized.startswith(family):
                 return self._families[family]
         raise KeyError(f"No provider family registered for model '{model_name}'")
 
-    def resolve_backend(self, model_name: str, env: Optional[Mapping[str, str]] = None) -> str:
-        family = self.get_family_config(model_name)
-        mode = ""
-        if family.backend_env_key:
-            env_mapping = env if env is not None else os.environ
-            mode = (env_mapping.get(family.backend_env_key) or "").strip().lower()
-
-        if mode in SUPPORTED_PROVIDER_BACKENDS:
-            return mode
-        return family.backend_default
-
-
-DEFAULT_PROVIDER_FAMILIES: Tuple[ProviderFamilyConfig, ...] = (
-    ProviderFamilyConfig(
-        model_family="wan2.7-",
-        backend_default="dashscope",
-        credential_sources={
-            "dashscope": ("DASHSCOPE_API_KEY",),
-        },
-        supported_modalities=("t2i", "i2i", "image", "i2v", "r2v"),
-        image_input_mode={
-            "dashscope": "dashscope_multimodal_message",
-        },
-        audio_input_mode={
-            "dashscope": "dashscope_temp_file_url",
-        },
-        reference_video_input_mode={
-            "dashscope": "dashscope_temp_file_url",
-        },
-    ),
-    ProviderFamilyConfig(
-        model_family="wan2.6-",
-        backend_default="dashscope",
-        credential_sources={
-            "dashscope": ("DASHSCOPE_API_KEY",),
-        },
-        supported_modalities=("t2i", "i2i", "i2v", "r2v"),
-        image_input_mode={
-            "dashscope": "dashscope_multimodal_message",
-        },
-        audio_input_mode={
-            "dashscope": "dashscope_temp_file_url",
-        },
-        reference_video_input_mode={
-            "dashscope": "dashscope_temp_file_url",
-        },
-    ),
-    ProviderFamilyConfig(
-        model_family="qwen-image-",
-        backend_default="dashscope",
-        credential_sources={
-            "dashscope": ("DASHSCOPE_API_KEY",),
-        },
-        supported_modalities=("t2i", "i2i", "image"),
-        image_input_mode={
-            "dashscope": "dashscope_multimodal_message",
-        },
-        audio_input_mode={
-            "dashscope": "dashscope_temp_file_url",
-        },
-        reference_video_input_mode={
-            "dashscope": "dashscope_temp_file_url",
-        },
-    ),
-    ProviderFamilyConfig(
-        model_family="kling/kling-",
-        backend_default="dashscope",
-        backend_env_key="KLING_PROVIDER_MODE",
-        credential_sources={
-            "dashscope": ("DASHSCOPE_API_KEY",),
-            "vendor": ("KLING_ACCESS_KEY", "KLING_SECRET_KEY"),
-        },
-        supported_modalities=("t2v", "i2v", "r2v"),
-        image_input_mode={
-            "dashscope": "dashscope_image_to_video",
-            "vendor": "kling_vendor_base64_image",
-        },
-        audio_input_mode={
-            "dashscope": "dashscope_temp_file_url",
-            "vendor": "kling_vendor_audio_url",
-        },
-        reference_video_input_mode={
-            "dashscope": "dashscope_temp_file_url",
-            "vendor": "kling_vendor_video_url",
-        },
-    ),
-    ProviderFamilyConfig(
-        model_family="kling-",
-        backend_default="dashscope",
-        backend_env_key="KLING_PROVIDER_MODE",
-        credential_sources={
-            "dashscope": ("DASHSCOPE_API_KEY",),
-            "vendor": ("KLING_ACCESS_KEY", "KLING_SECRET_KEY"),
-        },
-        supported_modalities=("t2v", "i2v", "r2v"),
-        image_input_mode={
-            "dashscope": "dashscope_image_to_video",
-            "vendor": "kling_vendor_base64_image",
-        },
-        audio_input_mode={
-            "dashscope": "dashscope_temp_file_url",
-            "vendor": "kling_vendor_audio_url",
-        },
-        reference_video_input_mode={
-            "dashscope": "dashscope_temp_file_url",
-            "vendor": "kling_vendor_video_url",
-        },
-    ),
-    ProviderFamilyConfig(
-        model_family="vidu/vidu",
-        backend_default="dashscope",
-        backend_env_key="VIDU_PROVIDER_MODE",
-        credential_sources={
-            "dashscope": ("DASHSCOPE_API_KEY",),
-            "vendor": ("VIDU_API_KEY",),
-        },
-        supported_modalities=("t2v", "i2v", "r2v"),
-        image_input_mode={
-            "dashscope": "dashscope_image_to_video",
-            "vendor": "vidu_vendor_image_url",
-        },
-        audio_input_mode={
-            "dashscope": "dashscope_temp_file_url",
-            "vendor": "vidu_vendor_audio_url",
-        },
-        reference_video_input_mode={
-            "dashscope": "dashscope_temp_file_url",
-            "vendor": "vidu_vendor_video_url",
-        },
-    ),
-    ProviderFamilyConfig(
-        model_family="vidu",
-        backend_default="dashscope",
-        backend_env_key="VIDU_PROVIDER_MODE",
-        credential_sources={
-            "dashscope": ("DASHSCOPE_API_KEY",),
-            "vendor": ("VIDU_API_KEY",),
-        },
-        supported_modalities=("t2v", "i2v", "r2v"),
-        image_input_mode={
-            "dashscope": "dashscope_image_to_video",
-            "vendor": "vidu_vendor_image_url",
-        },
-        audio_input_mode={
-            "dashscope": "dashscope_temp_file_url",
-            "vendor": "vidu_vendor_audio_url",
-        },
-        reference_video_input_mode={
-            "dashscope": "dashscope_temp_file_url",
-            "vendor": "vidu_vendor_video_url",
-        },
-    ),
-    ProviderFamilyConfig(
-        model_family="pixverse/pixverse-",
-        backend_default="dashscope",
-        credential_sources={
-            "dashscope": ("DASHSCOPE_API_KEY",),
-        },
-        supported_modalities=("t2v", "i2v", "r2v"),
-        image_input_mode={
-            "dashscope": "dashscope_image_to_video",
-        },
-        audio_input_mode={
-            "dashscope": "dashscope_temp_file_url",
-        },
-        reference_video_input_mode={
-            "dashscope": "dashscope_temp_file_url",
-        },
-    ),
-    ProviderFamilyConfig(
-        model_family="pixverse-",
-        backend_default="dashscope",
-        credential_sources={
-            "dashscope": ("DASHSCOPE_API_KEY",),
-        },
-        supported_modalities=("t2v", "i2v", "r2v"),
-        image_input_mode={
-            "dashscope": "dashscope_image_to_video",
-        },
-        audio_input_mode={
-            "dashscope": "dashscope_temp_file_url",
-        },
-        reference_video_input_mode={
-            "dashscope": "dashscope_temp_file_url",
-        },
-    ),
-)
+    def resolve_backend(
+        self,
+        model_name: str,
+        env: Optional[Mapping[str, str]] = None,
+    ) -> str:
+        # Resolve the family first so unsupported model IDs still fail closed.
+        self.get_family_config(model_name)
+        return "newapi"
 
 
 def get_default_provider_registry() -> ProviderRegistry:
-    try:
-        catalog = load_generated_model_catalog()
-        return ProviderRegistry(build_provider_family_configs(catalog))
-    except Exception:
-        return ProviderRegistry(DEFAULT_PROVIDER_FAMILIES)
+    """Build the registry from the validated generated catalog.
+
+    A missing or invalid catalog is an application configuration error; there
+    is intentionally no legacy provider-family fallback.
+    """
+
+    catalog = load_generated_model_catalog()
+    return ProviderRegistry(build_provider_family_configs(catalog))
 
 
-def resolve_provider_backend(model_name: str, env: Optional[Mapping[str, str]] = None) -> str:
+def resolve_provider_backend(
+    model_name: str,
+    env: Optional[Mapping[str, str]] = None,
+) -> str:
     return get_default_provider_registry().resolve_backend(model_name=model_name, env=env)
 
-
-# ---------------------------------------------------------------------------
-# Phase 2: Gateway metadata inspection (read-only, no routing changes)
-# ---------------------------------------------------------------------------
 
 def get_gateway_for_model(
     model_id: str,
     backend: Optional[str] = None,
 ) -> Optional[str]:
-    """Inspect the gateway metadata for a model (flat or canonical ID).
+    """Return catalog gateway metadata for an approved New API model."""
 
-    This is a read-only diagnostic helper.  It does NOT change routing
-    behavior — current routing remains family-prefix based.
-    """
     from .model_catalog import get_catalog_accessor
 
-    accessor = get_catalog_accessor()
-    canonical_id = accessor.resolve_legacy_to_canonical(model_id)
-    if canonical_id is None:
-        canonical_id = model_id  # already canonical or unknown
+    requested_backend = (backend or "newapi").strip().lower()
+    if requested_backend != "newapi":
+        raise ValueError(
+            f"Unsupported provider backend '{requested_backend}'. "
+            "LumenX supports New API only."
+        )
 
-    resolved_backend = backend or "dashscope"
-    return accessor.get_gateway(canonical_id, resolved_backend)
+    accessor = get_catalog_accessor()
+    canonical_id = accessor.resolve_legacy_to_canonical(model_id) or model_id
+    return accessor.get_gateway(canonical_id, "newapi")

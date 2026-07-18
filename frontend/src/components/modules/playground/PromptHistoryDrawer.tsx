@@ -15,8 +15,6 @@ const MODE_LABELS: Record<string, string> = {
   i2i: 'I2I',
   t2v: 'T2V',
   i2v: 'I2V',
-  r2v: 'R2V',
-  v2v: 'V2V',
 };
 
 type RelTime =

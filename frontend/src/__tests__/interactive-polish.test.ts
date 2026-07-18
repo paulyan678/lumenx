@@ -108,19 +108,6 @@ function buildVideoPolishPayload(draftPrompt: string, feedback: string = "") {
     };
 }
 
-/** Mirrors api.polishR2VPrompt payload */
-function buildR2VPolishPayload(
-    draftPrompt: string,
-    slots: { description: string }[],
-    feedback: string = "",
-) {
-    return {
-        draft_prompt: draftPrompt,
-        slots: slots,
-        feedback: feedback,
-    };
-}
-
 /** Mirrors api.refineFramePrompt payload */
 function buildRefineFramePayload(
     frameId: string,
@@ -151,31 +138,6 @@ describe('buildVideoPolishPayload', () => {
             draft_prompt: "a nice prompt",
             feedback: "make it more cinematic",
         });
-    });
-});
-
-describe('buildR2VPolishPayload', () => {
-    it('should include slots and empty feedback by default', () => {
-        const slots = [{ description: "warrior" }];
-        const payload = buildR2VPolishPayload("prompt", slots);
-        expect(payload).toEqual({
-            draft_prompt: "prompt",
-            slots: [{ description: "warrior" }],
-            feedback: "",
-        });
-    });
-
-    it('should include feedback when provided', () => {
-        const slots = [{ description: "warrior" }, { description: "mage" }];
-        const payload = buildR2VPolishPayload("prompt", slots, "add more action");
-        expect(payload.feedback).toBe("add more action");
-        expect(payload.slots).toHaveLength(2);
-    });
-
-    it('should work with empty slots array', () => {
-        const payload = buildR2VPolishPayload("prompt", [], "feedback");
-        expect(payload.slots).toEqual([]);
-        expect(payload.feedback).toBe("feedback");
     });
 });
 

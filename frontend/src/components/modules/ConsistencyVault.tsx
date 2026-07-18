@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { motion, AnimatePresence } from "framer-motion";
-import { Paintbrush, User, Users, MapPin, Box, Lock, Unlock, RefreshCw, Upload, Image as ImageIcon, X, Check, Settings, ChevronRight, Trash2, Plus, Link as LinkIcon } from "lucide-react";
+import { User, Users, MapPin, Box, Lock, Unlock, RefreshCw, Upload, Image as ImageIcon, X, Check, Settings, ChevronRight, Trash2, Plus, Link as LinkIcon } from "lucide-react";
 import { useProjectStore } from "@/store/projectStore";
 import { api, API_URL, crudApi } from "@/lib/api";
 import { getAssetUrl } from "@/lib/utils";
@@ -406,17 +406,6 @@ export default function ConsistencyVault() {
             </div>
 
             {/* Content Grid */}
-            {currentProject?.workflow_mode !== "i2v_legacy" && (
-                <div className="mx-6 mt-4 px-4 py-3 rounded-lg bg-primary/5 border border-primary/20 flex items-start gap-3">
-                    <Paintbrush size={16} className="text-primary mt-0.5 shrink-0" />
-                    <div>
-                        <p className="text-sm font-medium text-foreground">{tv("r2vModeActive")}</p>
-                        <p className="text-xs text-text-secondary mt-0.5">
-                            {tv("r2vBannerDesc")}
-                        </p>
-                    </div>
-                </div>
-            )}
             <div className="flex-1 overflow-y-auto p-6">
                 {!currentProject ? (
                     <div className="flex items-center justify-center h-full text-text-muted">

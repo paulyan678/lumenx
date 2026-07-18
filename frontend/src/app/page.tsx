@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useId } from "react";
 import { motion } from "framer-motion";
 import {
   Plus, RefreshCw, Library, FileUp, X, ChevronDown, FileText,
-  Zap, Film, Sparkles, Search, Clock, MoreVertical,
+  Film, Sparkles, Search, Clock, MoreVertical,
 } from "lucide-react";
 import { useProjectStore, Project } from "@/store/projectStore";
 import { toast } from "@/store/toastStore";
@@ -31,11 +31,8 @@ const PlaygroundPage = dynamic(() => import("@/components/modules/playground/Pla
 function CreateSeriesDialog({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [workflowMode, setWorkflowMode] = useState<"r2v" | "i2v_legacy">("r2v");
-  // R2V v2 Phase 6 — content_mode (scripted | freeform)
+  // Series content can still be scripted or freeform; generation always uses I2V.
   const [contentMode, setContentMode] = useState<"scripted" | "freeform">("scripted");
-  // PR-3e — default per-shot generation mode (r2v=节奏优先 / i2v=画面优先)
-  const [defaultGenerationMode, setDefaultGenerationMode] = useState<"r2v" | "i2v">("r2v");
   const [isCreating, setIsCreating] = useState(false);
   const t = useTranslations("workspace");
   const tc = useTranslations("common");
@@ -101,15 +98,13 @@ function CreateSeriesDialog({ isOpen, onClose }: { isOpen: boolean; onClose: () 
       const { api } = await import("@/lib/api");
       const series = await api.createSeriesV2(title.trim(), {
         description: description.trim() || undefined,
-        workflow_mode: workflowMode,
+        workflow_mode: "i2v_legacy",
         content_mode: contentMode,
-        default_generation_mode: defaultGenerationMode,
+        default_generation_mode: "i2v",
       });
       setTitle("");
       setDescription("");
-      setWorkflowMode("r2v");
       setContentMode("scripted");
-      setDefaultGenerationMode("r2v");
       onClose();
       window.location.hash = `#/series/${series.id}`;
     } catch (error) {
@@ -150,49 +145,7 @@ function CreateSeriesDialog({ isOpen, onClose }: { isOpen: boolean; onClose: () 
             />
           </div>
 
-          {/* Workflow Mode */}
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-2">{tp("workflowMode")}</label>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setWorkflowMode("r2v")}
-                className={`relative p-4 rounded-xl border-2 text-left transition-all ${
-                  workflowMode === "r2v"
-                    ? "border-primary bg-primary/10"
-                    : "border-border bg-surface hover:border-text-muted"
-                }`}
-              >
-                <div className="flex items-center gap-2 mb-1.5">
-                  <Zap size={16} className={workflowMode === "r2v" ? "text-primary" : "text-text-secondary"} />
-                  <span className="font-semibold text-sm text-foreground">{tp("workflowR2V")}</span>
-                </div>
-                <p className="text-xs text-text-secondary leading-relaxed">{tp("workflowR2VDesc")}</p>
-                {workflowMode === "r2v" && (
-                  <span className="absolute top-2 right-2 text-[0.625rem] font-medium text-primary bg-primary/20 px-1.5 py-0.5 rounded">
-                    {tc("recommended")}
-                  </span>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => setWorkflowMode("i2v_legacy")}
-                className={`relative p-4 rounded-xl border-2 text-left transition-all ${
-                  workflowMode === "i2v_legacy"
-                    ? "border-primary bg-primary/10"
-                    : "border-border bg-surface hover:border-text-muted"
-                }`}
-              >
-                <div className="flex items-center gap-2 mb-1.5">
-                  <Film size={16} className={workflowMode === "i2v_legacy" ? "text-primary" : "text-text-secondary"} />
-                  <span className="font-semibold text-sm text-foreground">{tp("workflowI2V")}</span>
-                </div>
-                <p className="text-xs text-text-secondary leading-relaxed">{tp("workflowI2VDesc")}</p>
-              </button>
-            </div>
-          </div>
-
-          {/* R2V v2 Phase 6 — Content mode picker */}
+          {/* Content mode picker */}
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">{tp("contentMode")}</label>
             <div className="grid grid-cols-2 gap-3">
@@ -228,50 +181,6 @@ function CreateSeriesDialog({ isOpen, onClose }: { isOpen: boolean; onClose: () 
                   <span className="font-semibold text-sm text-foreground">{tp("contentFreeform")}</span>
                 </div>
                 <p className="text-xs text-text-secondary leading-relaxed">{tp("contentFreeformDesc")}</p>
-              </button>
-            </div>
-          </div>
-
-          {/* PR-3e · Visual Control Preference picker — decides new-shot default
-              tabMode (r2v=direct_r2v / i2v=t2i_i2v). Series-level setting,
-              episodes inherit, shots can override individually. */}
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-2">{tp("visualControlPref")}</label>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setDefaultGenerationMode("r2v")}
-                className={`relative p-4 rounded-xl border-2 text-left transition-all ${
-                  defaultGenerationMode === "r2v"
-                    ? "border-primary bg-primary/10"
-                    : "border-border bg-surface hover:border-text-muted"
-                }`}
-              >
-                <div className="flex items-center gap-2 mb-1.5">
-                  <Zap size={16} className={defaultGenerationMode === "r2v" ? "text-primary" : "text-text-secondary"} />
-                  <span className="font-semibold text-sm text-foreground">{tp("visualControlR2V")}</span>
-                </div>
-                <p className="text-xs text-text-secondary leading-relaxed">{tp("visualControlR2VDesc")}</p>
-                {defaultGenerationMode === "r2v" && (
-                  <span className="absolute top-2 right-2 text-[0.625rem] font-medium text-primary bg-primary/20 px-1.5 py-0.5 rounded">
-                    {tc("recommended")}
-                  </span>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => setDefaultGenerationMode("i2v")}
-                className={`relative p-4 rounded-xl border-2 text-left transition-all ${
-                  defaultGenerationMode === "i2v"
-                    ? "border-primary bg-primary/10"
-                    : "border-border bg-surface hover:border-text-muted"
-                }`}
-              >
-                <div className="flex items-center gap-2 mb-1.5">
-                  <Film size={16} className={defaultGenerationMode === "i2v" ? "text-primary" : "text-text-secondary"} />
-                  <span className="font-semibold text-sm text-foreground">{tp("visualControlI2V")}</span>
-                </div>
-                <p className="text-xs text-text-secondary leading-relaxed">{tp("visualControlI2VDesc")}</p>
               </button>
             </div>
           </div>

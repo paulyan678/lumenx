@@ -15,12 +15,9 @@ report:
      pipeline.mark_video_task_failed helper writes status + error so the
      UI gets a definite failure.
 
-  3. The user can end up with model="wan2.7-r2v" cached in
-     localStorage but submit through the I2V flow without supplying ref
-     images, which made wanx.py raise mid-generation. Fix:
-     create_video_task validates model⇄refs consistency at submit time
-     so the frontend gets a clean 400 instead of a permanently-failed
-     task.
+  3. A stale client can submit a removed model or unsupported R2V mode.
+     create_video_task rejects both before persisting a task, so the
+     frontend gets a clean 400 instead of a permanently-failed task.
 """
 
 import time
@@ -33,6 +30,10 @@ from src.apps.comic_gen.models import Script, StoryboardFrame, VideoTask
 from src.apps.comic_gen.pipeline import ComicGenPipeline
 
 
+VIDEO_MODEL = "doubao-seedance-2-0-fast-260128"
+VIDEO_KEY_FIELD = "NEWAPI_SEEDANCE_2_FAST_API_KEY"
+
+
 @pytest.fixture
 def pipeline(tmp_path):
     """Pipeline with temp data files, real IO bypassed."""
@@ -40,7 +41,6 @@ def pipeline(tmp_path):
          patch("src.apps.comic_gen.pipeline.AssetGenerator"), \
          patch("src.apps.comic_gen.pipeline.StoryboardGenerator"), \
          patch("src.apps.comic_gen.pipeline.VideoGenerator"), \
-         patch("src.apps.comic_gen.pipeline.AudioGenerator"), \
          patch("src.apps.comic_gen.pipeline.ExportManager"):
         p = ComicGenPipeline()
     p.data_file = str(tmp_path / "projects.json")
@@ -57,7 +57,7 @@ def _video_task(status="pending", task_id=None) -> VideoTask:
         image_url="uploads/img.png",
         prompt="prompt",
         status=status,
-        model="wan2.7-i2v",
+        model=VIDEO_MODEL,
     )
 
 
@@ -104,14 +104,14 @@ def test_orphan_recovery_preserves_existing_error_message(pipeline):
     """If a stuck task already has an error message attached, the
     recovery sweep doesn't overwrite it (preserves diagnostic value)."""
     task = _video_task(status="pending", task_id="t1")
-    task.error = "DashScope provider timed out"
+    task.error = "New API provider timed out"
     pipeline.scripts = {"p1": _script_with_tasks(task)}
 
     pipeline._recover_orphan_tasks()
 
     recovered = pipeline.scripts["p1"].video_tasks[0]
     assert recovered.status == "failed"
-    assert recovered.error == "DashScope provider timed out"
+    assert recovered.error == "New API provider timed out"
 
 
 def test_orphan_recovery_is_noop_when_nothing_stuck(pipeline):
@@ -166,37 +166,33 @@ def test_mark_video_task_failed_returns_false_for_unknown(pipeline):
 # ---------------------------------------------------------------------------
 
 
-def test_create_video_task_rejects_r2v_model_without_refs(pipeline):
-    """The user reproduced this: stale localStorage carried wan2.7-r2v
-    into an I2V flow that never supplies ref images. Without the guard
-    wanx.py raises mid-flight and the user sees only a spinner."""
+def test_create_video_task_rejects_removed_model_before_persisting(pipeline):
+    """A stale selection cannot route to a removed provider model."""
     pipeline.scripts = {"p1": _script_with_tasks()}
 
-    with pytest.raises(ValueError, match="reference-to-video"):
+    with pytest.raises(ValueError, match="Unsupported New API model ID"):
         pipeline.create_video_task(
             script_id="p1",
             image_url="uploads/img.png",
             prompt="A scene",
             model="wan2.7-r2v",
-            generation_mode="i2v",   # mismatched against the model
-            reference_image_urls=[],
+            generation_mode="i2v",
         )
 
     # Task was never persisted.
     assert pipeline.scripts["p1"].video_tasks == []
 
 
-def test_create_video_task_rejects_wan26_r2v_without_video_refs(pipeline):
+def test_create_video_task_rejects_unsupported_r2v_mode(pipeline):
     pipeline.scripts = {"p1": _script_with_tasks()}
 
-    with pytest.raises(ValueError, match="reference-to-video"):
+    with pytest.raises(ValueError, match="does not support generation mode 'r2v'"):
         pipeline.create_video_task(
             script_id="p1",
             image_url="",
             prompt="A scene",
-            model="wan2.6-r2v",
+            model=VIDEO_MODEL,
             generation_mode="r2v",
-            reference_video_urls=[],
         )
 
 
@@ -251,48 +247,35 @@ def test_annotate_video_task_returns_none_for_unknown(pipeline):
     assert pipeline.annotate_video_task("ghost", "t1", is_starred=True) is None
 
 
-def test_model_settings_persists_r2v_model(pipeline):
-    """B-plan: project-level model_settings.r2v_model is the default
-    Storyboard's R2V tab seeds from. Verify it round-trips: writing
-    via update_model_settings persists, get_script() sees it back."""
+def test_model_settings_migrates_stale_models_and_persists_approved_switch(pipeline):
+    """Stale saved selections migrate, then approved switches persist."""
     from src.apps.comic_gen.models import Script
     script = Script(
         id="p1", title="P", original_text="t",
         created_at=time.time(), updated_at=time.time(),
+        model_settings={
+            "chat_model": "legacy-chat",
+            "t2i_model": "wan2.7-image-pro",
+            "i2v_model": "kling-v3-i2v",
+            "r2v_model": "vidu-q3-r2v",
+        },
     )
     pipeline.scripts = {"p1": script}
 
-    # Default value is wan2.7-r2v per ModelSettings field default.
-    assert script.model_settings.r2v_model == "wan2.7-r2v"
+    assert script.model_settings.chat_model == "deepseek-v4-flash"
+    assert script.model_settings.image_model == "gpt-image-2"
+    assert script.model_settings.video_model == VIDEO_MODEL
+    assert not hasattr(script.model_settings, "r2v_model")
 
-    # Update through the pipeline path the API endpoint uses.
     with patch.object(pipeline, "_save_data"):
-        updated = pipeline.update_model_settings("p1", r2v_model="kling-v3-r2v")
-    assert updated.model_settings.r2v_model == "kling-v3-r2v"
-
-    # Other fields untouched.
-    assert updated.model_settings.i2v_model == script.model_settings.i2v_model
-
-
-def test_create_video_task_accepts_r2v_with_refs(pipeline):
-    pipeline.scripts = {"p1": _script_with_tasks()}
-    # Avoid touching disk for snapshot copy.
-    with patch.object(pipeline, "_save_data"):
-        # The snapshot copy logic also touches the filesystem; route a
-        # bogus URL through the http branch by setting a non-existent
-        # path so the function early-skips the snapshot but still
-        # creates the task.
-        script, task_id = pipeline.create_video_task(
-            script_id="p1",
-            image_url="http://example.com/img.png",
-            prompt="A scene",
-            model="wan2.7-r2v",
-            generation_mode="r2v",
-            reference_image_urls=["http://example.com/ref1.png"],
+        updated = pipeline.update_model_settings(
+            "p1",
+            chat_model="qwen3.7-max",
+            video_model="doubao-seedance-2-0-mini-260615",
         )
-
-    assert task_id
-    assert any(t.id == task_id for t in script.video_tasks)
+    assert updated.model_settings.chat_model == "qwen3.7-max"
+    assert updated.model_settings.video_model == "doubao-seedance-2-0-mini-260615"
+    assert updated.model_settings.i2v_model == updated.model_settings.video_model
 
 
 # ---------------------------------------------------------------------------
@@ -451,14 +434,15 @@ def test_update_frame_workbench_returns_none_for_unknown(pipeline):
     assert pipeline.update_frame_workbench("ghost", "f1", workbench_tab_mode="t2i_i2v") is None
 
 
-def test_create_video_task_persists_workbench_tab(pipeline):
+def test_create_video_task_persists_workbench_tab(pipeline, monkeypatch):
+    monkeypatch.setenv(VIDEO_KEY_FIELD, "unit-test-video-key")
     pipeline.scripts = {"p1": _script_with_tasks()}
     with patch.object(pipeline, "_save_data"):
         script, task_id = pipeline.create_video_task(
             script_id="p1",
             image_url="http://example.com/img.png",
             prompt="A scene",
-            model="wan2.7-i2v",
+            model=VIDEO_MODEL,
             generation_mode="i2v",
             workbench_tab="t2i_i2v",
         )
@@ -466,15 +450,16 @@ def test_create_video_task_persists_workbench_tab(pipeline):
     assert task.workbench_tab == "t2i_i2v"
 
 
-def test_create_video_task_workbench_tab_defaults_to_none(pipeline):
+def test_create_video_task_workbench_tab_defaults_to_none(pipeline, monkeypatch):
     """Pre-Phase-2 callers don't supply workbench_tab — must not break."""
+    monkeypatch.setenv(VIDEO_KEY_FIELD, "unit-test-video-key")
     pipeline.scripts = {"p1": _script_with_tasks()}
     with patch.object(pipeline, "_save_data"):
         script, task_id = pipeline.create_video_task(
             script_id="p1",
             image_url="http://example.com/img.png",
             prompt="A scene",
-            model="wan2.7-i2v",
+            model=VIDEO_MODEL,
             generation_mode="i2v",
         )
     task = next(t for t in script.video_tasks if t.id == task_id)

@@ -4,7 +4,7 @@
 
 import os
 import sys
-from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules
+from PyInstaller.utils.hooks import collect_all
 
 block_cipher = None
 
@@ -15,11 +15,11 @@ ROOT_DIR = os.path.abspath('.')
 datas = [
     ('static', 'static'),
     ('src/apps/comic_gen/style_presets.json', 'src/apps/comic_gen'),
+    (
+        'config/model_catalog/generated/model_catalog.json',
+        'config/model_catalog/generated',
+    ),
 ]
-
-# 如果存在 .env 文件，也打包进去
-if os.path.exists('.env'):
-    datas.append(('.env', '.'))
 
 # 收集所有隐藏导入
 hiddenimports = [
@@ -41,12 +41,14 @@ hiddenimports = [
     'starlette.staticfiles',
     'fastapi',
     'pydantic',
-    # 阿里云 SDK
-    'dashscope',
+    # New API (OpenAI-compatible chat) and optional OSS storage
+    'openai',
     'oss2',
-    'alibabacloud_videoenhan20200320',
-    'alibabacloud_tea_openapi',
-    'alibabacloud_tea_util',
+    # Local audio separation
+    'demucs',
+    'demucs.pretrained',
+    'demucs.separate',
+    'soundfile',
     # 其他
     'yaml',
     'dotenv',
@@ -57,7 +59,7 @@ hiddenimports = [
 ]
 
 # 自动收集包的所有内容
-for package in ['uvicorn', 'fastapi', 'starlette', 'pydantic']:
+for package in ['uvicorn', 'fastapi', 'starlette', 'pydantic', 'demucs']:
     tmp_datas, tmp_binaries, tmp_hiddenimports = collect_all(package)
     datas += tmp_datas
     hiddenimports += tmp_hiddenimports
@@ -74,7 +76,6 @@ a = Analysis(
     excludes=[
         # 排除不需要的模块以减小体积
         'matplotlib',
-        'numpy',
         'PIL',
         'tkinter',
     ],

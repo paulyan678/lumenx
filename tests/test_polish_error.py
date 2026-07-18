@@ -49,8 +49,7 @@ class TestPolishVideoPromptErrors:
     def test_is_configured_false_raises(self):
         sp = ScriptProcessor.__new__(ScriptProcessor)
         sp.llm = MagicMock()
-        # is_configured 是 property，代理到 self.llm.is_configured
-        sp.llm.is_configured = False
+        sp.llm.require_configured.side_effect = RuntimeError("missing selected-model key")
         with pytest.raises(PolishError) as exc_info:
             sp.polish_video_prompt("draft")
         assert exc_info.value.reason == "is_configured_false"
@@ -58,8 +57,7 @@ class TestPolishVideoPromptErrors:
     def test_api_error_raises(self):
         sp = ScriptProcessor.__new__(ScriptProcessor)
         sp.llm = MagicMock()
-        sp.llm.is_configured = True
-        sp.llm.chat.side_effect = RuntimeError("DashScope API error: timeout")
+        sp.llm.chat.side_effect = RuntimeError("New API error: timeout")
         with pytest.raises(PolishError) as exc_info:
             sp.polish_video_prompt("draft prompt")
         assert exc_info.value.reason == "api_error"
@@ -169,37 +167,3 @@ class TestBilingualAnchoredIteration:
         user_content = messages[-1]["content"]
         assert "[当前提示词]" in user_content  # 旧格式
         assert "[当前提示词-CN]" not in user_content  # 没用双语锚点格式
-
-
-# ---------------------------------------------------------------------------
-# polish_r2v_prompt parity（同样的错误路径，简化版）
-# ---------------------------------------------------------------------------
-
-class TestPolishR2VPromptErrors:
-    def test_is_configured_false_raises(self):
-        sp = ScriptProcessor.__new__(ScriptProcessor)
-        sp.llm = MagicMock()
-        sp.llm.is_configured = False
-        with pytest.raises(PolishError) as exc_info:
-            sp.polish_r2v_prompt("draft", slots=[])
-        assert exc_info.value.reason == "is_configured_false"
-
-    def test_r2v_bilingual_anchor(self):
-        sp = ScriptProcessor.__new__(ScriptProcessor)
-        sp.llm = MagicMock()
-        sp.llm.is_configured = True
-        sp.llm.chat.return_value = json.dumps({
-            "prompt_cn": "迭代", "prompt_en": "Iterated R2V different text",
-        })
-        sp.polish_r2v_prompt(
-            draft_prompt="character1 walks forward",
-            slots=[{"description": "雷震"}],
-            feedback="加慢动作",
-            prev_cn="character1 缓慢前行",
-        )
-        call = sp.llm.chat.call_args
-        messages = call.kwargs["messages"] if "messages" in call.kwargs else call.args[0]
-        user_content = messages[-1]["content"]
-        assert "character1 缓慢前行" in user_content
-        assert "character1 walks forward" in user_content
-        assert "加慢动作" in user_content

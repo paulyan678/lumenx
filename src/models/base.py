@@ -1,6 +1,17 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Tuple
 
+
+class ImageGenModel(ABC):
+    """Provider-neutral abstract image generation interface."""
+
+    def __init__(self, config: Dict[str, Any]):
+        self.config = config
+
+    @abstractmethod
+    def generate(self, prompt: str, output_path: str, **kwargs) -> Tuple[str, float]:
+        pass
+
 class VideoGenModel(ABC):
     """Abstract base class for video generation models."""
     

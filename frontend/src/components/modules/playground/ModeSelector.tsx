@@ -3,10 +3,10 @@
 import { useTranslations } from 'next-intl';
 import { usePlaygroundStore, type PlaygroundMode } from './usePlaygroundStore';
 
-// Two grouped pill rows. All 6 modes are surfaced directly (i2i is explicit,
-// no longer auto-detect-only). Each pill calls setMode; active = store mode.
+// The New API catalog currently supports image generation/editing and
+// Seedance text/image-to-video. Unsupported R2V/V2V modes are not rendered.
 const IMAGE_MODES: PlaygroundMode[] = ['t2i', 'i2i'];
-const VIDEO_MODES: PlaygroundMode[] = ['t2v', 'i2v', 'r2v', 'v2v'];
+const VIDEO_MODES: PlaygroundMode[] = ['t2v', 'i2v'];
 
 export default function ModeSelector() {
   const t = useTranslations('playground');

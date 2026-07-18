@@ -212,7 +212,7 @@ class OSSImageUploader:
 
             url = self.bucket.sign_url('GET', object_key, expires, slash_safe=True)
 
-            # Ensure HTTPS - some AI APIs (e.g. DashScope wan2.6-i2v) require HTTPS
+            # Ensure HTTPS for provider-facing media references.
             if url.startswith("http://"):
                 url = "https://" + url[7:]
 

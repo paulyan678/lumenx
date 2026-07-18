@@ -34,12 +34,6 @@ export default function ModelSelector() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [open]);
 
-  useEffect(() => {
-    if (availableModels.length > 0 && !availableModels.some((m) => m.id === modelId)) {
-      setModelId(availableModels[0].id);
-    }
-  }, [availableModels, modelId, setModelId]);
-
   function handleSelect(id: string) {
     setModelId(id);
     setOpen(false);

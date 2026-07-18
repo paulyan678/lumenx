@@ -8,13 +8,11 @@ import { useTranslations } from "next-intl";
 import { useProjectStore } from "@/store/projectStore";
 import { api, crudApi, type VideoTask, type RefineSSEEvent } from "@/lib/api";
 import { getAssetUrl } from "@/lib/utils";
-import { selectedVariantUrl } from "@/lib/characterImage";
 import { debugLog } from "@/lib/debugLog";
 import type { BatchSummary } from "./storyboard-r2v/shot-panel/CandidatesSection";
-import { getR2vRouteModelId, isR2vImageBased, VIDEO_I2V_MODELS, VIDEO_R2V_MODELS, DEFAULT_I2V_MODEL_ID, DEFAULT_R2V_MODEL_ID } from "@/lib/modelCatalog";
+import { VIDEO_I2V_MODELS, DEFAULT_I2V_MODEL_ID } from "@/lib/modelCatalog";
 import ShotCard, { type ShotNode } from "./storyboard-r2v/ShotCard";
 import { buildAssembledPrompt } from "./storyboard-r2v/buildAssembledPrompt";
-import DialogueAudioRow from "./storyboard-r2v/DialogueAudioRow";
 import StoryboardGenerateDialog from "./storyboard-r2v/StoryboardGenerateDialog";
 import { toast } from "@/store/toastStore";
 import { Wand2 } from "lucide-react";
@@ -52,29 +50,32 @@ export default function StoryboardR2V() {
     const [shots, setShots] = useState<ShotNode[]>(() => {
         if (currentProject?.frames && currentProject.frames.length > 0) {
             const videoTasks: any[] = (currentProject as any).video_tasks ?? [];
-            return currentProject.frames.map((frame: any) => frameToShotNode(frame, videoTasks));
+            return currentProject.frames.map((frame: any) => ({
+                ...frameToShotNode(frame, videoTasks, "t2i_i2v"),
+                tabMode: "t2i_i2v" as const,
+            }));
         }
-        return [migrateShotNode({ id: `shot_${Date.now()}`, prompt: "", tabMode: "direct_r2v" })];
+        return [migrateShotNode({ id: `shot_${Date.now()}`, prompt: "", tabMode: "t2i_i2v" })];
     });
 
     // Global video config (with localStorage persistence for model selection)
     const [videoConfig, setVideoConfig] = useState<VideoConfig>(() => {
         const ls = typeof window !== 'undefined' ? window.localStorage : null;
-        const savedI2v = ls?.getItem('storyboard-r2v-model') ?? null;
-        const savedR2v = ls?.getItem('storyboard-r2v-r2v-model') ?? null;
-        const projectI2v = currentProject?.model_settings?.i2v_model || DEFAULT_I2V_MODEL_ID;
+        const savedI2v = ls?.getItem('storyboard-newapi-video-model')
+            ?? ls?.getItem('storyboard-r2v-model')
+            ?? null;
+        const projectI2v = currentProject?.model_settings?.video_model
+            || currentProject?.model_settings?.i2v_model
+            || DEFAULT_I2V_MODEL_ID;
 
-        // I2V — defensive: a cached localStorage model id may have been
-        // hidden or removed from the I2V list since it was last
-        // selected (e.g. the user once picked `wan2.7-r2v` while it was
-        // visible, the catalog later marked it hidden, and now the ID
-        // lingers in their browser). Falling back to the default avoids
-        // silently shipping the wrong model into the I2V flow.
+        // A cached model may have been removed from the approved list.
+        // Normalize stale values to the explicit New API default.
         const i2vCandidate = savedI2v || projectI2v;
         const i2vOk = VIDEO_I2V_MODELS.find(m => m.id === i2vCandidate);
         const i2vModelId = i2vOk ? i2vCandidate : DEFAULT_I2V_MODEL_ID;
         if (!i2vOk && ls && savedI2v) {
             ls.removeItem('storyboard-r2v-model');
+            ls.removeItem('storyboard-newapi-video-model');
             debugLog.warn(
                 "Studio",
                 `Cached I2V model "${i2vCandidate}" is no longer in the visible I2V list; ` +
@@ -82,22 +83,8 @@ export default function StoryboardR2V() {
             );
         }
 
-        // R2V preference order:
-        //   1. localStorage (user's last explicit pick — survives reloads)
-        //   2. project.model_settings.r2v_model (project-level default,
-        //      set in 生成设置 — Plan B "specialize" hierarchy)
-        //   3. derived from i2v family (initial coherence on first mount)
-        //   4. catalog DEFAULT_R2V_MODEL_ID
-        // Each candidate is validated against VIDEO_R2V_MODELS so a
-        // hidden id from any layer falls through cleanly.
-        const projectR2v = currentProject?.model_settings?.r2v_model;
-        const r2vDerived = getR2vRouteModelId(i2vModelId);
-        const r2vCandidate = savedR2v || projectR2v || r2vDerived || DEFAULT_R2V_MODEL_ID;
-        const r2vOk = VIDEO_R2V_MODELS.find(m => m.id === r2vCandidate);
-        const r2vModelId = r2vOk ? r2vCandidate : (VIDEO_R2V_MODELS[0]?.id ?? DEFAULT_R2V_MODEL_ID);
-        if (!r2vOk && ls && savedR2v) {
-            ls.removeItem('storyboard-r2v-r2v-model');
-        }
+        ls?.removeItem('storyboard-r2v-model');
+        ls?.removeItem('storyboard-r2v-r2v-model');
 
         const finalConfig = VIDEO_I2V_MODELS.find(m => m.id === i2vModelId);
         const dc = finalConfig?.duration;
@@ -105,7 +92,6 @@ export default function StoryboardR2V() {
         return {
             ...DEFAULT_VIDEO_CONFIG,
             model: i2vModelId,
-            r2vModel: r2vModelId,
             duration: defaultDuration,
         };
     });
@@ -143,17 +129,8 @@ export default function StoryboardR2V() {
     // after 500ms via setTimeout in generateVideoBatch.
     const submittingShotsRef = useRef<Set<string>>(new Set());
 
-    // Inline per-shot validation error messages (shown by ParamsSection
-    // below the Generate CTA). Used for pre-flight failures like
-    // "R2V needs reference images" that we catch before hitting the
-    // backend, so the user gets immediate feedback instead of a
-    // task that queues, fails, and shows up only in the diagnose log.
+    // Inline per-shot validation errors are shown before submission.
     const [shotErrors, setShotErrors] = useState<Record<string, string>>({});
-    const missingRefsMessage = useCallback(
-        (modelLabel: string) =>
-            t("missingRefs", { model: modelLabel }),
-        [t],
-    );
 
     // Per-shot seed override. The Seed advanced param doesn't live in
     // videoConfig (seeds are inherently per-generation; sharing one
@@ -360,13 +337,10 @@ export default function StoryboardR2V() {
     // Add a new shot after the given index
     const addShot = useCallback(async (afterIndex: number) => {
         const synthId = `shot_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-        // PR-3e · pick default tabMode from project preference (inherited from
-        // series). "i2v" (画面优先) → t2i_i2v; "r2v" (节奏优先, default) → direct_r2v.
-        const defaultMode = currentProject?.default_generation_mode === "i2v" ? "t2i_i2v" : "direct_r2v";
         const newShot: ShotNode = {
             id: synthId,
             prompt: "",
-            tabMode: defaultMode,
+            tabMode: "t2i_i2v",
         };
         setShots(prev => {
             const updated = [...prev];
@@ -415,7 +389,6 @@ export default function StoryboardR2V() {
         () => (currentProject?.frames?.length ?? 0) > 0 ? "summary" : "idle"
     );
     const [refineProgress, setRefineProgress] = useState<{ current: number; total: number } | null>(null);
-    const [dialogueProgress, setDialogueProgress] = useState<{ current: number; total: number } | null>(null);
 
     const PHASE1_CAPTIONS = useMemo(() => [
         "正在分析剧本结构…",
@@ -430,58 +403,8 @@ export default function StoryboardR2V() {
         if (!currentProject?.frames?.length) return null;
         const frames = currentProject.frames as any[];
         const frameCount = frames.length;
-        const withDialogue = frames.filter((f: any) =>
-            f.dialogue_structured?.line || f.dialogue
-        );
-        const charsWithVoice = new Set(
-            (currentProject as any).characters?.filter((c: any) => c.voice_id).map((c: any) => c.id) ?? []
-        );
-        const charNameToVoice = new Map<string, boolean>(
-            (currentProject as any).characters?.filter((c: any) => c.voice_id).map((c: any) => [c.name?.toLowerCase(), true]) ?? []
-        );
-        const hasVoiceBinding = (f: any): boolean => {
-            if (f.character_ids?.[0] && charsWithVoice.has(f.character_ids[0])) return true;
-            const speaker = f.dialogue_structured?.speaker || f.speaker;
-            return !!(speaker && charNameToVoice.has(speaker.toLowerCase()));
-        };
-        const dialogueReady = withDialogue.filter((f: any) =>
-            hasVoiceBinding(f) && !f.audio_url
-        ).length;
-        const dialogueMissing = withDialogue.filter((f: any) => !hasVoiceBinding(f)).length;
-        return { frameCount, dialogueReady, dialogueMissing };
-    }, [currentProject?.frames, (currentProject as any)?.characters]);
-
-    const handleBatchDialogue = useCallback(async () => {
-        if (!currentProject?.id) return;
-        setBannerState("dialogue");
-        setDialogueProgress(null);
-        try {
-            const frames = currentProject.frames as any[] ?? [];
-            const totalWithDialogue = frames.filter((f: any) => f.dialogue_structured?.line || f.dialogue).length;
-            setDialogueProgress({ current: 0, total: totalWithDialogue });
-            const result = await api.generateDialogueAudioBatch(currentProject.id);
-            const stats = result._batch_stats;
-            if (stats.failed > 0) {
-                toast.warning(`对白生成完成：${stats.generated} 条成功，${stats.failed} 条失败`);
-            } else if (stats.generated > 0) {
-                toast.success(`已生成 ${stats.generated} 条对白音频`);
-            } else if (stats.no_voice > 0 && stats.skipped === 0) {
-                toast.warning(`${stats.no_voice} 条对白的角色尚未绑定语音`);
-            } else if (stats.skipped > 0) {
-                toast.success(t("dialogueAllUpToDate"));
-            } else {
-                toast.warning("未找到可生成的对白");
-            }
-            const updated = await api.getProject(currentProject.id);
-            if (updated?.frames) updateProject(currentProject.id, { frames: updated.frames });
-        } catch (e) {
-            debugLog.error("Studio", "batch dialogue audio failed", e);
-            toast.error(t("batchDialogueFailed"));
-        } finally {
-            setBannerState("summary");
-            setDialogueProgress(null);
-        }
-    }, [currentProject, updateProject]);
+        return { frameCount };
+    }, [currentProject?.frames]);
 
     const handleSmartGenerate = useCallback(async () => {
         if (!currentProject?.id) return;
@@ -500,9 +423,8 @@ export default function StoryboardR2V() {
             const newFrameCount = Array.isArray(updated?.frames) ? updated.frames.length : 0;
             updateProject(projectId, updated);
             if (Array.isArray(updated?.frames)) {
-                const defaultMode = currentProject.default_generation_mode === "i2v" ? "t2i_i2v" : "direct_r2v";
                 const videoTasks: any[] = (updated as any).video_tasks ?? [];
-                setShots(updated.frames.map((frame: any) => frameToShotNode(frame, videoTasks, defaultMode)));
+                setShots(updated.frames.map((frame: any) => ({ ...frameToShotNode(frame, videoTasks, "t2i_i2v"), tabMode: "t2i_i2v" as const })));
             }
 
             // Phase 2: batch refine (SSE)
@@ -517,9 +439,8 @@ export default function StoryboardR2V() {
                 const refreshed = await api.getProject(projectId);
                 if (refreshed?.frames) {
                     updateProject(projectId, { frames: refreshed.frames });
-                    const defaultMode = currentProject.default_generation_mode === "i2v" ? "t2i_i2v" : "direct_r2v";
                     const videoTasks: any[] = (refreshed as any).video_tasks ?? [];
-                    setShots(refreshed.frames.map((frame: any) => frameToShotNode(frame, videoTasks, defaultMode)));
+                    setShots(refreshed.frames.map((frame: any) => ({ ...frameToShotNode(frame, videoTasks, "t2i_i2v"), tabMode: "t2i_i2v" as const })));
                 }
             }
             setBannerState("summary");
@@ -545,9 +466,8 @@ export default function StoryboardR2V() {
             const updated = await api.getProject(currentProject.id);
             if (updated?.frames) {
                 updateProject(currentProject.id, { frames: updated.frames });
-                const defaultMode = currentProject.default_generation_mode === "i2v" ? "t2i_i2v" : "direct_r2v";
                 const videoTasks: any[] = (updated as any).video_tasks ?? [];
-                setShots(updated.frames.map((frame: any) => frameToShotNode(frame, videoTasks, defaultMode)));
+                setShots(updated.frames.map((frame: any) => ({ ...frameToShotNode(frame, videoTasks, "t2i_i2v"), tabMode: "t2i_i2v" as const })));
             }
             toast.success(t("refineDoneToast"));
         } catch (err) {
@@ -661,16 +581,6 @@ export default function StoryboardR2V() {
         }));
     }, [persistPrompt]);
 
-    // Set shot tab mode + persist so the user's last-active tab
-    // survives refresh.
-    const setTabMode = useCallback((index: number, mode: "t2i_i2v" | "direct_r2v") => {
-        setShots(prev => prev.map((s, i) => {
-            if (i !== index) return s;
-            persistWorkbench(s.id, { workbench_tab_mode: mode });
-            return { ...s, tabMode: mode };
-        }));
-    }, [persistWorkbench]);
-
     // Structured field updates — local immediate + debounce 3s auto-save
     const fieldPendingRef = useRef<Map<string, { timer: number; fields: Record<string, any> }>>(new Map());
     const handleUpdateField = useCallback((index: number, field: string, value: string | number | null) => {
@@ -724,105 +634,15 @@ export default function StoryboardR2V() {
         map.set(shotId, { timer, fields: merged });
     }, [shots, currentProject?.id, updateProject]);
 
-    // Duration editor config — derived from active R2V model's catalog entry
+    // Duration editor config follows the active approved Seedance model.
     const durationEditorCfg = useMemo(() => {
-        const r2vModel = VIDEO_R2V_MODELS.find(m => m.id === videoConfig.r2vModel);
-        const dc = r2vModel?.duration;
+        const activeModel = VIDEO_I2V_MODELS.find(m => m.id === videoConfig.model);
+        const dc = activeModel?.duration;
         if (!dc) return { min: 3, max: 15, step: 1 };
         if (dc.type === "slider") return { min: dc.min, max: dc.max, step: dc.step };
         if (dc.type === "buttons") return { min: Math.min(...dc.options), max: Math.max(...dc.options), step: 1 };
         return { min: dc.value, max: dc.value, step: 1 };
-    }, [videoConfig.r2vModel]);
-
-    // Parse asset tags from prompt and resolve to URLs
-    const parseAssetTags = useCallback((prompt: string): string[] => {
-        // HappyHorse uses [characterN:name] as generic reference-image slots.
-        // N determines the position in the URL array: character1 → image[0], etc.
-        // The "name" can be a character, scene, or prop — we look up all three.
-        // Dedup by slot number (first-seen wins): the same slot referenced
-        // multiple times in the prompt still corresponds to one reference
-        // image, so [character1:小兔子] used twice resolves to one URL slot
-        // not two. Without this, model expectations (characterN → URL[N-1])
-        // would shift right and downstream slots would point to the wrong
-        // images.
-        const seenSlot = new Set<number>();
-        const slots: { idx: number; url: string }[] = [];
-        const tagPattern = /\[character(\d+):([^\]]+)\]/g;
-        let match;
-        while ((match = tagPattern.exec(prompt)) !== null) {
-            const slotNum = parseInt(match[1], 10);
-            if (seenSlot.has(slotNum)) continue;
-            const name = match[2];
-            let url: string | undefined;
-
-            // Try character first
-            const char = characters.find((c: any) => c.name === name);
-            if (char) {
-                url = selectedVariantUrl(char.reference_sheet) || selectedVariantUrl(char.full_body_asset);
-            }
-            // Try scene
-            if (!url) {
-                const scene = scenes.find((s: any) => s.name === name);
-                const sceneAsset = scene?.image_asset;
-                if (sceneAsset?.selected_id && sceneAsset.variants?.length) {
-                    const selected = sceneAsset.variants.find((v: any) => v.id === sceneAsset.selected_id);
-                    if (selected) url = selected.url;
-                } else if (sceneAsset?.variants?.[0]) {
-                    url = sceneAsset.variants[0].url;
-                }
-            }
-            // Try prop
-            if (!url) {
-                const prop = props.find((p: any) => p.name === name);
-                const propAsset = prop?.image_asset;
-                if (propAsset?.selected_id && propAsset.variants?.length) {
-                    const selected = propAsset.variants.find((v: any) => v.id === propAsset.selected_id);
-                    if (selected) url = selected.url;
-                } else if (propAsset?.variants?.[0]) {
-                    url = propAsset.variants[0].url;
-                }
-            }
-
-            if (url) {
-                slots.push({ idx: slotNum, url });
-                seenSlot.add(slotNum);
-            }
-        }
-        // Sort by slot number so URL array matches HappyHorse's positional mapping
-        slots.sort((a, b) => a.idx - b.idx);
-        return slots.map(s => s.url);
-    }, [characters, scenes, props]);
-
-    const hasAssetTags = useCallback((prompt: string): boolean => {
-        return /\[character\d+:[^\]]+\]/.test(prompt);
-    }, []);
-
-    const getUnresolvedAssetNames = useCallback((prompt: string): string[] => {
-        const unresolved: string[] = [];
-        const tagPattern = /\[character\d+:([^\]]+)\]/g;
-        let match;
-        while ((match = tagPattern.exec(prompt)) !== null) {
-            const name = match[1];
-            let hasImage = false;
-            // Check character
-            const char = characters.find((c: any) => c.name === name);
-            if (char) {
-                hasImage = !!(char.reference_sheet?.image_variants?.length || char.full_body_asset?.variants?.length);
-            }
-            // Check scene
-            if (!hasImage) {
-                const scene = scenes.find((s: any) => s.name === name);
-                hasImage = !!(scene?.image_asset?.variants?.length);
-            }
-            // Check prop
-            if (!hasImage) {
-                const prop = props.find((p: any) => p.name === name);
-                hasImage = !!(prop?.image_asset?.variants?.length);
-            }
-            if (!hasImage) unresolved.push(name);
-        }
-        return unresolved;
-    }, [characters, scenes, props]);
+    }, [videoConfig.model]);
 
     // Strip tags from prompt for clean text
     const cleanPrompt = (prompt: string): string => {
@@ -875,158 +695,64 @@ export default function StoryboardR2V() {
         }
     }, [shots, currentProject, persistWorkbench]);
 
-    // Generate video for a shot
+    // Generate one I2V task for a shot using the selected New API model.
     const generateVideo = useCallback(async (index: number) => {
         const shot = shots[index];
-        if (!currentProject || !shot.prompt.trim()) return;
+        if (!currentProject || !shot?.prompt.trim()) return;
+        const imageUrl = getActiveT2IImageUrl(shot) || shot.imageUrl || "";
+        if (!imageUrl) {
+            const message = t("i2vNeedsFirstFrame") || "Please generate or upload a first frame.";
+            setShotErrors((current) => ({ ...current, [shot.id]: message }));
+            toast.warning(message);
+            return;
+        }
+        if (!VIDEO_I2V_MODELS.some((model) => model.id === videoConfig.model)) {
+            setVideoConfig((current) => ({ ...current, model: DEFAULT_I2V_MODEL_ID }));
+            setShotErrors((current) => ({
+                ...current,
+                [shot.id]: `Unsupported video model: ${videoConfig.model}`,
+            }));
+            return;
+        }
 
-        const promptText = buildAssembledPrompt(shot);
-
-        setShots(prev => prev.map((s, i) =>
-            i === index ? { ...s, videoStatus: "pending" } : s
+        setShots((current) => current.map((item, shotIndex) =>
+            shotIndex === index ? { ...item, videoStatus: "pending" } : item,
         ));
 
         try {
-            if (shot.tabMode === "direct_r2v") {
-                // R2V mode: use reference assets. We prefer the user's
-                // explicit R2V model choice (videoConfig.r2vModel) over
-                // the derived route from the I2V model. The derivation
-                // is kept as a fallback when the explicit r2vModel is
-                // missing or invalid (which can only happen if the
-                // catalog flipped under our feet).
-                const referenceUrls = parseAssetTags(shot.prompt);
-                const explicitR2v = videoConfig.r2vModel;
-                const explicitOk = VIDEO_R2V_MODELS.some(m => m.id === explicitR2v);
-                const routeModelId = explicitOk
-                    ? explicitR2v
-                    : getR2vRouteModelId(videoConfig.model);
-                const imageBased = isR2vImageBased(routeModelId);
-
-                const tasks = await api.createVideoTask(
-                    currentProject.id,
-                    "",  // no image_url for R2V
-                    promptText,
-                    videoConfig.duration,
-                    undefined, // seed
-                    videoConfig.resolution,
-                    false, // generateAudio
-                    "", // audioUrl
-                    videoConfig.promptExtend,
-                    videoConfig.negativePrompt,
-                    1, // batchSize
-                    routeModelId,  // use routed R2V model
-                    shot.id, // frameId
-                    "multi", // shotType
-                    "r2v", // generationMode
-                    !imageBased ? referenceUrls : undefined, // referenceVideoUrls (Wan 2.6 legacy)
-                    undefined, undefined, undefined, // kling params
-                    undefined, undefined, // vidu params
-                    imageBased ? referenceUrls : undefined, // referenceImageUrls
-                );
-                const task = Array.isArray(tasks) ? tasks[0] : tasks;
-
-                if (task && task.id) {
-                    setShots(prev => prev.map((s, i) =>
-                        i === index ? { ...s, videoTaskId: task.id, videoStatus: "processing" } : s
-                    ));
-                }
-            } else {
-                // I2V mode: use T2I image as first frame.
-                // Bug A guard: even if videoConfig.model passed the
-                // mount-time check, the catalog can change at runtime
-                // (catalog reload, project setting flip). Last sanity
-                // check right before submit so we never ship an r2v-
-                // only model into the I2V flow.
-                const i2vModelOk = VIDEO_I2V_MODELS.some(m => m.id === videoConfig.model);
-                if (!i2vModelOk) {
-                    debugLog.warn(
-                        "Studio",
-                        `Refusing to submit I2V task with model "${videoConfig.model}" ` +
-                        `which is not in the visible I2V list. Falling back to "${DEFAULT_I2V_MODEL_ID}".`,
-                    );
-                    setVideoConfig(c => ({ ...c, model: DEFAULT_I2V_MODEL_ID }));
-                    if (typeof window !== 'undefined') {
-                        localStorage.removeItem('storyboard-r2v-model');
-                    }
-                    setShots(prev => prev.map((s, i) =>
-                        i === index ? { ...s, videoStatus: "failed" as const } : s,
-                    ));
-                    return;
-                }
-                // Use the multi-frame-aware accessor so this legacy path
-                // stays in sync with the new ParamsSection batch path
-                // (Issue 15). `shot.t2iImageUrl` (legacy singular) and
-                // `shot.t2iImageUrls[selectedIndex]` should normally agree,
-                // but the singular field has occasionally lagged behind the
-                // plural one (e.g. async upload state mid-flight), causing
-                // HappyHorse to silently submit with no media.
-                const imageUrl = getActiveT2IImageUrl(shot) || shot.imageUrl || "";
-                if (!imageUrl) {
-                    // I2V without a first frame is guaranteed to fail with
-                    // "input.media required" on HappyHorse — surface inline
-                    // instead of letting it 502 mid-generation.
-                    setShotErrors(prev => ({
-                        ...prev,
-                        [shot.id]: t("i2vNeedsFirstFrame") || "请先上传或生成首帧再生成视频。",
-                    }));
-                    setShots(prev => prev.map((s, i) =>
-                        i === index ? { ...s, videoStatus: undefined } : s,
-                    ));
-                    return;
-                }
-
-                const tasks = await api.createVideoTask(
-                    currentProject.id,
-                    imageUrl,
-                    promptText,
-                    videoConfig.duration,
-                    undefined, // seed
-                    videoConfig.resolution,
-                    false, // generateAudio
-                    "", // audioUrl
-                    videoConfig.promptExtend,
-                    videoConfig.negativePrompt,
-                    1, // batchSize
-                    videoConfig.model, // direct I2V model
-                    shot.id, // frameId
-                    "multi", // shotType
-                    "i2v", // generationMode
-                    undefined, // referenceVideoUrls
-                    // Kling params
-                    videoConfig.mode,
-                    videoConfig.sound,
-                    videoConfig.cfgScale,
-                    // Vidu params
-                    videoConfig.viduAudio,
-                    videoConfig.movementAmplitude,
-                    // HappyHorse
-                    undefined,
-                );
-                const task = Array.isArray(tasks) ? tasks[0] : tasks;
-
-                if (task && task.id) {
-                    setShots(prev => prev.map((s, i) =>
-                        i === index ? { ...s, videoTaskId: task.id, videoStatus: "processing" } : s
-                    ));
-                }
+            const response = await api.createVideoTask(currentProject.id, {
+                image_url: imageUrl,
+                prompt: buildAssembledPrompt(shot),
+                frame_id: shot.id,
+                duration: videoConfig.duration,
+                resolution: videoConfig.resolution,
+                generate_audio: videoConfig.generateAudio,
+                batch_size: 1,
+                model: videoConfig.model,
+                generation_mode: "i2v",
+                ratio: videoConfig.ratio,
+                watermark: videoConfig.watermark,
+                workbench_tab: "t2i_i2v",
+            });
+            const task = Array.isArray(response) ? response[0] : response;
+            if (task?.id) {
+                setShots((current) => current.map((item, shotIndex) =>
+                    shotIndex === index
+                        ? { ...item, videoTaskId: task.id, videoStatus: "processing" }
+                        : item,
+                ));
             }
         } catch (error: any) {
             debugLog.error("Studio", "Failed to generate video for shot:", error);
             const detail = error?.response?.data?.detail || error?.message || t("unknownErrorFallback");
             toast.error(t("videoGenFailedToast", { detail: String(detail).slice(0, 150) }));
-            setShots(prev => prev.map((s, i) =>
-                i === index ? { ...s, videoStatus: "failed" } : s
+            setShots((current) => current.map((item, shotIndex) =>
+                shotIndex === index ? { ...item, videoStatus: "failed" } : item,
             ));
         }
-    }, [shots, currentProject, videoConfig, parseAssetTags]);
+    }, [shots, currentProject, videoConfig, t]);
 
-    // Batch-aware generation. The user's "抽卡" mental model: one
-    // click of Generate ×N fires N independent createVideoTask calls
-    // in parallel (each becomes its own VideoTask record on the
-    // backend). All N task ids get appended to the shot's per-tab
-    // bucket so the CandidatesSection can render them as one batch.
-    // Refactored from the single-task generateVideo to support both
-    // R2V and I2V paths; falls back to N=1 if count is undefined.
+    // Batch generation submits independent strict-schema I2V requests.
     const generateVideoBatch = useCallback(async (
         index: number,
         count: number,
@@ -1034,193 +760,81 @@ export default function StoryboardR2V() {
     ) => {
         const shot = shots[index];
         if (!currentProject || !shot?.prompt.trim()) return;
-        const promptText = buildAssembledPrompt(shot);
-        const tabMode = shot.tabMode;
-        const effectiveCount = Math.max(1, Math.min(6, count || 1));
 
-        // Pre-flight: R2V tab needs reference inputs. Without them
-        // the backend rejects with 400 anyway, but historically the
-        // task would queue, fail mid-generation, and the user'd see
-        // "排队中..." until the failure surfaced. Cheaper to validate
-        // here and show inline error in the ParamsSection.
-        if (tabMode === "direct_r2v") {
-            const refs = parseAssetTags(shot.prompt);
-            if (refs.length === 0) {
-                const hasTags = hasAssetTags(shot.prompt);
-                let errMsg: string;
-                if (hasTags) {
-                    const unresolved = getUnresolvedAssetNames(shot.prompt);
-                    errMsg = t("unresolvedRefImages", { refs: unresolved.join("、") });
-                } else {
-                    const r2vModelId = params?.model ?? videoConfig.r2vModel;
-                    const r2vModel = VIDEO_R2V_MODELS.find(m => m.id === r2vModelId);
-                    const modelLabel = r2vModel?.name ?? r2vModelId;
-                    errMsg = missingRefsMessage(modelLabel);
-                }
-                setShotErrors(prev => ({ ...prev, [shot.id]: errMsg }));
-                toast.warning(errMsg);
-                return;
-            }
-        } else {
-            const probeImage = getActiveT2IImageUrl(shot) || shot.imageUrl || "";
-            if (!probeImage) {
-                const errMsg = t("i2vNeedsFirstFrame") || "请先上传或生成首帧再生成视频。";
-                setShotErrors(prev => ({ ...prev, [shot.id]: errMsg }));
-                toast.warning(errMsg);
-                return;
-            }
-        }
-
-        // Per-shot submission lockout (Issue 17). The earlier in-flight guard
-        // (`shot.videoStatus === "pending"|"processing"`) had a false positive
-        // problem: when a shot has multiple tasks (batch ×4), one fails + others
-        // still processing, retrying the failed one was BLOCKED by the others'
-        // status. Replace with a 500ms debounce on the SHOT specifically — that
-        // catches double-clicks / strict-mode double-fires without entangling
-        // status semantics.
-        if (submittingShotsRef.current.has(shot.id)) {
-            debugLog.warn("Studio", "generateVideoBatch: refused — same shot submitted < 500ms ago");
+        const imageUrl = getActiveT2IImageUrl(shot) || shot.imageUrl || "";
+        if (!imageUrl) {
+            const message = t("i2vNeedsFirstFrame") || "Please generate or upload a first frame.";
+            setShotErrors((current) => ({ ...current, [shot.id]: message }));
+            toast.warning(message);
             return;
         }
+
+        const modelId = params?.model ?? videoConfig.model;
+        if (!VIDEO_I2V_MODELS.some((model) => model.id === modelId)) {
+            const message = `Unsupported video model: ${modelId}`;
+            setShotErrors((current) => ({ ...current, [shot.id]: message }));
+            toast.error(message);
+            return;
+        }
+
+        if (submittingShotsRef.current.has(shot.id)) return;
         submittingShotsRef.current.add(shot.id);
         window.setTimeout(() => submittingShotsRef.current.delete(shot.id), 500);
-        // Clear any prior error once this attempt is valid; success
-        // path or backend-side rejection will overwrite if needed.
-        setShotErrors(prev => {
-            if (!prev[shot.id]) return prev;
-            const next = { ...prev };
+        setShotErrors((current) => {
+            const next = { ...current };
             delete next[shot.id];
             return next;
         });
-
-        setShots(prev => prev.map((s, i) =>
-            i === index ? { ...s, videoStatus: "pending" } : s
+        setShots((current) => current.map((item, shotIndex) =>
+            shotIndex === index ? { ...item, videoStatus: "pending" } : item,
         ));
 
+        const effectiveCount = Math.max(1, Math.min(6, count || 1));
         try {
-            // Build a per-call factory so the batch fires N parallel
-            // requests through Promise.all — fail-fast on any one
-            // failure leaves the others untouched on the backend (the
-            // BG-task wrapper handles their lifecycle independently).
             const createOne = async (): Promise<string | null> => {
-                if (tabMode === "direct_r2v") {
-                    const referenceUrls = parseAssetTags(shot.prompt);
-                    const explicitR2v = params?.model ?? videoConfig.r2vModel;
-                    const explicitOk = VIDEO_R2V_MODELS.some(m => m.id === explicitR2v);
-                    const routeModelId = explicitOk
-                        ? explicitR2v
-                        : getR2vRouteModelId(videoConfig.model);
-                    const imageBased = isR2vImageBased(routeModelId);
-                    const tasks = await api.createVideoTask(
-                        currentProject.id,
-                        "",
-                        promptText,
-                        params?.duration ?? videoConfig.duration,
-                        params?.seed,
-                        params?.resolution ?? videoConfig.resolution,
-                        false,
-                        "",
-                        params?.promptExtend ?? videoConfig.promptExtend,
-                        params?.negativePrompt ?? videoConfig.negativePrompt,
-                        1,
-                        routeModelId,
-                        shot.id,
-                        params?.shotType ?? "multi",
-                        "r2v",
-                        !imageBased ? referenceUrls : undefined,
-                        undefined, undefined, undefined,
-                        undefined, undefined,
-                        imageBased ? referenceUrls : undefined,
-                        params?.ratio,
-                        tabMode,
-                        params?.watermark,
-                    );
-                    const task = Array.isArray(tasks) ? tasks[0] : tasks;
-                    return task?.id ?? null;
-                }
-                // I2V branch — same defensive check on the model.
-                const i2vModelId = params?.model ?? videoConfig.model;
-                const i2vModelOk = VIDEO_I2V_MODELS.some(m => m.id === i2vModelId);
-                if (!i2vModelOk) {
-                    debugLog.warn("Studio", `Refusing I2V submission with non-I2V model "${i2vModelId}".`);
-                    return null;
-                }
-                const imageUrl = getActiveT2IImageUrl(shot) || shot.imageUrl || "";
-                const tasks = await api.createVideoTask(
-                    currentProject.id,
-                    imageUrl,
-                    promptText,
-                    params?.duration ?? videoConfig.duration,
-                    params?.seed,
-                    params?.resolution ?? videoConfig.resolution,
-                    false,
-                    "",
-                    params?.promptExtend ?? videoConfig.promptExtend,
-                    params?.negativePrompt ?? videoConfig.negativePrompt,
-                    1,
-                    i2vModelId,
-                    shot.id,
-                    params?.shotType ?? "multi",
-                    "i2v",
-                    undefined,
-                    params?.mode ?? videoConfig.mode,
-                    params?.sound ?? videoConfig.sound,
-                    params?.cfgScale ?? videoConfig.cfgScale,
-                    params?.viduAudio ?? videoConfig.viduAudio,
-                    params?.movementAmplitude ?? videoConfig.movementAmplitude,
-                    undefined,
-                    undefined,
-                    tabMode,
-                    params?.watermark,
-                );
-                const task = Array.isArray(tasks) ? tasks[0] : tasks;
+                const response = await api.createVideoTask(currentProject.id, {
+                    image_url: imageUrl,
+                    prompt: buildAssembledPrompt(shot),
+                    frame_id: shot.id,
+                    duration: params?.duration ?? videoConfig.duration,
+                    seed: params?.seed,
+                    resolution: params?.resolution ?? videoConfig.resolution,
+                    generate_audio: params?.generateAudio ?? videoConfig.generateAudio,
+                    batch_size: 1,
+                    model: modelId,
+                    generation_mode: "i2v",
+                    ratio: params?.ratio ?? videoConfig.ratio,
+                    watermark: params?.watermark ?? videoConfig.watermark,
+                    workbench_tab: "t2i_i2v",
+                });
+                const task = Array.isArray(response) ? response[0] : response;
                 return task?.id ?? null;
             };
 
             const taskIds = (await Promise.all(
                 Array.from({ length: effectiveCount }, createOne),
-            )).filter((id): id is string => !!id);
+            )).filter((id): id is string => Boolean(id));
 
-            if (taskIds.length > 0) {
-                setShotErrors(prev => {
-                    if (!prev[shot.id]) return prev;
-                    const next = { ...prev };
-                    delete next[shot.id];
-                    return next;
-                });
-                setShots(prev => prev.map((s, i) => {
-                    if (i !== index) return s;
-                    // Mirror the latest task id on the legacy single
-                    // field so the ShotCard preview spinner / cancel
-                    // CTA keep working. The candidates panel reads
-                    // from project.video_tasks (filtered by
-                    // frame_id + workbench_tab), so the per-tab id
-                    // bucket on the shot is no longer needed.
-                    return {
-                        ...s,
+            if (taskIds.length === 0) throw new Error(t("videoGenSubmitFailedToast"));
+            setShots((current) => current.map((item, shotIndex) =>
+                shotIndex === index
+                    ? {
+                        ...item,
                         videoTaskId: taskIds[taskIds.length - 1],
-                        videoStatus: "processing" as const,
-                    };
-                }));
-            } else {
-                toast.error(t("videoGenSubmitFailedToast"));
-                setShots(prev => prev.map((s, i) =>
-                    i === index ? { ...s, videoStatus: "failed" as const } : s
-                ));
-            }
+                        videoStatus: "processing",
+                    }
+                    : item,
+            ));
         } catch (error: any) {
             debugLog.error("Studio", "Batch generate failed for shot:", error);
-            const status = error?.response?.status;
             const detail = error?.response?.data?.detail || error?.message || t("unknownErrorFallback");
-            if (status === 400 && typeof detail === "string") {
-                setShotErrors(prev => ({ ...prev, [shot.id]: detail }));
-            }
+            setShotErrors((current) => ({ ...current, [shot.id]: String(detail) }));
             toast.error(t("videoGenFailedToast", { detail: String(detail).slice(0, 150) }));
-            setShots(prev => prev.map((s, i) =>
-                i === index ? { ...s, videoStatus: "failed" as const } : s
+            setShots((current) => current.map((item, shotIndex) =>
+                shotIndex === index ? { ...item, videoStatus: "failed" } : item,
             ));
         }
-    }, [shots, currentProject, videoConfig, parseAssetTags, missingRefsMessage]);
+    }, [shots, currentProject, videoConfig, t]);
 
     // Project-level task refresh: when any task on any shot is in
     // flight, refetch the whole project every 5s. The candidates
@@ -1363,15 +977,7 @@ export default function StoryboardR2V() {
         }
     }, [drawerState.targetShotIndex, shots, updatePrompt]);
 
-    // Toolbar model display: surface the model the project's workflow
-    // mode actually uses, not the I2V parent. R2V projects were
-    // showing "wan2.7-i2v" while their generation actually went
-    // through wan2.6-r2v / wan2.7-r2v — confusing and the source of
-    // the "but I selected R2V" support thread.
-    const isR2VWorkflow = (currentProject?.workflow_mode ?? "r2v") === "r2v";
-    const currentModelName = isR2VWorkflow
-        ? (VIDEO_R2V_MODELS.find(m => m.id === videoConfig.r2vModel)?.name ?? videoConfig.r2vModel)
-        : (VIDEO_I2V_MODELS.find(m => m.id === videoConfig.model)?.name ?? videoConfig.model);
+    const currentModelName = VIDEO_I2V_MODELS.find(m => m.id === videoConfig.model)?.name ?? videoConfig.model;
 
     // ---- Project-level task derivations (drive Queue + Candidates) ----
     // We derive these via useMemo so per-render allocation is cheap and
@@ -1470,20 +1076,11 @@ export default function StoryboardR2V() {
     }, [compareSelectedIds, tasksById]);
 
     // Per-shot candidate tasks — derived directly from the project-
-    // level video_tasks. After Phase 2 persistence, each VideoTask
-    // carries `frame_id` + `workbench_tab` so we can bucket without a
-    // shot-side index. Pre-Phase-2 tasks lack `workbench_tab`; they
-    // fall back to `generation_mode` so legacy records still group
-    // correctly into the right tab.
+    // level video_tasks. New API exposes one I2V workbench per shot.
     const tasksForShot = useCallback((shot: ShotNode): VideoTask[] => {
         return allVideoTasks.filter((t) => {
             if (t.frame_id !== shot.id) return false;
-            if (t.workbench_tab != null) {
-                return t.workbench_tab === shot.tabMode;
-            }
-            // Legacy fallback: i2v tasks belong in t2i_i2v, r2v in direct_r2v.
-            if (shot.tabMode === "direct_r2v") return t.generation_mode === "r2v";
-            return t.generation_mode !== "r2v"; // i2v + undefined → i2v tab
+            return t.workbench_tab == null || t.workbench_tab === "t2i_i2v";
         });
     }, [allVideoTasks]);
 
@@ -1494,24 +1091,16 @@ export default function StoryboardR2V() {
     //  - videoConfig for shared knobs the user typically picks once
     //    and uses across all shots in a project.
     const paramsStateForShot = useCallback((shot: ShotNode): ParamsState => {
-        const isR2v = shot.tabMode === "direct_r2v";
-        const modelId = isR2v ? videoConfig.r2vModel : videoConfig.model;
         return {
-            model: modelId,
+            model: videoConfig.model,
             duration: shot.duration ?? videoConfig.duration,
             count: shotCounts[shot.id] ?? 1,
             // Per-shot seed override (Sweep G fix); undefined means
             // "random per generation".
             seed: shotSeeds[shot.id],
             resolution: videoConfig.resolution,
-            ratio: undefined,
-            negativePrompt: videoConfig.negativePrompt,
-            promptExtend: videoConfig.promptExtend,
-            cfgScale: videoConfig.cfgScale,
-            mode: videoConfig.mode,
-            movementAmplitude: videoConfig.movementAmplitude,
-            sound: videoConfig.sound,
-            viduAudio: videoConfig.viduAudio,
+            ratio: videoConfig.ratio,
+            generateAudio: videoConfig.generateAudio,
             watermark: videoConfig.watermark,
         };
     }, [videoConfig, shotCounts, shotSeeds]);
@@ -1547,31 +1136,18 @@ export default function StoryboardR2V() {
             if (prev[shot.id] === next.seed) return prev;
             return { ...prev, [shot.id]: next.seed };
         });
-        const isR2v = shot.tabMode === "direct_r2v";
         const ls = typeof window !== "undefined" ? window.localStorage : null;
         setVideoConfig(prev => {
             const updated: VideoConfig = {
                 ...prev,
                 duration: next.duration,
                 resolution: next.resolution ?? prev.resolution,
-                negativePrompt: next.negativePrompt ?? prev.negativePrompt,
-                promptExtend: next.promptExtend ?? prev.promptExtend,
-                cfgScale: next.cfgScale ?? prev.cfgScale,
-                mode: next.mode ?? prev.mode,
-                movementAmplitude: next.movementAmplitude ?? prev.movementAmplitude,
-                sound: next.sound ?? prev.sound,
-                viduAudio: next.viduAudio ?? prev.viduAudio,
-                // Watermark — preserve undefined (means "model doesn't expose
-                // it") so swapping to a non-watermark-supporting model clears it.
-                watermark: next.watermark,
+                ratio: next.ratio ?? prev.ratio,
+                generateAudio: next.generateAudio ?? prev.generateAudio,
+                watermark: next.watermark ?? prev.watermark,
+                model: next.model,
             };
-            if (isR2v) {
-                updated.r2vModel = next.model;
-                ls?.setItem("storyboard-r2v-r2v-model", next.model);
-            } else {
-                updated.model = next.model;
-                ls?.setItem("storyboard-r2v-model", next.model);
-            }
+            ls?.setItem("storyboard-newapi-video-model", next.model);
             return updated;
         });
     }, [persistWorkbench, shotCounts]);
@@ -1690,7 +1266,7 @@ export default function StoryboardR2V() {
         }
     }, [currentProject]);
 
-    // 复用此批参数: copy a batch's model + neg_prompt into videoConfig,
+    // Reuse the selected New API model and output settings from a batch.
     // so the next Generate uses the same recipe. We don't change count
     // here — count remains the per-shot knob the user chose.
     const handleReuseBatchParams = useCallback((batch: BatchSummary) => {
@@ -1698,15 +1274,11 @@ export default function StoryboardR2V() {
         if (!first) return;
         setVideoConfig(prev => {
             const updated = { ...prev };
-            // Decide which slot the batch's model lives in (I2V or R2V).
-            if (VIDEO_R2V_MODELS.some(m => m.id === first.model)) {
-                updated.r2vModel = first.model!;
-            } else if (VIDEO_I2V_MODELS.some(m => m.id === first.model)) {
+            if (VIDEO_I2V_MODELS.some(m => m.id === first.model)) {
                 updated.model = first.model!;
             }
             if (first.duration) updated.duration = first.duration;
             if (first.resolution) updated.resolution = first.resolution;
-            if (first.negative_prompt !== undefined) updated.negativePrompt = first.negative_prompt;
             return updated;
         });
     }, []);
@@ -1756,7 +1328,7 @@ export default function StoryboardR2V() {
             {/* Unified page header (shared StepPageHeader) */}
             <StepPageHeader
                 stepNumber={4}
-                englishName="STORYBOARD R2V"
+                englishName="STORYBOARD"
                 title={tStep("storyboardTitle")}
                 subtitle={tStep("storyboardSubtitle")}
                 pills={(
@@ -1832,9 +1404,7 @@ export default function StoryboardR2V() {
                 state={bannerState}
                 phase1Captions={PHASE1_CAPTIONS}
                 refineProgress={refineProgress}
-                dialogueProgress={dialogueProgress}
                 summary={bannerSummary}
-                onGenerateDialogue={handleBatchDialogue}
             />
 
             <div className="flex-1 overflow-y-auto px-5 pt-1.5 pb-10 space-y-5 sm:px-7">
@@ -1876,8 +1446,8 @@ export default function StoryboardR2V() {
                         (t) => t.status === "pending" || t.status === "processing",
                     ).length;
                     const paramsState = paramsStateForShot(shot);
-                    const isI2vTab = shot.tabMode === "t2i_i2v";
-                    const modelList = shot.tabMode === "direct_r2v" ? VIDEO_R2V_MODELS : VIDEO_I2V_MODELS;
+                    const isI2vTab = true;
+                    const modelList = VIDEO_I2V_MODELS;
                     return (
                     /* Plain div (was motion.div) — staggered enter
                        animation re-fired every time the user switched
@@ -1904,7 +1474,6 @@ export default function StoryboardR2V() {
                             onMoveUp={() => moveShot(index, "up")}
                             onMoveDown={() => moveShot(index, "down")}
                             onDuplicate={() => duplicateShot(index)}
-                            onSetTabMode={(mode) => setTabMode(index, mode)}
                             onOpenDrawer={() => setDrawerState({ isOpen: true, targetShotIndex: index })}
                             onInsertAsset={(type, name) => {
                                 // Direct chip insert (same as chip bar logic, delegated to chip bar)
@@ -1932,21 +1501,12 @@ export default function StoryboardR2V() {
                             }
                             expanded={expandedShots.has(shot.id)}
                             onToggleExpanded={() => toggleShotExpanded(shot.id)}
-                            /* PR-3c · 闭环生成: ShotCard 内全宽生成行 + count selector.
-                               canGenerate: direct_r2v 需 prompt; t2i_i2v 还需 first frame. */
+                            /* The New API workbench is keyframe + I2V only. */
                             generateCount={paramsState.count}
-                            genSummary={`${
-                                shot.tabMode === "direct_r2v"
-                                    ? (VIDEO_R2V_MODELS.find(m => m.id === videoConfig.r2vModel)?.name ?? videoConfig.r2vModel ?? "")
-                                    : (VIDEO_I2V_MODELS.find(m => m.id === videoConfig.model)?.name ?? videoConfig.model ?? "")
-                            } · ${paramsState.duration}s`}
+                            genSummary={`${VIDEO_I2V_MODELS.find(m => m.id === videoConfig.model)?.name ?? videoConfig.model ?? ""} · ${paramsState.duration}s`}
                             canGenerate={
                                 shot.prompt.trim().length > 0
-                                && (
-                                    shot.tabMode === "direct_r2v"
-                                    || !!shot.t2iImageUrl
-                                    || (shot.t2iImageUrls?.length ?? 0) > 0
-                                )
+                                && (!!shot.t2iImageUrl || (shot.t2iImageUrls?.length ?? 0) > 0)
                             }
                             onSetGenerateCount={(n) => handleShotParamsChange(shot, { ...paramsState, count: n })}
                             onGenerateBatch={(n) => generateVideoBatch(index, n, paramsState)}
@@ -1964,101 +1524,7 @@ export default function StoryboardR2V() {
                                 }
                             }}
                         />
-                        {/* PR-3j · Frame-level dialogue audio row. Only renders
-                            when the frame has dialogue text; resolves the
-                            bound character's voice_id and tracks stale state. */}
-                        {(() => {
-                            const frame = currentProject?.frames?.find((f: any) => f.id === shot.id);
-                            if (!frame) return null;
-                            const dialogueText = frame?.dialogue_structured?.line || frame?.dialogue;
-                            const hasVideoTask = !!(frame.selected_video_id || (currentProject as any)?.video_tasks?.find((t: any) => t.frame_id === frame.id && t.status === "completed"));
-                            // Show row when dialogue exists, or when video exists (dub available)
-                            if (!dialogueText?.trim() && !hasVideoTask) return null;
-                            const charId = Array.isArray(frame.character_ids) ? frame.character_ids[0] : null;
-                            const speaker = charId ? characters.find((c: any) => c.id === charId) : null;
-                            return (
-                                <div className="mx-5 mb-4">
-                                    <DialogueAudioRow
-                                        scriptId={currentProject!.id}
-                                        frameId={frame.id}
-                                        dialogue={dialogueText}
-                                        voiceId={speaker?.voice_id}
-                                        audioUrl={frame.audio_url}
-                                        audioError={frame.audio_error}
-                                        snapshotDialogue={dialogueText}
-                                        snapshotVoiceId={frame.dialogue_voice_id}
-                                        snapshotInstructions={frame.dialogue_instructions}
-                                        onUpdateDialogue={async (text: string) => {
-                                            if (!currentProject) return;
-                                            try {
-                                                await api.updateFrame(currentProject.id, frame.id, { dialogue: text });
-                                                const updated = await api.getProject(currentProject.id);
-                                                if (updated?.frames) updateProject(currentProject.id, { frames: updated.frames });
-                                            } catch (e) {
-                                                debugLog.error("Studio", "update dialogue from audio row failed", e);
-                                            }
-                                        }}
-                                        onAudioUpdated={async () => {
-                                            if (!currentProject) return;
-                                            try {
-                                                const updated = await api.getProject(currentProject.id);
-                                                if (updated?.frames) {
-                                                    updateProject(currentProject.id, { frames: updated.frames });
-                                                }
-                                            } catch (e) {
-                                                debugLog.warn("Studio", "refresh after audio gen failed", e);
-                                            }
-                                        }}
-                                        videoUrl={(() => {
-                                            const selectedId = frame.selected_video_id;
-                                            const task = (currentProject as any)?.video_tasks?.find(
-                                                (t: any) => selectedId ? t.id === selectedId : (t.frame_id === frame.id && t.status === "completed")
-                                            );
-                                            return task?.video_url;
-                                        })()}
-                                        videoTaskId={frame.selected_video_id ||
-                                            (currentProject as any)?.video_tasks?.find(
-                                                (t: any) => t.frame_id === frame.id && t.status === "completed"
-                                            )?.id}
-                                        previewVideoUrl={frame.preview_video_url}
-                                        dubbedVideoUrl={frame.dubbed_video_url}
-                                        dubOffsetMs={frame.dub_offset_ms ?? 0}
-                                        onPreviewDub={async (videoTaskId: string, offsetMs: number) => {
-                                            if (!currentProject) return;
-                                            await api.previewDub(currentProject.id, frame.id, videoTaskId, offsetMs);
-                                            const updated = await api.getProject(currentProject.id);
-                                            if (updated?.frames) {
-                                                updateProject(currentProject.id, { frames: updated.frames });
-                                            }
-                                        }}
-                                        onApplyDub={async () => {
-                                            if (!currentProject) return;
-                                            await api.applyDub(currentProject.id, frame.id);
-                                            const updated = await api.getProject(currentProject.id);
-                                            if (updated?.frames) {
-                                                updateProject(currentProject.id, { frames: updated.frames });
-                                            }
-                                        }}
-                                        onRevertDub={async () => {
-                                            if (!currentProject) return;
-                                            await api.revertDub(currentProject.id, frame.id);
-                                            const updated = await api.getProject(currentProject.id);
-                                            if (updated?.frames) {
-                                                updateProject(currentProject.id, { frames: updated.frames });
-                                            }
-                                        }}
-                                    />
-                                </div>
-                            );
-                        })()}
-                        {/* Attached workbench: t2i_i2v 模式下渲染顺序为
-                            Step 1 (T2ISubsection) → Step 2 (ParamsSection)
-                            → CandidatesSection；direct_r2v 模式无 T2I 区，
-                            ParamsSection → CandidatesSection。
-                            Spec: docs/design/r2v-workflow-v3-unified.md §4.3.2
-                            (PR-3a · Option A 最小修复)
-                            v1 不加 explicit section header / first-frame
-                            thumbnail in Step 2 — 看用户反馈再升级 v2. */}
+                        {/* New API workbench: first frame, I2V params, candidates. */}
                         {expandedShots.has(shot.id) ? (
                         <div className="mx-5 mb-[18px] motion-safe:animate-[shotPanelIn_220ms_cubic-bezier(0.22,1,0.36,1)_both]">
                             {isI2vTab ? (
@@ -2175,15 +1641,12 @@ export default function StoryboardR2V() {
                                     />
                                 </div>
                             ) : null}
-                            {/* Step 2 · 生成视频 (ParamsSection) — always shown
-                                when shot expanded; renders below Step 1 in
-                                t2i_i2v mode, and is the only section above
-                                candidates in direct_r2v mode. */}
+                            {/* Step 2 · video generation params. */}
                             <div className={isI2vTab ? "border-t border-glass-border" : ""}>
                                 <ParamsSection
                                     shotId={shot.id}
                                     modelList={modelList}
-                                    title={isI2vTab ? "I2V Params" : "R2V Params"}
+                                    title="I2V Params"
                                     params={paramsState}
                                     onChange={(next) => handleShotParamsChange(shot, next)}
                                     inFlightCount={shotInFlight}
@@ -2278,4 +1741,3 @@ export default function StoryboardR2V() {
         </div>
     );
 }
-

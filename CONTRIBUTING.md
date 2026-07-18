@@ -51,13 +51,15 @@ When contributing to media upload/generation flows, please keep these invariants
 
 - **Local-first storage**: files under `output/` are always written first and remain the durable project source.
 - **OSS is optional**: OSS acts as an optional mirror and signed-URL service, not a mandatory storage backend.
-- **DashScope-first backend**: for supported model families, DashScope is the default provider backend.
-- **Vendor-direct remains available**: Kling/Vidu vendor APIs are still supported when users opt in and configure vendor credentials.
+- **New API only**: every AI request routes through the shared `NEWAPI_BASE_URL`.
+- **One key per model**: the selected model ID must use only its matching `NEWAPI_*_API_KEY` field.
+- **Fail closed**: a missing key or unsupported model must produce a validation error. Do not add provider, model, or credential fallbacks.
+- **Capability-safe selectors**: chat, image, and video selectors may only expose models from their matching catalog group.
 
 Use the following vocabulary consistently in PRs, code, and docs:
 
 - `storage_mode`: `local_only` or `local_plus_oss`
-- `provider_backend`: `dashscope` or `vendor`
+- `provider_backend`: `newapi`
 - `media_ref`: stable project-side media reference (for example local relative path or OSS object key)
 - `resolved_media_input`: request-side provider-ready payload derived from `media_ref`
 
@@ -77,7 +79,7 @@ Typical use cases:
 - changing default models
 - changing model parameter metadata
 - changing model UI visibility
-- refreshing vendor-doc evidence
+- refreshing New API contract evidence
 
 Minimum expected command sequence after catalog changes:
 
@@ -135,7 +137,7 @@ We use **ESLint** configuration:
 ```bash
 cd frontend
 npm run lint
-npm run type-check
+npm run typecheck
 ```
 
 **Key Points**:

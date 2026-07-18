@@ -13,11 +13,17 @@ from .llm import ScriptProcessor
 from .assets import AssetGenerator
 from .storyboard import StoryboardGenerator
 from .video import VideoGenerator
-from .audio import AudioGenerator
 from .export import ExportManager
 from ...utils import get_logger
+from ...utils.newapi_models import (
+    CHAT,
+    IMAGE,
+    VIDEO,
+    get_model_spec,
+    get_selected_model,
+    resolve_model_api_key,
+)
 from ...utils.oss_utils import is_object_key
-from ...utils.provider_registry import resolve_provider_backend
 from ...utils.system_check import get_ffmpeg_path, get_ffmpeg_install_instructions
 
 logger = get_logger(__name__)
@@ -76,7 +82,6 @@ class ComicGenPipeline:
         self.asset_generator = AssetGenerator(self.config.get('assets'))
         self.storyboard_generator = StoryboardGenerator(self.config.get('storyboard'))
         self.video_generator = VideoGenerator(self.config.get('video'))
-        self.audio_generator = AudioGenerator(self.config.get('audio'))
         self.export_manager = ExportManager(self.config.get('export'))
         
         self.data_file = "output/projects.json"
@@ -99,9 +104,7 @@ class ComicGenPipeline:
         # Temporary cache for file import previews (import_id -> text)
         self._import_cache: Dict[str, str] = {}
         # Cached model instances (lazily initialized)
-        self._kling_model = None
-        self._vidu_model = None
-        self._mulerouter_video_model = None
+        self._newapi_video_model = None
 
         # Pre-download Demucs model in background so first dub request is fast
         self._demucs_ready = threading.Event()
@@ -353,24 +356,6 @@ class ComicGenPipeline:
                 logger.warning("mark_video_task_failed: save failed")
             return True
 
-    def _resolve_video_backend(self, model_name: str) -> str:
-        try:
-            return resolve_provider_backend(model_name)
-        except (KeyError, ValueError):
-            logger.debug(
-                "Provider backend not registered for video model %s, defaulting to dashscope.",
-                model_name,
-            )
-            return "dashscope"
-        except Exception as e:
-            logger.warning(
-                "Unexpected error resolving provider backend for video model %s: %s. "
-                "Falling back to dashscope.",
-                model_name,
-                e,
-            )
-            return "dashscope"
-
     # ... (existing methods)
 
     def export_project(self, script_id: str, options: Dict[str, Any]) -> str:
@@ -378,7 +363,7 @@ class ComicGenPipeline:
         script = self.scripts.get(script_id)
         if not script:
             raise ValueError("Script not found")
-            
+
         export_url = self.export_manager.render_project(script, options)
         return export_url
 
@@ -391,7 +376,16 @@ class ComicGenPipeline:
         try:
             with open(self.data_file, 'r') as f:
                 data = json.load(f)
-                return {k: Script(**v) for k, v in data.items()}
+                scripts = {k: Script(**v) for k, v in data.items()}
+            migrated = any(
+                (raw.get("model_settings") or {}) != script.model_settings.model_dump()
+                for key, script in scripts.items()
+                for raw in [data.get(key) or {}]
+            )
+            if migrated:
+                with open(self.data_file, "w") as f:
+                    json.dump({k: v.model_dump() for k, v in scripts.items()}, f, indent=2)
+            return scripts
         except Exception as e:
             logger.error(f"Failed to load data: {e}")
             return {}
@@ -402,7 +396,7 @@ class ComicGenPipeline:
             try:
                 os.makedirs(os.path.dirname(self.data_file), exist_ok=True)
                 with open(self.data_file, 'w') as f:
-                    json.dump({k: v.dict() for k, v in self.scripts.items()}, f, indent=2)
+                    json.dump({k: v.model_dump() for k, v in self.scripts.items()}, f, indent=2)
             except Exception as e:
                 logger.error(f"Failed to save data: {e}")
 
@@ -496,7 +490,6 @@ class ComicGenPipeline:
         # (it returns [] for any project without a series_id). Same for
         # prompt_config, default_generation_mode, bgm_url, mix_settings —
         # all project-level fields unrelated to entity extraction.
-        # custom_voices lives on Series, NOT Script — do not touch it here.
         new_script.series_id = existing_script.series_id
         new_script.episode_number = existing_script.episode_number
         new_script.prompt_config = existing_script.prompt_config
@@ -543,6 +536,9 @@ class ComicGenPipeline:
         # Get effective model names from project settings if not overridden
         t2i_model = model_name or script.model_settings.t2i_model
         i2i_model = script.model_settings.i2i_model
+        get_model_spec(t2i_model, IMAGE)
+        get_model_spec(i2i_model, IMAGE)
+        resolve_model_api_key(t2i_model, IMAGE)
         
         # Get effective size based on asset type (aspect_ratio param overrides model_settings)
         from .assets import ASPECT_RATIO_TO_SIZE
@@ -558,11 +554,11 @@ class ComicGenPipeline:
             effective_aspect = "9:16"
 
         if asset_type == "character":
-            default_size = "576*1024"
+            default_size = "1024x1536"
         elif asset_type == "scene":
-            default_size = "1024*576"
+            default_size = "1536x1024"
         else:
-            default_size = "1024*1024"
+            default_size = "1024x1024"
 
         effective_size = ASPECT_RATIO_TO_SIZE.get(effective_aspect, default_size)
         
@@ -683,6 +679,10 @@ class ComicGenPipeline:
         script = self.scripts.get(script_id)
         if not script:
             raise ValueError("Script not found")
+
+        selected_model = model_name or script.model_settings.image_model
+        get_model_spec(selected_model, IMAGE)
+        resolve_model_api_key(selected_model, IMAGE)
         
         # Find the asset and set to PROCESSING
         asset_list = []
@@ -737,7 +737,7 @@ class ComicGenPipeline:
                 "apply_style": apply_style,
                 "negative_prompt": negative_prompt,
                 "batch_size": batch_size,
-                "model_name": model_name,
+                "model_name": selected_model,
                 "aspect_ratio": aspect_ratio,
             }
         }
@@ -795,8 +795,8 @@ class ComicGenPipeline:
         asset_type = task["asset_type"]
         positive_prompt = params.get("effective_positive_prompt", "")
         negative_prompt = params.get("effective_negative_prompt", "")
-        t2i_model = params.get("t2i_model", "wan2.6-t2i")
-        effective_size = params.get("effective_size", "576*1024")
+        t2i_model = params.get("t2i_model") or series.model_settings.image_model
+        effective_size = params.get("effective_size", "1024x1536")
         batch_size = params.get("batch_size", 1)
         generation_type = params.get("generation_type", "all")
         prompt = params.get("prompt")
@@ -856,11 +856,18 @@ class ComicGenPipeline:
 
     def create_motion_ref_task(self, script_id: str, asset_id: str, asset_type: str, 
                                 prompt: Optional[str] = None, audio_url: Optional[str] = None, 
-                                duration: int = 5, batch_size: int = 1) -> Tuple[Script, str]:
+                                duration: int = 5, batch_size: int = 1,
+                                model_id: Optional[str] = None) -> Tuple[Script, str]:
         """Creates an async motion reference generation task."""
         script = self.scripts.get(script_id)
         if not script:
             raise ValueError("Script not found")
+        if audio_url:
+            raise ValueError("New API Seedance does not support driving-audio input")
+        selected_model = get_model_spec(
+            model_id or script.model_settings.video_model, VIDEO
+        ).model_id
+        resolve_model_api_key(selected_model, VIDEO)
             
         task_id = str(uuid.uuid4())
         self.video_generation_tasks[task_id] = {
@@ -875,7 +882,8 @@ class ComicGenPipeline:
                 "prompt": prompt,
                 "audio_url": audio_url,
                 "duration": duration,
-                "batch_size": batch_size
+                "batch_size": batch_size,
+                "model": selected_model,
             }
         }
         
@@ -901,7 +909,8 @@ class ComicGenPipeline:
                 prompt=params["prompt"],
                 audio_url=params["audio_url"],
                 duration=params["duration"],
-                batch_size=params["batch_size"]
+                batch_size=params["batch_size"],
+                model_id=params["model"],
             )
             task["status"] = "completed"
             task["progress"] = 100
@@ -1430,7 +1439,7 @@ class ComicGenPipeline:
 
     def refine_frame(self, script_id: str, frame_id: str) -> Optional[StoryboardFrame]:
         """Phase 2: Refine a single coarse frame into a rich frame."""
-        from .prompt_assembly import assemble_prompt, sync_dialogue_to_tts
+        from .prompt_assembly import assemble_prompt, sync_dialogue_metadata
         from .models import DialogueStructured, CameraMovementData, Blocking, AudioNote, LightingData, StageSubject
 
         script = self.scripts.get(script_id)
@@ -1561,8 +1570,8 @@ class ComicGenPipeline:
                 description=lt.get("description"),
             )
 
-        # Sync dialogue → TTS instructions & compute assembled prompt
-        sync_dialogue_to_tts(frame)
+        # Sync dialogue performance instructions and compute the assembled prompt
+        sync_dialogue_metadata(frame)
         frame.assembled_prompt = assemble_prompt(frame, all_characters)
         frame.updated_at = time.time()
 
@@ -1792,7 +1801,8 @@ class ComicGenPipeline:
         prompt: Optional[str] = None,
         audio_url: Optional[str] = None,
         duration: int = 5,
-        batch_size: int = 1
+        batch_size: int = 1,
+        model_id: Optional[str] = None,
     ) -> Script:
         """Generate Motion Reference video for an asset (Character Full Body/Headshot, Scene, or Prop).
 
@@ -1889,7 +1899,8 @@ class ComicGenPipeline:
                     image_url=source_image_url,
                     prompt=prompt,
                     duration=duration,
-                    audio_url=audio_url
+                    audio_url=audio_url,
+                    model_id=model_id or script.model_settings.video_model,
                 )
 
                 if video_result and video_result.get("video_url"):
@@ -1923,7 +1934,7 @@ class ComicGenPipeline:
                             duration=duration,
                             created_at=time.time(),
                             generate_audio=bool(audio_url),
-                            model="wan2.6-i2v",
+                            model=model_id or script.model_settings.video_model,
                             generation_mode="i2v"  # Image to video (motion reference)
                         )
 
@@ -2019,7 +2030,7 @@ class ComicGenPipeline:
             # Get effective size from storyboard_aspect_ratio
             from .assets import ASPECT_RATIO_TO_SIZE
             storyboard_aspect_ratio = script.model_settings.storyboard_aspect_ratio
-            effective_size = ASPECT_RATIO_TO_SIZE.get(storyboard_aspect_ratio, "1024*576")  # Default to landscape
+            effective_size = ASPECT_RATIO_TO_SIZE.get(storyboard_aspect_ratio, "1536x1024")
             
             # Use model from settings
             i2i_model = script.model_settings.i2i_model
@@ -2076,65 +2087,45 @@ class ComicGenPipeline:
         self._save_data()
         return script
 
-    def create_video_task(self, script_id: str, image_url: str, prompt: str, duration: int = 5, seed: int = None, resolution: str = "720p", generate_audio: bool = False, audio_url: str = None, prompt_extend: bool = True, negative_prompt: str = None, model: str = "wan2.7-i2v", frame_id: str = None, shot_type: str = "single", generation_mode: str = "i2v", reference_video_urls: list = None, reference_image_urls: list = None, ratio: str = None, watermark: Optional[bool] = None, mode: str = None, sound: str = None, cfg_scale: float = None, vidu_audio: bool = None, movement_amplitude: str = None, workbench_tab: Optional[str] = None) -> Tuple[Script, str]:
+    def create_video_task(
+        self,
+        script_id: str,
+        image_url: Optional[str],
+        prompt: str,
+        duration: int = 5,
+        seed: int = None,
+        resolution: str = "720p",
+        generate_audio: bool = False,
+        model: str = None,
+        frame_id: str = None,
+        generation_mode: str = "i2v",
+        ratio: str = None,
+        watermark: Optional[bool] = None,
+        workbench_tab: Optional[str] = None,
+    ) -> Tuple[Script, str]:
         """Creates a new video generation task."""
         script = self.get_script(script_id)
         if not script:
             raise ValueError("Script not found")
-        
-        task_id = str(uuid.uuid4())
-        
-        # If R2V mode is selected, use the appropriate R2V model
-        if generation_mode == "r2v":
-            # Skip auto-switch if user already selected an R2V model directly
-            if not (model and model.endswith("-r2v")):
-                if model and model.startswith("happyhorse-"):
-                    model = "happyhorse-1.1-r2v"
-                elif model and model.startswith("wan2.7-"):
-                    model = "wan2.7-r2v"
-                elif model and model.startswith("kling"):
-                    model = "kling-v3-r2v"
-                elif model and model.startswith("pixverse"):
-                    model = "pixverse-c1-r2v"
-                elif model and model.startswith("vidu"):
-                    model = "viduq3-pro-r2v"
-                elif model and model.startswith("seedance"):
-                    model = "seedance-2.0-r2v"
-                else:
-                    model = "wan2.7-r2v"
 
-        # Defensive guard against model⇄mode⇄refs mismatch. Every R2V
-        # model needs reference inputs; without them the underlying
-        # provider call raises mid-generation, the BG task crashes,
-        # and the user sees nothing but a spinner. Catch the
-        # inconsistency at task-creation time so the frontend gets a
-        # clean 400 instead of a permanently-failed task.
-        #
-        # Originally we only checked wan2.7-r2v / wan2.6-r2v (the
-        # first reported case). Production added happyhorse-1.0-r2v,
-        # kling-v3-r2v, pixverse-c1-r2v, pixverse-v5.6-r2v,
-        # viduq3-pro-r2v, viduq3-turbo-r2v — all need refs too. We
-        # now match on the "-r2v" suffix so new R2V families inherit
-        # the check automatically. Only wan2.6-r2v (legacy) takes
-        # video refs; everything else takes image refs.
-        is_r2v_model = isinstance(model, str) and model.endswith("-r2v")
-        if is_r2v_model:
-            needs_video_refs = model == "wan2.6-r2v"
-            refs = (
-                (reference_video_urls or []) if needs_video_refs
-                else (reference_image_urls or [])
+        model = model or script.model_settings.video_model or get_selected_model(VIDEO)
+        spec = get_model_spec(model, VIDEO)
+        if generation_mode not in spec.supported_modes:
+            raise ValueError(
+                f"Model '{model}' does not support generation mode '{generation_mode}'"
             )
-            if not refs:
-                kind = "video" if needs_video_refs else "image"
-                raise ValueError(
-                    f"Model '{model}' is reference-to-video and requires {kind} references, "
-                    f"but none were provided. Attach reference {kind}s (use @ in the prompt "
-                    "to reference characters / scenes / props) or switch to an I2V model "
-                    "(e.g. wan2.7-i2v)."
-                )
+        if generation_mode == "i2v" and not image_url:
+            raise ValueError("Image-to-video generation requires one source image")
+        if generation_mode == "t2v" and image_url:
+            raise ValueError("Text-to-video generation must not include a source image")
+        # Validate the exact selected model's dedicated key before a task is
+        # persisted or queued. There is no capability/shared-key fallback.
+        resolve_model_api_key(model, VIDEO)
+
+        task_id = str(uuid.uuid4())
 
         # Snapshot the input image to ensure consistency
-        snapshot_url = image_url
+        snapshot_url = image_url or ""
         try:
             # Resolve source path
             if image_url and not image_url.startswith("http"):
@@ -2180,21 +2171,10 @@ class ComicGenPipeline:
             seed=seed,
             resolution=resolution,
             generate_audio=generate_audio,
-            audio_url=audio_url,
-            prompt_extend=prompt_extend,
-            negative_prompt=negative_prompt,
             model=model,
-            shot_type=shot_type,
             generation_mode=generation_mode,
-            reference_video_urls=reference_video_urls or [],
-            reference_image_urls=reference_image_urls or [],
             ratio=ratio,
             watermark=watermark,
-            mode=mode,
-            sound=sound,
-            cfg_scale=cfg_scale,
-            vidu_audio=vidu_audio,
-            movement_amplitude=movement_amplitude,
             workbench_tab=workbench_tab,
             created_at=time.time()
         )
@@ -2629,7 +2609,7 @@ class ComicGenPipeline:
             raise ValueError(f"Frame {frame_id} not found")
 
         if not frame.audio_url:
-            raise ValueError("Frame has no TTS audio (audio_url). Generate dialogue audio first.")
+            raise ValueError("Frame has no dialogue audio (audio_url). Upload an audio track first.")
 
         video_task = next((t for t in script.video_tasks if t.id == video_task_id), None)
         if not video_task or not video_task.video_url:
@@ -2640,14 +2620,14 @@ class ComicGenPipeline:
             raise RuntimeError("FFmpeg is required for audio dubbing but was not found.")
 
         video_path = self._resolve_media_path(video_task.video_url, suffix=".mp4")
-        tts_path = self._resolve_media_path(frame.audio_url, suffix=".mp3")
+        dialogue_path = self._resolve_media_path(frame.audio_url, suffix=".mp3")
 
         if not video_path or not os.path.exists(video_path):
             raise ValueError(f"Video file not found: {video_task.video_url}")
-        if not tts_path or not os.path.exists(tts_path):
+        if not dialogue_path or not os.path.exists(dialogue_path):
             raise ValueError(f"Audio file not found: {frame.audio_url}")
-        if os.path.getsize(tts_path) < 1000:
-            raise ValueError("TTS audio file is invalid or empty. Please regenerate dialogue audio.")
+        if os.path.getsize(dialogue_path) < 1000:
+            raise ValueError("Dialogue audio file is invalid or empty. Please upload it again.")
 
         # Delete old preview (lazy cleanup)
         if frame.preview_video_url:
@@ -2675,15 +2655,15 @@ class ComicGenPipeline:
                 mix_cmd = [
                     ffmpeg_path, "-y",
                     "-i", bg_audio_path,
-                    "-i", tts_path,
+                    "-i", dialogue_path,
                     "-filter_complex",
-                    f"[1:a]adelay={delay_str}[tts];[0:a][tts]amix=inputs=2:duration=first:weights=1 1[out]",
+                    f"[1:a]adelay={delay_str}[dialogue];[0:a][dialogue]amix=inputs=2:duration=first:weights=1 1[out]",
                     "-map", "[out]",
                     "-ac", "2", "-ar", "44100",
                     mixed_audio,
                 ]
 
-                logger.info(f"[DUB] Mixing TTS with background (adelay={offset_ms}ms)")
+                logger.info(f"[DUB] Mixing dialogue audio with background (adelay={offset_ms}ms)")
                 subprocess.run(mix_cmd, check=True, capture_output=True, timeout=60)
 
                 if not os.path.exists(mixed_audio):
@@ -2706,9 +2686,9 @@ class ComicGenPipeline:
                 cmd = [
                     ffmpeg_path, "-y",
                     "-i", video_path,
-                    "-i", tts_path,
+                    "-i", dialogue_path,
                     "-filter_complex",
-                    f"[1:a]adelay={delay_str}[tts];[tts]apad[out]",
+                    f"[1:a]adelay={delay_str}[dialogue];[dialogue]apad[out]",
                     "-map", "0:v",
                     "-map", "[out]",
                     "-c:v", "copy",
@@ -2838,7 +2818,7 @@ class ComicGenPipeline:
         for i, frame in enumerate(script.frames):
             logger.info(f"[MERGE] Processing frame {i+1}/{len(script.frames)}: {frame.id}")
 
-            # Prefer dubbed version (TTS audio already overlaid with lip-sync offset)
+            # Prefer dubbed version (dialogue audio already overlaid with lip-sync offset)
             if frame.dubbed_video_url:
                 dubbed_path = _safe_resolve_path("output", frame.dubbed_video_url)
                 if os.path.exists(dubbed_path):
@@ -3134,8 +3114,17 @@ class ComicGenPipeline:
         
         return "FFmpeg merge failed with unknown error. Please check the application logs for details."
 
-    def create_asset_video_task(self, script_id: str, asset_id: str, asset_type: str, prompt: str, duration: int = 5, aspect_ratio: str = None) -> Tuple[Script, str]:
-        """Creates a new video generation task for an asset (R2V)."""
+    def create_asset_video_task(
+        self,
+        script_id: str,
+        asset_id: str,
+        asset_type: str,
+        prompt: str,
+        duration: int = 5,
+        aspect_ratio: str = None,
+        model_id: str = None,
+    ) -> Tuple[Script, str]:
+        """Create a New API image-to-video task for an asset."""
         script = self.scripts.get(script_id)
         if not script:
             raise ValueError("Script not found")
@@ -3166,26 +3155,17 @@ class ComicGenPipeline:
         if prompt:
             target_asset.video_prompt = prompt
             
-        task_id = str(uuid.uuid4())
-        
-        # Create VideoTask
-        task = VideoTask(
-            id=task_id,
-            project_id=script_id,
-            asset_id=asset_id, # Link to asset
+        script, task_id = self.create_video_task(
+            script_id=script_id,
             image_url=image_url,
             prompt=prompt or f"Cinematic shot of {target_asset.name}",
-            status="pending",
             duration=duration,
-            model=script.model_settings.r2v_model if hasattr(script.model_settings, 'r2v_model') and script.model_settings.r2v_model else "wan2.7-r2v",
-            generation_mode="r2v",
-            created_at=time.time()
+            model=model_id or script.model_settings.video_model,
+            generation_mode="i2v",
+            ratio=aspect_ratio,
         )
-        
-        # Add to script.video_tasks for global tracking
-        if not script.video_tasks:
-            script.video_tasks = []
-        script.video_tasks.append(task)
+        task = next(task for task in script.video_tasks if task.id == task_id)
+        task.asset_id = asset_id
         
         # Add to asset's video_assets list
         if not target_asset.video_assets:
@@ -3223,140 +3203,48 @@ class ComicGenPipeline:
             output_path = os.path.join("output", "video", output_filename)
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
             
-            # Handle Audio Logic
-            # 1. Silent: audio_url=None, audio=False
-            # 2. AI Sound: audio_url=None, audio=True
-            # 3. Sound Driven: audio_url=URL (audio param ignored)
-            
-            final_audio_url = None
-            final_generate_audio = False
-            
-            if task.audio_url:
-                # Sound Driven Mode
-                final_audio_url = task.audio_url
-                final_generate_audio = False # API says audio param ignored if url present, but let's be explicit
-            elif task.generate_audio:
-                # AI Sound Mode
-                final_audio_url = None
-                final_generate_audio = True
-            else:
-                # Silent Mode
-                final_audio_url = None
-                final_generate_audio = False
-
-            # Ensure img_url is passed correctly for OSS
             img_url = task.image_url
+            model_name = task.model or get_selected_model(VIDEO)
+            spec = get_model_spec(model_name, VIDEO)
+            if task.generation_mode not in spec.supported_modes:
+                raise ValueError(
+                    f"Model '{model_name}' does not support generation mode '{task.generation_mode}'"
+                )
+            if getattr(task, "audio_url", None):
+                raise ValueError("New API Seedance does not support driving-audio input")
 
-            # Route to the appropriate model based on task.model
-            model_name = task.model or ""
-            model_name_lower = model_name.lower()
-            backend = self._resolve_video_backend(model_name)
-            use_vendor_kling = backend == "vendor" and (
-                model_name_lower.startswith("kling-") or model_name_lower.startswith("kling/kling-")
-            )
-            use_vendor_vidu = backend == "vendor" and (
-                model_name_lower.startswith("vidu")
-                or model_name_lower.startswith("viduq2")
-                or model_name_lower.startswith("viduq3")
-                or model_name_lower.startswith("vidu/vidu")
-            )
-            use_mulerouter = backend == "mulerouter" and (
-                model_name_lower.startswith("seedance")
-            )
+            if self._newapi_video_model is None:
+                from ...models.newapi import NewAPIVideoModel
+                self._newapi_video_model = NewAPIVideoModel({})
 
-            if use_mulerouter:
-                if self._mulerouter_video_model is None:
-                    from ...models.mulerouter import MuleRouterVideoModel
-                    self._mulerouter_video_model = MuleRouterVideoModel({})
-                video_path, _ = self._mulerouter_video_model.generate(
-                    prompt=task.prompt,
-                    output_path=output_path,
-                    img_url=img_url,
-                    img_path=img_path,
-                    duration=task.duration,
-                    resolution=task.resolution,
-                    aspect_ratio=task.ratio or "16:9",
-                    seed=task.seed,
-                    watermark=bool(task.watermark) if task.watermark is not None else False,
-                    generation_mode=task.generation_mode,
-                    ref_image_urls=task.reference_image_urls if task.generation_mode == "r2v" else None,
-                )
-            elif use_vendor_kling:
-                # Use Kling model (cached)
-                if self._kling_model is None:
-                    from ...models.kling import KlingModel
-                    self._kling_model = KlingModel({})
-                video_path, _ = self._kling_model.generate(
-                    prompt=task.prompt,
-                    output_path=output_path,
-                    img_url=img_url,
-                    img_path=img_path,
-                    duration=task.duration,
-                    model=task.model,
-                    negative_prompt=task.negative_prompt,
-                    aspect_ratio="16:9",
-                    mode=task.mode or "std",
-                    sound=task.sound or "off",
-                    cfg_scale=task.cfg_scale,
-                )
-            elif use_vendor_vidu:
-                # Use Vidu model (cached)
-                if self._vidu_model is None:
-                    from ...models.vidu import ViduModel
-                    self._vidu_model = ViduModel({})
-                video_path, _ = self._vidu_model.generate(
-                    prompt=task.prompt,
-                    output_path=output_path,
-                    img_url=img_url,
-                    img_path=img_path,
-                    duration=task.duration,
-                    model=task.model,
-                    resolution=task.resolution,
-                    aspect_ratio="16:9",
-                    seed=task.seed or 0,
-                    audio=task.vidu_audio if task.vidu_audio is not None else True,
-                    movement_amplitude=task.movement_amplitude or "auto",
-                )
-            else:
-                # Default: Wanx model
-                # Issue 17: persist provider IDs (Bailian / DashScope task_id +
-                # request_id) onto our VideoTask the moment wanx gets them, BEFORE
-                # the long polling loop. Lets the user copy them from the queue
-                # panel even mid-generation if the task hangs.
-                def _capture_provider_ids(provider_name: str, ptask_id: Optional[str], preq_id: Optional[str]) -> None:
-                    task.provider_name = provider_name
-                    task.provider_task_id = ptask_id
-                    task.provider_request_id = preq_id
-                    try:
-                        self._save_data()
-                    except Exception:
-                        logger.warning("Failed to persist provider IDs mid-flight; will retry at task completion")
-                video_path, _ = self.video_generator.model.generate(
-                    prompt=task.prompt,
-                    output_path=output_path,
-                    img_path=img_path,
-                    img_url=img_url,
-                    duration=task.duration,
-                    seed=task.seed,
-                    resolution=task.resolution,
-                    # Pass new params
-                    audio_url=final_audio_url,
-                    audio=final_generate_audio,
-                    prompt_extend=task.prompt_extend,
-                    negative_prompt=task.negative_prompt,
-                    model=task.model,
-                    shot_type=task.shot_type,
-                    ref_video_urls=task.reference_video_urls if task.generation_mode == "r2v" else None,
-                    ref_image_urls=task.reference_image_urls if task.generation_mode == "r2v" else None,
-                    ratio=task.ratio,
-                    # Pass watermark explicitly; wanx.generate's default is False so
-                    # None becomes False, matching "leave to provider default = off".
-                    watermark=bool(task.watermark) if task.watermark is not None else False,
-                    audio_setting=task.audio_setting,
-                    camera_motion=None,
-                    subject_motion=None,
-                    on_provider_ids=_capture_provider_ids,
-                )
+            def _capture_newapi_provider_ids(
+                provider_name: str,
+                ptask_id: Optional[str],
+                preq_id: Optional[str],
+            ) -> None:
+                task.provider_name = provider_name
+                task.provider_task_id = ptask_id
+                task.provider_request_id = preq_id
+                try:
+                    self._save_data()
+                except Exception:
+                    logger.warning("Failed to persist New API provider IDs mid-flight")
+
+            video_path, _ = self._newapi_video_model.generate(
+                prompt=task.prompt,
+                output_path=output_path,
+                img_url=img_url or None,
+                img_path=img_path,
+                model_id=model_name,
+                duration=task.duration,
+                resolution=task.resolution,
+                aspect_ratio=task.ratio or "16:9",
+                seed=task.seed,
+                generate_audio=task.generate_audio,
+                watermark=bool(task.watermark) if task.watermark is not None else False,
+                generation_mode=task.generation_mode,
+                on_provider_ids=_capture_newapi_provider_ids,
+            )
             
             task.video_url = os.path.relpath(output_path, "output")
             task.status = "completed"
@@ -3370,6 +3258,7 @@ class ComicGenPipeline:
             logger.exception("Failed to process video task")
             logger.error(f"Video generation failed: {e}")
             task.status = "failed"
+            task.error = str(e)
             if task.asset_id:
                 self._sync_asset_video_task(script, task)
             
@@ -3453,119 +3342,8 @@ class ComicGenPipeline:
         self._save_data()
         return script
 
-    def generate_audio(self, script_id: str) -> Script:
-        """Step 5: Generate audio (Dialogue & SFX)."""
-        script = self.scripts.get(script_id)
-        if not script:
-            raise ValueError("Script not found")
-            
-        logger.info(f"Generating audio for script {script.id}")
-        
-        for frame in script.frames:
-            # Generate Dialogue
-            if frame.dialogue:
-                speaker = None
-                if frame.character_ids:
-                    speaker = next((c for c in script.characters if c.id == frame.character_ids[0]), None)
-                
-                if speaker:
-                    self.audio_generator.generate_dialogue(
-                        frame, speaker,
-                        speed=speaker.voice_speed,
-                        pitch=speaker.voice_pitch,
-                        volume=speaker.voice_volume
-                    )
-            
-            # Generate SFX (Text-to-Audio)
-            if frame.action_description:
-                self.audio_generator.generate_sfx(frame)
-                
-            # Generate SFX (Video-to-Audio) - if video exists
-            if frame.video_url:
-                self.audio_generator.generate_sfx_from_video(frame)
-                
-            # Generate BGM
-            # Simple logic: generate BGM for every frame (or scene start)
-            self.audio_generator.generate_bgm(frame)
-                
-        self._save_data()
-        return script
 
-    def generate_dialogue_line(
-        self,
-        script_id: str,
-        frame_id: str,
-        speed: float = 1.0,
-        pitch: float = 1.0,
-        volume: int = 50,
-        instructions: Optional[str] = None,
-    ) -> Script:
-        """Generates audio for a specific frame with parameters.
 
-        PR-3j: accepts `instructions` (chip emotion + free text). For
-        custom voices (clone/design) we resolve the target_model/family
-        override here so generation reuses the registered voice model.
-        """
-        script = self.scripts.get(script_id)
-        if not script:
-            raise ValueError("Script not found")
-
-        frame = next((f for f in script.frames if f.id == frame_id), None)
-        if not frame:
-            raise ValueError("Frame not found")
-
-        dialogue_text = (
-            (frame.dialogue_structured.line if frame.dialogue_structured else None)
-            or frame.dialogue
-        )
-        if dialogue_text:
-            speaker = None
-            if frame.character_ids:
-                speaker = next((c for c in script.characters if c.id == frame.character_ids[0]), None)
-            speaker_name = frame.speaker or (
-                frame.dialogue_structured.speaker if frame.dialogue_structured else None
-            )
-            if not speaker and speaker_name:
-                key = speaker_name.strip().lower()
-                speaker = next(
-                    (c for c in script.characters if c.name.strip().lower() == key
-                     or key in c.name.strip().lower()
-                     or c.name.strip().lower() in key),
-                    None,
-                )
-
-            if speaker:
-                model_override = None
-                family_override = None
-                if speaker.voice_id:
-                    custom = self.find_custom_voice(speaker.voice_id)
-                    if custom:
-                        model_override = custom.target_model
-                        family_override = custom.family
-                self.audio_generator.generate_dialogue(
-                    frame, speaker, speed, pitch, volume,
-                    instructions=instructions,
-                    model_override=model_override,
-                    family_override=family_override,
-                )
-
-        self._save_data()
-        return script
-
-    def bind_voice(self, script_id: str, char_id: str, voice_id: str, voice_name: str) -> Script:
-        """Binds a voice to a character."""
-        script = self.scripts.get(script_id)
-        if not script:
-            raise ValueError("Script not found")
-            
-        char = next((c for c in script.characters if c.id == char_id), None)
-        if not char:
-            raise ValueError("Character not found")
-            
-        char.voice_id = voice_id
-        char.voice_name = voice_name
-        self._save_data()
-        return script
 
     def get_script(self, script_id: str) -> Optional[Script]:
         return self.scripts.get(script_id)
@@ -3773,30 +3551,52 @@ class ComicGenPipeline:
         self._save_data()
         return script
 
-    def update_model_settings(self, script_id: str, t2i_model: str = None, i2i_model: str = None, i2v_model: str = None, r2v_model: str = None, character_aspect_ratio: str = None, scene_aspect_ratio: str = None, prop_aspect_ratio: str = None, storyboard_aspect_ratio: str = None, image_model: str = None) -> Script:
+    def update_model_settings(
+        self,
+        script_id: str,
+        t2i_model: str = None,
+        i2i_model: str = None,
+        i2v_model: str = None,
+        character_aspect_ratio: str = None,
+        scene_aspect_ratio: str = None,
+        prop_aspect_ratio: str = None,
+        storyboard_aspect_ratio: str = None,
+        image_model: str = None,
+        chat_model: str = None,
+        video_model: str = None,
+    ) -> Script:
         """Updates the model settings for a script."""
         script = self.scripts.get(script_id)
         if not script:
             raise ValueError("Script not found")
 
-        if t2i_model:
-            script.model_settings.t2i_model = t2i_model
-        if i2i_model:
-            script.model_settings.i2i_model = i2i_model
-        if i2v_model:
-            script.model_settings.i2v_model = i2v_model
-        if r2v_model:
-            script.model_settings.r2v_model = r2v_model
-        if image_model:
-            script.model_settings.image_model = image_model
-        if character_aspect_ratio:
-            script.model_settings.character_aspect_ratio = character_aspect_ratio
-        if scene_aspect_ratio:
-            script.model_settings.scene_aspect_ratio = scene_aspect_ratio
-        if prop_aspect_ratio:
-            script.model_settings.prop_aspect_ratio = prop_aspect_ratio
-        if storyboard_aspect_ratio:
-            script.model_settings.storyboard_aspect_ratio = storyboard_aspect_ratio
+        updates: Dict[str, Any] = {}
+        selected_image = image_model or t2i_model or i2i_model
+        if selected_image:
+            selected_image = get_model_spec(selected_image, IMAGE).model_id
+            updates.update(
+                image_model=selected_image,
+                t2i_model=selected_image,
+                i2i_model=selected_image,
+            )
+        selected_video = video_model or i2v_model
+        if selected_video:
+            selected_video = get_model_spec(selected_video, VIDEO).model_id
+            updates.update(video_model=selected_video, i2v_model=selected_video)
+        if chat_model:
+            updates["chat_model"] = get_model_spec(chat_model, CHAT).model_id
+        for field, value in (
+            ("character_aspect_ratio", character_aspect_ratio),
+            ("scene_aspect_ratio", scene_aspect_ratio),
+            ("prop_aspect_ratio", prop_aspect_ratio),
+            ("storyboard_aspect_ratio", storyboard_aspect_ratio),
+        ):
+            if value:
+                updates[field] = value
+
+        script.model_settings = script.model_settings.__class__.model_validate(
+            {**script.model_settings.model_dump(), **updates}
+        )
 
         self._save_data()
         return script
@@ -3865,7 +3665,16 @@ class ComicGenPipeline:
         try:
             with open(self.series_data_file, 'r') as f:
                 data = json.load(f)
-                return {k: Series(**v) for k, v in data.items()}
+                series_store = {k: Series(**v) for k, v in data.items()}
+            migrated = any(
+                (raw.get("model_settings") or {}) != series.model_settings.model_dump()
+                for key, series in series_store.items()
+                for raw in [data.get(key) or {}]
+            )
+            if migrated:
+                with open(self.series_data_file, "w") as f:
+                    json.dump({k: v.model_dump() for k, v in series_store.items()}, f, indent=2)
+            return series_store
         except Exception as e:
             logger.error(f"Failed to load series data: {e}")
             return {}
@@ -3957,8 +3766,7 @@ class ComicGenPipeline:
         project-independent global pool. Tolerates a partial payload (used
         by the Playground录入 flow, which calls this directly rather than
         through a request model). Recognized payload keys: name,
-        description, image_url, persona (characters), voice_id
-        (characters)."""
+        description, image_url, and persona (characters)."""
         from .models import Character, Scene, Prop, AssetUnit, ImageVariant
         with self._save_lock:
             payload = dict(payload or {})
@@ -3976,7 +3784,6 @@ class ComicGenPipeline:
                     name=name,
                     description=description,
                     persona=payload.get("persona") or "",
-                    voice_id=payload.get("voice_id"),
                     reference_sheet=ref_sheet,
                 )
             elif asset_type == "scene":
@@ -4252,294 +4059,17 @@ class ComicGenPipeline:
             return series
 
     # ─────────────────────────────────────────────────────────────
-    # PR-3h/i · Custom voice (clone + design) management
-    # Per Q16.1: series-level pool. Episodes / characters in the series
-    # share access via VoicePickerModal's 我的复刻 / 我的设计 tabs.
     # ─────────────────────────────────────────────────────────────
 
-    def create_voice_clone(
-        self,
-        series_id: str,
-        audio_url: str,
-        label: str,
-        target_model: str = "cosyvoice-v3.5-plus",
-    ) -> 'CustomVoice':
-        """Clone a voice from a reference audio URL via dashscope customization.
 
-        Calls /services/audio/tts/customization with model='voice-enrollment'
-        action='create_voice'. Persists the returned voice_id under
-        series.custom_voices[]. Returns the CustomVoice entry.
 
-        Per doc: audio must be ≤10MB, MP3/WAV/M4A, ≥16kHz, 10-20s recommended.
-        Frontend should pre-validate before calling.
-        """
-        import requests
-        from .models import CustomVoice  # local import to avoid circular
 
-        with self._save_lock:
-            series = self.series_store.get(series_id)
-            if not series:
-                raise ValueError(f"Series not found: {series_id}")
-
-            api_key = os.getenv("DASHSCOPE_API_KEY")
-            if not api_key:
-                raise RuntimeError("DASHSCOPE_API_KEY not configured")
-
-            # Dashscope customization endpoint (Beijing region; intl uses
-            # dashscope-intl URL — TODO when LumenX supports intl deployment)
-            url = "https://dashscope.aliyuncs.com/api/v1/services/audio/tts/customization"
-            payload = {
-                "model": "voice-enrollment",
-                "input": {
-                    "action": "create_voice",
-                    "target_model": target_model,
-                    "prefix": label[:20],  # API has prefix length limit
-                    "url": audio_url,
-                },
-            }
-            headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-
-            logger.info(f"[voice/clone] creating voice for series={series_id} label='{label}' target={target_model}")
-            resp = requests.post(url, json=payload, headers=headers, timeout=60)
-            if resp.status_code != 200:
-                logger.error(f"[voice/clone] dashscope error {resp.status_code}: {resp.text[:500]}")
-                raise RuntimeError(f"Voice clone failed: HTTP {resp.status_code} — {resp.text[:200]}")
-
-            data = resp.json()
-            # Per doc shape: output.voice (CosyVoice) or output.voice_id (Qwen-TTS)
-            voice_id = (
-                data.get("output", {}).get("voice")
-                or data.get("output", {}).get("voice_id")
-                or data.get("voice")
-            )
-            if not voice_id:
-                logger.error(f"[voice/clone] no voice_id in response: {data}")
-                raise RuntimeError(f"Voice clone succeeded but voice_id missing in response: {data}")
-
-            custom = CustomVoice(
-                id=str(voice_id),
-                label=label,
-                origin="clone",
-                target_model=target_model,
-                family="cosyvoice",  # PR-3h hardcodes CosyVoice clone target
-                source_audio_url=audio_url,
-            )
-            if series.custom_voices is None:
-                series.custom_voices = []
-            series.custom_voices.append(custom)
-            series.updated_at = time.time()
-            self._save_series_data_unlocked()
-            logger.info(f"[voice/clone] success voice_id={voice_id} stored on series={series_id}")
-            return custom
-
-    def list_custom_voices(self, series_id: str) -> List['CustomVoice']:
-        """Return all custom voices in a series (clones + designs).
-        Empty list if series has none or doesn't exist."""
-        series = self.series_store.get(series_id)
-        if not series:
-            return []
-        return list(series.custom_voices or [])
-
-    def delete_custom_voice(self, series_id: str, voice_id: str) -> bool:
-        """Remove a custom voice entry. Returns True if removed, False if
-        not found. Note: does NOT call dashscope to delete the underlying
-        voice (the platform allows re-use for 24h; cleanup is best-effort)."""
-        with self._save_lock:
-            series = self.series_store.get(series_id)
-            if not series or not series.custom_voices:
-                return False
-            before = len(series.custom_voices)
-            series.custom_voices = [v for v in series.custom_voices if v.id != voice_id]
-            removed = before != len(series.custom_voices)
-            if removed:
-                series.updated_at = time.time()
-                self._save_series_data_unlocked()
-            return removed
-
-    def find_custom_voice(self, voice_id: str) -> Optional['CustomVoice']:
-        """Search all series for a custom voice by voice_id. Used by
-        /voice/preview to resolve target_model for cloned/designed voices
-        (which aren't in the static TTS_VOICE_REGISTRY)."""
-        for series in self.series_store.values():
-            for cv in (series.custom_voices or []):
-                if cv.id == voice_id:
-                    return cv
-        return None
 
     # ─────────────────────────────────────────────────────────────
-    # PR-3i · Voice design (iterate: prompt → preview → accept)
-    # Unlike clone (audio-driven, 1 shot), design is text-driven and
-    # users naturally iterate. Each preview mints a new voice on
-    # dashscope; we only persist the voice the user explicitly accepts.
     # ─────────────────────────────────────────────────────────────
 
-    def voice_design_preview(
-        self,
-        voice_prompt: str,
-        preview_text: str,
-        target_model: str = "cosyvoice-v3.5-plus",
-    ) -> Dict[str, Any]:
-        """Mint a new design voice via dashscope (preview returned inline).
 
-        Per dashscope contract: create_voice with voice_prompt MUST be paired
-        with preview_text in the same call; the API returns both the voice_id
-        and a preview audio URL. We download the URL into our cache dir so
-        the frontend can play it through the same /files static mount used
-        by /voice/preview.
 
-        Does NOT persist; user iterates by re-calling with tweaked params.
-        """
-        import requests
-        import hashlib
-
-        api_key = os.getenv("DASHSCOPE_API_KEY")
-        if not api_key:
-            raise RuntimeError("DASHSCOPE_API_KEY not configured")
-
-        url = "https://dashscope.aliyuncs.com/api/v1/services/audio/tts/customization"
-        payload = {
-            "model": "voice-enrollment",
-            "input": {
-                "action": "create_voice",
-                "target_model": target_model,
-                "prefix": "design",
-                "voice_prompt": voice_prompt[:500],
-                "preview_text": (preview_text or "你好，这是一段音色测试。")[:200],
-            },
-        }
-        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-
-        logger.info(f"[voice/design] preview voice_prompt='{voice_prompt[:60]}…' target={target_model}")
-        # dashscope voice design has variable latency (10-60s); the customization
-        # service occasionally returns its own timeout. Retry once on 5xx/timeout.
-        resp = None
-        last_err = None
-        for attempt in range(2):
-            try:
-                resp = requests.post(url, json=payload, headers=headers, timeout=120)
-                if resp.status_code == 200:
-                    break
-                last_err = f"HTTP {resp.status_code} — {resp.text[:200]}"
-                if resp.status_code < 500 and "Timeout" not in (resp.text or ""):
-                    break  # client error, don't retry
-                logger.warning(f"[voice/design] attempt {attempt+1} failed: {last_err}; retrying")
-            except requests.RequestException as e:
-                last_err = str(e)
-                logger.warning(f"[voice/design] attempt {attempt+1} network error: {e}; retrying")
-        if resp is None or resp.status_code != 200:
-            logger.error(f"[voice/design] all attempts failed: {last_err}")
-            raise RuntimeError(f"Voice design failed: {last_err}")
-
-        data = resp.json()
-        output = data.get("output", {}) or {}
-        voice_id = output.get("voice") or output.get("voice_id") or data.get("voice")
-        remote_preview = output.get("preview_audio") or output.get("preview_audio_url") or output.get("audio_url")
-        if not voice_id:
-            logger.error(f"[voice/design] no voice_id in response: {data}")
-            raise RuntimeError(f"Voice design API returned no voice_id: {data}")
-
-        voice_id_str = str(voice_id)
-
-        cache_dir = "output/cache/voice_design_preview"
-        os.makedirs(cache_dir, exist_ok=True)
-        cache_key = hashlib.md5(f"{voice_id_str}|{preview_text}".encode("utf-8")).hexdigest()
-        cache_path = os.path.join(cache_dir, f"{cache_key}.mp3")
-
-        if remote_preview:
-            # Download the dashscope-served preview into our cache.
-            try:
-                audio_resp = requests.get(remote_preview, timeout=60)
-                audio_resp.raise_for_status()
-                with open(cache_path, "wb") as f:
-                    f.write(audio_resp.content)
-            except Exception as e:
-                logger.warning(f"[voice/design] preview download failed, falling back to local TTS: {e}")
-                remote_preview = None
-
-        if not remote_preview:
-            if not self.audio_generator.tts:
-                raise RuntimeError("TTS unavailable; cannot synthesize preview")
-            self.audio_generator.tts.synthesize(
-                text=preview_text,
-                output_path=cache_path,
-                voice=voice_id_str,
-                model_override=target_model,
-                family_override="cosyvoice",
-            )
-
-        preview_url = f"cache/voice_design_preview/{cache_key}.mp3"
-        return {"voice_id": voice_id_str, "preview_url": preview_url, "target_model": target_model}
-
-    def voice_design_save(
-        self,
-        series_id: str,
-        voice_id: str,
-        voice_prompt: str,
-        label: str,
-        target_model: str = "cosyvoice-v3.5-plus",
-    ) -> 'CustomVoice':
-        """Persist a previewed design voice into series.custom_voices[]."""
-        from .models import CustomVoice
-
-        with self._save_lock:
-            series = self.series_store.get(series_id)
-            if not series:
-                raise ValueError(f"Series not found: {series_id}")
-
-            existing = next(
-                (cv for cv in (series.custom_voices or []) if cv.id == voice_id),
-                None,
-            )
-            if existing:
-                logger.info(f"[voice/design] save: voice_id={voice_id} already exists; returning existing")
-                return existing
-
-            custom = CustomVoice(
-                id=voice_id,
-                label=label,
-                origin="design",
-                target_model=target_model,
-                family="cosyvoice",
-                voice_prompt=voice_prompt[:500],
-            )
-            if series.custom_voices is None:
-                series.custom_voices = []
-            series.custom_voices.append(custom)
-            series.updated_at = time.time()
-            self._save_series_data_unlocked()
-            logger.info(f"[voice/design] saved voice_id={voice_id} to series={series_id}")
-            return custom
-
-    def translate_character_to_voice_prompt(self, description: str) -> str:
-        """LLM helper: convert a character description into a CosyVoice
-        voice_prompt suitable for /services/audio/tts/customization.
-
-        The prompt should describe vocal qualities (timbre, pace, age, mood)
-        in concise Chinese. CosyVoice voice_prompt cap is 500 chars; we
-        target ~120-200 to leave headroom for tone hints.
-        """
-        from .llm_adapter import LLMAdapter
-
-        adapter = LLMAdapter()
-        if not adapter.is_configured:
-            raise RuntimeError("LLM adapter not configured (missing DASHSCOPE_API_KEY)")
-
-        system_prompt = (
-            "你是一个语音设计师，擅长将角色设定转化为简洁的中文音色描述。"
-            "输出要求："
-            "1. 只描述音色、语速、年龄、情绪，不要描写外貌或剧情。"
-            "2. 用 100-200 字中文，单段无标题，不带引号或多余说明。"
-            "3. 重点：性别·年龄·音色质感·语速·气质氛围。"
-        )
-        user_prompt = f"角色设定：\n{description.strip()[:1000]}\n\n请输出音色描述。"
-
-        text = adapter.chat(
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-        )
-        return (text or "").strip()[:500]
 
     def get_series_episodes(self, series_id: str) -> List[Script]:
         """Get all Episodes belonging to a Series, in order."""
@@ -4759,20 +4289,22 @@ class ComicGenPipeline:
             raise ValueError("Series not found")
 
         t2i_model = model_name or series.model_settings.t2i_model
+        get_model_spec(t2i_model, IMAGE)
+        resolve_model_api_key(t2i_model, IMAGE)
 
         from .assets import ASPECT_RATIO_TO_SIZE
         if asset_type == "character":
             aspect_ratio = series.model_settings.character_aspect_ratio
-            default_size = "576*1024"
+            default_size = "1024x1536"
         elif asset_type == "scene":
             aspect_ratio = series.model_settings.scene_aspect_ratio
-            default_size = "1024*576"
+            default_size = "1536x1024"
         elif asset_type == "prop":
             aspect_ratio = series.model_settings.prop_aspect_ratio
-            default_size = "1024*1024"
+            default_size = "1024x1024"
         else:
             aspect_ratio = "9:16"
-            default_size = "576*1024"
+            default_size = "1024x1536"
         effective_size = ASPECT_RATIO_TO_SIZE.get(aspect_ratio, default_size)
 
         effective_positive_prompt = ""
@@ -4861,14 +4393,13 @@ class ComicGenPipeline:
 
     def get_effective_prompt(self, prompt_type: str, episode: Script, series: Optional[Series] = None) -> str:
         """Three-level fallback: Episode -> Series -> system default."""
-        valid_prompt_types = ("storyboard_polish", "video_polish", "r2v_polish", "storyboard_extraction")
+        valid_prompt_types = ("storyboard_polish", "video_polish", "storyboard_extraction")
         if prompt_type not in valid_prompt_types:
             raise ValueError(f"Invalid prompt_type: {prompt_type}. Must be one of {valid_prompt_types}")
-        from .llm import DEFAULT_STORYBOARD_POLISH_PROMPT, DEFAULT_VIDEO_POLISH_PROMPT, DEFAULT_R2V_POLISH_PROMPT, DEFAULT_STORYBOARD_EXTRACTION_PROMPT
+        from .llm import DEFAULT_STORYBOARD_POLISH_PROMPT, DEFAULT_VIDEO_POLISH_PROMPT, DEFAULT_STORYBOARD_EXTRACTION_PROMPT
         defaults = {
             "storyboard_polish": DEFAULT_STORYBOARD_POLISH_PROMPT,
             "video_polish": DEFAULT_VIDEO_POLISH_PROMPT,
-            "r2v_polish": DEFAULT_R2V_POLISH_PROMPT,
             "storyboard_extraction": DEFAULT_STORYBOARD_EXTRACTION_PROMPT,
         }
         episode_value = getattr(episode.prompt_config, prompt_type, "")

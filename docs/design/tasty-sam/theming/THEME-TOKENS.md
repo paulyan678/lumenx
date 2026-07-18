@@ -79,6 +79,6 @@
 
 ## 5. 验证三层是否自洽
 
-打开 `theme-switch-demo.html`，在 DevTools 改某主题的 `--seed-primary` 一处 →
-该主题的 `--color-primary`、按钮、候选选中框、glow 应**全部随之变化**。
+在主题开发环境中通过 DevTools 改某主题的 `--seed-primary` 一处 →
+该主题的 `--color-primary`、按钮、选中框、glow 应**全部随之变化**。
 若有组件不跟随，说明它写死了颜色，需改回引用 semantic 变量。

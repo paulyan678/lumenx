@@ -45,22 +45,6 @@ const MODE_CONFIG: Partial<Record<PlaygroundMode, ModeConfig>> = {
     maxFiles: 1,
     icon: 'image',
   },
-  r2v: {
-    labelKey: 'compose.mediaReference',
-    accept: 'image/*',
-    hintKey: 'r2v',
-    multiple: true,
-    maxFiles: 9,
-    icon: 'image',
-  },
-  v2v: {
-    labelKey: 'compose.mediaSourceVideo',
-    accept: 'video/*',
-    hintKey: 'v2v',
-    multiple: false,
-    maxFiles: 1,
-    icon: 'video',
-  },
 };
 
 // ---------------------------------------------------------------------------
@@ -99,7 +83,7 @@ function resolveMediaSrc(path: string): string {
 // ---------------------------------------------------------------------------
 // Single-reference preview — Line B media-preview-row (thumb + name + meta).
 //
-// Used for maxFiles=1 modes (i2i / i2v first-frame / v2v source video). Mirrors
+// Used for maxFiles=1 modes (i2i / i2v first-frame). Mirrors
 // the mockup's `.media-preview-row`: a larger thumbnail on the left, file name +
 // "W × H · FORMAT" meta on the right. Dimensions are read from the loaded media
 // (onLoad / onLoadedMetadata); format is derived from the extension. File size is
@@ -174,7 +158,6 @@ function SingleRefPreview({
 
 export default function MediaInput() {
   const mode = usePlaygroundStore((s) => s.mode);
-  const modelId = usePlaygroundStore((s) => s.modelId);
   const inputMedia = usePlaygroundStore((s) => s.inputMedia);
   const setInputMedia = usePlaygroundStore((s) => s.setInputMedia);
   const t = useTranslations('playground');
@@ -184,19 +167,7 @@ export default function MediaInput() {
   const [dragOver, setDragOver] = useState(false);
   const [showAssetPicker, setShowAssetPicker] = useState(false);
 
-  const isSeedance = modelId.startsWith('seedance');
-
-  let config = MODE_CONFIG[mode];
-
-  // Override r2v config when Seedance is selected
-  if (config && mode === 'r2v' && isSeedance) {
-    config = {
-      ...config,
-      labelKey: 'media.labelRefMaterialAV',
-      accept: 'image/*,video/*,audio/*',
-      hintKey: 'r2vSeedance',
-    };
-  }
+  const config = MODE_CONFIG[mode];
 
   // Don't render for t2v mode (no input media needed)
   if (!config) return null;
@@ -289,12 +260,7 @@ export default function MediaInput() {
   };
 
   // Determine accept type for AssetPickerModal
-  const acceptType: 'image' | 'video' | 'all' =
-    mode === 'r2v' && isSeedance
-      ? 'all'
-      : config.icon === 'video'
-        ? 'video'
-        : 'image';
+  const acceptType: 'image' | 'video' | 'all' = config.icon === 'video' ? 'video' : 'image';
 
   // -------------------------------------------------------------------------
   // Render: hidden file input
@@ -385,8 +351,8 @@ export default function MediaInput() {
   // -------------------------------------------------------------------------
   // Render: has media state
   //
-  // Multi-reference modes (r2v / t2i, maxFiles>1) → thumbnail tile grid.
-  // Single-reference modes (i2i / i2v / v2v, maxFiles=1) → media-preview-row
+  // Optional multi-reference T2I uses a thumbnail grid. I2I/I2V use a single
+  // media-preview row.
   // (larger thumb + file name + dimensions·format), per the mockup.
   // -------------------------------------------------------------------------
 
@@ -438,7 +404,7 @@ export default function MediaInput() {
               </div>
             ))}
 
-            {/* Add more button for r2v */}
+            {/* Add another optional image reference. */}
             {canAddMore && (
               <button
                 type="button"
@@ -457,7 +423,7 @@ export default function MediaInput() {
             )}
           </div>
 
-          {/* File count for r2v */}
+          {/* File count for optional image references. */}
           <div className="font-mono text-[0.6875rem] text-text-muted">
             {t('media.fileCount', { current: inputMedia.length, max: config.maxFiles })}
           </div>

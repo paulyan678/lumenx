@@ -1,9 +1,4 @@
-"""Playground service layer -- orchestrates AI generation by delegating to existing model adapters.
-
-Routes based on model_id to the appropriate adapter (WanxModel, KlingModel,
-ViduModel, MuleRouterVideoModel/ImageModel, WanxImageModel).  Mirrors the
-routing logic in ``src/apps/comic_gen/pipeline.py:process_video_task()``.
-"""
+"""New API-only playground generation service."""
 
 import os
 import shutil
@@ -19,6 +14,7 @@ from .models import (
 )
 from .storage import PlaygroundStorage
 from ...utils import get_logger
+from ...utils.newapi_models import IMAGE, VIDEO, resolve_model_api_key
 
 logger = get_logger(__name__)
 
@@ -35,13 +31,8 @@ class PlaygroundService:
 
     def __init__(self, storage: PlaygroundStorage):
         self.storage = storage
-        # Lazy-initialised model instances (cached for the lifetime of the service)
-        self._wanx_model = None
-        self._wanx_image_model = None
-        self._kling_model = None
-        self._vidu_model = None
-        self._mulerouter_video_model = None
-        self._mulerouter_image_model = None
+        self._newapi_video_model = None
+        self._newapi_image_model = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -50,6 +41,8 @@ class PlaygroundService:
     def create_generation(self, request: GenerateRequest) -> PlaygroundGeneration:
         """Create a :class:`PlaygroundGeneration` record with *status=pending*,
         persist it via storage, and return it."""
+        capability = IMAGE if request.mode in {PlaygroundMode.T2I, PlaygroundMode.I2I} else VIDEO
+        resolve_model_api_key(request.model_id, capability)
         gen = PlaygroundGeneration(
             id=str(uuid.uuid4()),
             mode=request.mode,
@@ -83,7 +76,7 @@ class PlaygroundService:
             mode = gen.mode
             if mode in (PlaygroundMode.T2I, PlaygroundMode.I2I):
                 self._process_image_generation(gen)
-            elif mode in (PlaygroundMode.T2V, PlaygroundMode.I2V, PlaygroundMode.R2V, PlaygroundMode.V2V):
+            elif mode in (PlaygroundMode.T2V, PlaygroundMode.I2V):
                 self._process_video_generation(gen)
             else:
                 raise ValueError(f"Unsupported playground mode: {mode}")
@@ -180,7 +173,6 @@ class PlaygroundService:
     def _process_image_generation(self, gen: PlaygroundGeneration) -> None:
         os.makedirs(IMAGE_OUTPUT_DIR, exist_ok=True)
 
-        model_lower = gen.model_id.lower()
         failures = []
 
         for idx in range(gen.batch_size):
@@ -189,10 +181,7 @@ class PlaygroundService:
             out_path = os.path.join(IMAGE_OUTPUT_DIR, out_filename)
 
             try:
-                if model_lower.startswith("gpt-image"):
-                    self._generate_image_mulerouter(gen, out_path, idx)
-                else:
-                    self._generate_image_wanx(gen, out_path, idx)
+                self._generate_image_newapi(gen, out_path, idx)
 
                 output_entry = PlaygroundOutput(
                     id=str(uuid.uuid4()),
@@ -208,44 +197,15 @@ class PlaygroundService:
         if failures and not gen.outputs:
             raise RuntimeError(f"All {len(failures)} batch items failed: {failures[0]}")
 
-    def _generate_image_wanx(self, gen: PlaygroundGeneration, out_path: str, _idx: int) -> None:
-        """Delegate to :class:`WanxImageModel` (DashScope image generation)."""
-        from ...models.image import WanxImageModel
+    def _generate_image_newapi(self, gen: PlaygroundGeneration, out_path: str, _idx: int) -> None:
+        from ...models.newapi import NewAPIImageModel
 
-        if self._wanx_image_model is None:
-            self._wanx_image_model = WanxImageModel({})
-
-        params = gen.parameters
-        kwargs = {
-            "model_name": gen.model_id,
-            "size": params.get("size", "1280*1280"),
-            "n": 1,
-            "negative_prompt": gen.negative_prompt,
-            "seed": params.get("seed"),
-            "prompt_extend": params.get("prompt_extend", True),
-            "watermark": params.get("watermark", False),
-        }
-
-        # i2i: attach reference images from input_media
-        ref_paths = list(gen.input_media) if gen.mode == PlaygroundMode.I2I else []
-        if ref_paths:
-            kwargs["ref_image_paths"] = ref_paths
-
-        self._wanx_image_model.generate(
-            prompt=gen.prompt,
-            output_path=out_path,
-            **kwargs,
-        )
-
-    def _generate_image_mulerouter(self, gen: PlaygroundGeneration, out_path: str, _idx: int) -> None:
-        """Delegate to :class:`MuleRouterImageModel` (GPT-Image-2)."""
-        from ...models.mulerouter import MuleRouterImageModel
-
-        if self._mulerouter_image_model is None:
-            self._mulerouter_image_model = MuleRouterImageModel({})
+        if self._newapi_image_model is None:
+            self._newapi_image_model = NewAPIImageModel({})
 
         params = gen.parameters
         kwargs = {
+            "model_id": gen.model_id,
             "size": params.get("size", "1024x1024"),
             "quality": params.get("quality", "high"),
             "n": 1,
@@ -255,20 +215,19 @@ class PlaygroundService:
         if gen.mode == PlaygroundMode.I2I and gen.input_media:
             kwargs["ref_image_paths"] = list(gen.input_media)
 
-        self._mulerouter_image_model.generate(
+        self._newapi_image_model.generate(
             prompt=gen.prompt,
             output_path=out_path,
             **kwargs,
         )
 
     # ------------------------------------------------------------------
-    # Video generation (t2v / i2v / r2v / v2v)
+    # Video generation (t2v / i2v)
     # ------------------------------------------------------------------
 
     def _process_video_generation(self, gen: PlaygroundGeneration) -> None:
         os.makedirs(VIDEO_OUTPUT_DIR, exist_ok=True)
 
-        model_lower = gen.model_id.lower()
         failures = []
 
         for idx in range(gen.batch_size):
@@ -276,18 +235,7 @@ class PlaygroundService:
             out_path = os.path.join(VIDEO_OUTPUT_DIR, out_filename)
 
             try:
-                if model_lower.startswith("seedance"):
-                    self._generate_video_mulerouter(gen, out_path)
-                elif model_lower.startswith("kling"):
-                    self._generate_video_kling(gen, out_path)
-                elif model_lower.startswith("vidu") or model_lower.startswith("viduq"):
-                    self._generate_video_vidu(gen, out_path)
-                elif model_lower.startswith("happyhorse"):
-                    self._generate_video_wanx(gen, out_path)
-                elif model_lower.startswith("pixverse"):
-                    self._generate_video_wanx(gen, out_path)
-                else:
-                    self._generate_video_wanx(gen, out_path)
+                self._generate_video_newapi(gen, out_path)
 
                 output_entry = PlaygroundOutput(
                     id=str(uuid.uuid4()),
@@ -305,121 +253,32 @@ class PlaygroundService:
 
     # -- adapter delegates ------------------------------------------------
 
-    def _generate_video_wanx(self, gen: PlaygroundGeneration, out_path: str) -> None:
-        """Delegate to :class:`WanxModel` (DashScope video generation -- wan2.x / happyhorse)."""
-        from ...models.wanx import WanxModel
+    def _generate_video_newapi(self, gen: PlaygroundGeneration, out_path: str) -> None:
+        from ...models.newapi import NewAPIVideoModel
 
-        if self._wanx_model is None:
-            self._wanx_model = WanxModel({})
-
-        params = gen.parameters
-        img_path, img_url = self._resolve_first_input_media(gen)
-
-        kwargs = {
-            "model": gen.model_id,
-            "duration": params.get("duration", 5),
-            "resolution": params.get("resolution", "720P"),
-            "seed": params.get("seed"),
-            "negative_prompt": gen.negative_prompt,
-            "prompt_extend": params.get("prompt_extend", True),
-            "watermark": params.get("watermark", False),
-            "ratio": params.get("ratio"),
-            "audio_url": params.get("audio_url"),
-        }
-
-        # r2v: reference images
-        if gen.mode == PlaygroundMode.R2V and gen.input_media:
-            kwargs["ref_image_urls"] = list(gen.input_media)
-
-        # v2v: video input
-        if gen.mode == PlaygroundMode.V2V and gen.input_media:
-            kwargs["video_url"] = gen.input_media[0]
-
-        self._wanx_model.generate(
-            prompt=gen.prompt,
-            output_path=out_path,
-            img_path=img_path,
-            img_url=img_url,
-            **kwargs,
-        )
-
-    def _generate_video_mulerouter(self, gen: PlaygroundGeneration, out_path: str) -> None:
-        """Delegate to :class:`MuleRouterVideoModel` (Seedance 2.0)."""
-        from ...models.mulerouter import MuleRouterVideoModel
-
-        if self._mulerouter_video_model is None:
-            self._mulerouter_video_model = MuleRouterVideoModel({})
+        if self._newapi_video_model is None:
+            self._newapi_video_model = NewAPIVideoModel({})
 
         params = gen.parameters
         img_path, img_url = self._resolve_first_input_media(gen)
 
         kwargs = {
+            "model_id": gen.model_id,
             "duration": params.get("duration", 5),
             "resolution": params.get("resolution", "1080p"),
             "aspect_ratio": params.get("aspect_ratio", "16:9"),
             "seed": params.get("seed"),
             "watermark": params.get("watermark", False),
+            "generate_audio": params.get("generate_audio", True),
+            "generation_mode": gen.mode.value,
         }
 
-        # r2v: reference images
-        if gen.mode == PlaygroundMode.R2V and gen.input_media:
-            kwargs["generation_mode"] = "r2v"
-            kwargs["ref_image_urls"] = list(gen.input_media)
-
-        self._mulerouter_video_model.generate(
+        self._newapi_video_model.generate(
             prompt=gen.prompt,
             output_path=out_path,
             img_url=img_url,
             img_path=img_path,
             **kwargs,
-        )
-
-    def _generate_video_kling(self, gen: PlaygroundGeneration, out_path: str) -> None:
-        """Delegate to :class:`KlingModel`."""
-        from ...models.kling import KlingModel
-
-        if self._kling_model is None:
-            self._kling_model = KlingModel({})
-
-        params = gen.parameters
-        img_path, img_url = self._resolve_first_input_media(gen)
-
-        self._kling_model.generate(
-            prompt=gen.prompt,
-            output_path=out_path,
-            img_url=img_url,
-            img_path=img_path,
-            duration=params.get("duration", 5),
-            model=gen.model_id,
-            negative_prompt=gen.negative_prompt,
-            aspect_ratio=params.get("aspect_ratio", "16:9"),
-            mode=params.get("mode", "std"),
-            sound=params.get("sound", "off"),
-            cfg_scale=params.get("cfg_scale"),
-        )
-
-    def _generate_video_vidu(self, gen: PlaygroundGeneration, out_path: str) -> None:
-        """Delegate to :class:`ViduModel`."""
-        from ...models.vidu import ViduModel
-
-        if self._vidu_model is None:
-            self._vidu_model = ViduModel({})
-
-        params = gen.parameters
-        img_path, img_url = self._resolve_first_input_media(gen)
-
-        self._vidu_model.generate(
-            prompt=gen.prompt,
-            output_path=out_path,
-            img_url=img_url,
-            img_path=img_path,
-            duration=params.get("duration", 5),
-            model=gen.model_id,
-            resolution=params.get("resolution", "720p"),
-            aspect_ratio=params.get("aspect_ratio", "16:9"),
-            seed=params.get("seed", 0),
-            audio=params.get("audio", True),
-            movement_amplitude=params.get("movement_amplitude", "auto"),
         )
 
     # ------------------------------------------------------------------

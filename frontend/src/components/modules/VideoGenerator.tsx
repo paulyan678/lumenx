@@ -31,24 +31,11 @@ export default function VideoGenerator() {
         resolution: "720p",
         duration: 5,
         seed: undefined as number | undefined,
-        generateAudio: true,  // Default to AI Sound enabled
-        audioUrl: "",
-        promptExtend: true,
-        negativePrompt: "",
+        generateAudio: true,
         batchSize: 1,
-        cameraMovement: "none" as string,
-        subjectMotion: "still" as string,
         model: defaultI2vModel,
-        shotType: "single" as string,  // 'single' or 'multi' (only for wan2.6-i2v)
-        generationMode: "i2v" as string,  // 'i2v' or 'r2v'
-        referenceVideoUrls: [] as string[],  // Reference videos for R2V (max 3)
-        // Kling params
-        mode: "std" as string,
-        sound: false,
-        cfgScale: 0.5,
-        // Vidu params
-        viduAudio: true,
-        movementAmplitude: "auto" as string,
+        ratio: "16:9",
+        watermark: false,
     });
 
     // Sync model from project settings when project changes
@@ -57,11 +44,11 @@ export default function VideoGenerator() {
             ...p,
             model: resolveModelId(
                 'i2v',
-                currentProject?.model_settings?.i2v_model,
+                currentProject?.model_settings?.video_model ?? currentProject?.model_settings?.i2v_model,
                 'video_sidebar',
             ),
         }));
-    }, [currentProject?.model_settings?.i2v_model]);
+    }, [currentProject?.model_settings?.video_model, currentProject?.model_settings?.i2v_model]);
 
     // Sync tasks from project
     useEffect(() => {
@@ -101,11 +88,8 @@ export default function VideoGenerator() {
         setRemixData({
             image_url: task.image_url,
             prompt: task.prompt,
-            negative_prompt: task.negative_prompt,
             seed: task.seed,
             duration: task.duration,
-            audio_url: task.audio_url,
-            prompt_extend: task.prompt_extend
         });
 
         // Update params state
@@ -115,12 +99,6 @@ export default function VideoGenerator() {
             seed: task.seed,
             resolution: task.resolution || "720p",
             generateAudio: task.generate_audio,
-            audioUrl: task.audio_url || "",
-            promptExtend: task.prompt_extend ?? true,
-            negativePrompt: task.negative_prompt || "",
-            // Reset motion params as they are not stored directly in task (they are in prompt)
-            cameraMovement: "none",
-            subjectMotion: "still"
         }));
     };
 

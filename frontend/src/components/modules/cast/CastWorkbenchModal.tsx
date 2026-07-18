@@ -220,7 +220,7 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
     // Effective t2i model — drives the "design_sheet" template gating: that
     // template only works with gpt-image-2, so it stays locked unless the
     // user has selected gpt-image-2 (override or project default).
-    const selectedModelId = modelOverride || currentProject?.model_settings?.t2i_model || "wan2.1-t2i";
+    const selectedModelId = modelOverride || currentProject?.model_settings?.t2i_model || "gpt-image-2";
     const isGptImage2 = selectedModelId === "gpt-image-2";
     const [selectedTemplate, setSelectedTemplate] = useState<CharacterTemplate>("simple");
     const [pendingTemplate, setPendingTemplate] = useState<CharacterTemplate | null>(null);
@@ -782,8 +782,8 @@ export default function CastWorkbenchModal({ isOpen, kind, entityId, onClose }: 
                                     </label>
                                     <GroupedModelGrid
                                         models={IMAGE_MODELS}
-                                        selectedId={modelOverride || currentProject.model_settings?.t2i_model || "wan2.1-t2i"}
-                                        onSelect={(id) => setModelOverride(id === (currentProject.model_settings?.t2i_model || "wan2.1-t2i") ? null : id)}
+                                        selectedId={modelOverride || currentProject.model_settings?.t2i_model || "gpt-image-2"}
+                                        onSelect={(id) => setModelOverride(id === (currentProject.model_settings?.t2i_model || "gpt-image-2") ? null : id)}
                                     />
                                 </div>
                             </div>

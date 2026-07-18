@@ -1,12 +1,15 @@
 from typing import List, Optional, Dict, Any
 from enum import Enum
 import time
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from ...utils.model_catalog import get_default_model_settings
-
-
-_DEFAULT_MODEL_SETTINGS = get_default_model_settings()
+from ...utils.newapi_models import (
+    CHAT,
+    IMAGE,
+    VIDEO,
+    DEFAULT_MODELS,
+    normalize_selected_model,
+)
 
 class AspectRatio(str, Enum):
     SQUARE = "1:1"
@@ -104,25 +107,6 @@ class LightingData(BaseModel):
     description: Optional[str] = Field(None, description="自然语言光影描述")
 
 
-class ProviderBackend(str, Enum):
-    DASHSCOPE = "dashscope"
-    VENDOR = "vendor"
-
-
-class ProviderRoutingConfig(BaseModel):
-    KLING_PROVIDER_MODE: ProviderBackend = Field(
-        ProviderBackend.DASHSCOPE,
-        description="Provider backend for kling-* models: dashscope or vendor",
-    )
-    VIDU_PROVIDER_MODE: ProviderBackend = Field(
-        ProviderBackend.DASHSCOPE,
-        description="Provider backend for vidu* models: dashscope or vendor",
-    )
-    PIXVERSE_PROVIDER_MODE: ProviderBackend = Field(
-        ProviderBackend.DASHSCOPE,
-        description="Provider backend for pixverse-* models: dashscope or vendor",
-    )
-
 class ImageVariant(BaseModel):
     id: str = Field(..., description="Unique identifier for the variant")
     url: str = Field(..., description="URL of the image")
@@ -183,37 +167,12 @@ class VideoTask(BaseModel):
     resolution: str = Field("720p", description="Video resolution")
     generate_audio: bool = Field(False, description="Whether to generate audio")
     audio_url: Optional[str] = Field(None, description="URL of generated/uploaded audio")
-    prompt_extend: bool = Field(True, description="Whether to use prompt extension")
-    negative_prompt: Optional[str] = Field(None, description="Negative prompt")
-    model: str = Field("wan2.7-i2v", description="Model used for generation")
-    shot_type: str = Field("single", description="Shot type: 'single' or 'multi' (only for wan I2V models)")
-    generation_mode: str = Field("i2v", description="Generation mode: 'i2v' (image-to-video) or 'r2v' (reference-to-video)")
-    reference_video_urls: List[str] = Field(default_factory=list, description="Reference video URLs for R2V generation (max 3)")
-    # Kling params
-    mode: Optional[str] = Field(None, description="Kling mode: std/pro")
-    sound: Optional[str] = Field(None, description="Kling sound: on/off")
-    cfg_scale: Optional[float] = Field(None, description="Kling cfg_scale: 0-1")
-    # Vidu params
-    vidu_audio: Optional[bool] = Field(None, description="Vidu audio output")
-    movement_amplitude: Optional[str] = Field(None, description="Vidu movement amplitude: auto/small/medium/large")
-    # HappyHorse params
-    reference_image_urls: List[str] = Field(default_factory=list, description="Reference image URLs for HappyHorse R2V (max 9)")
-    ratio: Optional[str] = Field(None, description="Aspect ratio for HappyHorse T2V/R2V: 16:9, 9:16, 1:1, 4:3, 3:4")
-    audio_setting: Optional[str] = Field(None, description="Audio setting for HappyHorse V2V: auto/origin")
-    # Watermark toggle — supported by wan/kling/vidu/pixverse/happyhorse video models.
-    # None = use provider default (most providers leave it off); True/False = explicit user choice.
+    model: str = Field(DEFAULT_MODELS[VIDEO], description="Exact New API model ID")
+    generation_mode: str = Field("i2v", description="Generation mode: t2v or i2v")
+    ratio: Optional[str] = Field(None, description="Video aspect ratio")
     watermark: Optional[bool] = Field(None, description="Whether to embed a provider watermark in the rendered clip")
-    # Provider-side identifiers (Issue 17). Persisted from the model's API response
-    # so the user can paste them into the provider's console (e.g. Bailian / 百炼)
-    # to diagnose failures without re-running. Different providers use different
-    # naming — the canonical fields here normalize to "task_id" + "request_id":
-    #   - DashScope (wan / qwen / happyhorse): task_id (output.task_id) + request_id
-    #   - Kling: task_id (kling/vendor mode) + request_id (header X-Kling-Request-Id)
-    #   - Vidu: task_id only
-    #   - PixVerse: task_id only
-    # provider_name labels the platform so the UI can render "dashscope: 1ce3..."
-    # rather than guessing from model_name.
-    provider_name: Optional[str] = Field(None, description="Which provider handled this task (dashscope / kling / vidu / pixverse / etc.)")
+    # New API provider-side identifiers persisted for task diagnostics.
+    provider_name: Optional[str] = Field(None, description="Provider handling the task")
     provider_task_id: Optional[str] = Field(None, description="Provider-side task ID; pasteable into the provider's console for diagnosis")
     provider_request_id: Optional[str] = Field(None, description="Provider-side request ID for support tickets (optional — not all providers return one)")
     # User annotations on this take (抽卡 review). Storyboard's candidates
@@ -298,16 +257,6 @@ class Character(BaseModel):
     headshot_updated_at: float = Field(0.0, description="[LEGACY] Timestamp of last headshot update")
 
     base_character_id: Optional[str] = Field(None, description="ID of the base character if this is a variant")
-    voice_id: Optional[str] = Field(None, description="ID of the voice model to use")
-    voice_name: Optional[str] = Field(None, description="Human-readable name of the voice")
-    voice_speed: float = Field(1.0, description="Default speech rate (0.5-2.0)")
-    voice_pitch: float = Field(1.0, description="Default pitch rate (0.5-2.0)")
-    voice_volume: int = Field(50, description="Default volume (0-100)")
-    # PR-3g (r2v-workflow-v3) — Voice source tracking. 'system' = built-in
-    # voice from TTS_VOICE_REGISTRY; 'clone' = user-uploaded reference
-    # audio (PR-3h); 'design' = voice generated from text prompt (PR-3i).
-    # Picker modal Tabs filter by this field (Q15.5 B).
-    voice_origin: str = Field("system", description="Voice source: 'system' | 'clone' | 'design'")
     locked: bool = Field(False, description="Whether this asset is locked from regeneration")
     starred: bool = Field(False, description="User-starred flag for the asset library shortlist")
     status: GenerationStatus = GenerationStatus.PENDING
@@ -390,7 +339,7 @@ class StoryboardFrame(BaseModel):
     # === Prompts ===
     image_prompt: Optional[str] = Field(None, description="Optimized prompt for T2I/I2I (Legacy)")
     image_prompt_cn: Optional[str] = Field(None, description="Polished Chinese prompt for user confirmation")
-    image_prompt_en: Optional[str] = Field(None, description="Polished English prompt for Wan model generation")
+    image_prompt_en: Optional[str] = Field(None, description="Polished English prompt for image generation")
     
     image_url: Optional[str] = Field(None, description="URL of the generated storyboard image (Legacy)")
     image_asset: Optional[ImageAsset] = Field(default_factory=ImageAsset, description="Storyboard image asset container")
@@ -400,17 +349,12 @@ class StoryboardFrame(BaseModel):
     video_prompt: Optional[str] = Field(None, description="Optimized prompt for I2V")
     video_url: Optional[str] = Field(None, description="URL of the generated video clip")
     
-    audio_url: Optional[str] = Field(None, description="URL of the generated dialogue audio")
-    audio_error: Optional[str] = Field(None, description="Audio generation error message")
+    audio_url: Optional[str] = Field(None, description="URL of an uploaded dialogue audio track")
+    audio_error: Optional[str] = Field(None, description="Audio processing error message")
     sfx_url: Optional[str] = Field(None, description="URL of the generated sound effect")
-    # PR-3j · Stale detection for dialogue audio. text_hash combines
-    # dialogue text + voice_id + instructions; UI flags audio as STALE
-    # when current state hashes differently than the snapshot.
-    dialogue_text_hash: Optional[str] = Field(None, description="MD5 of (dialogue|voice_id|instructions) at audio generation time")
-    dialogue_voice_id: Optional[str] = Field(None, description="Voice id used to generate the current audio")
     dialogue_instructions: Optional[str] = Field(None, description="Emotion/style instructions used for the current audio")
     
-    dubbed_video_url: Optional[str] = Field(None, description="URL of the video with TTS audio dubbed over original track")
+    dubbed_video_url: Optional[str] = Field(None, description="URL of the video with dialogue audio mixed over the original track")
     dubbed_video_task_id: Optional[str] = Field(None, description="ID of the VideoTask that was dubbed (for UI display)")
     dub_offset_ms: int = Field(0, description="Audio offset in ms for dubbing (positive = audio starts later)")
     bg_audio_url: Optional[str] = Field(None, description="Cached background audio (Demucs no_vocals) path")
@@ -458,44 +402,49 @@ class StoryboardFrame(BaseModel):
         description="Task ID of the chosen final take for this frame (singular). Set in Assembly stage; read by Storyboard.",
     )
 
-class CustomVoice(BaseModel):
-    """PR-3h/i — User-created custom voice (clone or design).
-
-    Lives on Series.custom_voices[] (Q16.1 推荐: per-series 共享池).
-    The picker modal's 我的复刻/我的设计 tabs read from this list.
-
-    For clones: source_audio_url retains the original upload reference for
-    later re-clone or audit; voice_prompt is None.
-    For designs (PR-3i): voice_prompt retains the description for iteration;
-    source_audio_url is None.
-    """
-    id: str = Field(..., description="voice_id returned by dashscope customization API")
-    label: str = Field(..., description="User-given display name (e.g. '林墨真人声')")
-    origin: str = Field(..., description="'clone' (PR-3h) | 'design' (PR-3i)")
-    target_model: str = Field(
-        "cosyvoice-v3.5-plus",
-        description="Speech-synth model the voice was bound to at creation time. Required for /voice/preview model override because custom voice_id is NOT in static VOICES registry.",
-    )
-    family: str = Field("cosyvoice", description="'cosyvoice' | 'qwen3' — for picker UI filtering")
-    created_at: float = Field(default_factory=time.time)
-    source_audio_url: Optional[str] = Field(None, description="Clone only: original upload URL")
-    voice_prompt: Optional[str] = Field(None, description="Design only: prompt used to generate (≤500 chars)")
-
-
 class ModelSettings(BaseModel):
-    """Model selection settings for different generation stages"""
-    t2i_model: str = Field(_DEFAULT_MODEL_SETTINGS.t2i_model, description="Text-to-Image model for Assets")
-    i2i_model: str = Field(_DEFAULT_MODEL_SETTINGS.i2i_model, description="Image-to-Image model for Storyboard")
-    image_model: str = Field(_DEFAULT_MODEL_SETTINGS.image_model, description="Image generation model (T2I+I2I unified)")
-    i2v_model: str = Field(_DEFAULT_MODEL_SETTINGS.i2v_model, description="Image-to-Video model for Motion")
-    r2v_model: str = Field(
-        "wan2.7-r2v",
-        description="Reference-to-Video default for the project. Used by Storyboard's R2V tab as the initial picker value; per-storyboard override still wins.",
-    )
+    """Persisted project/series New API model selections.
+
+    Legacy stage-specific fields remain as synchronized aliases so existing
+    project files and generation workflows continue to load. Stale saved
+    selections migrate to the approved defaults during validation.
+    """
+
+    model_config = ConfigDict(validate_assignment=True)
+
+    chat_model: str = Field(DEFAULT_MODELS[CHAT], description="Active New API chat model")
+    image_model: str = Field(DEFAULT_MODELS[IMAGE], description="Active New API image model")
+    video_model: str = Field(DEFAULT_MODELS[VIDEO], description="Active New API video model")
+    t2i_model: str = Field(DEFAULT_MODELS[IMAGE], description="Legacy alias of image_model")
+    i2i_model: str = Field(DEFAULT_MODELS[IMAGE], description="Legacy alias of image_model")
+    i2v_model: str = Field(DEFAULT_MODELS[VIDEO], description="Legacy alias of video_model")
     character_aspect_ratio: str = Field("9:16", description="Aspect ratio for Characters (9:16, 16:9, 1:1)")
     scene_aspect_ratio: str = Field("16:9", description="Aspect ratio for Scenes (9:16, 16:9, 1:1)")
     prop_aspect_ratio: str = Field("1:1", description="Aspect ratio for Props (9:16, 16:9, 1:1)")
     storyboard_aspect_ratio: str = Field("16:9", description="Aspect ratio for Storyboard (9:16, 16:9, 1:1)")
+
+    @model_validator(mode="before")
+    @classmethod
+    def migrate_legacy_model_selections(cls, value):
+        data = dict(value or {})
+        image_model = normalize_selected_model(
+            IMAGE,
+            data.get("image_model") or data.get("t2i_model") or data.get("i2i_model"),
+        )
+        video_model = normalize_selected_model(
+            VIDEO,
+            data.get("video_model") or data.get("i2v_model"),
+        )
+        data.update(
+            chat_model=normalize_selected_model(CHAT, data.get("chat_model")),
+            image_model=image_model,
+            t2i_model=image_model,
+            i2i_model=image_model,
+            video_model=video_model,
+            i2v_model=video_model,
+        )
+        data.pop("r2v_model", None)
+        return data
 
 
 class ArtDirection(BaseModel):
@@ -509,13 +458,9 @@ class PromptConfig(BaseModel):
     """Custom system prompts for polish/refine stages. Empty string = use system default."""
     storyboard_polish: str = Field("", description="Custom system prompt for storyboard polish (Prompt C)")
     video_polish: str = Field("", description="Custom system prompt for video I2V polish (Prompt D)")
-    r2v_polish: str = Field("", description="Custom system prompt for video R2V polish (Prompt E)")
     entity_extraction: str = Field("", description="Custom system prompt for novel→character/scene/prop extraction (Prompt A)")
     style_analysis: str = Field("", description="Custom system prompt for novel→visual style recommendations")
     storyboard_extraction: str = Field("", description="Custom system prompt for script→storyboard extraction (Prompt B)")
-    # Polish 调用使用的 LLM 模型。空 = 用 LLMAdapter 默认（qwen3.6-plus）。
-    # 显式覆盖时用于切到 vision-capable 或更便宜的模型（qwen3.6-flash、kimi-k2.6 等）。
-    polish_model: str = Field("", description="Override LLM model id used for polish calls; empty = use system default")
 
 class Script(BaseModel):
     id: str = Field(..., description="Unique identifier for the script project")
@@ -631,11 +576,6 @@ class Series(BaseModel):
     # the shot card tab toggle. See Project.default_generation_mode for
     # full semantics.
     default_generation_mode: str = Field("r2v", description="Default per-shot generation_mode for new episodes: 'r2v' (节奏优先) or 'i2v' (画面优先)")
-
-    # PR-3h/i (r2v-workflow-v3) — Custom voice pool (clones + designs).
-    # Per Q16.1: series-level scope. Any character in this series can pick
-    # from this pool via VoicePickerModal's 我的复刻 / 我的设计 tabs.
-    custom_voices: List["CustomVoice"] = Field(default_factory=list, description="User-created custom voices (clones + designs)")
 
     # R2V v2 Phase 6 — content source mode. Orthogonal to workflow_mode.
     # 'scripted'  = traditional flow (Script step parses entities first)

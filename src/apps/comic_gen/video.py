@@ -1,7 +1,8 @@
 import os
 from typing import Dict, Any
 from .models import StoryboardFrame, GenerationStatus
-from ...models.wanx import WanxModel
+from ...models.newapi import NewAPIVideoModel
+from ...utils.newapi_models import VIDEO, get_model_spec, get_selected_model
 from ...utils import get_logger
 
 logger = get_logger(__name__)
@@ -9,10 +10,17 @@ logger = get_logger(__name__)
 class VideoGenerator:
     def __init__(self, config: Dict[str, Any] = None):
         self.config = config or {}
-        self.model = WanxModel(self.config.get('model', {}))
+        self.model = NewAPIVideoModel(self.config.get('model', {}))
         self.output_dir = self.config.get('output_dir', 'output/video')
 
-    def generate_i2v(self, image_url: str, prompt: str, duration: int = 5, audio_url: str = None) -> Dict[str, Any]:
+    def generate_i2v(
+        self,
+        image_url: str,
+        prompt: str,
+        duration: int = 5,
+        audio_url: str = None,
+        model_id: str = None,
+    ) -> Dict[str, Any]:
         """
         Generate Image-to-Video for motion reference.
         
@@ -26,6 +34,11 @@ class VideoGenerator:
             Dict with video_url key containing the generated video URL
         """
         import uuid
+
+        selected_model = model_id or get_selected_model(VIDEO)
+        get_model_spec(selected_model, VIDEO)
+        if audio_url:
+            raise ValueError("New API Seedance does not support driving-audio input")
         
         logger.info(f"Generating I2V motion reference: prompt={prompt[:50]}..., duration={duration}")
         
@@ -47,7 +60,9 @@ class VideoGenerator:
                 prompt=prompt,
                 output_path=output_path,
                 img_path=img_path,
-                img_url=image_url if not img_path else None
+                img_url=image_url if not img_path else None,
+                model_id=selected_model,
+                generation_mode="i2v",
             )
             
             # Upload to OSS if configured
@@ -69,7 +84,7 @@ class VideoGenerator:
             logger.error(f"Failed to generate I2V motion reference: {e}")
             raise
 
-    def generate_clip(self, frame: StoryboardFrame) -> StoryboardFrame:
+    def generate_clip(self, frame: StoryboardFrame, model_id: str = None) -> StoryboardFrame:
         """Generates a video clip from a storyboard frame."""
         if not frame.image_url:
             logger.error(f"Frame {frame.id} has no image URL. Cannot generate video.")
@@ -82,7 +97,7 @@ class VideoGenerator:
         prompt = frame.video_prompt or frame.image_prompt or frame.action_description
         
         # Convert file:// URL to local path if necessary, or ensure the model can handle it.
-        # Wanx API needs a public URL or OSS URL. 
+        # New API accepts a public URL or encoded image input.
         # For this local demo, we might need to assume the user has a way to serve files or upload them.
         # OR we mock the upload.
         # For now, let's assume the image_url is accessible to the API (e.g. if we used an OSS URL earlier).
@@ -122,7 +137,9 @@ class VideoGenerator:
                 prompt=prompt,
                 output_path=output_path,
                 img_path=img_path, # Pass local path, model will upload
-                img_url=img_url if not img_path else None # Pass URL if it's already remote
+                img_url=img_url if not img_path else None, # Pass URL if it's already remote
+                model_id=model_id or get_selected_model(VIDEO),
+                generation_mode="i2v",
             )
             
             # Store relative path for frontend serving

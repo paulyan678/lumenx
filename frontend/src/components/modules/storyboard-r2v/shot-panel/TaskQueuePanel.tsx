@@ -233,14 +233,7 @@ function TaskRow({
     const inputThumbUrl = task.image_url || undefined;
     const outputVideoUrl = task.video_url || undefined;
 
-    // Provider ID display: when provider_name=dashscope, label as "百炼"
-    // (user-friendly Chinese name) since that's the console they'll paste into.
-    const providerLabel =
-        task.provider_name === "dashscope" ? t("providerDashscope")
-            : task.provider_name === "kling" ? t("providerKling")
-                : task.provider_name === "vidu" ? "Vidu"
-                    : task.provider_name === "pixverse" ? "PixVerse"
-                        : task.provider_name || "provider";
+    const providerLabel = "New API";
 
     // Build diagnose blob — copy-pasteable into a support ticket.
     const diagnoseBlob = [

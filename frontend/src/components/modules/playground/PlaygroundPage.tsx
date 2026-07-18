@@ -21,13 +21,11 @@ const MODE_LABELS: Record<PlaygroundMode, string> = {
   i2i: 'I2I',
   t2v: 'T2V',
   i2v: 'I2V',
-  r2v: 'R2V',
-  v2v: 'V2V',
 };
 
 /** Modes that require media input (image or video source).
  *  t2i also shows optional media input — when provided, it auto-becomes i2i. */
-const MODES_WITH_MEDIA: PlaygroundMode[] = ['i2i', 'i2v', 'r2v', 'v2v'];
+const MODES_WITH_MEDIA: PlaygroundMode[] = ['i2i', 'i2v'];
 const MODES_WITH_OPTIONAL_MEDIA: PlaygroundMode[] = ['t2i'];
 
 /** Polling interval for generation status (ms) */
@@ -279,15 +277,7 @@ export default function PlaygroundPage() {
           {showMediaInput && (
             <section className="glass-panel atelier-card rounded-[20px] px-5 py-5">
               <div className="mb-3 font-mono text-[0.625rem] font-semibold uppercase tracking-[0.16em] text-text-secondary">
-                {t(
-                  mode === 'v2v'
-                    ? 'compose.mediaSourceVideo'
-                    : mode === 'r2v'
-                      ? 'compose.mediaRefMaterial'
-                      : mode === 'i2v'
-                        ? 'compose.mediaFirstFrame'
-                        : 'compose.mediaReference'
-                )}
+                {t(mode === 'i2v' ? 'compose.mediaFirstFrame' : 'compose.mediaReference')}
               </div>
               <MediaInput />
             </section>

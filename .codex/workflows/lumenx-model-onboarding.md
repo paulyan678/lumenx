@@ -9,7 +9,7 @@ Use this workflow when working in this repository and the user asks to:
 
 - onboard a new model or model family into LumenX
 - update model docs, versions, defaults, parameters, or UI exposure
-- refresh DashScope proxy mappings for Wan, Kling, Vidu, or future families
+- update the approved New API model IDs, capabilities, or model-specific credentials
 - review whether a model change is catalog-only or requires runtime adapter work
 - run `/lumenx-model-onboarding`
 
@@ -20,21 +20,41 @@ This workflow is the repo-native entrypoint for model support work. It keeps the
 - **Doc refresh only**: update source links, release notes, or integration notes with no runtime change.
 - **Catalog-only**: add or update model IDs, defaults, status, capabilities, durations, params, docs, or UI visibility entirely inside `config/model_catalog/`.
 - **Catalog + frontend**: a catalog change also changes what the settings UI or video UI should expose.
-- **Catalog + runtime adapter**: the model needs a new provider transport mode, request parameter, endpoint behavior, auth mode, or response parsing logic.
-- **New provider family**: add a new family and wire routing, media transport, validation, and UI support end-to-end.
+- **Catalog + runtime adapter**: the model needs a New API request parameter, endpoint behavior, response parser, or exact model-to-key routing change.
+- **Provider-boundary change**: any request to add a provider other than New API is an architecture change, not routine model onboarding, and requires explicit user approval.
+
+## Current Single-Provider Invariant
+
+LumenX supports New API as its only AI provider. The approved model IDs are:
+
+- Chat: `deepseek-v4-flash`, `qwen3.7-max`, `deepseek-v4-pro`
+- Image: `gpt-image-2`
+- Video: `doubao-seedance-2-0-260128`, `doubao-seedance-2-0-fast-260128`, `doubao-seedance-2-0-mini-260615`
+
+The only shared provider setting is `NEWAPI_BASE_URL`. Exact credential mappings are:
+
+- `gpt-image-2` → `NEWAPI_GPT_IMAGE_2_API_KEY`
+- `doubao-seedance-2-0-260128` → `NEWAPI_SEEDANCE_2_API_KEY`
+- `doubao-seedance-2-0-fast-260128` → `NEWAPI_SEEDANCE_2_FAST_API_KEY`
+- `doubao-seedance-2-0-mini-260615` → `NEWAPI_SEEDANCE_2_MINI_API_KEY`
+- `deepseek-v4-flash` → `NEWAPI_DEEPSEEK_V4_FLASH_API_KEY`
+- `qwen3.7-max` → `NEWAPI_QWEN_37_MAX_API_KEY`
+- `deepseek-v4-pro` → `NEWAPI_DEEPSEEK_V4_PRO_API_KEY`
+
+Runtime code must resolve the selected model ID and that model's exact API key together. It must reject unsupported IDs or missing keys and must never reuse another model's key or fall back to another provider.
 
 ## Required Inputs
 
 Before making changes, collect or infer these inputs:
 
-- provider name
+- New API endpoint and request contract
 - model family
 - model IDs involved
 - change type from the list above
 - source doc URLs
 - whether the change affects:
   - default model selection
-  - provider backend routing
+  - exact model-to-key routing
   - input transport
   - request params
   - frontend visibility
@@ -110,7 +130,7 @@ Classify the request into one of these buckets:
   - request payload changes
   - media transport mode changes
   - polling / response shape changes
-  - a new provider family is introduced
+  - the New API transport or exact model-to-key mapping changes
 
 Do not force a catalog-only change when the docs clearly imply runtime work.
 
@@ -138,24 +158,25 @@ Update at least these fields when relevant:
 - `duration`
 - `params`
 - `inputs`
-- family-level `supported_backends`
+- family-level `supported_backends` (must contain only `newapi`)
 - family-level `transport`
-- family-level `credential_sources`
+- family-level `credential_sources` (must identify the exact model-specific key)
 
 Rules:
 
 - visible models must carry doc linkage
 - defaults must point to real models
 - planned/hidden models should not be exposed in UI by accident
+- unsupported model IDs must not remain in selectors, defaults, validation, or runtime routing
+- no credential source may fall back to a different model's key
 - do not parse YAML from the frontend, always regenerate the frontend JSON mirror
 
 ## Phase 4: Extend Runtime or Frontend Only When Needed
 
 If runtime behavior changes, inspect and update the appropriate areas:
 
-- `src/utils/provider_registry.py`
-- `src/utils/provider_media.py`
-- `src/models/`
+- `src/utils/newapi_models.py`
+- `src/models/newapi.py`
 - `src/apps/comic_gen/models.py`
 - request/response handling in provider-specific model wrappers
 
@@ -212,7 +233,7 @@ If the change is narrower, you may run targeted checks first, but do not claim c
 
 ## Stop And Ask The User When
 
-- the docs imply a new provider family or auth contract
+- the docs imply a provider other than New API or a new authentication contract
 - a new transport mode is required
 - a new UI control is required and the right UX is not obvious
 - the raw archive repo or Context Hub package is unavailable and the user expects a full sync

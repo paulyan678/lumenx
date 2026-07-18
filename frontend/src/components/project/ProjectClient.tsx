@@ -26,12 +26,7 @@ import dynamic from "next/dynamic";
 
 const CreativeCanvas = dynamic(() => import("@/components/canvas/CreativeCanvas"), { ssr: false });
 
-// PR-3m · Steps 7-9 (Voice / Final Mix / Export) deprecated. Their
-// functionality moved into:
-//   - Voice  → Cast voice binding + Storyboard DialogueAudioRow (PR-3g-3j)
-//   - Mix    → Assembly Mix phase tab (PR-3k)
-//   - Export → Assembly Export phase tab (PR-3k)
-// Both legacy and unified projects now share the 6-step shape.
+// Audio mixing and export are handled by the Assembly step.
 const LEGACY_STEPS = [
     { id: "script", label: "1. Script", icon: BookOpen },
     { id: "art_direction", label: "2. Art Direction", icon: Palette },
@@ -41,12 +36,8 @@ const LEGACY_STEPS = [
     { id: "assembly", label: "6. Assembly", icon: Film },
 ];
 
-// PR-3f (r2v-workflow-v3) — Unified workflow: 5 steps including Cast.
-// Per-shot tabMode toggle (t2i_i2v vs direct_r2v) inside Storyboard
-// replaces the project-level i2v_legacy / r2v split. Backend enum
-// value remains "r2v" for backward compat — UI normalizes to "Unified".
-// Legacy `assets` step is dropped — Cast supersedes ConsistencyVault
-// for unified projects (ConsistencyVault stays only for legacy workflow).
+// Unified workflow: five steps including the episode Cast view.
+// The legacy backend enum remains accepted for persisted projects.
 const UNIFIED_STEPS = [
     { id: "script", label: "1. Script", icon: BookOpen },
     { id: "art_direction", label: "2. Art Direction", icon: Palette },
@@ -111,7 +102,6 @@ export default function ProjectClient({ id, breadcrumbSegments }: { id: string; 
         // (no navigation behavior change).
         const frames = currentProject?.frames ?? [];
         const chars = currentProject?.characters ?? [];
-        const bound = chars.filter(c => c.voice_id).length;
         const frameCount = frames.length;
         const hasArt = !!currentProject?.art_direction;
         const hasMerged = !!currentProject?.merged_video_url;
@@ -121,9 +111,7 @@ export default function ProjectClient({ id, breadcrumbSegments }: { id: string; 
                     return hasArt ? { status: "ready", statusLabel: tp("railArtReady") } : { status: "idle" };
                 case "cast":
                     return chars.length > 0
-                        ? (bound > 0
-                            ? { status: "ready", statusLabel: tp("railCastBound", { n: chars.length, m: bound }) }
-                            : { status: "ready", statusLabel: tp("railCast", { n: chars.length }) })
+                        ? { status: "ready", statusLabel: tp("railCast", { n: chars.length }) }
                         : { status: "idle" };
                 case "storyboard_r2v":
                 case "storyboard":

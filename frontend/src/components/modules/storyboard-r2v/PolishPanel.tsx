@@ -1,6 +1,6 @@
 "use client";
 /**
- * PolishPanel — Storyboard R2V workbench 的 AI 提示词润色面板。
+ * PolishPanel — New API I2V prompt-polish panel.
  *
  * 重构 (#114) 后的核心约定：
  *   - 后端 fallback 不再静默 (#117)：失败抛 HTTP 502 + {reason, message_zh/en, prompt_cn?, prompt_en?}
@@ -46,12 +46,8 @@ interface PolishErrorState {
 
 interface PolishPanelProps {
     prompt: string;
-    tabMode: "t2i_i2v" | "direct_r2v";
     scriptId: string;
-    slots?: { description: string }[];
-    /** Image URLs to ground the polish (Issue 13). i2v: active first frame
-     *  (T2I or storyboard render); r2v: reference image URLs. Empty/omit =
-     *  pure text-only polish (back-compat for shots with no frame). */
+    /** Active first-frame images used to ground the polish request. */
     imageUrls?: string[];
     onApply: (text: string) => void;
 }
@@ -88,9 +84,7 @@ function parsePolishError(err: any, t: (key: string) => string): PolishErrorStat
 
 export default function PolishPanel({
     prompt,
-    tabMode,
     scriptId,
-    slots = [],
     imageUrls = [],
     onApply,
 }: PolishPanelProps) {
@@ -116,9 +110,7 @@ export default function PolishPanel({
         // 成功后再 setPolished 覆盖。
 
         try {
-            const res = tabMode === "direct_r2v"
-                ? await api.polishR2VPrompt(draft, slots, feedbackText, scriptId, prevCn, imageUrls)
-                : await api.polishVideoPrompt(draft, feedbackText, scriptId, prevCn, imageUrls);
+            const res = await api.polishVideoPrompt(draft, feedbackText, scriptId, prevCn, imageUrls);
             if (res?.prompt_cn && res?.prompt_en) {
                 setPolished({ cn: res.prompt_cn, en: res.prompt_en });
                 setFeedback("");
@@ -142,7 +134,7 @@ export default function PolishPanel({
         } finally {
             setIsPolishing(false);
         }
-    }, [tabMode, prompt, slots, scriptId, polished?.en, polished?.cn, imageUrls]);
+    }, [prompt, scriptId, polished?.en, polished?.cn, imageUrls, t]);
 
     const handleApply = useCallback((text: string) => {
         onApply(text);

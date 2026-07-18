@@ -6,16 +6,26 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 import yaml
 
 
-SUPPORTED_PROVIDER_BACKENDS = ("dashscope", "vendor", "mulerouter")
+SUPPORTED_PROVIDER_BACKENDS = ("newapi",)
+SUPPORTED_PROVIDERS = ("newapi",)
 SUPPORTED_MODEL_STATUSES = ("active", "planned", "deprecated", "hidden")
-SUPPORTED_SELECTION_GROUPS = ("t2i", "i2i", "image", "i2v", "r2v", "t2v")
+SUPPORTED_SELECTION_GROUPS = ("chat", "image", "video")
+SUPPORTED_CAPABILITIES = ("chat", "t2i", "i2i", "t2v", "i2v")
+SELECTION_GROUP_CAPABILITIES = {
+    "chat": frozenset({"chat"}),
+    "image": frozenset({"t2i", "i2i"}),
+    "video": frozenset({"t2v", "i2v"}),
+}
+DEFAULT_MODEL_SELECTION_GROUPS = {
+    "chat_model": "chat",
+    "image_model": "image",
+    "video_model": "video",
+}
 VISIBLE_MODEL_SURFACES = ("project_settings", "series_settings", "video_sidebar", "global_settings")
 DEFAULT_MODEL_SURFACE_REQUIREMENTS = {
-    "t2i_model": ("project_settings", "series_settings", "global_settings"),
-    "i2i_model": ("project_settings", "series_settings", "global_settings"),
+    "chat_model": ("project_settings", "series_settings", "global_settings"),
     "image_model": ("project_settings", "series_settings", "global_settings"),
-    "i2v_model": ("project_settings", "series_settings", "video_sidebar", "global_settings"),
-    "r2v_model": ("project_settings", "series_settings", "video_sidebar", "global_settings"),
+    "video_model": ("project_settings", "series_settings", "video_sidebar", "global_settings"),
 }
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -31,11 +41,9 @@ FRONTEND_GENERATED_MODEL_CATALOG_PATH = (
 
 @dataclass(frozen=True)
 class DefaultModelSettings:
-    t2i_model: str
-    i2i_model: str
+    chat_model: str
     image_model: str
-    i2v_model: str
-    r2v_model: str = ""
+    video_model: str
 
 
 @dataclass(frozen=True)
@@ -88,6 +96,23 @@ def _validate_backend_names(names: Iterable[str], *, label: str) -> List[str]:
     return normalized
 
 
+def _normalize_credential_sources(value: Any, *, label: str) -> Dict[str, List[str]]:
+    raw_sources = _require_mapping(value, label=label)
+    normalized: Dict[str, List[str]] = {}
+    for backend, keys in raw_sources.items():
+        normalized_backend = _require_non_empty_str(
+            backend,
+            label=f"{label} backend",
+        ).lower()
+        if normalized_backend not in SUPPORTED_PROVIDER_BACKENDS:
+            raise ValueError(f"Unsupported backend '{normalized_backend}' in {label}")
+        normalized[normalized_backend] = _normalize_string_list(
+            keys,
+            label=f"{label}.{normalized_backend}",
+        )
+    return normalized
+
+
 def _sorted_unique(values: Sequence[str]) -> List[str]:
     return sorted(dict.fromkeys(values))
 
@@ -108,7 +133,32 @@ def _build_schema_stub() -> Dict[str, Any]:
         "required": ["version", "defaults", "families", "models"],
         "properties": {
             "version": {"type": "integer"},
-            "defaults": {"type": "object"},
+            "defaults": {
+                "type": "object",
+                "required": ["model_settings", "canonical_model_settings"],
+                "properties": {
+                    "model_settings": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "required": ["chat_model", "image_model", "video_model"],
+                        "properties": {
+                            "chat_model": {"type": "string", "minLength": 1},
+                            "image_model": {"type": "string", "minLength": 1},
+                            "video_model": {"type": "string", "minLength": 1},
+                        },
+                    },
+                    "canonical_model_settings": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "required": ["chat_model", "image_model", "video_model"],
+                        "properties": {
+                            "chat_model": {"type": "string", "minLength": 1},
+                            "image_model": {"type": "string", "minLength": 1},
+                            "video_model": {"type": "string", "minLength": 1},
+                        },
+                    },
+                },
+            },
             "families": {"type": "object"},
             "models": {"type": "object"},
             "model_lines": {"type": "object"},
@@ -363,23 +413,18 @@ def build_catalog_dict(catalog_root: Optional[Path] = None) -> Dict[str, Any]:
         defaults.get("model_settings"),
         label="defaults.model_settings",
     )
-    t2i_default = _require_non_empty_str(
-        default_model_settings.get("t2i_model"),
-        label="defaults.model_settings.t2i_model",
-    )
-    i2i_default = _require_non_empty_str(
-        default_model_settings.get("i2i_model"),
-        label="defaults.model_settings.i2i_model",
-    )
-    i2v_default = _require_non_empty_str(
-        default_model_settings.get("i2v_model"),
-        label="defaults.model_settings.i2v_model",
+    chat_default = _require_non_empty_str(
+        default_model_settings.get("chat_model"),
+        label="defaults.model_settings.chat_model",
     )
     image_default = _require_non_empty_str(
         default_model_settings.get("image_model"),
         label="defaults.model_settings.image_model",
     )
-    r2v_default = (default_model_settings.get("r2v_model") or "").strip() or None
+    video_default = _require_non_empty_str(
+        default_model_settings.get("video_model"),
+        label="defaults.model_settings.video_model",
+    )
 
     families: Dict[str, Dict[str, Any]] = {}
     models: Dict[str, Dict[str, Any]] = {}
@@ -391,7 +436,12 @@ def build_catalog_dict(catalog_root: Optional[Path] = None) -> Dict[str, Any]:
         raw_family = _read_yaml(family_path)
         family_name = _require_non_empty_str(raw_family.get("family"), label=f"{family_path}: family")
         display_name = raw_family.get("display_name", "")
-        provider = _require_non_empty_str(raw_family.get("provider"), label=f"{family_path}: provider")
+        provider = _require_non_empty_str(
+            raw_family.get("provider"),
+            label=f"{family_path}: provider",
+        ).lower()
+        if provider not in SUPPORTED_PROVIDERS:
+            raise ValueError(f"Unsupported provider '{provider}' in {family_path}")
         routing_prefixes = _sorted_unique(
             _normalize_string_list(raw_family.get("routing_prefixes"), label=f"{family_path}: routing_prefixes")
         )
@@ -408,26 +458,23 @@ def build_catalog_dict(catalog_root: Optional[Path] = None) -> Dict[str, Any]:
                 f"default_backend '{default_backend}' must exist in supported_backends for {family_path}"
             )
 
-        credential_sources_raw = _require_mapping(
+        credential_sources = _normalize_credential_sources(
             raw_family.get("credential_sources"),
             label=f"{family_path}: credential_sources",
         )
-        credential_sources: Dict[str, List[str]] = {}
-        for backend, keys in credential_sources_raw.items():
-            normalized_backend = _require_non_empty_str(
-                backend, label=f"{family_path}: credential_sources backend"
-            ).lower()
-            if normalized_backend not in SUPPORTED_PROVIDER_BACKENDS:
-                raise ValueError(f"Unsupported backend '{normalized_backend}' in {family_path}")
-            credential_sources[normalized_backend] = _normalize_string_list(
-                keys,
-                label=f"{family_path}: credential_sources.{normalized_backend}",
-            )
 
         supported_modalities = _normalize_string_list(
             raw_family.get("supported_modalities"),
             label=f"{family_path}: supported_modalities",
         )
+        unsupported_modalities = sorted(
+            set(supported_modalities) - set(SUPPORTED_CAPABILITIES)
+        )
+        if unsupported_modalities:
+            raise ValueError(
+                f"Unsupported capabilities {unsupported_modalities} in "
+                f"{family_path}: supported_modalities"
+            )
 
         transport = _require_mapping(raw_family.get("transport"), label=f"{family_path}: transport")
         image_input_mode = _require_mapping(
@@ -593,6 +640,15 @@ def build_catalog_dict(catalog_root: Optional[Path] = None) -> Dict[str, Any]:
                         mode_mapping.get("capabilities", [mode_name]),
                         label=f"{family_path}: {legacy_model_id}.capabilities",
                     )
+                    unsupported_capabilities = sorted(
+                        set(capabilities) - SELECTION_GROUP_CAPABILITIES[selection_group]
+                    )
+                    if unsupported_capabilities:
+                        raise ValueError(
+                            f"Model '{legacy_model_id}' has capabilities "
+                            f"{unsupported_capabilities} incompatible with selection_group "
+                            f"'{selection_group}'"
+                        )
                     canonical_mode_id = f"{model_line_id}#{_require_non_empty_str(mode_name, label=f'{family_path}: mode name')}"
                     if canonical_mode_id in modes:
                         raise ValueError(f"Duplicate canonical mode id '{canonical_mode_id}'")
@@ -734,6 +790,26 @@ def build_catalog_dict(catalog_root: Optional[Path] = None) -> Dict[str, Any]:
                 model_mapping.get("capabilities"),
                 label=f"{family_path}: {model_id}.capabilities",
             )
+            unsupported_capabilities = sorted(
+                set(capabilities) - SELECTION_GROUP_CAPABILITIES[selection_group]
+            )
+            if unsupported_capabilities:
+                raise ValueError(
+                    f"Model '{model_id}' has capabilities {unsupported_capabilities} "
+                    f"incompatible with selection_group '{selection_group}'"
+                )
+            model_credential_sources = _normalize_credential_sources(
+                model_mapping.get("credential_sources", credential_sources),
+                label=f"{family_path}: {model_id}.credential_sources",
+            )
+            if set(model_credential_sources) != set(supported_backends):
+                raise ValueError(
+                    f"Model '{model_id}' must define credentials for exactly the family backends"
+                )
+            if any(len(keys) != 1 for keys in model_credential_sources.values()):
+                raise ValueError(
+                    f"Model '{model_id}' must define exactly one credential per backend"
+                )
             runtime = _normalize_runtime_backends(
                 model_mapping.get("runtime", {}),
                 label=f"{family_path}: {model_id}.runtime",
@@ -765,7 +841,7 @@ def build_catalog_dict(catalog_root: Optional[Path] = None) -> Dict[str, Any]:
                 supported_backends=supported_backends,
                 default_backend=default_backend,
                 backend_env_key=raw_family.get("backend_env_key"),
-                credential_sources=credential_sources,
+                credential_sources=model_credential_sources,
                 routing_prefixes=routing_prefixes,
                 transport=transport_payload,
                 official_snapshot_ids=official_snapshot_ids,
@@ -808,7 +884,7 @@ def build_catalog_dict(catalog_root: Optional[Path] = None) -> Dict[str, Any]:
                 "supported_backends": list(supported_backends),
                 "default_backend": default_backend,
                 "backend_env_key": raw_family.get("backend_env_key"),
-                "credential_sources": credential_sources,
+                "credential_sources": model_credential_sources,
                 "routing_prefixes": list(routing_prefixes),
                 "supported_modalities": list(supported_modalities),
                 "transport": transport_payload,
@@ -832,7 +908,7 @@ def build_catalog_dict(catalog_root: Optional[Path] = None) -> Dict[str, Any]:
                 supported_backends=supported_backends,
                 default_backend=default_backend,
                 backend_env_key=raw_family.get("backend_env_key"),
-                credential_sources=credential_sources,
+                credential_sources=model_credential_sources,
                 routing_prefixes=routing_prefixes,
                 transport=transport_payload,
                 runtime=runtime,
@@ -865,11 +941,21 @@ def build_catalog_dict(catalog_root: Optional[Path] = None) -> Dict[str, Any]:
                 legacy_model_id=model_id,
             )
 
-    for model_id in (t2i_default, i2i_default, image_default, i2v_default):
+    configured_defaults = {
+        "chat_model": chat_default,
+        "image_model": image_default,
+        "video_model": video_default,
+    }
+    for default_key, model_id in configured_defaults.items():
         if model_id not in models:
             raise ValueError(f"Default model '{model_id}' is missing from the catalog")
-    if r2v_default and r2v_default not in models:
-        raise ValueError(f"Default model '{r2v_default}' is missing from the catalog")
+        actual_group = models[model_id]["ui"]["selection_group"]
+        expected_group = DEFAULT_MODEL_SELECTION_GROUPS[default_key]
+        if actual_group != expected_group:
+            raise ValueError(
+                f"Default '{default_key}' must select a '{expected_group}' model, "
+                f"got '{actual_group}'"
+            )
 
     for family in families.values():
         family["models"] = sorted(family["models"])
@@ -878,22 +964,12 @@ def build_catalog_dict(catalog_root: Optional[Path] = None) -> Dict[str, Any]:
         line_payload["legacy_model_ids"] = sorted(line_payload["legacy_model_ids"])
 
     canonical_defaults = {
-        "t2i_model": legacy_model_ids[t2i_default],
-        "i2i_model": legacy_model_ids[i2i_default],
+        "chat_model": legacy_model_ids[chat_default],
         "image_model": legacy_model_ids[image_default],
-        "i2v_model": legacy_model_ids[i2v_default],
+        "video_model": legacy_model_ids[video_default],
     }
-    if r2v_default:
-        canonical_defaults["r2v_model"] = legacy_model_ids[r2v_default]
 
-    default_settings: Dict[str, Any] = {
-        "t2i_model": t2i_default,
-        "i2i_model": i2i_default,
-        "image_model": image_default,
-        "i2v_model": i2v_default,
-    }
-    if r2v_default:
-        default_settings["r2v_model"] = r2v_default
+    default_settings: Dict[str, Any] = dict(configured_defaults)
 
     return {
         "version": version,
@@ -1026,7 +1102,7 @@ class CatalogAccessor:
         return dict(entry) if entry else None
 
     def get_gateway(
-        self, canonical_mode_id: str, backend: str = "dashscope"
+        self, canonical_mode_id: str, backend: str = "newapi"
     ) -> Optional[str]:
         """Return the gateway value for a canonical mode on a specific backend."""
         runtime = self.get_mode_runtime(canonical_mode_id)
@@ -1070,11 +1146,9 @@ def get_default_model_settings(catalog_root: Optional[Path] = None) -> DefaultMo
     catalog = build_catalog_dict(catalog_root or MODEL_CATALOG_ROOT)
     defaults = catalog["defaults"]["model_settings"]
     return DefaultModelSettings(
-        t2i_model=defaults["t2i_model"],
-        i2i_model=defaults["i2i_model"],
+        chat_model=defaults["chat_model"],
         image_model=defaults["image_model"],
-        i2v_model=defaults["i2v_model"],
-        r2v_model=defaults["r2v_model"],
+        video_model=defaults["video_model"],
     )
 
 

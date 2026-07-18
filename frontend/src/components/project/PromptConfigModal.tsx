@@ -6,6 +6,7 @@ import { X, FileText, RotateCcw, ChevronDown, ChevronRight, Loader2 } from 'luci
 import { useTranslations } from 'next-intl';
 import { useProjectStore } from '@/store/projectStore';
 import { api } from '@/lib/api';
+import { DEFAULT_ACTIVE_MODELS, getApprovedModels, normalizeActiveModel } from '@/lib/newApiModels';
 
 interface PromptConfigModalProps {
     isOpen: boolean;
@@ -15,7 +16,6 @@ interface PromptConfigModalProps {
 interface PromptDefaults {
     storyboard_polish: string;
     video_polish: string;
-    r2v_polish: string;
 }
 
 const SECTIONS = [
@@ -29,12 +29,9 @@ const SECTIONS = [
         label: 'Video I2V Polish (Prompt D)',
         description: 'System prompt for Image-to-Video prompt polishing. No dynamic placeholders needed.',
     },
-    {
-        key: 'r2v_polish' as const,
-        label: 'Video R2V Polish (Prompt E)',
-        description: 'System prompt for Reference-to-Video prompt polishing. Placeholder: {SLOTS} (character slot context).',
-    },
 ];
+
+const CHAT_MODELS = getApprovedModels('chat');
 
 export default function PromptConfigModal({ isOpen, onClose }: PromptConfigModalProps) {
     const currentProject = useProjectStore((state) => state.currentProject);
@@ -42,7 +39,7 @@ export default function PromptConfigModal({ isOpen, onClose }: PromptConfigModal
     const t = useTranslations("project");
     const tc = useTranslations("common");
 
-    const [config, setConfig] = useState({ storyboard_polish: '', video_polish: '', r2v_polish: '', polish_model: '' });
+    const [config, setConfig] = useState<{ storyboard_polish: string; video_polish: string; polish_model: string }>({ storyboard_polish: '', video_polish: '', polish_model: DEFAULT_ACTIVE_MODELS.chat });
     const [defaults, setDefaults] = useState<PromptDefaults | null>(null);
     const [expandedDefault, setExpandedDefault] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -56,8 +53,15 @@ export default function PromptConfigModal({ isOpen, onClose }: PromptConfigModal
             setExpandedDefault(null);
             api.getPromptConfig(currentProject.id)
                 .then((data) => {
-                    setConfig(data.prompt_config);
-                    setDefaults(data.defaults);
+                    setConfig({
+                        storyboard_polish: data.prompt_config?.storyboard_polish ?? '',
+                        video_polish: data.prompt_config?.video_polish ?? '',
+                        polish_model: normalizeActiveModel('chat', data.prompt_config?.polish_model),
+                    });
+                    setDefaults({
+                        storyboard_polish: data.defaults?.storyboard_polish ?? '',
+                        video_polish: data.defaults?.video_polish ?? '',
+                    });
                 })
                 .catch((err) => {
                     console.error("Failed to load prompt config:", err);
@@ -137,25 +141,21 @@ export default function PromptConfigModal({ isOpen, onClose }: PromptConfigModal
                                     {t("promptEmptyHint")}
                                 </div>
 
-                                {/* Issue 13: polish 用的 LLM 模型选择。优先项目级 → 系列级 →
-                                    LLMAdapter 默认（qwen3.6-plus）。三个推荐选项都是
-                                    vision-capable，能让带首帧/参考图的润色更准确。 */}
                                 <div className="space-y-2">
                                     <div>
                                         <h3 className="text-sm font-bold text-foreground">Polish 模型</h3>
                                         <p className="text-[0.625rem] text-text-muted mt-0.5">
-                                            选择 AI 润色调用的 LLM 模型。三个选项都支持视觉理解，能在润色时参考首帧/参考图。
+                                            选择 New API 聊天模型处理提示词润色。
                                         </p>
                                     </div>
                                     <select
-                                        value={config.polish_model || "qwen3.7-plus"}
+                                        value={config.polish_model}
                                         onChange={(e) => setConfig(prev => ({ ...prev, polish_model: e.target.value }))}
                                         className="w-full bg-surface border border-glass-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:border-purple-500/50"
                                     >
-                                        <option value="qwen3.7-plus">qwen3.7-plus · 通义千问 3.7 Plus（最新）</option>
-                                        <option value="qwen3.6-plus">qwen3.6-plus · 通义千问 3.6 Plus（视觉）</option>
-                                        <option value="qwen3.6-flash">qwen3.6-flash · 通义千问 3.6 Flash（更快）</option>
-                                        <option value="kimi-k2.6">kimi-k2.6 · Moonshot Kimi K2.6（视觉）</option>
+                                        {CHAT_MODELS.map((model) => (
+                                            <option key={model.id} value={model.id}>{model.name} · {model.id}</option>
+                                        ))}
                                     </select>
                                     <div className="border-b border-border-subtle pt-1" />
                                 </div>
@@ -199,9 +199,7 @@ export default function PromptConfigModal({ isOpen, onClose }: PromptConfigModal
                                             </div>
                                         )}
 
-                                        {section.key !== 'r2v_polish' && (
-                                            <div className="border-b border-border-subtle" />
-                                        )}
+                                        <div className="border-b border-border-subtle" />
                                     </div>
                                 ))}
                             </>

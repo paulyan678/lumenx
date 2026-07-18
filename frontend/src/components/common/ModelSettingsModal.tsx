@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, X, Image, Video, Film, Check, Layout, User, Building, Box } from 'lucide-react';
+import { Settings, X, Image, Video, MessageSquare, Check, Layout, User, Building, Box } from 'lucide-react';
 import { useProjectStore, IMAGE_MODELS, I2V_MODELS, ASPECT_RATIOS } from '@/store/projectStore';
-import { resolveModelSettings, VIDEO_R2V_MODELS, DEFAULT_R2V_MODEL_ID } from '@/lib/modelCatalog';
+import { CHAT_MODELS, resolveModelSettings } from '@/lib/modelCatalog';
 import { api } from '@/lib/api';
 import { useTranslations } from "next-intl";
 import GroupedModelGrid from '@/components/common/GroupedModelGrid';
@@ -21,14 +21,9 @@ export default function ModelSettingsModal({ isOpen, onClose }: ModelSettingsMod
     const updateProject = useProjectStore((state) => state.updateProject);
     const resolvedSettings = resolveModelSettings(currentProject?.model_settings, 'project_settings');
 
-    const [t2iModel, setT2iModel] = useState(resolvedSettings.t2i_model);
-    const [i2iModel, setI2iModel] = useState(resolvedSettings.i2i_model);
+    const [chatModel, setChatModel] = useState(resolvedSettings.chat_model);
+    const [imageModel, setImageModel] = useState(resolvedSettings.image_model);
     const [i2vModel, setI2vModel] = useState(resolvedSettings.i2v_model);
-    // R2V default for the project. Storyboard's R2V tab seeds from
-    // here on first mount; per-storyboard localStorage override still
-    // wins. Falls back to catalog's DEFAULT_R2V_MODEL_ID when the
-    // project has no r2v_model set yet (older projects).
-    const [r2vModel, setR2vModel] = useState(resolvedSettings.r2v_model || DEFAULT_R2V_MODEL_ID);
     const [characterAspectRatio, setCharacterAspectRatio] = useState(resolvedSettings.character_aspect_ratio);
     const [sceneAspectRatio, setSceneAspectRatio] = useState(resolvedSettings.scene_aspect_ratio);
     const [propAspectRatio, setPropAspectRatio] = useState(resolvedSettings.prop_aspect_ratio);
@@ -38,10 +33,9 @@ export default function ModelSettingsModal({ isOpen, onClose }: ModelSettingsMod
     // Sync state when project changes
     useEffect(() => {
         const normalizedSettings = resolveModelSettings(currentProject?.model_settings, 'project_settings');
-        setT2iModel(normalizedSettings.t2i_model);
-        setI2iModel(normalizedSettings.i2i_model);
+        setChatModel(normalizedSettings.chat_model);
+        setImageModel(normalizedSettings.image_model);
         setI2vModel(normalizedSettings.i2v_model);
-        setR2vModel(normalizedSettings.r2v_model || DEFAULT_R2V_MODEL_ID);
         setCharacterAspectRatio(normalizedSettings.character_aspect_ratio);
         setSceneAspectRatio(normalizedSettings.scene_aspect_ratio);
         setPropAspectRatio(normalizedSettings.prop_aspect_ratio);
@@ -52,18 +46,18 @@ export default function ModelSettingsModal({ isOpen, onClose }: ModelSettingsMod
         if (!currentProject) return;
         setIsSaving(true);
         try {
-            const updated = await api.updateModelSettings(
-                currentProject.id,
-                t2iModel,
-                i2iModel,
-                i2vModel,
-                characterAspectRatio,
-                sceneAspectRatio,
-                propAspectRatio,
-                storyboardAspectRatio,
-                undefined, // imageModel — managed via t2i/i2i for now
-                r2vModel,
-            );
+            const updated = await api.updateModelSettings(currentProject.id, {
+                chat_model: chatModel,
+                image_model: imageModel,
+                t2i_model: imageModel,
+                i2i_model: imageModel,
+                video_model: i2vModel,
+                i2v_model: i2vModel,
+                character_aspect_ratio: characterAspectRatio,
+                scene_aspect_ratio: sceneAspectRatio,
+                prop_aspect_ratio: propAspectRatio,
+                storyboard_aspect_ratio: storyboardAspectRatio,
+            });
             updateProject(currentProject.id, updated);
             onClose();
         } catch (error) {
@@ -113,6 +107,16 @@ export default function ModelSettingsModal({ isOpen, onClose }: ModelSettingsMod
 
                     {/* Content */}
                     <div className="p-5 space-y-6 overflow-y-auto">
+                        <div className="space-y-3">
+                            <div className="flex items-center gap-2 text-sm font-bold text-foreground">
+                                <MessageSquare size={16} className="text-primary" />
+                                <span>{t("chatModel")}</span>
+                            </div>
+                            <GroupedModelGrid models={CHAT_MODELS} selectedId={chatModel} onSelect={setChatModel} />
+                        </div>
+
+                        <div className="border-t border-glass-border" />
+
                         {/* Assets Section */}
                         <div className="space-y-5">
                             <div className="flex items-center gap-2 text-sm font-bold text-foreground">
@@ -125,8 +129,8 @@ export default function ModelSettingsModal({ isOpen, onClose }: ModelSettingsMod
                                 <label className="text-xs text-text-secondary">{t("model")}</label>
                                 <GroupedModelGrid
                                     models={IMAGE_MODELS}
-                                    selectedId={t2iModel}
-                                    onSelect={(id) => setT2iModel(id)}
+                                    selectedId={imageModel}
+                                    onSelect={setImageModel}
                                 />
                             </div>
 
@@ -209,16 +213,6 @@ export default function ModelSettingsModal({ isOpen, onClose }: ModelSettingsMod
                                 <span>{t("storyboardI2I")}</span>
                             </div>
 
-                            {/* I2I Model */}
-                            <div className="space-y-2">
-                                <label className="text-xs text-text-secondary">{t("model")}</label>
-                                <GroupedModelGrid
-                                    models={IMAGE_MODELS}
-                                    selectedId={i2iModel}
-                                    onSelect={(id) => setI2iModel(id)}
-                                />
-                            </div>
-
                             {/* Storyboard Aspect Ratio */}
                             <div className="space-y-2">
                                 <label className="text-xs text-text-secondary">{t("aspectRatio")}</label>
@@ -261,29 +255,6 @@ export default function ModelSettingsModal({ isOpen, onClose }: ModelSettingsMod
                             </div>
                         </div>
 
-                        <div className="border-t border-glass-border" />
-
-                        {/* R2V Section — Reference-to-Video. Project default;
-                            Storyboard R2V tab seeds from here on first mount,
-                            per-storyboard localStorage override still wins. */}
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-2 text-sm font-bold text-foreground">
-                                <Film size={16} className="text-pink-400" />
-                                <span>R2V · 参考生视频</span>
-                            </div>
-                            <p className="text-xs text-text-muted">
-                                项目级 R2V 模型默认值。Storyboard 的 R2V tab 进入时按此初始化；用户在 storyboard 内的临时切换会保存在本地、不影响这里。
-                            </p>
-
-                            <div className="space-y-2">
-                                <label className="text-xs text-text-secondary">{t("model")}</label>
-                                <GroupedModelGrid
-                                    models={VIDEO_R2V_MODELS}
-                                    selectedId={r2vModel}
-                                    onSelect={(id) => setR2vModel(id)}
-                                />
-                            </div>
-                        </div>
                     </div>
 
                     {/* Footer */}

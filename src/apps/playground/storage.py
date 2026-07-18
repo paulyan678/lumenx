@@ -29,6 +29,10 @@ class PlaygroundStorage:
         """Load both JSON files, creating them if missing."""
         self._history = self._load_file(self.HISTORY_PATH, PlaygroundGeneration)
         self._templates = self._load_file(self.TEMPLATES_PATH, PlaygroundTemplate)
+        if os.path.exists(self.TEMPLATES_PATH):
+            # Persist any stale template model migration performed by the
+            # PlaygroundTemplate validator.
+            self._save_templates()
 
     @staticmethod
     def _load_file(path: str, model_cls):

@@ -1,14 +1,14 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
-import { Save, Loader2, ChevronDown, ChevronRight, FolderOpen, WifiOff, Copy, Check } from "lucide-react";
+import { Save, Loader2, FolderOpen, WifiOff, Copy, Check } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { api, type EnvConfigPayload, type ProviderMode, API_URL } from "@/lib/api";
+import { api, type EnvConfigPayload, API_URL } from "@/lib/api";
 import { ASPECT_RATIOS } from "@/store/projectStore";
 import {
   DEFAULT_MODEL_SETTINGS,
+  GLOBAL_CHAT_MODELS,
   GLOBAL_I2V_MODELS,
-  GLOBAL_R2V_MODELS,
   GLOBAL_IMAGE_MODELS,
   normalizeModelSettings,
   type FrontendModelSettings,
@@ -20,6 +20,17 @@ import { Image, Video, Layout, User, Building, Box } from "lucide-react";
 import GroupedModelGrid from "@/components/common/GroupedModelGrid";
 import LumenXBranding from "@/components/layout/LumenXBranding";
 import UpdateChecker from "./UpdateChecker";
+import NewApiModelManager from "./NewApiModelManager";
+import {
+  DEFAULT_ACTIVE_MODELS,
+  buildSecretReplacementPatch,
+  configuredSecretFields,
+  getNewApiValidationErrors,
+  normalizeActiveModel,
+  type ActiveNewApiSelection,
+  type NewApiCapability,
+  type NewApiSecretField,
+} from "@/lib/newApiModels";
 type SettingsCategory = "general" | "models" | "prompts" | "apikeys" | "storage" | "about";
 import {
   FormRow,
@@ -33,72 +44,44 @@ import {
 const APP_VERSION = "v0.2.0";
 
 type EnvConfig = EnvConfigPayload & {
-  DASHSCOPE_API_KEY: string;
+  NEWAPI_BASE_URL: string;
+  NEWAPI_CHAT_MODEL: string;
+  NEWAPI_IMAGE_MODEL: string;
+  NEWAPI_VIDEO_MODEL: string;
   ALIBABA_CLOUD_ACCESS_KEY_ID: string;
   ALIBABA_CLOUD_ACCESS_KEY_SECRET: string;
   OSS_ENABLE: boolean;
   OSS_BUCKET_NAME: string;
   OSS_ENDPOINT: string;
   OSS_BASE_PATH: string;
-  KLING_PROVIDER_MODE: ProviderMode;
-  VIDU_PROVIDER_MODE: ProviderMode;
-  PIXVERSE_PROVIDER_MODE: ProviderMode;
-  KLING_ACCESS_KEY: string;
-  KLING_SECRET_KEY: string;
-  VIDU_API_KEY: string;
-  MULEROUTER_API_KEY: string;
-  MULERUN_CLI_LOGGED_IN?: boolean;
-  endpoint_overrides: Record<string, string>;
 };
 
-const ENDPOINT_PROVIDERS = [
-  { key: "DASHSCOPE_BASE_URL", label: "DashScope", placeholder: "https://dashscope.aliyuncs.com" },
-  { key: "KLING_BASE_URL", label: "Kling", placeholder: "https://api-beijing.klingai.com/v1" },
-  { key: "VIDU_BASE_URL", label: "Vidu", placeholder: "https://api.vidu.cn/ent/v2" },
-  { key: "MULEROUTER_BASE_URL", label: "MuleRouter", placeholder: "https://api.mulerouter.ai" },
-];
-
 const DEFAULT_CONFIG: EnvConfig = {
-  DASHSCOPE_API_KEY: "",
+  NEWAPI_BASE_URL: "",
+  NEWAPI_CHAT_MODEL: DEFAULT_ACTIVE_MODELS.chat,
+  NEWAPI_IMAGE_MODEL: DEFAULT_ACTIVE_MODELS.image,
+  NEWAPI_VIDEO_MODEL: DEFAULT_ACTIVE_MODELS.video,
   ALIBABA_CLOUD_ACCESS_KEY_ID: "",
   ALIBABA_CLOUD_ACCESS_KEY_SECRET: "",
   OSS_ENABLE: true,
   OSS_BUCKET_NAME: "",
   OSS_ENDPOINT: "",
   OSS_BASE_PATH: "",
-  KLING_PROVIDER_MODE: "dashscope",
-  VIDU_PROVIDER_MODE: "dashscope",
-  PIXVERSE_PROVIDER_MODE: "dashscope",
-  KLING_ACCESS_KEY: "",
-  KLING_SECRET_KEY: "",
-  VIDU_API_KEY: "",
-  MULEROUTER_API_KEY: "",
-  endpoint_overrides: {},
 };
-
-const normalizeProviderMode = (mode?: string): ProviderMode => (mode === "vendor" ? "vendor" : "dashscope");
 
 const normalizeEnvConfig = (existing: EnvConfig, data?: EnvConfigPayload): EnvConfig => ({
   ...existing,
-  ...data,
-  KLING_PROVIDER_MODE: normalizeProviderMode(data?.KLING_PROVIDER_MODE ?? existing.KLING_PROVIDER_MODE),
-  VIDU_PROVIDER_MODE: normalizeProviderMode(data?.VIDU_PROVIDER_MODE ?? existing.VIDU_PROVIDER_MODE),
-  PIXVERSE_PROVIDER_MODE: normalizeProviderMode(data?.PIXVERSE_PROVIDER_MODE ?? existing.PIXVERSE_PROVIDER_MODE),
-  endpoint_overrides: data?.endpoint_overrides ?? existing.endpoint_overrides ?? {},
+  NEWAPI_BASE_URL: data?.NEWAPI_BASE_URL?.trim() || existing.NEWAPI_BASE_URL,
+  NEWAPI_CHAT_MODEL: normalizeActiveModel("chat", data?.NEWAPI_CHAT_MODEL),
+  NEWAPI_IMAGE_MODEL: normalizeActiveModel("image", data?.NEWAPI_IMAGE_MODEL),
+  NEWAPI_VIDEO_MODEL: normalizeActiveModel("video", data?.NEWAPI_VIDEO_MODEL),
+  ALIBABA_CLOUD_ACCESS_KEY_ID: data?.ALIBABA_CLOUD_ACCESS_KEY_ID ?? existing.ALIBABA_CLOUD_ACCESS_KEY_ID,
+  ALIBABA_CLOUD_ACCESS_KEY_SECRET: data?.ALIBABA_CLOUD_ACCESS_KEY_SECRET ?? existing.ALIBABA_CLOUD_ACCESS_KEY_SECRET,
+  OSS_ENABLE: data?.OSS_ENABLE ?? existing.OSS_ENABLE,
+  OSS_BUCKET_NAME: data?.OSS_BUCKET_NAME ?? existing.OSS_BUCKET_NAME,
+  OSS_ENDPOINT: data?.OSS_ENDPOINT ?? existing.OSS_ENDPOINT,
+  OSS_BASE_PATH: data?.OSS_BASE_PATH ?? existing.OSS_BASE_PATH,
 });
-
-const getValidationErrors = (env: EnvConfig): string[] => {
-  const errors: string[] = [];
-  if (!env.DASHSCOPE_API_KEY?.trim()) errors.push("DashScope API Key");
-  if (env.KLING_PROVIDER_MODE === "vendor") {
-    if (!env.KLING_ACCESS_KEY?.trim()) errors.push("Kling Access Key (vendor mode)");
-    if (!env.KLING_SECRET_KEY?.trim()) errors.push("Kling Secret Key (vendor mode)");
-  }
-  if (env.VIDU_PROVIDER_MODE === "vendor" && !env.VIDU_API_KEY?.trim()) {
-    errors.push("Vidu API Key (vendor mode)");
-  }
-  return errors;
-};
 
 const LS_KEY_MODEL = "lumenx_default_model_settings";
 const LS_KEY_PROMPT = "lumenx_default_prompt_config";
@@ -106,7 +89,6 @@ const LS_KEY_PROMPT = "lumenx_default_prompt_config";
 interface DefaultPromptConfig {
   storyboard_polish: string;
   video_polish: string;
-  r2v_polish: string;
   entity_extraction: string;
   style_analysis: string;
   storyboard_extraction: string;
@@ -115,7 +97,6 @@ interface DefaultPromptConfig {
 const EMPTY_PROMPT_CONFIG: DefaultPromptConfig = {
   storyboard_polish: "",
   video_polish: "",
-  r2v_polish: "",
   entity_extraction: "",
   style_analysis: "",
   storyboard_extraction: "",
@@ -193,7 +174,8 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [endpointsOpen, setEndpointsOpen] = useState(false);
+  const [secretReplacements, setSecretReplacements] = useState<Partial<Record<NewApiSecretField, string>>>({});
+  const [configuredSecrets, setConfiguredSecrets] = useState<Partial<Record<NewApiSecretField, boolean>>>({});
 
   // ── Default Model Settings ──
   const [modelSettings, setModelSettings] = useState<FrontendModelSettings>(() =>
@@ -224,7 +206,19 @@ export default function SettingsPage() {
     setLoadError(null);
     try {
       const data = await api.getEnvConfig();
-      setConfig((prev) => normalizeEnvConfig(prev, data));
+      const normalizedConfig = normalizeEnvConfig(DEFAULT_CONFIG, data);
+      setConfig(normalizedConfig);
+      setModelSettings((current) => normalizeModelSettings({
+        ...current,
+        chat_model: normalizedConfig.NEWAPI_CHAT_MODEL,
+        t2i_model: normalizedConfig.NEWAPI_IMAGE_MODEL,
+        i2i_model: normalizedConfig.NEWAPI_IMAGE_MODEL,
+        image_model: normalizedConfig.NEWAPI_IMAGE_MODEL,
+        i2v_model: normalizedConfig.NEWAPI_VIDEO_MODEL,
+        video_model: normalizedConfig.NEWAPI_VIDEO_MODEL,
+      }, "global_settings"));
+      setConfiguredSecrets(configuredSecretFields(data as Record<string, unknown>));
+      setSecretReplacements({});
     } catch {
       setLoadError(t("loadConfigFailed"));
     } finally {
@@ -323,14 +317,31 @@ export default function SettingsPage() {
   }, [active, systemChecked, systemLoading, loadSystem]);
 
   const handleSaveApiConfig = async () => {
-    const errors = getValidationErrors(config);
+    const activeSelection: ActiveNewApiSelection = {
+      chat: config.NEWAPI_CHAT_MODEL,
+      image: config.NEWAPI_IMAGE_MODEL,
+      video: config.NEWAPI_VIDEO_MODEL,
+    };
+    const errors = getNewApiValidationErrors(
+      config.NEWAPI_BASE_URL,
+      activeSelection,
+      configuredSecrets,
+      secretReplacements,
+    );
     if (errors.length > 0) {
       toast.error(t("fillRequired"), { body: `- ${errors.join("\n- ")}` });
       return;
     }
     setSaving(true);
     try {
-      await api.saveEnvConfig(config);
+      await api.saveEnvConfig({
+        NEWAPI_BASE_URL: config.NEWAPI_BASE_URL,
+        NEWAPI_CHAT_MODEL: activeSelection.chat,
+        NEWAPI_IMAGE_MODEL: activeSelection.image,
+        NEWAPI_VIDEO_MODEL: activeSelection.video,
+        ...buildSecretReplacementPatch(secretReplacements),
+      });
+      await loadConfig();
       toast.success(t("saveSuccess"));
     } catch {
       toast.error(t("saveConfigFailed"));
@@ -339,7 +350,7 @@ export default function SettingsPage() {
     }
   };
 
-  // Storage(OSS) 保存不应被 DashScope / 生成相关必填项挡住——它们与存储无关。
+  // Storage credentials are unrelated to New API model readiness.
   const handleSaveStorage = async () => {
     setSaving(true);
     try {
@@ -356,14 +367,7 @@ export default function SettingsPage() {
     setConfig((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleEndpointChange = (envKey: string, value: string) => {
-    setConfig((prev) => ({
-      ...prev,
-      endpoint_overrides: { ...prev.endpoint_overrides, [envKey]: value },
-    }));
-  };
-
-  const handleSaveModelDefaults = () => {
+  const handleSaveModelDefaults = async () => {
     const normalized = normalizeModelSettings(modelSettings, "global_settings");
     // T2I and I2I share one image model in the UI; persist both backend
     // fields plus image_model so per-project backfill stays consistent.
@@ -371,10 +375,42 @@ export default function SettingsPage() {
       ...normalized,
       i2i_model: normalized.t2i_model,
       image_model: normalized.t2i_model,
+      video_model: normalized.i2v_model,
     };
+    const activeSelection: ActiveNewApiSelection = {
+      chat: merged.chat_model,
+      image: merged.image_model,
+      video: merged.video_model,
+    };
+    const errors = getNewApiValidationErrors(
+      config.NEWAPI_BASE_URL,
+      activeSelection,
+      configuredSecrets,
+      secretReplacements,
+    );
+    if (errors.length) {
+      toast.error(t("fillRequired"), { body: `- ${errors.join("\n- ")}` });
+      return;
+    }
     localStorage.setItem(LS_KEY_MODEL, JSON.stringify(merged));
     setModelSettings(merged);
-    toast.success(t("saved"));
+    try {
+      await api.saveEnvConfig({
+        NEWAPI_BASE_URL: config.NEWAPI_BASE_URL,
+        NEWAPI_CHAT_MODEL: activeSelection.chat,
+        NEWAPI_IMAGE_MODEL: activeSelection.image,
+        NEWAPI_VIDEO_MODEL: activeSelection.video,
+      });
+      setConfig((current) => ({
+        ...current,
+        NEWAPI_CHAT_MODEL: activeSelection.chat,
+        NEWAPI_IMAGE_MODEL: activeSelection.image,
+        NEWAPI_VIDEO_MODEL: activeSelection.video,
+      }));
+      toast.success(t("saved"));
+    } catch {
+      toast.error(t("saveConfigFailed"));
+    }
   };
 
   const handleSavePromptDefaults = () => {
@@ -399,12 +435,6 @@ export default function SettingsPage() {
       /* clipboard blocked */
     }
   };
-
-  // MuleRun 登录轮询的 interval 句柄：卸载时清理，避免轮询泄漏 + setConfig-after-unmount。
-  const mulerunPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  useEffect(() => () => {
-    if (mulerunPollRef.current) clearInterval(mulerunPollRef.current);
-  }, []);
 
   const PathField = ({ value, label }: { value: string; label: string }) => (
     <div>
@@ -521,6 +551,14 @@ export default function SettingsPage() {
       title={t("secModelsTitle")}
       desc={t("secModelsDesc")}
     >
+      <FormRow label={t("chatModelLabel")} hint={t("chatModelHint")}>
+        <GroupedModelGrid
+          models={GLOBAL_CHAT_MODELS}
+          selectedId={modelSettings.chat_model}
+          onSelect={(id) => setModelSettings((settings) => ({ ...settings, chat_model: id }))}
+        />
+      </FormRow>
+
       {/* Image model (T2I + I2I unified) */}
       <FormRow label={t("imageModelLabel")} hint={t("imageModelHint")}>
         <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
@@ -588,20 +626,7 @@ export default function SettingsPage() {
         <GroupedModelGrid
           models={GLOBAL_I2V_MODELS}
           selectedId={modelSettings.i2v_model}
-          onSelect={(id) => setModelSettings((s) => ({ ...s, i2v_model: id }))}
-        />
-      </FormRow>
-
-      {/* R2V */}
-      <FormRow label={t("r2vModelLabel")} hint={t("r2vModelHint")}>
-        <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
-          <Video size={15} className="text-purple-400" />
-          <span>Reference-to-Video</span>
-        </div>
-        <GroupedModelGrid
-          models={GLOBAL_R2V_MODELS}
-          selectedId={modelSettings.r2v_model ?? ""}
-          onSelect={(id) => setModelSettings((s) => ({ ...s, r2v_model: id }))}
+          onSelect={(id) => setModelSettings((s) => ({ ...s, i2v_model: id, video_model: id }))}
         />
       </FormRow>
 
@@ -624,7 +649,6 @@ export default function SettingsPage() {
     { key: "storyboard_extraction", label: t("promptStoryboardExtractLabel"), desc: t("promptStoryboardExtractDesc") },
     { key: "storyboard_polish", label: t("promptStoryboardPolishLabel"), desc: t("promptStoryboardPolishDesc") },
     { key: "video_polish", label: t("promptVideoPolishLabel"), desc: t("promptVideoPolishDesc") },
-    { key: "r2v_polish", label: t("promptR2vPolishLabel"), desc: t("promptR2vPolishDesc") },
   ];
 
   const renderPrompts = () => (
@@ -676,185 +700,40 @@ export default function SettingsPage() {
           {loadError}
         </div>
       ) : (
-        <div className="space-y-1">
-          <FormRow label={t("dashscopeKeyLabel")} hint={t("dashscopeKeyHint")}>
-            <FieldLabel>DASHSCOPE_API_KEY *</FieldLabel>
-            <KeyField
-              value={config.DASHSCOPE_API_KEY}
-              onChange={(v) => handleChange("DASHSCOPE_API_KEY", v)}
-              placeholder="sk-..."
-              status={
-                config.DASHSCOPE_API_KEY?.trim()
-                  ? { kind: "ok", text: t("filled") }
-                  : { kind: "warn", text: t("notConfiguredUnavailable") }
-              }
-            />
-          </FormRow>
-
-          <FormRow label={t("klingLabel")} hint={t("klingHint")}>
-            <ModeSegment
-              value={config.KLING_PROVIDER_MODE}
-              onChange={(v) => handleChange("KLING_PROVIDER_MODE", v)}
-              options={[
-                { id: "dashscope", label: "DashScope" },
-                { id: "vendor", label: t("vendorDirect") },
-              ]}
-            />
-            {config.KLING_PROVIDER_MODE === "vendor" && (
-              <div className="space-y-3 mt-3">
-                <div>
-                  <FieldLabel>KLING_ACCESS_KEY *</FieldLabel>
-                  <KeyField value={config.KLING_ACCESS_KEY} onChange={(v) => handleChange("KLING_ACCESS_KEY", v)} placeholder="Kling Access Key" />
-                </div>
-                <div>
-                  <FieldLabel>KLING_SECRET_KEY *</FieldLabel>
-                  <KeyField value={config.KLING_SECRET_KEY} onChange={(v) => handleChange("KLING_SECRET_KEY", v)} placeholder="Kling Secret Key" />
-                </div>
-              </div>
-            )}
-          </FormRow>
-
-          <FormRow label="Vidu" hint={t("viduHint")}>
-            <ModeSegment
-              value={config.VIDU_PROVIDER_MODE}
-              onChange={(v) => handleChange("VIDU_PROVIDER_MODE", v)}
-              options={[
-                { id: "dashscope", label: "DashScope" },
-                { id: "vendor", label: t("vendorDirect") },
-              ]}
-            />
-            {config.VIDU_PROVIDER_MODE === "vendor" && (
-              <div className="mt-3">
-                <FieldLabel>VIDU_API_KEY *</FieldLabel>
-                <KeyField value={config.VIDU_API_KEY} onChange={(v) => handleChange("VIDU_API_KEY", v)} placeholder="Vidu API Key" />
-              </div>
-            )}
-          </FormRow>
-
-          <FormRow label={t("mulerunLabel")} hint={t("mulerunHint")}>
-            {!config.MULEROUTER_API_KEY && !config.MULERUN_CLI_LOGGED_IN && (
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    await api.triggerMulerunLogin();
-                    if (mulerunPollRef.current) clearInterval(mulerunPollRef.current); // 重入守卫
-                    const stop = () => {
-                      if (mulerunPollRef.current) {
-                        clearInterval(mulerunPollRef.current);
-                        mulerunPollRef.current = null;
-                      }
-                    };
-                    mulerunPollRef.current = setInterval(async () => {
-                      try {
-                        const env = await api.getEnvConfig();
-                        if (env.MULERUN_CLI_LOGGED_IN) {
-                          stop();
-                          setConfig((c) => ({ ...c, MULERUN_CLI_LOGGED_IN: true }));
-                        }
-                      } catch {
-                        /* silent */
-                      }
-                    }, 3000);
-                    setTimeout(stop, 120000);
-                  } catch (err: any) {
-                    toast.error(err?.response?.data?.detail || t("loginFailed"));
-                  }
-                }}
-                className="w-full py-2.5 rounded-lg bg-primary text-on-accent text-sm font-medium hover:bg-primary-hover transition-colors mb-3"
-              >
-                {t("mulerunLogin")}
-              </button>
-            )}
-            {!config.MULEROUTER_API_KEY && config.MULERUN_CLI_LOGGED_IN && (
-              <div className="flex items-center gap-3 mb-3">
-                <div className="flex items-center gap-2 text-sm text-emerald-400">
-                  <Check size={16} />
-                  {t("mulerunLoggedIn")}
-                </div>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      await api.triggerMulerunLogin();
-                    } catch (err: any) {
-                      toast.error(err?.response?.data?.detail || t("loginFailed"));
-                    }
-                  }}
-                  className="text-xs text-text-secondary hover:text-foreground transition-colors underline underline-offset-2"
-                >
-                  {t("reLogin")}
-                </button>
-              </div>
-            )}
-            <FieldLabel>MULEROUTER_API_KEY</FieldLabel>
-            <KeyField
-              value={config.MULEROUTER_API_KEY}
-              onChange={(v) => setConfig((c) => ({ ...c, MULEROUTER_API_KEY: v }))}
-              placeholder="muk-..."
-            />
-            <details className="group mt-3">
-              <summary className="text-xs text-primary cursor-pointer hover:underline flex items-center gap-1">
-                <ChevronRight size={12} className="transition-transform group-open:rotate-90" />
-                {t("manualGetKey")}
-              </summary>
-              <div className="mt-2 space-y-2 pl-4 border-l border-glass-border">
-                {[
-                  { n: "1", label: t("stepInstallCli"), cmd: "npm i -g @mulerunai/cli" },
-                  { n: "2", label: t("stepBrowserLogin"), cmd: "mulerun login" },
-                  { n: "3", label: t("stepCopyKey"), cmd: "mulerun studio config" },
-                ].map((step) => (
-                  <div key={step.n} className="flex items-center gap-2 text-xs text-text-secondary">
-                    <span className="shrink-0 w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[0.625rem] font-bold">
-                      {step.n}
-                    </span>
-                    <span>{step.label}</span>
-                    <code
-                      className="ml-auto px-2 py-0.5 bg-glass rounded text-[0.6875rem] font-mono select-all cursor-pointer"
-                      onClick={(e) => {
-                        navigator.clipboard.writeText(step.cmd);
-                        const el = e.currentTarget;
-                        el.style.outline = "1px solid var(--color-primary)";
-                        setTimeout(() => (el.style.outline = ""), 800);
-                      }}
-                    >
-                      {step.cmd}
-                    </code>
-                  </div>
-                ))}
-                <p className="text-[0.6875rem] text-text-muted mt-1">{t("mulerunKeyHint")}</p>
-              </div>
-            </details>
-          </FormRow>
-
-          <FormRow label={t("advancedEndpointsLabel")} hint={t("advancedEndpointsHint")}>
-            <button
-              type="button"
-              onClick={() => setEndpointsOpen(!endpointsOpen)}
-              className="flex items-center gap-2 text-sm font-medium text-text-secondary hover:text-foreground transition-colors"
-            >
-              {endpointsOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-              {endpointsOpen ? t("collapseEndpoints") : t("expandEndpoints")}
-            </button>
-            {endpointsOpen && (
-              <div className="mt-3 space-y-3">
-                {ENDPOINT_PROVIDERS.map(({ key, label, placeholder }) => (
-                  <div key={key}>
-                    <FieldLabel>{label} BASE URL</FieldLabel>
-                    <input
-                      type="text"
-                      value={config.endpoint_overrides[key] || ""}
-                      onChange={(e) => handleEndpointChange(key, e.target.value)}
-                      placeholder={placeholder}
-                      className={settingsInputClass + " font-mono text-[0.71875rem]"}
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
-          </FormRow>
-
-          <div className="flex justify-end pt-4">
+        <>
+          <NewApiModelManager
+            baseUrl={config.NEWAPI_BASE_URL}
+            active={{
+              chat: config.NEWAPI_CHAT_MODEL,
+              image: config.NEWAPI_IMAGE_MODEL,
+              video: config.NEWAPI_VIDEO_MODEL,
+            }}
+            replacements={secretReplacements}
+            configured={configuredSecrets}
+            onBaseUrlChange={(value) => handleChange("NEWAPI_BASE_URL", value)}
+            onActiveChange={(capability: NewApiCapability, modelId: string) => {
+              const field = capability === "chat"
+                ? "NEWAPI_CHAT_MODEL"
+                : capability === "image"
+                  ? "NEWAPI_IMAGE_MODEL"
+                  : "NEWAPI_VIDEO_MODEL";
+              setConfig((current) => ({ ...current, [field]: modelId }));
+              setModelSettings((current) => ({
+                ...current,
+                ...(capability === "chat" ? { chat_model: modelId } : {}),
+                ...(capability === "image"
+                  ? { image_model: modelId, t2i_model: modelId, i2i_model: modelId }
+                  : {}),
+                ...(capability === "video"
+                  ? { video_model: modelId, i2v_model: modelId }
+                  : {}),
+              }));
+            }}
+            onSecretChange={(field, value) => {
+              setSecretReplacements((current) => ({ ...current, [field]: value }));
+            }}
+          />
+          <div className="flex justify-end pt-5">
             <button
               type="button"
               onClick={handleSaveApiConfig}
@@ -865,7 +744,7 @@ export default function SettingsPage() {
               {saving ? t("saving") : t("saveConfig")}
             </button>
           </div>
-        </div>
+        </>
       )}
     </Section>
   );

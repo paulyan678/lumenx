@@ -1,122 +1,108 @@
 family: seedance
-display_name: "Seedance (即梦)"
-provider: mulerouter
+display_name: "Seedance"
+provider: newapi
 routing_prefixes:
-  - seedance-2.0-
-  - seedance/seedance-
+  - doubao-seedance-
 supported_backends:
-  - mulerouter
-default_backend: mulerouter
+  - newapi
+default_backend: newapi
 credential_sources:
-  mulerouter:
-    - MULEROUTER_API_KEY
+  newapi:
+    - NEWAPI_SEEDANCE_2_API_KEY
+    - NEWAPI_SEEDANCE_2_FAST_API_KEY
+    - NEWAPI_SEEDANCE_2_MINI_API_KEY
 supported_modalities:
   - t2v
   - i2v
-  - r2v
 docs:
   official_snapshot_ids:
-    - mulerouter/seedance-2.0/2026-06-03
+    - newapi/seedance-2.0/2026-07-18
 transport:
   image_input_mode:
-    mulerouter: mulerouter_base64_image
+    newapi: newapi_image_url_or_data
   audio_input_mode:
-    mulerouter: mulerouter_audio_url
+    newapi: unsupported
   reference_video_input_mode:
-    mulerouter: mulerouter_video_url
+    newapi: unsupported
 models:
-  - id: seedance/seedance-2.0-video
+  - id: doubao-seedance-2-0-260128
     display_name: Seedance 2.0
-    description: ByteDance Seedance 2.0 video generation via MuleRouter
+    description: Seedance 2.0 through New API for text-to-video and single-image image-to-video
     status: active
     release_stage: stable
+    capabilities: [t2v, i2v]
+    credential_sources:
+      newapi: [NEWAPI_SEEDANCE_2_API_KEY]
     docs:
-      context_hub_doc_ids:
-        - mulerouter/seedance-2.0
+      context_hub_doc_ids: [newapi/seedance-2.0]
     runtime:
-      mulerouter:
-        gateway: mulerouter
-    modes:
-      t2v:
-        legacy_id: seedance-2.0-t2v
-        display_name: Seedance 2.0 T2V
-        description: Text-to-video generation
-        capabilities: [t2v]
-        ui:
-          selection_group: t2v
-          visible_in: [project_settings, series_settings, video_sidebar, global_settings]
-          order: 85
-          badges: [new]
-        duration:
-          type: slider
-          min: 4
-          max: 15
-          step: 1
-          default: 5
-        params:
-          resolution:
-            options: [720p, 1080p]
-            default: 1080p
-          seed: true
-          negativePrompt: false
-          promptExtend: false
-          watermark: true
-      i2v:
-        legacy_id: seedance-2.0-i2v
-        display_name: Seedance 2.0 I2V
-        description: Image-to-video generation
-        capabilities: [i2v]
-        ui:
-          selection_group: i2v
-          visible_in: [project_settings, series_settings, video_sidebar, global_settings]
-          order: 90
-          badges: [new]
-        duration:
-          type: slider
-          min: 4
-          max: 15
-          step: 1
-          default: 5
-        params:
-          resolution:
-            options: [720p, 1080p]
-            default: 1080p
-          seed: true
-          negativePrompt: false
-          promptExtend: false
-          watermark: true
-        inputs:
-          reference_images:
-            max: 1
-            reference_type: image
-      r2v:
-        legacy_id: seedance-2.0-r2v
-        display_name: Seedance 2.0 R2V
-        description: Reference-to-video with multi-image input
-        capabilities: [r2v]
-        ui:
-          selection_group: r2v
-          visible_in: [project_settings, series_settings, video_sidebar, global_settings]
-          order: 80
-          badges: [new]
-        duration:
-          type: slider
-          min: 4
-          max: 15
-          step: 1
-          default: 5
-        params:
-          resolution:
-            options: [720p, 1080p]
-            default: 1080p
-          seed: true
-          negativePrompt: false
-          promptExtend: false
-          watermark: true
-        docs:
-          context_hub_doc_ids:
-            - mulerouter/seedance-2.0
-        inputs:
-          reference_images:
-            max: 9
-            reference_type: image
+      newapi:
+        gateway: newapi
+    ui:
+      selection_group: video
+      visible_in: [project_settings, series_settings, video_sidebar, global_settings]
+      order: 90
+    duration: &seedance_duration
+      type: slider
+      min: 4
+      max: 15
+      step: 1
+      default: 5
+    params: &seedance_params
+      resolution:
+        options: [720p, 1080p]
+        default: 1080p
+      ratio:
+        options: ["16:9", "9:16", "1:1"]
+        default: "16:9"
+      seed: true
+      negativePrompt: false
+      promptExtend: false
+      watermark: true
+    inputs: &single_image_input
+      reference_images:
+        max: 1
+        reference_type: image
+
+  - id: doubao-seedance-2-0-fast-260128
+    display_name: Seedance 2.0 Fast
+    description: Faster Seedance 2.0 generation through New API for text-to-video and single-image image-to-video
+    status: active
+    release_stage: stable
+    capabilities: [t2v, i2v]
+    credential_sources:
+      newapi: [NEWAPI_SEEDANCE_2_FAST_API_KEY]
+    docs:
+      context_hub_doc_ids: [newapi/seedance-2.0]
+    runtime:
+      newapi:
+        gateway: newapi
+    ui:
+      selection_group: video
+      visible_in: [project_settings, series_settings, video_sidebar, global_settings]
+      order: 100
+      recommended: true
+    duration: *seedance_duration
+    params: *seedance_params
+    inputs: *single_image_input
+
+  - id: doubao-seedance-2-0-mini-260615
+    display_name: Seedance 2.0 Mini
+    description: Cost-efficient Seedance 2.0 generation through New API for text-to-video and single-image image-to-video
+    status: active
+    release_stage: stable
+    capabilities: [t2v, i2v]
+    credential_sources:
+      newapi: [NEWAPI_SEEDANCE_2_MINI_API_KEY]
+    docs:
+      context_hub_doc_ids: [newapi/seedance-2.0]
+    runtime:
+      newapi:
+        gateway: newapi
+    ui:
+      selection_group: video
+      visible_in: [project_settings, series_settings, video_sidebar, global_settings]
+      order: 80
+    duration: *seedance_duration
+    params: *seedance_params
+    inputs: *single_image_input

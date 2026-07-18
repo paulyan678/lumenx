@@ -1,191 +1,123 @@
-# Lumen-X 用户手册
+# LumenX 用户手册
 
-> 作者：星莲(StarLotus，张钧贺)
+## 快速开始
 
-## 📋 目录
+1. 启动 LumenX。
+2. 打开“设置”。
+3. 在“New API 模型管理”中填写 `NEWAPI_BASE_URL`。
+4. 为计划使用的每个模型填写它自己的 API Key，然后保存。
+5. 分别选择活动的聊天、图像和视频模型。
 
-1. [快速开始](#-快速开始)
-2. [API 密钥配置](#-api-密钥配置)
-3. [OSS 存储配置（可选）](#-oss-存储配置可选)
-4. [日志查看](#-日志查看)
-5. [常见问题](#-常见问题)
+开发环境也可以从项目根目录的示例文件开始：
 
----
+```bash
+cp .env.example .env
+chmod 600 .env
+```
 
-## 🚀 快速开始
+`.env` 已被 Git 忽略。不要把真实密钥提交到仓库、截图、日志或问题报告中。
 
-### 首次启动（仅限应用打包方式）
+## New API 配置
 
-1. **双击应用图标**启动 Lumen-X
-2. 应用会自动打开**设置页面**
-3. 按照提示完成 **API 密钥配置**
+New API 是 LumenX 唯一的 AI Provider。所有模型共用一个网关地址，但每个模型使用独立凭证。
 
-### 应用数据目录
+| 能力 | 模型 ID | 专用密钥字段 |
+|---|---|---|
+| 图像 | `gpt-image-2` | `NEWAPI_GPT_IMAGE_2_API_KEY` |
+| 视频 | `doubao-seedance-2-0-260128` | `NEWAPI_SEEDANCE_2_API_KEY` |
+| 视频 | `doubao-seedance-2-0-fast-260128` | `NEWAPI_SEEDANCE_2_FAST_API_KEY` |
+| 视频 | `doubao-seedance-2-0-mini-260615` | `NEWAPI_SEEDANCE_2_MINI_API_KEY` |
+| 聊天 | `deepseek-v4-flash` | `NEWAPI_DEEPSEEK_V4_FLASH_API_KEY` |
+| 聊天 | `qwen3.7-max` | `NEWAPI_QWEN_37_MAX_API_KEY` |
+| 聊天 | `deepseek-v4-pro` | `NEWAPI_DEEPSEEK_V4_PRO_API_KEY` |
 
-所有用户数据存储在以下位置：
+共享字段：
+
+- `NEWAPI_BASE_URL`：New API 网关根地址，通常以 `/v1` 结尾。
+
+保存后，设置页面只会显示遮罩值，不会从后端取回完整密钥。请求会严格使用“所选模型 ID + 该模型专用密钥”。所选模型缺少密钥时，LumenX 会在提交前显示错误；不会改用其他模型、其他密钥或其他 Provider。
+
+## 模型选择
+
+聊天、图像和视频的活动模型相互独立，并在保存后保持选择，页面重载或应用重启不会重置。
+
+默认值：
+
+- 聊天：`deepseek-v4-flash`
+- 图像：`gpt-image-2`
+- 视频：`doubao-seedance-2-0-fast-260128`
+
+选择器只显示对应类别的模型：
+
+- 聊天选择器：三个聊天模型。
+- 图像选择器：仅 `gpt-image-2`。
+- 视频选择器：三个 Seedance 模型。
+
+设置页与相关生成页面会标出当前活动模型。切换聊天或视频模型后无需重启应用。
+
+## 支持的生成流程
+
+| 流程 | 可用模型 |
+|---|---|
+| 文生图 | `gpt-image-2` |
+| 图像编辑 | `gpt-image-2` |
+| 文生视频 | 三个 Seedance 模型 |
+| 单图图生视频 | 三个 Seedance 模型 |
+
+当前 New API 请求协议只实现单参考图的图生视频。界面不提供多参考图的参考生视频流程，也不会把任何 Seedance 模型描述成支持该流程。
+
+## 本地数据与可选 OSS
+
+用户数据默认存储在：
 
 | 系统 | 路径 |
-|------|------|
+|---|---|
 | macOS / Linux | `~/.lumen-x/` |
 | Windows | `C:\Users\<用户名>\.lumen-x\` |
 
----
+生成素材本地优先保存到 `output/`。OSS 是可选的媒体镜像和签名 URL 服务，与 AI Provider 或模型路由无关。需要时可配置：
 
-## 🔑 API 密钥配置
+- `ALIBABA_CLOUD_ACCESS_KEY_ID`
+- `ALIBABA_CLOUD_ACCESS_KEY_SECRET`
+- `OSS_BUCKET_NAME`
+- `OSS_ENDPOINT`
+- `OSS_BASE_PATH`
 
-LumenX 使用阿里云灵积平台(DashScope)提供 AI 能力。
+## 日志与故障排查
 
-### 获取 API Key
-
-1. 访问 [阿里云灵积平台](https://dashscope.aliyun.com/)
-2. 登录您的阿里云账号（没有账号请先注册）
-3. 进入 **控制台** → **API-KEY 管理**
-4. 点击 **创建新的 API-KEY**
-5. 复制生成的 API Key
-
-### 在应用中配置
-
-1. 启动 LumenX
-2. 点击左上角 **设置图标** ⚙️
-3. 找到 **DASHSCOPE_API_KEY** 输入框
-4. 粘贴您的 API Key
-5. 点击 **保存**
-
-> ⚠️ **重要**：请妥善保管您的 API Key，不要泄露给他人。
-
----
-
-## 🧩 运行模式说明（含必填项）
-
-LumenX 的媒体存储是 **本地优先**：
-
-- 所有素材先落盘到 `output/`；
-- OSS 仅在你配置后作为“可选镜像 + 签名 URL”使用；
-- Kling/Vidu 默认跟随 DashScope，可按需切到原厂。
-
-### 模式 1：DashScope-only（推荐起步）
-
-- 适用：不配置 OSS，不走 Kling/Vidu 原厂。
-- 必填：
-  - `DASHSCOPE_API_KEY`
-
-### 模式 2：DashScope + OSS（可选增强）
-
-- 适用：希望保留本地文件，同时在 OSS 做镜像和 URL 服务。
-- 必填：
-  - `DASHSCOPE_API_KEY`
-  - `ALIBABA_CLOUD_ACCESS_KEY_ID`
-  - `ALIBABA_CLOUD_ACCESS_KEY_SECRET`
-  - `OSS_BUCKET_NAME`
-  - `OSS_ENDPOINT`
-- 可选：
-  - `OSS_BASE_PATH`
-
-### 模式 3：DashScope-first + Kling 原厂
-
-- 适用：仅 Kling 走原厂，其它继续走 DashScope。
-- 必填：
-  - `DASHSCOPE_API_KEY`
-  - `KLING_PROVIDER_MODE=vendor`
-  - `KLING_ACCESS_KEY`
-  - `KLING_SECRET_KEY`
-
-### 模式 4：DashScope-first + Vidu 原厂
-
-- 适用：仅 Vidu 走原厂，其它继续走 DashScope。
-- 必填：
-  - `DASHSCOPE_API_KEY`
-  - `VIDU_PROVIDER_MODE=vendor`
-  - `VIDU_API_KEY`
-
-> 提示：是否配置 OSS 与是否选择 Kling/Vidu 原厂是两个独立开关，可组合使用。
-
----
-
-## ☁️ OSS 存储配置（可选）
-
-OSS 配置用于云端存储生成的资产，适合团队协作或跨设备使用。
-
-### 获取 OSS 配置信息
-
-1. 访问 [阿里云 OSS 控制台](https://oss.console.aliyun.com/)
-2. 创建或选择一个 **Bucket**
-3. 记录以下信息：
-   - **Bucket 名称**
-   - **Endpoint**（如 `oss-cn-beijing.aliyuncs.com`）
-4. 在 **RAM 访问控制** 中创建 AccessKey
-
-### 在应用中配置
-
-在设置页面填写以下字段：
-
-| 字段 | 说明 | 示例 |
-|------|------|------|
-| ALIBABA_CLOUD_ACCESS_KEY_ID | AccessKey ID | `LTAI5t...` |
-| ALIBABA_CLOUD_ACCESS_KEY_SECRET | AccessKey Secret | `xxxxxx...` |
-| OSS_BUCKET_NAME | Bucket 名称 | `my-lumenx-bucket` |
-| OSS_ENDPOINT | OSS 地域节点 | `oss-cn-beijing.aliyuncs.com` |
-| OSS_BASE_PATH | 存储路径前缀 | `lumenx` |
-
----
-
-## 📋 日志查看
-
-当遇到问题时，日志文件可帮助排查原因。
-
-### 日志文件位置
+日志位置：
 
 | 系统 | 路径 |
-|------|------|
+|---|---|
 | macOS / Linux | `~/.lumen-x/logs/app.log` |
 | Windows | `C:\Users\<用户名>\.lumen-x\logs\app.log` |
 
-### 打开日志目录
+生成失败时依次检查：
 
-**macOS**：
-1. 打开 Finder
-2. 按 `Cmd + Shift + G`
-3. 输入 `~/.lumen-x/logs` 并回车
+1. 所选模型是否已启用并配置了它自己的密钥。
+2. `NEWAPI_BASE_URL` 是否正确且网络可访问。
+3. 模型 ID 是否与 New API 控制台中的精确 ID 一致。
+4. 账户余额、配额和模型权限是否正常。
+5. 日志中的请求 ID 和已遮罩错误信息。
 
-**Windows**：
-1. 打开资源管理器
-2. 在地址栏输入 `%USERPROFILE%\.lumen-x\logs`
-3. 按回车
+提交问题报告前，请删除日志中的个人数据、媒体地址和任何可能的凭证。不要提供 `.env` 或完整 API Key。
 
-### 如何提交问题报告
+## 常见问题
 
-如需技术支持，请提供：
-1. **app.log** 文件（或其中的错误部分）
-2. 操作步骤描述
+### 为什么一个模型一个密钥？
 
----
+这样可以确保模型与凭证严格匹配，避免错误计费或把一个模型的权限用于另一个模型。
 
-## ❓ 常见问题
+### 可以只配置正在使用的模型吗？
 
-### Q: 为什么需要配置 API Key？
+可以。未配置密钥的模型仍可在设置中看到其未配置状态，但选择它后提交请求会被明确拒绝。
 
-A: LumenX 使用阿里云灵积平台的 AI 模型进行图像和视频生成。API Key 用于验证您的身份并计费。
+### 为什么没有参考生视频选择器？
 
-### Q: OSS 配置失败怎么办？
+当前实现没有经过验证的多参考图 New API 请求合同，因此只提供文生视频和单图图生视频。
 
-请检查：
-1. AccessKey ID 和 Secret 是否正确
-2. Bucket 名称是否存在
-3. Endpoint 格式是否正确（不需要 `https://` 前缀）
-4. RAM 权限是否包含 OSS 读写权限
+### 如何清理界面缓存？
 
-### Q: 生成失败如何排查？
+退出应用后删除 `~/.lumen-x/` 下的 `webview_storage` 目录，再重新启动。密钥配置与项目数据应先按需备份。
 
-1. 查看日志文件中的错误信息
-2. 检查 API Key 是否过期或余额不足
-3. 确认网络连接正常
-
-### Q: 如何清理缓存？
-
-删除 `~/.lumen-x/` 目录下的 `webview_storage` 文件夹，然后重启应用。
-
----
-
-## 📞 获取帮助
-
-如有问题，请联系本项目开发者 星莲（StarLotus，张钧贺） 或查看项目 README 文档。
+更多信息见 [README](README.md) 与 [New API 合同](docs/api-reference/newapi.md)。

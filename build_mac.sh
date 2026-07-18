@@ -116,6 +116,7 @@ pyinstaller --clean --noconfirm \
     $ICON_PARAM \
     --add-data "static:static" \
     --add-data "src:src" \
+    --add-data "config/model_catalog/generated/model_catalog.json:config/model_catalog/generated" \
     --add-binary "bin/ffmpeg:." \
     --hidden-import=src \
     --hidden-import=src.apps \
@@ -136,11 +137,12 @@ pyinstaller --clean --noconfirm \
     --hidden-import=starlette.staticfiles \
     --hidden-import=fastapi \
     --hidden-import=pydantic \
-    --hidden-import=dashscope \
+    --hidden-import=openai \
     --hidden-import=oss2 \
-    --hidden-import=alibabacloud_videoenhan20200320 \
-    --hidden-import=alibabacloud_tea_openapi \
-    --hidden-import=alibabacloud_tea_util \
+    --hidden-import=demucs \
+    --hidden-import=demucs.pretrained \
+    --hidden-import=demucs.separate \
+    --hidden-import=soundfile \
     --hidden-import=yaml \
     --hidden-import=dotenv \
     --hidden-import=httptools \
@@ -151,6 +153,7 @@ pyinstaller --clean --noconfirm \
     --collect-all fastapi \
     --collect-all starlette \
     --collect-all pydantic \
+    --collect-all demucs \
     main.py
 
 # 复制打包结果到项目根目录

@@ -363,7 +363,7 @@ function EpisodeContentPanel({
             </h2>
           </div>
           <p className="text-xs text-text-secondary">
-            {episode.workflow_mode === "r2v" ? "R2V" : "I2V Legacy"} · {t("frameCount", { count: frames.length })}
+            New API I2V · {t("frameCount", { count: frames.length })}
           </p>
         </div>
         <motion.button

@@ -42,9 +42,9 @@ LumenX currently includes two core modules:
 
 - **Deep Script Analysis** — LLM auto-extracts characters/scenes/props, generates structured storyboards
 - **Art Direction Control** — Custom visual styles with global consistency
-- **Multi-model Asset Generation** — Character turnarounds, scene establishing shots, prop references
-- **AI Video Generation** — I2V / R2V multi-mode video generation + batch candidates
-- **Smart Dubbing** — CosyVoice / Qwen3-TTS multi-voice dialogue synthesis
+- **New API Asset Generation** — Character turnarounds, scene establishing shots, prop references
+- **AI Video Generation** — Seedance text-to-video and single-image image-to-video + batch candidates
+- **Audio Production** — Local Demucs separation and FFmpeg-based final assembly
 - **One-click Export** — Timeline editing + FFmpeg merging
 
 </td>
@@ -52,8 +52,8 @@ LumenX currently includes two core modules:
 
 ### 🎨 Playground — Standalone Generation Workbench
 
-- **6 Generation Modes** — Image, Text-to-Video, Image-to-Video, Reference-to-Video, Video Editing
-- **10+ AI Models** — GPT-Image-2, Wan 2.7, Seedance 2.0, Kling V3, Vidu Q3, HappyHorse, etc.
+- **4 Supported Workflows** — Text-to-image, image editing, text-to-video, and image-to-video
+- **7 Approved Models** — GPT Image 2, three Seedance variants, and three chat models
 - **Dynamic Parameters** — Per-model parameter configuration (size/resolution/duration/quality)
 - **Concurrent Tasks** — Multiple tasks execute simultaneously with real-time status tracking
 - **Prompt Templates** — Save/reuse/favorite/history
@@ -81,11 +81,7 @@ LumenX currently includes two core modules:
 ## 📸 Screenshots
 
 <div align="center">
-
-| Studio Storyboard | Playground |
-|:---:|:---:|
-| <img src="docs/images/studio-storyboard.jpg" alt="Studio" width="100%" /> | <img src="docs/images/playground-overview.jpg" alt="Playground" width="100%" /> |
-
+  <img src="docs/images/playground-overview.jpg" alt="Playground" width="90%" />
 </div>
 
 ---
@@ -94,16 +90,13 @@ LumenX currently includes two core modules:
 
 | Provider | Models | Capabilities |
 |----------|--------|--------------|
-| **DashScope** | Wan 2.7 Image/Video, Qwen Image 2.0, HappyHorse 1.0 | T2I, I2I, I2V, R2V, T2V, V2V |
-| **DashScope** | Kling V3 | I2V, R2V |
-| **DashScope** | Vidu Q3 Pro / Turbo | I2V, R2V |
-| **DashScope** | PixVerse V6 / C1 | I2V, R2V |
-| **MuleRun** | Seedance 2.0 | T2V, I2V, R2V |
-| **MuleRun** | GPT-Image-2 | T2I, I2I (up to 4K) |
-| **Kling Direct** | Kling V3 | I2V, R2V |
-| **Vidu Direct** | Vidu Q3 Pro / Turbo | I2V, R2V |
-| **DashScope** | CosyVoice, Qwen3-TTS | TTS Dubbing |
-| **DashScope** | Qwen 3.7 Plus | Script Analysis, Prompt Polish |
+| **New API** | `gpt-image-2` | T2I, image editing |
+| **New API** | `doubao-seedance-2-0-260128` | T2V, single-image I2V |
+| **New API** | `doubao-seedance-2-0-fast-260128` | T2V, single-image I2V |
+| **New API** | `doubao-seedance-2-0-mini-260615` | T2V, single-image I2V |
+| **New API** | `deepseek-v4-flash`, `qwen3.7-max`, `deepseek-v4-pro` | Script analysis, prompt refinement, chat |
+
+Reference-to-video is not advertised because the implemented New API contract does not support multi-reference input.
 
 ---
 
@@ -124,7 +117,8 @@ cd lumenx
 
 # Configure API Key
 cp .env.example .env
-# Edit .env, fill in DASHSCOPE_API_KEY (required)
+chmod 600 .env
+# Edit .env, set NEWAPI_BASE_URL and the key for each model you plan to use
 
 # Start (backend on 17177 + frontend on 3008, auto-opens browser)
 npm run dev
@@ -149,17 +143,18 @@ cd frontend && npm install && npm run dev  # http://localhost:3008
 
 ---
 
-## ⚙️ Configuration Modes
+## ⚙️ New API Configuration
 
-LumenX uses a **local-first** architecture. The minimal setup requires only one API key.
+LumenX uses a **local-first** architecture and New API is its only AI provider. Every model has a dedicated key; a request is rejected if the selected model's key is missing.
 
-| Mode | Required | Available Capabilities |
-|------|----------|----------------------|
-| **Basic** | `DASHSCOPE_API_KEY` | Wan/Qwen/HappyHorse/PixVerse/Kling(proxy)/Vidu(proxy) + TTS |
-| **+ MuleRun** | + `mulerun login` or `MULEROUTER_API_KEY` | + Seedance 2.0 + GPT-Image-2 |
-| **+ Kling Direct** | + `KLING_ACCESS_KEY` + `KLING_SECRET_KEY` | Kling direct connection |
-| **+ Vidu Direct** | + `VIDU_API_KEY` | Vidu direct connection |
-| **+ OSS** | + Alibaba Cloud OSS credentials | Cloud media mirror + signed URLs |
+| Configuration | Purpose |
+|---------------|---------|
+| `NEWAPI_BASE_URL` | Shared HTTPS gateway root ending in `/v1` |
+| `NEWAPI_*_API_KEY` | Dedicated credential for one exact approved model |
+| `NEWAPI_CHAT_MODEL` | Active chat model; default `deepseek-v4-flash` |
+| `NEWAPI_IMAGE_MODEL` | Active image model; default `gpt-image-2` |
+| `NEWAPI_VIDEO_MODEL` | Active video model; default `doubao-seedance-2-0-fast-260128` |
+| Optional OSS fields | Cloud media mirror + signed URLs; unrelated to AI routing |
 
 <details>
 <summary>Detailed Configuration</summary>
@@ -168,9 +163,7 @@ All settings can be configured via:
 - **Development**: `.env` file in project root
 - **In-app Settings**: Settings page (saves to `~/.lumen-x/config.json`)
 
-MuleRun supports two authentication methods:
-1. **CLI mode** (recommended): `npm i -g @mulerunai/cli && mulerun login`
-2. **API Key mode**: Enter `muk-...` format key in Settings page
+Saved keys stay masked in the application. LumenX never sends one model's key with another model ID and never falls back to another provider or model.
 
 </details>
 
@@ -178,9 +171,7 @@ MuleRun supports two authentication methods:
 
 ## 🏗️ Architecture
 
-<div align="center">
-  <img src="docs/images/architecture-cybr.png" alt="LumenX System Architecture" width="90%" />
-</div>
+The Next.js frontend calls a FastAPI backend that uses New API as its sole AI provider. The backend resolves the selected exact model ID together with its model-specific key. Optional OSS storage handles media only and is not part of AI routing.
 
 ### Directory Structure
 
@@ -194,8 +185,8 @@ lumenx/
 ├── src/
 │   ├── apps/comic_gen/        # Studio backend (API + Pipeline)
 │   ├── apps/playground/       # Playground backend (API + Service)
-│   ├── models/                # AI model adapters (Wanx/Kling/Vidu/MuleRouter)
-│   └── audio/                 # TTS voice synthesis
+│   ├── models/                # New API image/video adapters
+│   └── audio/                 # Local audio processing utilities
 ├── config/model_catalog/      # Model catalog (YAML → JSON)
 └── output/                    # Generated outputs (local storage)
 ```
@@ -209,8 +200,7 @@ lumenx/
 | [User Manual](USER_MANUAL.md) | Feature usage guide |
 | [API Docs](http://localhost:17177/docs) | Swagger UI |
 | [Model Onboarding](docs/model-onboarding-implementation.md) | New model integration guide |
-| [Catalog Architecture](docs/plans/2026-04-03-model-docs-and-catalog-architecture.md) | Model catalog design |
-| [Playground PRD](docs/plans/2026-06-06-playground-standalone-generation-prd.md) | Playground design document |
+| [New API Contract](docs/api-reference/newapi.md) | Supported models, credentials, and capabilities |
 
 ---
 

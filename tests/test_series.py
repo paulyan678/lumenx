@@ -26,7 +26,6 @@ def pipeline(tmp_path):
          patch("src.apps.comic_gen.pipeline.AssetGenerator"), \
          patch("src.apps.comic_gen.pipeline.StoryboardGenerator"), \
          patch("src.apps.comic_gen.pipeline.VideoGenerator"), \
-         patch("src.apps.comic_gen.pipeline.AudioGenerator"), \
          patch("src.apps.comic_gen.pipeline.ExportManager"):
         p = ComicGenPipeline()
     p.data_file = str(tmp_path / "projects.json")

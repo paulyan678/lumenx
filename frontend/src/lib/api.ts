@@ -1,5 +1,5 @@
 import axios from "axios";
-import { DEFAULT_I2V_MODEL_ID } from "@/lib/modelCatalog";
+import type { NewApiSecretField } from "@/lib/newApiModels";
 
 // Dynamic API URL detection (no port enumeration):
 // 1. Explicit override: NEXT_PUBLIC_API_URL (any env / proxy setup).
@@ -35,64 +35,52 @@ const getApiUrl = (): string => {
 
 export const API_URL = getApiUrl();
 
-export type ProviderMode = "dashscope" | "vendor";
-
-/**
- * PR-3g #3 · TTS voice metadata returned by GET /voices.
- * Family-aware fields (family/dialect/lang_primary/supports_instruction)
- * power the Voice picker modal's tabbed UI (Q15.5 B):
- *   Tab 1 系统音色 → origin === "system"
- *   Tab 2 我的复刻 → origin === "clone"   (PR-3h)
- *   Tab 3 我的设计 → origin === "design"  (PR-3i)
- * Inside Tab 1, group by family (cosyvoice / qwen3) + dialect markers.
- */
-export interface VoiceMeta {
-    id: string;
-    name: string;
-    gender: "Male" | "Female" | "Neutral" | "Unknown";
-    model: string;                                            // backend model id (cosyvoice-v3-flash / qwen3-tts-flash / ...)
-    family: "cosyvoice" | "qwen3";
-    supports_instruction: boolean;
-    dialect?: string | null;                                  // 'shanghai' | 'beijing' | 'sichuan' | 'cantonese' | etc.
-    lang_primary?: string | null;                             // 'es' | 'ru' | 'it' | 'ko' | 'ja' | 'de' | 'fr' for international
-    origin: "system" | "clone" | "design";
-}
-
-/**
- * PR-3h · Custom voice entry from series.custom_voices[].
- * Returned by GET /series/{id}/custom_voices and POST /voice/clone (single).
- * Picker tabs 2/3 render these alongside the system catalog.
- */
-export interface CustomVoice {
-    id: string;                            // dashscope voice_id
-    label: string;                         // user-given display name
-    origin: "clone" | "design";
-    target_model: string;                  // e.g. "cosyvoice-v3.5-plus"
-    family: "cosyvoice" | "qwen3";
-    created_at: number;
-    source_audio_url?: string | null;      // clone-specific
-    voice_prompt?: string | null;          // design-specific (PR-3i)
+export interface NewApiModelConfigPayload {
+    model_id: string;
+    display_name: string;
+    capability: "chat" | "image" | "video";
+    api_key_field: NewApiSecretField;
+    configured: boolean;
+    active: boolean;
+    supported_modes: string[];
 }
 
 export interface EnvConfigPayload {
-    DASHSCOPE_API_KEY?: string;
+    NEWAPI_BASE_URL?: string;
+    NEWAPI_CHAT_MODEL?: string;
+    NEWAPI_IMAGE_MODEL?: string;
+    NEWAPI_VIDEO_MODEL?: string;
+    NEWAPI_GPT_IMAGE_2_API_KEY?: string;
+    NEWAPI_SEEDANCE_2_API_KEY?: string;
+    NEWAPI_SEEDANCE_2_FAST_API_KEY?: string;
+    NEWAPI_SEEDANCE_2_MINI_API_KEY?: string;
+    NEWAPI_DEEPSEEK_V4_FLASH_API_KEY?: string;
+    NEWAPI_QWEN_37_MAX_API_KEY?: string;
+    NEWAPI_DEEPSEEK_V4_PRO_API_KEY?: string;
     ALIBABA_CLOUD_ACCESS_KEY_ID?: string;
     ALIBABA_CLOUD_ACCESS_KEY_SECRET?: string;
     OSS_BUCKET_NAME?: string;
     OSS_ENDPOINT?: string;
     OSS_BASE_PATH?: string;
     OSS_ENABLE?: boolean;
-    KLING_PROVIDER_MODE?: ProviderMode;
-    VIDU_PROVIDER_MODE?: ProviderMode;
-    PIXVERSE_PROVIDER_MODE?: ProviderMode;
-    KLING_ACCESS_KEY?: string;
-    KLING_SECRET_KEY?: string;
-    VIDU_API_KEY?: string;
-    endpoint_overrides?: Record<string, string>;
     // Secrets from GET are masked (bullets + last 4 chars). This map reports
     // which credential fields are actually configured on the backend.
-    secrets_configured?: Record<string, boolean>;
-    [key: string]: string | Record<string, string> | Record<string, boolean> | boolean | undefined;
+    secrets_configured?: Partial<Record<NewApiSecretField | "ALIBABA_CLOUD_ACCESS_KEY_ID" | "ALIBABA_CLOUD_ACCESS_KEY_SECRET", boolean>>;
+    NEWAPI_MODELS?: NewApiModelConfigPayload[];
+    [key: string]: string | Record<string, string> | Record<string, boolean> | NewApiModelConfigPayload[] | boolean | undefined;
+}
+
+export interface ModelSettingsPayload {
+    chat_model?: string;
+    image_model?: string;
+    video_model?: string;
+    t2i_model?: string;
+    i2i_model?: string;
+    i2v_model?: string;
+    character_aspect_ratio?: string;
+    scene_aspect_ratio?: string;
+    prop_aspect_ratio?: string;
+    storyboard_aspect_ratio?: string;
 }
 
 // R2V v2 Phase 4 — Cross-episode reconcile types
@@ -128,15 +116,10 @@ export interface VideoTask {
     seed?: number;
     resolution: string;
     generate_audio: boolean;
-    audio_url?: string;
-    prompt_extend: boolean;
-    negative_prompt?: string;
     created_at: number;
     model?: string;
     frame_id?: string;
-    generation_mode?: string;
-    reference_video_urls?: string[];
-    reference_image_urls?: string[];
+    generation_mode?: "t2v" | "i2v";
     ratio?: string;
     /** Failure reason set by pipeline / cancel / orphan recovery. */
     error?: string | null;
@@ -146,18 +129,30 @@ export interface VideoTask {
     is_starred?: boolean;
     /** User-attached short free-text note (≤20 chars, server-truncated). */
     label?: string | null;
-    /** Source tab in the Storyboard R2V workbench. Pre-Phase-2 records
+    /** Source tab in the storyboard workbench. Older records
      *  parse with null/undefined; CandidatesSection falls back to
      *  generation_mode to bucket them in that case. */
-    workbench_tab?: "t2i_i2v" | "direct_r2v" | null;
-    /** Provider-side identifiers (Issue 17). Used by TaskQueuePanel to let
-     *  users copy IDs into the provider's console (Bailian / 百炼 etc.) for
-     *  diagnosis. Different platforms use different naming — these are
-     *  normalized canonical fields. provider_request_id may be absent for
-     *  platforms that don't expose one (Vidu / PixVerse). */
+    workbench_tab?: "t2i_i2v" | null;
+    /** New API provider-side identifiers used by TaskQueuePanel diagnostics. */
     provider_name?: string | null;
     provider_task_id?: string | null;
     provider_request_id?: string | null;
+}
+
+export interface CreateVideoTaskPayload {
+    image_url?: string | null;
+    prompt: string;
+    frame_id?: string | null;
+    duration?: number;
+    seed?: number | null;
+    resolution?: string;
+    generate_audio?: boolean;
+    batch_size?: number;
+    model?: string | null;
+    generation_mode?: "t2v" | "i2v";
+    ratio?: string | null;
+    watermark?: boolean | null;
+    workbench_tab?: "t2i_i2v" | null;
 }
 
 // ─── Storyboard Schema v2 types ─────────────────────────────────────────────
@@ -211,7 +206,7 @@ export interface RefineSSEEvent {
 }
 
 export const api = {
-    createProject: async (title: string, text: string, skipAnalysis: boolean = false, workflowMode: string = "r2v", seriesId?: string) => {
+    createProject: async (title: string, text: string, skipAnalysis: boolean = false, workflowMode: string = "i2v_legacy", seriesId?: string) => {
         const res = await axios.post(`${API_URL}/projects`, { title, text, workflow_mode: workflowMode, series_id: seriesId }, {
             params: { skip_analysis: skipAnalysis }
         });
@@ -267,71 +262,8 @@ export const api = {
         return res.data;
     },
 
-    createVideoTask: async (
-        id: string,
-        image_url: string,
-        prompt: string,
-        duration: number = 5,
-        seed?: number,
-        resolution: string = "720p",
-        generateAudio: boolean = false,
-        audioUrl?: string,
-        promptExtend: boolean = true,
-        negativePrompt?: string,
-        batchSize: number = 1,
-        model: string = DEFAULT_I2V_MODEL_ID,
-        frameId?: string,
-        shotType: string = "single",  // 'single' or 'multi' (only for wan2.6-i2v)
-        generationMode: string = "i2v",  // 'i2v' or 'r2v'
-        referenceVideoUrls: string[] = [],  // Reference videos for R2V (max 3)
-        // Kling params
-        mode?: string,
-        sound?: boolean,
-        cfgScale?: number,
-        // Vidu params
-        viduAudio?: boolean,
-        movementAmplitude?: string,
-        // HappyHorse params
-        referenceImageUrls: string[] = [],  // Reference images for HappyHorse R2V (1-9)
-        ratio?: string,  // Aspect ratio: 16:9, 9:16, 1:1, 4:3, 3:4
-        // Storyboard R2V workbench tab the user clicked Generate from.
-        // Distinct from generationMode (backend dispatcher); workbench_tab
-        // lets the candidates panel group takes per UI tab on refresh.
-        workbenchTab?: "t2i_i2v" | "direct_r2v",
-        // Watermark toggle — supported across wan / kling / vidu / pixverse /
-        // happyhorse video. undefined = leave to provider default (typically
-        // off); explicit boolean is user's Advanced-section choice.
-        watermark?: boolean
-    ) => {
-        const res = await axios.post(`${API_URL}/projects/${id}/video_tasks`, {
-            image_url,
-            prompt,
-            duration,
-            seed,
-            resolution,
-            generate_audio: generateAudio,
-            audio_url: audioUrl,
-            prompt_extend: promptExtend,
-            negative_prompt: negativePrompt,
-            batch_size: batchSize,
-            model,
-            frame_id: frameId,
-            shot_type: shotType,
-            generation_mode: generationMode,
-            reference_video_urls: referenceVideoUrls,
-            // Kling
-            mode,
-            sound: sound != null ? (sound ? "on" : "off") : undefined,
-            cfg_scale: cfgScale,
-            // Vidu
-            vidu_audio: viduAudio,
-            movement_amplitude: movementAmplitude,
-            // HappyHorse
-            reference_image_urls: referenceImageUrls,
-            ratio,
-            watermark,
-            workbench_tab: workbenchTab,
-        });
+    createVideoTask: async (id: string, payload: CreateVideoTaskPayload) => {
+        const res = await axios.post(`${API_URL}/projects/${id}/video_tasks`, payload);
         return res.data;
     },
 
@@ -357,8 +289,8 @@ export const api = {
         return res.data;
     },
 
-    /** Persist Storyboard R2V workbench state onto a frame.
-     *  Used by StoryboardR2V to write tab/T2I history/active index/
+    /** Persist storyboard I2V workbench state onto a frame.
+     *  Used by the storyboard to write T2I history/active index/
      *  batch-count whenever the user changes them. Server clamps:
      *    t2i_image_urls ≤ 10 FIFO,
      *    t2i_selected_index ∈ [0, len-1],
@@ -368,7 +300,7 @@ export const api = {
         scriptId: string,
         frameId: string,
         patch: {
-            workbench_tab_mode?: "t2i_i2v" | "direct_r2v";
+            workbench_tab_mode?: "t2i_i2v";
             t2i_image_urls?: string[];
             t2i_selected_index?: number;
             workbench_generate_count?: number;
@@ -622,29 +554,8 @@ export const api = {
         return res.data;
     },
 
-    updateModelSettings: async (
-        scriptId: string,
-        t2iModel?: string,
-        i2iModel?: string,
-        i2vModel?: string,
-        characterAspectRatio?: string,
-        sceneAspectRatio?: string,
-        propAspectRatio?: string,
-        storyboardAspectRatio?: string,
-        imageModel?: string,
-        r2vModel?: string,
-    ) => {
-        const res = await axios.post(`${API_URL}/projects/${scriptId}/model_settings`, {
-            t2i_model: t2iModel,
-            i2i_model: i2iModel,
-            i2v_model: i2vModel,
-            r2v_model: r2vModel,
-            image_model: imageModel,
-            character_aspect_ratio: characterAspectRatio,
-            scene_aspect_ratio: sceneAspectRatio,
-            prop_aspect_ratio: propAspectRatio,
-            storyboard_aspect_ratio: storyboardAspectRatio
-        });
+    updateModelSettings: async (scriptId: string, settings: ModelSettingsPayload) => {
+        const res = await axios.post(`${API_URL}/projects/${scriptId}/model_settings`, settings);
         return res.data;
     },
 
@@ -653,13 +564,13 @@ export const api = {
         return res.data;
     },
 
-    updatePromptConfig: async (scriptId: string, config: { storyboard_polish?: string; video_polish?: string; r2v_polish?: string; entity_extraction?: string; style_analysis?: string; storyboard_extraction?: string }) => {
+    updatePromptConfig: async (scriptId: string, config: { storyboard_polish?: string; video_polish?: string; polish_model?: string; entity_extraction?: string; style_analysis?: string; storyboard_extraction?: string }) => {
         const res = await axios.put(`${API_URL}/projects/${scriptId}/prompt_config`, config);
         return res.data;
     },
 
-    /** Phase-2 默认 Prompt — built-in DEFAULT text for all six prompt keys
-     *  (storyboard_polish / video_polish / r2v_polish / entity_extraction /
+    /** Built-in defaults for supported prompt keys
+     *  (storyboard_polish / video_polish / entity_extraction /
      *  style_analysis / storyboard_extraction). Settings pre-fills fields from
      *  this; on save it stores "" for any field still equal to its default
      *  (delta semantics → backend uses the built-in). */
@@ -730,10 +641,7 @@ export const api = {
     //     model_echo 是 warning（带原文），其余是 hard error。
     //
     // prevCn（#119）：迭代时传入上一次 CN 实现双语锚点；首次留空。
-    // Issue 13: image_urls + polish_model added.
-    //   image_urls: I2V — pass active first frame URL (T2I selection or
-    //     storyboard frame); R2V — pass reference image URLs. Empty/omit
-    //     for T2I-only / no-frame shots ⇒ backend falls back to text-only.
+    // image_urls passes the active I2V first frame when available.
     //   polishModel: explicit override; "" lets backend resolve from
     //     project/series PromptConfig.polish_model, then default.
     polishVideoPrompt: async (
@@ -746,26 +654,6 @@ export const api = {
     ) => {
         const res = await axios.post(`${API_URL}/video/polish_prompt`, {
             draft_prompt: draftPrompt,
-            feedback: feedback,
-            script_id: scriptId,
-            prev_cn: prevCn,
-            image_urls: imageUrls,
-            polish_model: polishModel,
-        });
-        return res.data;
-    },
-    polishR2VPrompt: async (
-        draftPrompt: string,
-        slots: { description: string }[],
-        feedback: string = "",
-        scriptId: string = "",
-        prevCn: string = "",
-        imageUrls: string[] = [],
-        polishModel: string = "",
-    ) => {
-        const res = await axios.post(`${API_URL}/video/polish_r2v_prompt`, {
-            draft_prompt: draftPrompt,
-            slots: slots,
             feedback: feedback,
             script_id: scriptId,
             prev_cn: prevCn,
@@ -866,202 +754,6 @@ export const api = {
     generateStoryboard: async (scriptId: string) => {
         const res = await axios.post(`${API_URL}/projects/${scriptId}/generate_storyboard`);
         return res.data;
-    },
-
-    getVoices: async (): Promise<VoiceMeta[]> => {
-        const response = await fetch(`${API_URL}/voices`);
-        if (!response.ok) throw new Error("Failed to fetch voices");
-        return response.json();
-    },
-
-    /**
-     * PR-3g #3 · Voice picker modal inline ▶ preview.
-     * Backend caches by md5(voice_id|text|speed|pitch|volume|instructions);
-     * first call generates, subsequent calls return cached URL instantly.
-     * Returns relative URL under /files (e.g. "cache/voice_preview/abc.mp3").
-     */
-    previewVoice: async (params: {
-        voice_id: string;
-        text: string;
-        speed?: number;
-        pitch?: number;
-        volume?: number;
-        instructions?: string;
-    }): Promise<{ url: string; cached: boolean }> => {
-        const response = await fetch(`${API_URL}/voice/preview`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                voice_id: params.voice_id,
-                text: params.text,
-                speed: params.speed ?? 1.0,
-                pitch: params.pitch ?? 1.0,
-                volume: params.volume ?? 50,
-                instructions: params.instructions ?? null,
-            }),
-        });
-        if (!response.ok) {
-            const detail = await response.text();
-            throw new Error(`Voice preview failed: ${response.status} ${detail}`);
-        }
-        return response.json();
-    },
-
-    /**
-     * PR-3h · Clone a voice from a reference audio URL.
-     * Frontend flow:
-     *   1. Upload audio file via /upload → receive URL
-     *   2. Call cloneVoice({series_id, audio_url, label}) → CustomVoice
-     *   3. Picker modal 我的复刻 tab refreshes via listCustomVoices()
-     * Audio requirements: ≤10MB, MP3/WAV/M4A, ≥16kHz, 10-20s recommended.
-     */
-    cloneVoice: async (params: {
-        series_id: string;
-        audio_url: string;
-        label: string;
-        target_model?: string;
-    }): Promise<CustomVoice> => {
-        const response = await fetch(`${API_URL}/voice/clone`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                series_id: params.series_id,
-                audio_url: params.audio_url,
-                label: params.label,
-                target_model: params.target_model ?? "cosyvoice-v3.5-plus",
-            }),
-        });
-        if (!response.ok) {
-            const detail = await response.text();
-            throw new Error(`Voice clone failed: ${response.status} ${detail}`);
-        }
-        return response.json();
-    },
-
-    /** PR-3h · List custom voices (clones + designs) on a series. */
-    listCustomVoices: async (seriesId: string): Promise<CustomVoice[]> => {
-        const response = await fetch(`${API_URL}/series/${seriesId}/custom_voices`);
-        if (!response.ok) throw new Error("Failed to list custom voices");
-        return response.json();
-    },
-
-    /** PR-3h · Remove a custom voice. Does NOT delete on dashscope side. */
-    deleteCustomVoice: async (seriesId: string, voiceId: string): Promise<{ removed: boolean }> => {
-        const response = await fetch(`${API_URL}/series/${seriesId}/custom_voices/${voiceId}`, {
-            method: "DELETE",
-        });
-        if (!response.ok) throw new Error("Failed to delete custom voice");
-        return response.json();
-    },
-
-    /**
-     * PR-3i · Voice design — mint a new voice from a text prompt + return preview.
-     * Iterative: re-call with tweaked voice_prompt; only persist via designVoiceAccept.
-     */
-    designVoicePreview: async (params: {
-        voice_prompt: string;
-        preview_text?: string;
-        target_model?: string;
-    }): Promise<{ voice_id: string; preview_url: string; target_model: string }> => {
-        const response = await fetch(`${API_URL}/voice/design/preview`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                voice_prompt: params.voice_prompt,
-                preview_text: params.preview_text ?? "你好，这是一段音色测试。请仔细听一听是否符合预期。",
-                target_model: params.target_model ?? "cosyvoice-v3.5-plus",
-            }),
-        });
-        if (!response.ok) {
-            const detail = await response.text();
-            throw new Error(`Voice design preview failed: ${response.status} ${detail}`);
-        }
-        return response.json();
-    },
-
-    /** PR-3i · Commit a previewed design voice to series.custom_voices[]. */
-    designVoiceAccept: async (params: {
-        series_id: string;
-        voice_id: string;
-        voice_prompt: string;
-        label: string;
-        target_model?: string;
-    }): Promise<CustomVoice> => {
-        const response = await fetch(`${API_URL}/voice/design/accept`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                series_id: params.series_id,
-                voice_id: params.voice_id,
-                voice_prompt: params.voice_prompt,
-                label: params.label,
-                target_model: params.target_model ?? "cosyvoice-v3.5-plus",
-            }),
-        });
-        if (!response.ok) {
-            const detail = await response.text();
-            throw new Error(`Voice design accept failed: ${response.status} ${detail}`);
-        }
-        return response.json();
-    },
-
-    /** PR-3i · LLM helper — translate character.description → CosyVoice voice_prompt. */
-    translateVoicePrompt: async (description: string): Promise<{ voice_prompt: string }> => {
-        const response = await fetch(`${API_URL}/voice/design/translate`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ description }),
-        });
-        if (!response.ok) {
-            const detail = await response.text();
-            throw new Error(`Voice prompt translate failed: ${response.status} ${detail}`);
-        }
-        return response.json();
-    },
-
-    bindVoice: async (scriptId: string, charId: string, voiceId: string, voiceName: string) => {
-        const response = await fetch(`${API_URL}/projects/${scriptId}/characters/${charId}/voice`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ voice_id: voiceId, voice_name: voiceName }),
-        });
-        if (!response.ok) throw new Error("Failed to bind voice");
-        return response.json();
-    },
-
-    generateAudio: async (scriptId: string) => {
-        const response = await fetch(`${API_URL}/projects/${scriptId}/generate_audio`, {
-            method: "POST",
-        });
-        if (!response.ok) throw new Error("Failed to generate audio");
-        return response.json();
-    },
-
-    generateLineAudio: async (
-        scriptId: string,
-        frameId: string,
-        speed: number,
-        pitch: number,
-        volume: number = 50,
-        instructions?: string,
-    ) => {
-        const response = await fetch(`${API_URL}/projects/${scriptId}/frames/${frameId}/audio`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ speed, pitch, volume, instructions: instructions || null }),
-        });
-        if (!response.ok) throw new Error("Failed to generate line audio");
-        return response.json();
-    },
-
-    /** PR-3j · Generate dialogue audio for every frame with dialogue.
-     *  Skips frames whose snapshot hash still matches. */
-    generateDialogueAudioBatch: async (scriptId: string): Promise<{ _batch_stats: { generated: number; skipped: number; failed: number; no_voice: number } }> => {
-        const response = await fetch(`${API_URL}/projects/${scriptId}/dialogue_audio/batch`, {
-            method: "POST",
-        });
-        if (!response.ok) throw new Error("Failed to generate dialogue audio batch");
-        return response.json();
     },
 
     previewDub: async (scriptId: string, frameId: string, videoTaskId: string, offsetMs: number = 0) => {
@@ -1184,11 +876,6 @@ export const api = {
         return res.data;
     },
 
-    triggerMulerunLogin: async () => {
-        const res = await axios.post(`${API_URL}/config/mulerun-login`);
-        return res.data;
-    },
-
     extractLastFrame: async (scriptId: string, frameId: string, videoTaskId: string) => {
         const res = await axios.post(`${API_URL}/projects/${scriptId}/frames/${frameId}/extract_last_frame`, {
             video_task_id: videoTaskId,
@@ -1217,20 +904,20 @@ export const api = {
     // Series CRUD
     createSeriesV2: async (
         title: string,
-        opts: { description?: string; workflow_mode?: string; content_mode?: "scripted" | "freeform"; default_generation_mode?: "r2v" | "i2v" } = {},
+        opts: { description?: string; workflow_mode?: "i2v_legacy"; content_mode?: "scripted" | "freeform"; default_generation_mode?: "i2v" } = {},
     ) => {
         const response = await axios.post(`${API_URL}/series`, {
             title,
             description: opts.description ?? "",
-            workflow_mode: opts.workflow_mode ?? "r2v",
+            workflow_mode: opts.workflow_mode ?? "i2v_legacy",
             content_mode: opts.content_mode ?? "scripted",
-            default_generation_mode: opts.default_generation_mode ?? "r2v",
+            default_generation_mode: opts.default_generation_mode ?? "i2v",
         });
         return response.data;
     },
 
-    createSeries: async (title: string, description?: string, workflowMode?: string) => {
-        const response = await axios.post(`${API_URL}/series`, { title, description, workflow_mode: workflowMode || "r2v" });
+    createSeries: async (title: string, description?: string, workflowMode: "i2v_legacy" = "i2v_legacy") => {
+        const response = await axios.post(`${API_URL}/series`, { title, description, workflow_mode: workflowMode });
         return response.data;
     },
     listSeries: async () => {
@@ -1243,10 +930,10 @@ export const api = {
         return res.data;
     },
     /** 新建一条全局/共享资产。后端：POST /library/assets。
-     *  assetType 为单数（"character"|"scene"|"prop"）。data 可含 name/description/persona/image_url/voice_id。 */
+     *  assetType 为单数（"character"|"scene"|"prop"）。data 可含 name/description/persona/image_url。 */
     createLibraryAsset: async (
         assetType: string,
-        data: { name: string; description?: string; persona?: string; image_url?: string; voice_id?: string },
+        data: { name: string; description?: string; persona?: string; image_url?: string },
     ) => {
         const res = await axios.post(`${API_URL}/library/assets`, { asset_type: assetType, ...data });
         return res.data;
@@ -1271,7 +958,6 @@ export const api = {
             description?: string;
             persona?: string;
             image_url?: string;
-            voice_id?: string;
             starred?: boolean;
             locked?: boolean;
             visual_weight?: number;
@@ -1367,7 +1053,7 @@ export const api = {
     createSeriesAsset: async (
         seriesId: string,
         kind: "characters" | "scenes" | "props",
-        data: { name: string; description?: string; persona?: string; image_url?: string; voice_id?: string },
+        data: { name: string; description?: string; persona?: string; image_url?: string },
     ) => {
         const res = await axios.post(`${API_URL}/series/${seriesId}/${kind}`, data);
         return res.data;
@@ -1455,7 +1141,7 @@ export const api = {
         const response = await axios.get(`${API_URL}/series/${seriesId}/prompt_config`);
         return response.data;
     },
-    updateSeriesPromptConfig: async (seriesId: string, config: { storyboard_polish?: string; video_polish?: string; r2v_polish?: string; storyboard_extraction?: string }) => {
+    updateSeriesPromptConfig: async (seriesId: string, config: { storyboard_polish?: string; video_polish?: string; polish_model?: string; storyboard_extraction?: string }) => {
         const response = await axios.put(`${API_URL}/series/${seriesId}/prompt_config`, config);
         return response.data;
     },
@@ -1463,22 +1149,13 @@ export const api = {
         const response = await axios.get(`${API_URL}/series/${seriesId}/model_settings`);
         return response.data;
     },
-    updateSeriesModelSettings: async (seriesId: string, settings: {
-        t2i_model?: string;
-        i2i_model?: string;
-        image_model?: string;
-        i2v_model?: string;
-        character_aspect_ratio?: string;
-        scene_aspect_ratio?: string;
-        prop_aspect_ratio?: string;
-        storyboard_aspect_ratio?: string;
-    }) => {
+    updateSeriesModelSettings: async (seriesId: string, settings: ModelSettingsPayload) => {
         const response = await axios.put(`${API_URL}/series/${seriesId}/model_settings`, settings);
         return response.data;
     },
 
     // Helper: create a project and add it as an episode to a series
-    createEpisodeForSeries: async (seriesId: string, title: string, episodeNumber: number, workflowMode: string = "r2v") => {
+    createEpisodeForSeries: async (seriesId: string, title: string, episodeNumber: number, workflowMode: string = "i2v_legacy") => {
         const project = await api.createProject(title, "", true, workflowMode);
         await api.addEpisodeToSeries(seriesId, project.id, episodeNumber);
         const refreshed = await api.getProject(project.id);
@@ -1494,7 +1171,7 @@ export const api = {
         });
         return response.data;
     },
-    importFileConfirm: async (data: { title: string; description?: string; text: string; episodes: any[] }) => {
+    importFileConfirm: async (data: { title: string; description?: string; import_id?: string; text?: string; episodes: any[] }) => {
         const response = await axios.post(`${API_URL}/series/import/confirm`, data);
         return response.data;
     },

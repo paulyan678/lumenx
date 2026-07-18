@@ -77,7 +77,11 @@ class ArgParser:
         parser.add_argument('--negative_prompt', type=str, help='Negative prompt')
         parser.add_argument('--audio_url', type=str, help='Audio URL for generation')
         parser.add_argument('--output_dir', type=str, help='Directory to save generated videos')
-        parser.add_argument('--model_name', type=str, help='Model name to use (e.g., wan2.5-t2v-preview)')
+        parser.add_argument(
+            '--model_name',
+            type=str,
+            help='Exact New API video model ID (for example, doubao-seedance-2-0-fast-260128)',
+        )
         parser.add_argument('--dry-run', action='store_true', help='Run without calling actual APIs')
         
         return parser.parse_args()

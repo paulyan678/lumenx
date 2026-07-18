@@ -17,6 +17,7 @@ from .models import (
 from .service import PlaygroundService
 from .storage import PlaygroundStorage
 from ...utils import get_logger
+from ...utils.newapi_models import MissingNewAPIKeyError, validate_model_for_mode
 
 logger = get_logger(__name__)
 
@@ -33,7 +34,10 @@ _service = PlaygroundService(_storage)
 
 def generate(request: GenerateRequest, background_tasks: BackgroundTasks):
     """Create a generation record and kick off processing in the background."""
-    gen = _service.create_generation(request)
+    try:
+        gen = _service.create_generation(request)
+    except (ValueError, MissingNewAPIKeyError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     background_tasks.add_task(_service.process_generation, gen.id)
     return gen
 
@@ -139,6 +143,11 @@ def update_template(template_id: str, request: UpdateTemplateRequest):
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
     update_data = request.model_dump(exclude_none=True)
+    candidate_mode = update_data.get("default_mode", template.default_mode)
+    candidate_model = update_data.get("default_model_id", template.default_model_id)
+    if candidate_mode and candidate_model:
+        mode_value = candidate_mode.value if hasattr(candidate_mode, "value") else candidate_mode
+        validate_model_for_mode(candidate_model, mode_value)
     for key, value in update_data.items():
         setattr(template, key, value)
     template.updated_at = datetime.now(timezone.utc).isoformat()

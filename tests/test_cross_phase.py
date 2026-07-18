@@ -30,7 +30,6 @@ def pipeline(tmp_path):
          patch("src.apps.comic_gen.pipeline.AssetGenerator"), \
          patch("src.apps.comic_gen.pipeline.StoryboardGenerator"), \
          patch("src.apps.comic_gen.pipeline.VideoGenerator"), \
-         patch("src.apps.comic_gen.pipeline.AudioGenerator"), \
          patch("src.apps.comic_gen.pipeline.ExportManager"):
         p = ComicGenPipeline()
     p.data_file = str(tmp_path / "projects.json")
@@ -84,9 +83,9 @@ class TestPromptConfigIntegration:
     """Tests that PromptConfig fallback works correctly across all polish types."""
 
     def test_all_valid_prompt_types_accepted(self, pipeline):
-        """All three prompt types should be accepted."""
+        """The supported storyboard and I2V prompt types are accepted."""
         ep = _make_script()
-        for ptype in ("storyboard_polish", "video_polish", "r2v_polish"):
+        for ptype in ("storyboard_polish", "video_polish"):
             result = pipeline.get_effective_prompt(ptype, ep)
             assert len(result.strip()) > 0, f"{ptype} should return non-empty default"
 
@@ -98,20 +97,17 @@ class TestPromptConfigIntegration:
             prompt_config=PromptConfig(
                 storyboard_polish="series storyboard",
                 video_polish="series video",
-                r2v_polish="series r2v",
             ),
         )
         ep = _make_script()
         ep.prompt_config = PromptConfig(
             storyboard_polish="ep storyboard",
             video_polish="ep video",
-            r2v_polish="ep r2v",
         )
 
         for ptype, expected in [
             ("storyboard_polish", "ep storyboard"),
             ("video_polish", "ep video"),
-            ("r2v_polish", "ep r2v"),
         ]:
             result = pipeline.get_effective_prompt(ptype, ep, series)
             assert result == expected
@@ -124,7 +120,6 @@ class TestPromptConfigIntegration:
             prompt_config=PromptConfig(
                 storyboard_polish="series storyboard",
                 video_polish="series video",
-                r2v_polish="series r2v",
             ),
         )
         ep = _make_script()
@@ -133,7 +128,6 @@ class TestPromptConfigIntegration:
         for ptype, expected in [
             ("storyboard_polish", "series storyboard"),
             ("video_polish", "series video"),
-            ("r2v_polish", "series r2v"),
         ]:
             result = pipeline.get_effective_prompt(ptype, ep, series)
             assert result == expected
@@ -284,30 +278,39 @@ class TestModelSettingsIntegration:
         now = _ts()
         s = Series(id="s1", title="S", created_at=now, updated_at=now)
         assert isinstance(s.model_settings, ModelSettings)
-        # Defaults follow the catalog (2026-05-26 meta switch: i2v default
-        # moved to happyhorse-1.0-i2v, i2i default unified with t2i on
-        # wan2.7-image-pro).
-        assert s.model_settings.t2i_model == "wan2.7-image-pro"
-        assert s.model_settings.i2v_model == "happyhorse-1.0-i2v"
+        assert s.model_settings.chat_model == "deepseek-v4-flash"
+        assert s.model_settings.image_model == "gpt-image-2"
+        assert s.model_settings.video_model == "doubao-seedance-2-0-fast-260128"
+        # Stage-specific compatibility aliases stay synchronized with the
+        # single active selection for their capability.
+        assert s.model_settings.t2i_model == s.model_settings.image_model
+        assert s.model_settings.i2i_model == s.model_settings.image_model
+        assert s.model_settings.i2v_model == s.model_settings.video_model
 
     def test_update_series_model_settings_via_pipeline(self, pipeline):
         """Pipeline update_series should accept model_settings changes."""
         s = pipeline.create_series("S")
-        new_ms = ModelSettings(t2i_model="custom-t2i", i2v_model="kling-1.6")
+        new_ms = ModelSettings(
+            chat_model="qwen3.7-max",
+            video_model="doubao-seedance-2-0-260128",
+        )
         updated = pipeline.update_series(s.id, {"model_settings": new_ms})
-        assert updated.model_settings.t2i_model == "custom-t2i"
-        assert updated.model_settings.i2v_model == "kling-1.6"
-        # Other fields keep catalog defaults.
-        assert updated.model_settings.i2i_model == "wan2.7-image-pro"
+        assert updated.model_settings.chat_model == "qwen3.7-max"
+        assert updated.model_settings.video_model == "doubao-seedance-2-0-260128"
+        assert updated.model_settings.i2v_model == updated.model_settings.video_model
+        assert updated.model_settings.image_model == "gpt-image-2"
 
     def test_update_series_model_settings_partial_via_copy(self, pipeline):
-        """Partial update via model_copy should preserve other fields."""
+        """A validated partial update preserves the other capabilities."""
         s = pipeline.create_series("S")
         current_ms = s.model_settings
-        updated_ms = current_ms.model_copy(update={"t2i_model": "new-model"})
+        updated_ms = ModelSettings.model_validate(
+            {**current_ms.model_dump(), "chat_model": "deepseek-v4-pro"}
+        )
         updated = pipeline.update_series(s.id, {"model_settings": updated_ms})
-        assert updated.model_settings.t2i_model == "new-model"
-        assert updated.model_settings.i2i_model == "wan2.7-image-pro"  # preserved
+        assert updated.model_settings.chat_model == "deepseek-v4-pro"
+        assert updated.model_settings.image_model == "gpt-image-2"
+        assert updated.model_settings.video_model == "doubao-seedance-2-0-fast-260128"
         assert updated.model_settings.storyboard_aspect_ratio == "16:9"  # preserved
 
     def test_model_settings_not_overwritten_by_id_or_created_at(self, pipeline):

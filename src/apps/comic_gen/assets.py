@@ -4,8 +4,10 @@ import time
 from typing import Dict, Any, List
 from urllib.parse import quote
 from .models import Character, Scene, Prop, GenerationStatus, ImageAsset, ImageVariant, MAX_VARIANTS_PER_ASSET
-from ...models.image import WanxImageModel, ImageGenModel
+from ...models.base import ImageGenModel
+from ...models.newapi import NewAPIImageModel
 from ...utils import get_logger
+from ...utils.newapi_models import IMAGE, get_model_spec, get_selected_model
 from ...utils.oss_utils import is_object_key
 
 logger = get_logger(__name__)
@@ -39,27 +41,22 @@ def cleanup_old_variants(image_asset: ImageAsset) -> None:
 
 # Aspect ratio to image size mapping
 ASPECT_RATIO_TO_SIZE = {
-    "9:16": "576*1024",   # Portrait
-    "3:4": "768*1024",    # Portrait (mild)
-    "1:1": "1024*1024",   # Square
-    "4:3": "1024*768",    # Landscape (mild)
-    "16:9": "1024*576",   # Landscape
+    "9:16": "1024x1536",
+    "3:4": "1024x1536",
+    "1:1": "1024x1024",
+    "4:3": "1536x1024",
+    "16:9": "1536x1024",
 }
 
 class AssetGenerator:
     def __init__(self, config: Dict[str, Any] = None):
         self.config = config or {}
-        self.model = WanxImageModel(self.config.get('model', {}))
-        self._mulerouter_image_model = None
+        self.model = NewAPIImageModel(self.config.get('model', {}))
         self.output_dir = self.config.get('output_dir', 'output/assets')
 
     def _get_model_for(self, model_name: str) -> "ImageGenModel":
-        """Route to the correct image adapter based on model name."""
-        if model_name and model_name.startswith("gpt-image"):
-            if self._mulerouter_image_model is None:
-                from ...models.mulerouter import MuleRouterImageModel
-                self._mulerouter_image_model = MuleRouterImageModel({})
-            return self._mulerouter_image_model
+        """Validate the requested image model and use New API exclusively."""
+        get_model_spec(model_name or get_selected_model(IMAGE), IMAGE)
         return self.model
 
     def generate_character(self, character: Character, generation_type: str = "all", prompt: str = "", positive_prompt: str = None, negative_prompt: str = "", batch_size: int = 1, model_name: str = None, i2i_model_name: str = None, size: str = None) -> Character:
@@ -73,7 +70,7 @@ class AssetGenerator:
         style_suffix = positive_prompt if positive_prompt is not None else "cinematic lighting, movie still, 8k, highly detailed, realistic"
         
         # Default size if not provided
-        effective_size = size or "576*1024"  # Default to portrait for characters
+        effective_size = size or "1024x1536"  # Default to portrait for characters
         
         try:
             # === R2V: Single unified reference sheet (T2I only) ===
@@ -82,7 +79,7 @@ class AssetGenerator:
                 if positive_prompt and positive_prompt not in effective_prompt:
                     effective_prompt = f"{effective_prompt}, {positive_prompt}"
 
-                effective_size = size or "1024*1024"
+                effective_size = size or "1024x1024"
 
                 successful_generations = 0
                 last_error = ""
@@ -215,12 +212,12 @@ class AssetGenerator:
                         fullbody_path = os.path.join(self.output_dir, 'characters', f"{character.id}_fullbody_{variant_id}.png")
                         os.makedirs(os.path.dirname(fullbody_path), exist_ok=True)
                         
-                        # Select model: use I2I model (wan2.6-image) when reference image is provided
+                        # Image editing uses the same approved GPT Image model.
                         effective_model_name = model_name
                         effective_generation_prompt = generation_prompt
                         if ref_image_path:
                             # Override to I2I model when using reference image
-                            effective_model_name = i2i_model_name or "wan2.6-image"
+                            effective_model_name = i2i_model_name or get_selected_model(IMAGE)
                             logger.debug(f"Reverse generation: Using I2I model {effective_model_name} with reference image")
                             
                             # Enhance prompt for reverse generation to emphasize reference consistency (only if not already present)
@@ -536,7 +533,7 @@ class AssetGenerator:
             positive_prompt = "cinematic lighting, movie still, 8k, highly detailed, realistic"
         
         # Default size for scenes (landscape)
-        effective_size = size or "1024*576"
+        effective_size = size or "1536x1024"
         
         prompt = f"Scene Concept Art: {scene.name}. {scene.description}. High quality, detailed. {positive_prompt}"
         
@@ -598,7 +595,7 @@ class AssetGenerator:
             positive_prompt = "cinematic lighting, movie still, 8k, highly detailed, realistic"
         
         # Default size for props (square)
-        effective_size = size or "1024*1024"
+        effective_size = size or "1024x1024"
         
         prompt = f"Prop Design: {prop.name}. {prop.description}. Isolated on white background, high quality, detailed. {positive_prompt}"
         

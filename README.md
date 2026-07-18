@@ -42,9 +42,9 @@ LumenX 目前包含两个核心模块：
 
 - **深度剧本分析** — LLM 自动提取角色/场景/道具，生成结构化分镜脚本
 - **可控美术指导** — 自定义视觉风格，全片画风统一
-- **多模型资产生成** — 角色三视图、场景定调图、道具参考图
-- **AI 分镜视频** — I2V / R2V 多模式视频生成 + 批量抽卡
-- **智能配音** — CosyVoice / Qwen3-TTS 多音色对白合成
+- **New API 资产生成** — 角色三视图、场景定调图、道具参考图
+- **AI 分镜视频** — Seedance 文生视频与单图图生视频 + 批量抽卡
+- **音频制作** — 本地 Demucs 分离与 FFmpeg 合成
 - **一键合成导出** — 时间线编辑 + FFmpeg 拼接成片
 
 </td>
@@ -52,8 +52,8 @@ LumenX 目前包含两个核心模块：
 
 ### 🎨 Playground — 独立生成工具台
 
-- **6 种生成模式** — 图像生成、文生视频、图生视频、参考生视频、视频编辑
-- **10+ AI 模型** — GPT-Image-2、Wan 2.7、Seedance 2.0、Kling V3、Vidu Q3、HappyHorse 等
+- **4 种支持流程** — 文生图、图像编辑、文生视频、图生视频
+- **7 个批准模型** — GPT Image 2、三个 Seedance 变体与三个聊天模型
 - **动态参数** — 每个模型独立参数（尺寸/分辨率/时长/画质）
 - **并发任务** — 多任务同时执行，实时状态追踪
 - **Prompt 模板** — 收藏/复用/历史记录
@@ -81,11 +81,7 @@ LumenX 目前包含两个核心模块：
 ## 📸 产品截图
 
 <div align="center">
-
-| Studio 分镜工作台 | Playground 创作台 |
-|:---:|:---:|
-| <img src="docs/images/studio-storyboard.jpg" alt="Studio" width="100%" /> | <img src="docs/images/playground-overview.jpg" alt="Playground" width="100%" /> |
-
+  <img src="docs/images/playground-overview.jpg" alt="Playground 创作台" width="90%" />
 </div>
 
 ---
@@ -94,16 +90,13 @@ LumenX 目前包含两个核心模块：
 
 | Provider | 模型 | 能力 |
 |----------|------|------|
-| **DashScope** | Wan 2.7 Image/Video, Qwen Image 2.0, HappyHorse 1.0 | T2I, I2I, I2V, R2V, T2V, V2V |
-| **DashScope** | Kling V3 | I2V, R2V |
-| **DashScope** | Vidu Q3 Pro / Turbo | I2V, R2V |
-| **DashScope** | PixVerse V6 / C1 | I2V, R2V |
-| **MuleRun** | Seedance 2.0 | T2V, I2V, R2V |
-| **MuleRun** | GPT-Image-2 | T2I, I2I (含 4K) |
-| **Kling 原厂** | Kling V3 | I2V, R2V |
-| **Vidu 原厂** | Vidu Q3 Pro / Turbo | I2V, R2V |
-| **DashScope** | CosyVoice, Qwen3-TTS | TTS 配音 |
-| **DashScope** | Qwen 3.7 Plus | 剧本分析、Prompt 润色 |
+| **New API** | `gpt-image-2` | 文生图、图像编辑 |
+| **New API** | `doubao-seedance-2-0-260128` | 文生视频、单图图生视频 |
+| **New API** | `doubao-seedance-2-0-fast-260128` | 文生视频、单图图生视频 |
+| **New API** | `doubao-seedance-2-0-mini-260615` | 文生视频、单图图生视频 |
+| **New API** | `deepseek-v4-flash`, `qwen3.7-max`, `deepseek-v4-pro` | 剧本分析、Prompt 润色、聊天 |
+
+当前实现的 New API 协议不支持多参考图输入，因此不宣传参考生视频能力。
 
 ---
 
@@ -124,7 +117,8 @@ cd lumenx
 
 # 配置 API Key
 cp .env.example .env
-# 编辑 .env，填入 DASHSCOPE_API_KEY（必填）
+chmod 600 .env
+# 编辑 .env，设置 NEWAPI_BASE_URL 及计划使用的每个模型的独立密钥
 
 # 启动（后端 17177 + 前端 3008，自动开浏览器）
 npm run dev
@@ -149,17 +143,18 @@ cd frontend && npm install && npm run dev  # http://localhost:3008
 
 ---
 
-## ⚙️ 配置模式
+## ⚙️ New API 配置
 
-LumenX 采用 **本地优先** 的架构，最简配置只需一个 API Key。
+LumenX 采用 **本地优先** 的架构，New API 是唯一 AI Provider。每个模型使用独立密钥；所选模型缺少对应密钥时，请求会被拒绝。
 
-| 模式 | 必填 | 可用能力 |
-|------|------|----------|
-| **基础** | `DASHSCOPE_API_KEY` | Wan/Qwen/HappyHorse/PixVerse/Kling(代理)/Vidu(代理) + TTS |
-| **+ MuleRun** | + `mulerun login` 或 `MULEROUTER_API_KEY` | + Seedance 2.0 + GPT-Image-2 |
-| **+ Kling 原厂** | + `KLING_ACCESS_KEY` + `KLING_SECRET_KEY` | Kling 直连 |
-| **+ Vidu 原厂** | + `VIDU_API_KEY` | Vidu 直连 |
-| **+ OSS** | + 阿里云 OSS 凭证 | 云端媒体镜像 + 签名 URL |
+| 配置 | 用途 |
+|------|------|
+| `NEWAPI_BASE_URL` | 以 `/v1` 结尾的共享 HTTPS 网关根地址 |
+| `NEWAPI_*_API_KEY` | 某一个精确批准模型的独立凭证 |
+| `NEWAPI_CHAT_MODEL` | 活动聊天模型；默认 `deepseek-v4-flash` |
+| `NEWAPI_IMAGE_MODEL` | 活动图像模型；默认 `gpt-image-2` |
+| `NEWAPI_VIDEO_MODEL` | 活动视频模型；默认 `doubao-seedance-2-0-fast-260128` |
+| 可选 OSS 字段 | 云端媒体镜像 + 签名 URL；与 AI 路由无关 |
 
 <details>
 <summary>详细配置说明</summary>
@@ -168,9 +163,7 @@ LumenX 采用 **本地优先** 的架构，最简配置只需一个 API Key。
 - **开发模式**: 项目根目录 `.env` 文件
 - **应用内设置**: Settings 页面（保存到 `~/.lumen-x/config.json`）
 
-MuleRun 支持两种认证方式：
-1. **CLI 模式**（推荐）: `npm i -g @mulerunai/cli && mulerun login`
-2. **API Key 模式**: 在设置页填入 `muk-...` 格式的 Key
+保存后的密钥在应用中始终保持遮罩。LumenX 不会将一个模型的密钥发给另一个模型，也不会回退到其他 Provider 或模型。
 
 </details>
 
@@ -178,9 +171,7 @@ MuleRun 支持两种认证方式：
 
 ## 🏗️ 技术架构
 
-<div align="center">
-  <img src="docs/images/architecture-cybr.png" alt="LumenX System Architecture" width="90%" />
-</div>
+Next.js 前端通过 FastAPI 后端调用唯一的 New API 提供方；后端按选中的精确模型 ID 解析对应的模型专属密钥。可选 OSS 只负责媒体存储，不参与 AI 路由。
 
 ### 目录结构
 
@@ -194,8 +185,8 @@ lumenx/
 ├── src/
 │   ├── apps/comic_gen/        # Studio 后端 (API + Pipeline)
 │   ├── apps/playground/       # Playground 后端 (API + Service)
-│   ├── models/                # AI 模型适配器 (Wanx/Kling/Vidu/MuleRouter)
-│   └── audio/                 # TTS 语音合成
+│   ├── models/                # New API 图像/视频适配器
+│   └── audio/                 # 本地音频处理工具
 ├── config/model_catalog/      # 模型目录 (YAML → JSON)
 └── output/                    # 生成产物 (本地存储)
 ```
@@ -209,8 +200,7 @@ lumenx/
 | [用户手册](USER_MANUAL.md) | 功能使用说明 |
 | [API 文档](http://localhost:17177/docs) | Swagger UI |
 | [模型接入](docs/model-onboarding-implementation.md) | 新模型接入指南 |
-| [Catalog 架构](docs/plans/2026-04-03-model-docs-and-catalog-architecture.md) | 模型目录设计 |
-| [Playground PRD](docs/plans/2026-06-06-playground-standalone-generation-prd.md) | 创作台设计文档 |
+| [New API 协议](docs/api-reference/newapi.md) | 支持模型、凭证与能力 |
 
 ---
 

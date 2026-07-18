@@ -2,18 +2,16 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, CheckCircle2, Mic } from "lucide-react";
+import { Loader2, CheckCircle2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 
-export type BannerState = "idle" | "phase1" | "phase2" | "dialogue" | "summary";
+export type BannerState = "idle" | "phase1" | "phase2" | "summary";
 
 export interface GenerationBannerProps {
     state: BannerState;
     phase1Captions: string[];
     refineProgress?: { current: number; total: number } | null;
-    dialogueProgress?: { current: number; total: number } | null;
-    summary?: { frameCount: number; dialogueReady: number; dialogueMissing: number } | null;
-    onGenerateDialogue?: () => void;
+    summary?: { frameCount: number } | null;
 }
 
 const CAPTION_INTERVAL = 3000;
@@ -22,9 +20,7 @@ export function GenerationBanner({
     state,
     phase1Captions,
     refineProgress,
-    dialogueProgress,
     summary,
-    onGenerateDialogue,
 }: GenerationBannerProps) {
     const [captionIndex, setCaptionIndex] = useState(0);
 
@@ -76,23 +72,10 @@ export function GenerationBanner({
                 </BannerShell>
             )}
 
-            {state === "dialogue" && (
-                <BannerShell key="dialogue">
-                    <Loader2 size={14} className="animate-spin text-status-processing-fg shrink-0" strokeWidth={1.8} />
-                    <span className="text-[0.8125rem] text-text-secondary">
-                        {t("bannerDialogueProgress", {
-                            current: dialogueProgress?.current ?? 0,
-                            total: dialogueProgress?.total ?? 0,
-                        })}
-                    </span>
-                </BannerShell>
-            )}
-
             {state === "summary" && summary && (
                 <SummaryBar
                     key="summary"
                     summary={summary}
-                    onGenerateDialogue={onGenerateDialogue}
                 />
             )}
         </AnimatePresence>
@@ -117,13 +100,10 @@ function BannerShell({ children }: { children: React.ReactNode }) {
 
 function SummaryBar({
     summary,
-    onGenerateDialogue,
 }: {
-    summary: { frameCount: number; dialogueReady: number; dialogueMissing: number };
-    onGenerateDialogue?: () => void;
+    summary: { frameCount: number };
 }) {
     const t = useTranslations("storyboardR2V");
-    const showCTA = summary.dialogueReady > 0;
 
     return (
         <motion.div
@@ -139,26 +119,7 @@ function SummaryBar({
                     <span className="text-status-completed-fg font-semibold">
                         {t("bannerFrameCount", { count: summary.frameCount })}
                     </span>
-                    {summary.dialogueReady > 0 && (
-                        <span className="ml-1.5">· {t("bannerDialoguePending", { count: summary.dialogueReady })}</span>
-                    )}
-                    {summary.dialogueMissing > 0 && (
-                        <span className="ml-1.5 text-accent font-medium">
-                            {t("bannerDialogueMissingVoice", { count: summary.dialogueMissing })}
-                        </span>
-                    )}
                 </span>
-                {showCTA && onGenerateDialogue && (
-                    <button
-                        type="button"
-                        onClick={onGenerateDialogue}
-                        title={t("bannerSynthDialogueTooltip")}
-                        className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-status-starred-border bg-status-starred-bg px-3 py-1 text-[0.75rem] font-semibold text-status-starred-fg transition-colors duration-fast ease-out-quart hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-starred-border"
-                    >
-                        <Mic size={12} aria-hidden="true" />
-                        {t("bannerSynthDialogue")}
-                    </button>
-                )}
             </div>
         </motion.div>
     );

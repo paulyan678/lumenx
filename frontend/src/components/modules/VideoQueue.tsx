@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Loader2, RefreshCw, Copy, Download, Trash2, AlertCircle } from "lucide-react";
 import { useTranslations } from "next-intl";
 
-import { VideoTask, API_URL } from "@/lib/api";
+import { VideoTask } from "@/lib/api";
 import { getAssetUrl } from "@/lib/utils";
 
 interface VideoQueueProps {
@@ -107,11 +107,7 @@ function TaskCard({ task, onRemix }: { task: VideoTask; onRemix: (t: VideoTask) 
                                 alt="Input"
                                 className="w-full h-full object-cover opacity-60"
                             />
-                        ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-purple-900/30 text-purple-400 text-[0.625rem] font-bold">
-                                R2V
-                            </div>
-                        )}
+                        ) : null}
                         <div className="absolute inset-0 flex items-center justify-center">
                             <Loader2 className="animate-spin text-primary" size={16} />
                         </div>
@@ -151,28 +147,7 @@ function TaskCard({ task, onRemix }: { task: VideoTask; onRemix: (t: VideoTask) 
                         <div className="w-1/2 relative border-r border-glass-border">
                             {task.image_url ? (
                                 <img src={getDisplayUrl(task.image_url)} alt="Input" className="w-full h-full object-cover" />
-                            ) : task.reference_video_urls && task.reference_video_urls.length > 0 ? (
-                                /* R2V: Show reference video thumbnails */
-                                <div className="w-full h-full grid grid-cols-2 gap-0.5 bg-purple-900/20">
-                                    {task.reference_video_urls.slice(0, 4).map((url, idx) => (
-                                        <div key={idx} className="relative bg-surface overflow-hidden">
-                                            <video
-                                                src={getAssetUrl(url)}
-                                                className="w-full h-full object-cover"
-                                                muted
-                                                preload="metadata"
-                                            />
-                                            <div className="absolute bottom-0.5 left-0.5 bg-purple-600/80 px-1 rounded text-[0.5rem] text-foreground font-bold">
-                                                @{String.fromCharCode(65 + idx)}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="w-full h-full flex items-center justify-center bg-purple-900/10 text-purple-400/50 text-xs font-bold">
-                                    R2V Input
-                                </div>
-                            )}
+                            ) : null}
                             <div className="absolute top-2 left-2 bg-surface px-1.5 py-0.5 rounded text-[0.625rem] text-text-secondary">Input</div>
                         </div>
 

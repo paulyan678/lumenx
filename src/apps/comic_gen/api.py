@@ -23,7 +23,7 @@
 from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional, Dict, List, Any
 import asyncio
 import time
@@ -39,16 +39,25 @@ from .pipeline import ComicGenPipeline, LibraryAssetInUseError
 from .models import (
     ArtDirection,
     PromptConfig,
-    ProviderBackend,
-    ProviderRoutingConfig,
     Script,
     Series,
     StoryboardFrame,
     VideoTask,
 )
-from .llm import ScriptProcessor, DEFAULT_STORYBOARD_POLISH_PROMPT, DEFAULT_VIDEO_POLISH_PROMPT, DEFAULT_R2V_POLISH_PROMPT, DEFAULT_ENTITY_EXTRACTION_PROMPT, DEFAULT_STYLE_ANALYSIS_PROMPT, DEFAULT_STORYBOARD_EXTRACTION_PROMPT
+from .llm import ScriptProcessor, DEFAULT_STORYBOARD_POLISH_PROMPT, DEFAULT_VIDEO_POLISH_PROMPT, DEFAULT_ENTITY_EXTRACTION_PROMPT, DEFAULT_STYLE_ANALYSIS_PROMPT, DEFAULT_STORYBOARD_EXTRACTION_PROMPT
 from ...utils.oss_utils import OSSImageUploader, sign_oss_urls_in_data
 from ...utils import setup_logging
+from ...utils.newapi_models import (
+    CHAT,
+    IMAGE,
+    VIDEO,
+    MODEL_API_KEY_FIELDS,
+    MissingNewAPIKeyError,
+    get_model_spec,
+    get_selected_model,
+    migrate_legacy_newapi_environment,
+    public_model_status,
+)
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv, set_key
 
@@ -176,6 +185,13 @@ class GenerateAssetRequest(BaseModel):
     batch_size: int = 1
     model_name: Optional[str] = None
     aspect_ratio: Optional[str] = None
+
+    @field_validator("model_name")
+    @classmethod
+    def validate_image_model(cls, value):
+        if value is not None:
+            get_model_spec(value, IMAGE)
+        return value
 
 class ToggleLockRequest(BaseModel):
     asset_id: str
@@ -361,8 +377,8 @@ async def create_project(request: CreateProjectRequest, skip_analysis: bool = Fa
             None,  # Use default executor
             partial(pipeline.create_project, request.title, request.text, skip_analysis, request.workflow_mode, request.series_id)
         )
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    except (ValueError, MissingNewAPIKeyError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
     return signed_response(result)
 
 
@@ -587,7 +603,6 @@ def get_series_prompt_config(series_id: str):
         "defaults": {
             "storyboard_polish": DEFAULT_STORYBOARD_POLISH_PROMPT,
             "video_polish": DEFAULT_VIDEO_POLISH_PROMPT,
-            "r2v_polish": DEFAULT_R2V_POLISH_PROMPT,
             "storyboard_extraction": DEFAULT_STORYBOARD_EXTRACTION_PROMPT,
         },
     }
@@ -608,15 +623,54 @@ def update_series_prompt_config(series_id: str, config: PromptConfig):
 # ============================================================
 
 class UpdateModelSettingsRequest(BaseModel):
+    chat_model: Optional[str] = None
     t2i_model: Optional[str] = None
     i2i_model: Optional[str] = None
     image_model: Optional[str] = None
     i2v_model: Optional[str] = None
-    r2v_model: Optional[str] = None
+    video_model: Optional[str] = None
     character_aspect_ratio: Optional[str] = None
     scene_aspect_ratio: Optional[str] = None
     prop_aspect_ratio: Optional[str] = None
     storyboard_aspect_ratio: Optional[str] = None
+
+    @field_validator("chat_model")
+    @classmethod
+    def validate_chat_selection(cls, value):
+        if value is not None:
+            get_model_spec(value, CHAT)
+        return value
+
+    @field_validator("t2i_model", "i2i_model", "image_model")
+    @classmethod
+    def validate_image_selection(cls, value):
+        if value is not None:
+            get_model_spec(value, IMAGE)
+        return value
+
+    @field_validator("i2v_model", "video_model")
+    @classmethod
+    def validate_video_selection(cls, value):
+        if value is not None:
+            get_model_spec(value, VIDEO)
+        return value
+
+
+def _synchronize_model_setting_updates(updates: Dict[str, Any]) -> Dict[str, Any]:
+    normalized = dict(updates)
+    image_model = next(
+        (normalized.get(key) for key in ("image_model", "t2i_model", "i2i_model") if normalized.get(key)),
+        None,
+    )
+    if image_model:
+        normalized.update(image_model=image_model, t2i_model=image_model, i2i_model=image_model)
+    video_model = next(
+        (normalized.get(key) for key in ("video_model", "i2v_model") if normalized.get(key)),
+        None,
+    )
+    if video_model:
+        normalized.update(video_model=video_model, i2v_model=video_model)
+    return normalized
 
 @app.get("/series/{series_id}/model_settings")
 def get_series_model_settings(series_id: str):
@@ -630,7 +684,9 @@ def get_series_model_settings(series_id: str):
 @app.put("/series/{series_id}/model_settings")
 def update_series_model_settings(series_id: str, settings: UpdateModelSettingsRequest):
     """Update Series-level model settings."""
-    updates = {k: v for k, v in settings.model_dump().items() if v is not None}
+    updates = _synchronize_model_setting_updates(
+        {k: v for k, v in settings.model_dump().items() if v is not None}
+    )
     if not updates:
         series = pipeline.get_series(series_id)
         if not series:
@@ -640,7 +696,9 @@ def update_series_model_settings(series_id: str, settings: UpdateModelSettingsRe
         current_series = pipeline.get_series(series_id)
         if not current_series:
             raise HTTPException(status_code=404, detail="Series not found")
-        ms = current_series.model_settings.model_copy(update=updates)
+        ms = current_series.model_settings.__class__.model_validate(
+            {**current_series.model_settings.model_dump(), **updates}
+        )
         series = pipeline.update_series(series_id, {"model_settings": ms})
         return signed_response(series)
     except ValueError as e:
@@ -686,8 +744,8 @@ def generate_series_asset(series_id: str, request: GenerateAssetRequest, backgro
         response_data = series.dict()
         response_data["_task_id"] = task_id
         return signed_response(response_data)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    except (ValueError, MissingNewAPIKeyError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -756,7 +814,6 @@ class CreateSeriesAssetRequest(BaseModel):
     description: Optional[str] = ""
     persona: Optional[str] = ""        # characters only — grouping label
     image_url: Optional[str] = None    # optional uploaded master sheet
-    voice_id: Optional[str] = None     # characters only — TTS voice binding
 
 
 def _new_id(prefix: str) -> str:
@@ -782,7 +839,6 @@ def create_series_character(series_id: str, request: CreateSeriesAssetRequest):
         name=request.name,
         description=request.description or "",
         persona=request.persona or "",
-        voice_id=request.voice_id,
         reference_sheet=ref_sheet,
     )
     series.characters.append(char)
@@ -858,7 +914,6 @@ class CreateLibraryAssetRequest(BaseModel):
     description: Optional[str] = ""
     persona: Optional[str] = ""        # characters only — grouping label
     image_url: Optional[str] = None    # optional pre-uploaded master image
-    voice_id: Optional[str] = None     # characters only — TTS voice binding
 
 
 class UpdateLibraryAssetRequest(BaseModel):
@@ -868,7 +923,6 @@ class UpdateLibraryAssetRequest(BaseModel):
     description: Optional[str] = None
     persona: Optional[str] = None
     image_url: Optional[str] = None
-    voice_id: Optional[str] = None
     starred: Optional[bool] = None
     locked: Optional[bool] = None
     visual_weight: Optional[int] = None
@@ -1097,26 +1151,61 @@ async def import_file_confirm(request: ConfirmImportRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-class EnvConfig(ProviderRoutingConfig):
-    DASHSCOPE_API_KEY: Optional[str] = None
+class EnvConfig(BaseModel):
+    """Writable New API and object-storage configuration.
+
+    ``extra='forbid'`` intentionally rejects stale provider controls instead
+    of accepting and silently ignoring them.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    NEWAPI_BASE_URL: Optional[str] = None
+    NEWAPI_CHAT_MODEL: Optional[str] = None
+    NEWAPI_IMAGE_MODEL: Optional[str] = None
+    NEWAPI_VIDEO_MODEL: Optional[str] = None
+    NEWAPI_GPT_IMAGE_2_API_KEY: Optional[str] = None
+    NEWAPI_SEEDANCE_2_API_KEY: Optional[str] = None
+    NEWAPI_SEEDANCE_2_FAST_API_KEY: Optional[str] = None
+    NEWAPI_SEEDANCE_2_MINI_API_KEY: Optional[str] = None
+    NEWAPI_DEEPSEEK_V4_FLASH_API_KEY: Optional[str] = None
+    NEWAPI_QWEN_37_MAX_API_KEY: Optional[str] = None
+    NEWAPI_DEEPSEEK_V4_PRO_API_KEY: Optional[str] = None
     ALIBABA_CLOUD_ACCESS_KEY_ID: Optional[str] = None
     ALIBABA_CLOUD_ACCESS_KEY_SECRET: Optional[str] = None
     OSS_BUCKET_NAME: Optional[str] = None
     OSS_ENDPOINT: Optional[str] = None
     OSS_BASE_PATH: Optional[str] = None
     OSS_ENABLE: bool = True
-    KLING_ACCESS_KEY: Optional[str] = None
-    KLING_SECRET_KEY: Optional[str] = None
-    VIDU_API_KEY: Optional[str] = None
-    MULEROUTER_API_KEY: Optional[str] = None
-    endpoint_overrides: Dict[str, str] = Field(default_factory=dict)
 
+    @field_validator("NEWAPI_BASE_URL")
+    @classmethod
+    def validate_newapi_base_url(cls, value):
+        if value and value.strip():
+            from ...models.newapi import normalize_newapi_base_url
+            return normalize_newapi_base_url(value)
+        return value
 
-def _normalize_provider_mode(value: Optional[str]) -> str:
-    normalized = (value or "").strip().lower()
-    if normalized in (ProviderBackend.DASHSCOPE.value, ProviderBackend.VENDOR.value):
-        return normalized
-    return ProviderBackend.DASHSCOPE.value
+    @field_validator("NEWAPI_CHAT_MODEL")
+    @classmethod
+    def validate_chat_model(cls, value):
+        if value is not None:
+            get_model_spec(value, CHAT)
+        return value
+
+    @field_validator("NEWAPI_IMAGE_MODEL")
+    @classmethod
+    def validate_image_model(cls, value):
+        if value is not None:
+            get_model_spec(value, IMAGE)
+        return value
+
+    @field_validator("NEWAPI_VIDEO_MODEL")
+    @classmethod
+    def validate_video_model(cls, value):
+        if value is not None:
+            get_model_spec(value, VIDEO)
+        return value
 
 
 def get_user_config_path() -> str:
@@ -1184,6 +1273,10 @@ def save_user_config(config_dict: dict):
         for key, value in config_dict.items():
             if value is not None:
                 set_key(config_path, key, value)
+    # Configuration contains credentials. Keep it private regardless of the
+    # process umask or whether python-dotenv created the file.
+    if os.path.exists(config_path):
+        os.chmod(config_path, 0o600)
 
 
 def remove_user_config_keys(keys: list):
@@ -1202,6 +1295,7 @@ def remove_user_config_keys(keys: list):
                     existing_config.pop(key, None)
                 with open(config_path, "w") as f:
                     json.dump(existing_config, f, indent=2)
+                os.chmod(config_path, 0o600)
             except Exception as e:
                 logger.warning(f"Failed to remove keys from config: {e}")
     else:
@@ -1216,6 +1310,9 @@ def remove_user_config_keys(keys: list):
 # Load user config on startup
 import sys
 load_user_config()
+_newapi_migration_updates = migrate_legacy_newapi_environment()
+if _newapi_migration_updates:
+    save_user_config(_newapi_migration_updates)
 
 
 
@@ -1235,12 +1332,9 @@ def get_config_info():
 def update_env_config(config: EnvConfig):
     """Updates environment configuration and saves to config file."""
     try:
-        raw_config = config.dict(exclude_unset=True)
+        raw_config = config.model_dump(exclude_unset=True)
 
-        # Extract endpoint_overrides and flatten into config_dict
-        endpoint_overrides = raw_config.pop("endpoint_overrides", {})
-
-        # Filter out None values and serialize enum values as plain strings.
+        # Filter out None values and serialize booleans as environment strings.
         config_dict: Dict[str, str] = {}
         for key, value in raw_config.items():
             if value is None:
@@ -1249,8 +1343,6 @@ def update_env_config(config: EnvConfig):
                 # Booleans (e.g. OSS_ENABLE) persist as "true"/"false" strings so
                 # they round-trip through os.environ and the .env/config.json store.
                 config_dict[key] = "true" if value else "false"
-            elif isinstance(value, ProviderBackend):
-                config_dict[key] = value.value
             else:
                 config_dict[key] = value
 
@@ -1262,28 +1354,12 @@ def update_env_config(config: EnvConfig):
             if field in SECRET_FIELDS and _MASK_CHAR in str(config_dict[field]):
                 config_dict.pop(field, None)
 
-        # Process endpoint overrides: validate keys against known providers
-        from ...utils.endpoints import PROVIDER_DEFAULTS
-        allowed_keys = {f"{p}_BASE_URL" for p in PROVIDER_DEFAULTS}
-        keys_to_remove = []
-        for env_key, value in endpoint_overrides.items():
-            if env_key not in allowed_keys:
-                logger.warning(f"Ignoring unknown endpoint key: {env_key}")
-                continue
-            if value and value.strip():
-                config_dict[env_key] = value.strip()
-            else:
-                # Clear override: remove from env and config file
-                os.environ.pop(env_key, None)
-                keys_to_remove.append(env_key)
-
         # Update current process env
         for key, value in config_dict.items():
             os.environ[key] = value
 
         # Save to file
         save_user_config(config_dict)
-        remove_user_config_keys(keys_to_remove)
 
         # Reset OSS singleton to pick up new config (non-blocking)
         try:
@@ -1975,12 +2051,21 @@ def generate_assets(script_id: str, background_tasks: BackgroundTasks):
 
 class GenerateMotionRefRequest(BaseModel):
     """Request model for generating Motion Reference videos."""
+    model_config = ConfigDict(extra="forbid")
+
     asset_id: str
     asset_type: str  # 'full_body' | 'head_shot' for characters; 'scene' | 'prop' for scenes and props
     prompt: Optional[str] = None
-    audio_url: Optional[str] = None  # Driving audio for lip-sync
+    model: Optional[str] = None
     duration: int = 5
     batch_size: int = 1
+
+    @field_validator("model")
+    @classmethod
+    def validate_video_model(cls, value):
+        if value is not None:
+            get_model_spec(value, VIDEO)
+        return value
 
 
 @app.post("/projects/{script_id}/assets/generate_motion_ref")
@@ -1992,9 +2077,9 @@ def generate_motion_ref(script_id: str, request: GenerateMotionRefRequest, backg
             asset_id=request.asset_id,
             asset_type=request.asset_type,
             prompt=request.prompt,
-            audio_url=request.audio_url,
             duration=request.duration,
-            batch_size=request.batch_size
+            batch_size=request.batch_size,
+            model_id=request.model,
         )
         
         # Add background processing
@@ -2005,8 +2090,8 @@ def generate_motion_ref(script_id: str, request: GenerateMotionRefRequest, backg
         response_data["_task_id"] = task_id
         return signed_response(response_data)
 
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    except (ValueError, MissingNewAPIKeyError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -2027,8 +2112,8 @@ def analyze_to_storyboard(script_id: str, request: AnalyzeToStoryboardRequest):
     try:
         updated_script = pipeline.analyze_text_to_frames(script_id, request.text)
         return signed_response(updated_script)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    except (ValueError, MissingNewAPIKeyError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Error in analyze_to_storyboard: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
@@ -2121,50 +2206,39 @@ def generate_video(script_id: str):
 
 
 
-@app.post("/projects/{script_id}/generate_audio", response_model=Script)
-def generate_audio(script_id: str):
-    """Triggers audio generation."""
-    try:
-        updated_script = pipeline.generate_audio(script_id)
-        return signed_response(updated_script)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-
 class CreateVideoTaskRequest(BaseModel):
-    image_url: str
+    model_config = ConfigDict(extra="forbid")
+
+    image_url: Optional[str] = None
     prompt: str
     frame_id: Optional[str] = None
     duration: int = 5
     seed: Optional[int] = None
     resolution: str = "720p"
     generate_audio: bool = False
-    audio_url: Optional[str] = None
-    prompt_extend: bool = True
-    negative_prompt: Optional[str] = None
     batch_size: int = 1
-    model: str = "wan2.6-i2v"
-    shot_type: str = "single"  # 'single' or 'multi' (only for wan2.6-i2v)
-    generation_mode: str = "i2v"  # 'i2v' (image-to-video) or 'r2v' (reference-to-video)
-    reference_video_urls: List[str] = []  # Reference video URLs for R2V (max 3)
-    # Kling params
-    mode: Optional[str] = None
-    sound: Optional[str] = None
-    cfg_scale: Optional[float] = None
-    # Vidu params
-    vidu_audio: Optional[bool] = None
-    movement_amplitude: Optional[str] = None
-    # HappyHorse params
-    reference_image_urls: List[str] = []  # Reference image URLs for HH R2V (max 9)
-    ratio: Optional[str] = None  # Aspect ratio for HH T2V/R2V
-    # Watermark toggle (wan / kling / vidu / pixverse / happyhorse video).
-    # None = leave to provider default; True/False = explicit user choice.
+    model: Optional[str] = None
+    generation_mode: str = "i2v"
+    ratio: Optional[str] = None
     watermark: Optional[bool] = None
     # Source tab in the Storyboard R2V workbench. Distinct from
     # generation_mode (backend dispatcher hint) — used by the candidates
     # panel to group takes per UI tab on refresh.
     workbench_tab: Optional[str] = None  # 't2i_i2v' | 'direct_r2v'
+
+    @field_validator("model")
+    @classmethod
+    def validate_video_model(cls, value):
+        if value is not None:
+            get_model_spec(value, VIDEO)
+        return value
+
+    @field_validator("generation_mode")
+    @classmethod
+    def validate_generation_mode(cls, value):
+        if value not in {"t2v", "i2v"}:
+            raise ValueError("New API video generation supports only t2v and i2v")
+        return value
 
 
 def process_video_task(script_id: str, task_id: str):
@@ -2289,21 +2363,10 @@ def create_video_task(script_id: str, request: CreateVideoTaskRequest, backgroun
                 seed=request.seed,
                 resolution=request.resolution,
                 generate_audio=request.generate_audio,
-                audio_url=request.audio_url,
-                prompt_extend=request.prompt_extend,
-                negative_prompt=request.negative_prompt,
                 model=request.model,
-                shot_type=request.shot_type,
                 generation_mode=request.generation_mode,
-                reference_video_urls=request.reference_video_urls,
-                reference_image_urls=request.reference_image_urls,
                 ratio=request.ratio,
                 watermark=request.watermark,
-                mode=request.mode,
-                sound=request.sound,
-                cfg_scale=request.cfg_scale,
-                vidu_audio=request.vidu_audio,
-                movement_amplitude=request.movement_amplitude,
                 workbench_tab=request.workbench_tab,
             )
 
@@ -2317,7 +2380,7 @@ def create_video_task(script_id: str, request: CreateVideoTaskRequest, backgroun
 
         return signed_response(tasks)
 
-    except ValueError as e:
+    except (ValueError, MissingNewAPIKeyError) as e:
         # Validation failures from pipeline.create_video_task (model⇄
         # mode⇄refs mismatch, missing references for R2V, etc.) are
         # the user's responsibility to fix — surface as 400 so the
@@ -2358,8 +2421,8 @@ def generate_single_asset(script_id: str, request: GenerateAssetRequest, backgro
         response_data["_task_id"] = task_id
         return signed_response(response_data)
 
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    except (ValueError, MissingNewAPIKeyError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -2381,9 +2444,19 @@ def get_task_status(task_id: str):
 
 
 class GenerateAssetVideoRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     prompt: Optional[str] = None
     duration: int = 5
     aspect_ratio: Optional[str] = None
+    model: Optional[str] = None
+
+    @field_validator("model")
+    @classmethod
+    def validate_video_model(cls, value):
+        if value is not None:
+            get_model_spec(value, VIDEO)
+        return value
 
 
 @app.post("/projects/{script_id}/assets/{asset_type}/{asset_id}/generate_video", response_model=Script)
@@ -2396,7 +2469,8 @@ def generate_asset_video(script_id: str, asset_type: str, asset_id: str, request
             asset_type,
             request.prompt,
             request.duration,
-            request.aspect_ratio
+            request.aspect_ratio,
+            request.model,
         )
         
         # Add background processing
@@ -2404,8 +2478,8 @@ def generate_asset_video(script_id: str, asset_type: str, asset_id: str, request
         
         return signed_response(script)
 
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    except (ValueError, MissingNewAPIKeyError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -2600,12 +2674,13 @@ def update_model_settings(script_id: str, request: UpdateModelSettingsRequest):
             request.t2i_model,
             request.i2i_model,
             request.i2v_model,
-            r2v_model=request.r2v_model,
             character_aspect_ratio=request.character_aspect_ratio,
             scene_aspect_ratio=request.scene_aspect_ratio,
             prop_aspect_ratio=request.prop_aspect_ratio,
             storyboard_aspect_ratio=request.storyboard_aspect_ratio,
             image_model=request.image_model,
+            chat_model=request.chat_model,
+            video_model=request.video_model,
         )
         return signed_response(updated_script)
     except ValueError as e:
@@ -2617,7 +2692,6 @@ def update_model_settings(script_id: str, request: UpdateModelSettingsRequest):
 class UpdatePromptConfigRequest(BaseModel):
     storyboard_polish: str = ""
     video_polish: str = ""
-    r2v_polish: str = ""
     entity_extraction: str = ""
     style_analysis: str = ""
     storyboard_extraction: str = ""
@@ -2636,7 +2710,6 @@ def get_prompt_config(script_id: str):
             "defaults": {
                 "storyboard_polish": DEFAULT_STORYBOARD_POLISH_PROMPT,
                 "video_polish": DEFAULT_VIDEO_POLISH_PROMPT,
-                "r2v_polish": DEFAULT_R2V_POLISH_PROMPT,
                 "storyboard_extraction": DEFAULT_STORYBOARD_EXTRACTION_PROMPT,
             }
         }
@@ -2654,15 +2727,12 @@ def update_prompt_config(script_id: str, request: UpdatePromptConfigRequest):
         if not script:
             raise HTTPException(status_code=404, detail="Project not found")
         existing = getattr(script, "prompt_config", None)
-        preserved_polish_model = getattr(existing, "polish_model", "") if existing else ""
         script.prompt_config = PromptConfig(
             storyboard_polish=request.storyboard_polish,
             video_polish=request.video_polish,
-            r2v_polish=request.r2v_polish,
             entity_extraction=request.entity_extraction,
             style_analysis=request.style_analysis,
             storyboard_extraction=request.storyboard_extraction,
-            polish_model=preserved_polish_model,
         )
         pipeline._save_data()
         return {"prompt_config": script.prompt_config.model_dump()}
@@ -2683,281 +2753,17 @@ def get_prompt_defaults():
     return {
         "storyboard_polish": DEFAULT_STORYBOARD_POLISH_PROMPT,
         "video_polish": DEFAULT_VIDEO_POLISH_PROMPT,
-        "r2v_polish": DEFAULT_R2V_POLISH_PROMPT,
         "entity_extraction": DEFAULT_ENTITY_EXTRACTION_PROMPT,
         "style_analysis": DEFAULT_STYLE_ANALYSIS_PROMPT,
         "storyboard_extraction": DEFAULT_STORYBOARD_EXTRACTION_PROMPT,
     }
 
 
-class BindVoiceRequest(BaseModel):
-    voice_id: str
-    voice_name: str
-
-
-@app.post("/projects/{script_id}/characters/{char_id}/voice", response_model=Script)
-def bind_voice(script_id: str, char_id: str, request: BindVoiceRequest):
-    """Binds a voice to a character."""
-    try:
-        updated_script = pipeline.bind_voice(script_id, char_id, request.voice_id, request.voice_name)
-        return signed_response(updated_script)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-class UpdateVoiceParamsRequest(BaseModel):
-    speed: float = 1.0
-    pitch: float = 1.0
-    volume: int = 50
-
-
-@app.put("/projects/{script_id}/characters/{char_id}/voice_params", response_model=Script)
-def update_voice_params(script_id: str, char_id: str, request: UpdateVoiceParamsRequest):
-    """Updates voice parameters for a character."""
-    script = pipeline.get_script(script_id)
-    if not script:
-        raise HTTPException(status_code=404, detail="Script not found")
-    char = next((c for c in script.characters if c.id == char_id), None)
-    if not char:
-        raise HTTPException(status_code=404, detail="Character not found")
-    char.voice_speed = request.speed
-    char.voice_pitch = request.pitch
-    char.voice_volume = request.volume
-    pipeline._save_data()
-    return signed_response(script)
-
-
-@app.get("/voices")
-def get_voices():
-    """Returns list of available voices."""
-    return pipeline.audio_generator.get_available_voices()
-
-
-class VoicePreviewRequest(BaseModel):
-    """PR-3g #3 · request shape for /voice/preview endpoint.
-
-    Backs the Voice picker modal's inline ▶ button. Frontend hits this
-    when user previews a voice card; backend either returns a cached
-    URL or generates fresh audio via TTSProcessor.
-    """
-    voice_id: str
-    text: str
-    speed: float = 1.0
-    pitch: float = 1.0
-    volume: int = 50
-    instructions: Optional[str] = None
-
-
-@app.post("/voice/preview")
-def voice_preview(request: VoicePreviewRequest):
-    """Generate or fetch cached preview audio for a voice.
-
-    Cache key = md5(voice_id|text|speed|pitch|volume|instructions). First
-    call triggers TTSProcessor.synthesize() and writes to
-    output/cache/voice_preview/{key}.mp3. Subsequent identical calls
-    return the cached URL instantly.
-
-    PR-3h #2: handles CUSTOM voices (clones/designs) by looking up
-    series.custom_voices[] for target_model + family overrides — required
-    because cloned voice_ids aren't in static TTS_VOICE_REGISTRY.
-
-    Spec: r2v-workflow-v3-unified.md §4.2.3 (cache strategy) + Q5 b/c.
-    """
-    import hashlib
-    if not pipeline.audio_generator.tts:
-        raise HTTPException(
-            status_code=503,
-            detail="TTS service unavailable. Check DASHSCOPE_API_KEY configuration.",
-        )
-
-    # PR-3h #2: resolve custom voice → target_model/family override
-    custom = pipeline.find_custom_voice(request.voice_id)
-    model_override = custom.target_model if custom else None
-    family_override = custom.family if custom else None
-
-    cache_dir = "output/cache/voice_preview"
-    os.makedirs(cache_dir, exist_ok=True)
-    cache_key = hashlib.md5(
-        f"{request.voice_id}|{request.text}|{request.speed}|{request.pitch}|{request.volume}|{request.instructions or ''}".encode("utf-8")
-    ).hexdigest()
-    cache_path = os.path.join(cache_dir, f"{cache_key}.mp3")
-    cached = os.path.exists(cache_path)
-
-    if not cached:
-        try:
-            pipeline.audio_generator.tts.synthesize(
-                text=request.text,
-                output_path=cache_path,
-                voice=request.voice_id,
-                speech_rate=request.speed,
-                pitch_rate=request.pitch,
-                volume=request.volume,
-                instructions=request.instructions,
-                model_override=model_override,
-                family_override=family_override,
-            )
-        except Exception as e:
-            logger.error(f"[/voice/preview] TTS error voice={request.voice_id}: {e}")
-            raise HTTPException(status_code=500, detail=f"TTS generation failed: {e}")
-
-    # Static mount /files maps to output/, so the relative path under output/
-    # becomes the URL path frontend can hit. signed_response wraps for OSS
-    # signing when configured, no-op otherwise.
-    url = f"cache/voice_preview/{cache_key}.mp3"
-    return signed_response({"url": url, "cached": cached})
-
-
 # ─────────────────────────────────────────────────────────────
-# PR-3h · Voice clone endpoints
-# Per Q16: series-level scope for custom voices. Frontend uploads audio
-# via existing /upload (gets URL), then calls /voice/clone with that URL.
 # ─────────────────────────────────────────────────────────────
 
-class VoiceCloneRequest(BaseModel):
-    """PR-3h request: clone a voice from a reference audio URL.
-
-    Frontend pre-validates: ≤10MB, MP3/WAV/M4A, ≥16kHz, 10-20s recommended.
-    """
-    series_id: str
-    audio_url: str
-    label: str
-    target_model: str = "cosyvoice-v3.5-plus"
-
-
-@app.post("/voice/clone")
-def voice_clone(request: VoiceCloneRequest):
-    """Create a custom voice by cloning a reference audio sample.
-
-    Per Q15.2: stored at series level so any character in the series can
-    pick from the clone via the VoicePickerModal '我的复刻' tab.
-    """
-    try:
-        custom = pipeline.create_voice_clone(
-            series_id=request.series_id,
-            audio_url=request.audio_url,
-            label=request.label,
-            target_model=request.target_model,
-        )
-        return signed_response(custom)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/series/{series_id}/custom_voices")
-def list_series_custom_voices(series_id: str):
-    """Return all custom voices (clones + designs) in a series."""
-    voices = pipeline.list_custom_voices(series_id)
-    return signed_response(voices)
-
-
-@app.delete("/series/{series_id}/custom_voices/{voice_id}")
-def delete_series_custom_voice(series_id: str, voice_id: str):
-    """Remove a custom voice from a series.
-
-    Note: does NOT delete on dashscope side (24h retention is best-effort).
-    If a character has this voice_id bound, the binding becomes orphaned
-    (frontend should warn before delete in v2).
-    """
-    removed = pipeline.delete_custom_voice(series_id, voice_id)
-    if not removed:
-        raise HTTPException(status_code=404, detail="Custom voice not found")
-    return signed_response({"removed": True})
-
-
 # ─────────────────────────────────────────────────────────────
-# PR-3i · Voice design endpoints
-# Iterative pattern: preview → (tweak prompt) → preview → accept.
-# Each preview mints a NEW voice on dashscope; only accept persists.
 # ─────────────────────────────────────────────────────────────
-
-class VoiceDesignPreviewRequest(BaseModel):
-    voice_prompt: str
-    preview_text: str = "你好，这是一段音色测试。请仔细听一听是否符合预期。"
-    target_model: str = "cosyvoice-v3.5-plus"
-
-
-@app.post("/voice/design/preview")
-def voice_design_preview(request: VoiceDesignPreviewRequest):
-    """Mint a fresh design voice and return a preview audio URL.
-
-    The user re-calls this with a tweaked voice_prompt to iterate.
-    Returns: {voice_id, preview_url, target_model}.
-    """
-    try:
-        result = pipeline.voice_design_preview(
-            voice_prompt=request.voice_prompt,
-            preview_text=request.preview_text,
-            target_model=request.target_model,
-        )
-        return signed_response(result)
-    except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-class VoiceDesignSaveRequest(BaseModel):
-    series_id: str
-    voice_id: str
-    voice_prompt: str
-    label: str
-    target_model: str = "cosyvoice-v3.5-plus"
-
-
-@app.post("/voice/design/accept")
-def voice_design_accept(request: VoiceDesignSaveRequest):
-    """Persist a previewed design voice into series.custom_voices[]."""
-    try:
-        custom = pipeline.voice_design_save(
-            series_id=request.series_id,
-            voice_id=request.voice_id,
-            voice_prompt=request.voice_prompt,
-            label=request.label,
-            target_model=request.target_model,
-        )
-        return signed_response(custom)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-class VoiceDesignTranslateRequest(BaseModel):
-    description: str
-
-
-@app.post("/voice/design/translate")
-def voice_design_translate(request: VoiceDesignTranslateRequest):
-    """LLM helper: character.description → CosyVoice voice_prompt."""
-    if not request.description.strip():
-        raise HTTPException(status_code=400, detail="description is empty")
-    try:
-        voice_prompt = pipeline.translate_character_to_voice_prompt(request.description)
-        return {"voice_prompt": voice_prompt}
-    except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-class GenerateLineAudioRequest(BaseModel):
-    speed: float = 1.0
-    pitch: float = 1.0
-    volume: int = 50
-    instructions: Optional[str] = None  # PR-3j · chip emotion + free text
-
-
-@app.post("/projects/{script_id}/frames/{frame_id}/audio", response_model=Script)
-def generate_line_audio(script_id: str, frame_id: str, request: GenerateLineAudioRequest):
-    """Generates audio for a specific frame with parameters."""
-    try:
-        updated_script = pipeline.generate_dialogue_line(
-            script_id, frame_id,
-            request.speed, request.pitch, request.volume,
-            instructions=request.instructions,
-        )
-        return signed_response(updated_script)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 
 # ─────────────────────────────────────────────────────────────
 # PR-3k · Audio mix endpoints (BGM presets + per-script mix settings)
@@ -3044,94 +2850,6 @@ def revert_frame_dub(script_id: str, frame_id: str):
         return signed_response(updated_script)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-
-
-@app.post("/projects/{script_id}/dialogue_audio/batch")
-def generate_dialogue_audio_batch(script_id: str):
-    """PR-3j · Generate audio for every frame that has dialogue.
-
-    Idempotent re-use: frames whose audio is already up-to-date (matching
-    text/voice/instructions hash) are skipped. Stale + missing frames get
-    regenerated using each character's bound voice.
-
-    Returns the updated script plus _batch_stats with generated/skipped/failed counts.
-    """
-    from .audio import dialogue_audio_is_stale
-    try:
-        script = pipeline.get_script(script_id)
-        if not script:
-            raise HTTPException(status_code=404, detail="Script not found")
-        char_lookup = {c.id: c for c in script.characters}
-        char_name_lookup = {c.name.strip().lower(): c for c in script.characters}
-        generated = 0
-        skipped = 0
-        failed = 0
-        no_voice = 0
-        for frame in script.frames:
-            dialogue_text = (
-                (frame.dialogue_structured.line if hasattr(frame, 'dialogue_structured') and frame.dialogue_structured else None)
-                or frame.dialogue
-            )
-            if not dialogue_text:
-                continue
-            speaker = None
-            if frame.character_ids:
-                speaker = char_lookup.get(frame.character_ids[0])
-            speaker_name = frame.speaker or (
-                frame.dialogue_structured.speaker if frame.dialogue_structured else None
-            )
-            if not speaker and speaker_name:
-                key = speaker_name.strip().lower()
-                speaker = char_name_lookup.get(key)
-                if not speaker:
-                    for name, char in char_name_lookup.items():
-                        if key in name or name in key:
-                            speaker = char
-                            break
-            if not speaker or not speaker.voice_id:
-                no_voice += 1
-                continue
-            if frame.audio_url and not dialogue_audio_is_stale(frame, speaker):
-                skipped += 1
-                continue
-            try:
-                pipeline.generate_dialogue_line(script_id, frame.id)
-                generated += 1
-            except Exception as exc:
-                logger.error(f"[batch_dialogue_audio] frame={frame.id} error={exc}")
-                failed += 1
-        logger.info(f"[batch_dialogue_audio] script={script_id} generated={generated} skipped={skipped} failed={failed} no_voice={no_voice}")
-        script = pipeline.get_script(script_id)
-        response_data = script.model_dump() if hasattr(script, 'model_dump') else script.dict()
-        response_data["_batch_stats"] = {"generated": generated, "skipped": skipped, "failed": failed, "no_voice": no_voice}
-        return signed_response(response_data)
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/projects/{script_id}/mix/generate_sfx", response_model=Script)
-def generate_mix_sfx(script_id: str):
-    """Triggers Video-to-Audio SFX generation for all frames."""
-    # Re-using generate_audio for now as it covers everything, 
-    # but ideally we'd have granular methods in pipeline.
-    # Let's just call generate_audio again, it's idempotent-ish.
-    try:
-        updated_script = pipeline.generate_audio(script_id)
-        return signed_response(updated_script)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/projects/{script_id}/mix/generate_bgm", response_model=Script)
-def generate_mix_bgm(script_id: str):
-    """Triggers BGM generation."""
-    try:
-        updated_script = pipeline.generate_audio(script_id)
-        return signed_response(updated_script)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 class ToggleFrameLockRequest(BaseModel):
@@ -3662,11 +3380,10 @@ def _get_custom_prompt(script_id: str, field: str) -> str:
     series = pipeline.get_series(script.series_id) if script.series_id else None
     effective = pipeline.get_effective_prompt(field, script, series)
     # If it's the system default, return empty so the LLM method uses its built-in default
-    from .llm import DEFAULT_STORYBOARD_POLISH_PROMPT, DEFAULT_VIDEO_POLISH_PROMPT, DEFAULT_R2V_POLISH_PROMPT
+    from .llm import DEFAULT_STORYBOARD_POLISH_PROMPT, DEFAULT_VIDEO_POLISH_PROMPT
     defaults = {
         "storyboard_polish": DEFAULT_STORYBOARD_POLISH_PROMPT,
         "video_polish": DEFAULT_VIDEO_POLISH_PROMPT,
-        "r2v_polish": DEFAULT_R2V_POLISH_PROMPT,
     }
     if effective == defaults.get(field, ""):
         return ""
@@ -3674,26 +3391,19 @@ def _get_custom_prompt(script_id: str, field: str) -> str:
 
 
 def _get_polish_model_for_project(script_id: str) -> str:
-    """Read polish_model with 3-level fallback: Episode.prompt_config → Series.prompt_config → "".
-    Empty = LLMAdapter uses its default (qwen3.6-plus). The frontend's polish-model dropdown
-    in PromptConfig modal writes here; backend just reads."""
+    """Resolve the project's active chat selection with series/global fallback."""
     if not script_id:
-        return ""
+        return get_selected_model(CHAT)
     script = pipeline.get_script(script_id)
     if not script:
-        return ""
-    # Episode first
-    ep_pc = getattr(script, "prompt_config", None)
-    if ep_pc and getattr(ep_pc, "polish_model", ""):
-        return ep_pc.polish_model
-    # Series fallback
+        return get_selected_model(CHAT)
+    if getattr(script, "model_settings", None):
+        return get_model_spec(script.model_settings.chat_model, CHAT).model_id
     if getattr(script, "series_id", None):
         series = pipeline.get_series(script.series_id)
-        if series:
-            s_pc = getattr(series, "prompt_config", None)
-            if s_pc and getattr(s_pc, "polish_model", ""):
-                return s_pc.polish_model
-    return ""
+        if series and getattr(series, "model_settings", None):
+            return get_model_spec(series.model_settings.chat_model, CHAT).model_id
+    return get_selected_model(CHAT)
 
 
 class PolishVideoPromptRequest(BaseModel):
@@ -3708,6 +3418,13 @@ class PolishVideoPromptRequest(BaseModel):
     # 显式覆盖 polish 用的 LLM 模型；空 = 用 project / series PromptConfig
     # 的 polish_model（再 fallback 到 system default）。
     polish_model: str = ""
+
+    @field_validator("polish_model")
+    @classmethod
+    def validate_polish_model(cls, value):
+        if value:
+            get_model_spec(value, CHAT)
+        return value
 
 
 def _polish_error_response(err) -> Dict[str, Any]:
@@ -3730,8 +3447,8 @@ def polish_video_prompt(request: PolishVideoPromptRequest):
     """Polishes a video generation prompt using LLM. Returns bilingual prompts.
 
     NOTE: Defined as a SYNC handler on purpose. The body calls
-    `processor.polish_video_prompt()` which makes a blocking HTTP call to
-    DashScope (openai sync client). If declared `async def`, FastAPI would
+    `processor.polish_video_prompt()` which makes a blocking New API HTTP call
+    through the OpenAI-compatible sync client. If declared `async def`, FastAPI would
     run it on the event loop itself — blocking ALL other endpoints for the
     10-30s LLM call (e.g. concurrent `GET /prompt_config` from the modal
     looks "stuck loading"). Sync handlers get auto-dispatched to anyio's
@@ -3769,97 +3486,11 @@ def polish_video_prompt(request: PolishVideoPromptRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-class RefSlot(BaseModel):
-    description: str  # Character name, e.g., "雷震", "白兔"
-
-
-class PolishR2VPromptRequest(BaseModel):
-    draft_prompt: str
-    slots: List[RefSlot]
-    feedback: str = Field("", max_length=2000)  # User feedback for iterative refinement
-    script_id: str = ""  # Optional: project ID to load custom prompt config
-    prev_cn: str = ""  # 双语锚点迭代用，首次留空
-    # R2V 模式：用户挂载的 character1/2/3 参考图 URL(s)，让 vision 模型
-    # 看清各角色实际形象。空列表 = 纯文本润色（兼容旧调用方）。
-    image_urls: List[str] = Field(default_factory=list, max_length=9)
-    polish_model: str = ""
-
-
-@app.post("/video/polish_r2v_prompt")
-def polish_r2v_prompt(request: PolishR2VPromptRequest):
-    """Polishes a R2V (Reference-to-Video) prompt using LLM. Returns bilingual prompts.
-    错误约定同 /video/polish_prompt。
-    SYNC handler on purpose — see polish_video_prompt for rationale."""
-    from .llm import PolishError
-    try:
-        custom_prompt = _get_custom_prompt(request.script_id, "r2v_polish")
-        polish_model = request.polish_model or _get_polish_model_for_project(request.script_id)
-        processor = ScriptProcessor()
-        slot_info = [{"description": s.description} for s in request.slots]
-        result = processor.polish_r2v_prompt(
-            request.draft_prompt,
-            slot_info,
-            request.feedback,
-            custom_prompt,
-            request.prev_cn,
-            image_urls=request.image_urls or None,
-            polish_model=polish_model,
-        )
-        return {
-            "prompt_cn": result.get("prompt_cn", ""),
-            "prompt_en": result.get("prompt_en", "")
-        }
-    except PolishError as e:
-        logger.warning("polish_r2v_prompt failed: %s", e)
-        raise HTTPException(status_code=502, detail=_polish_error_response(e))
-    except Exception as e:
-        logger.exception("polish_r2v_prompt unexpected error")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# ===== Environment Configuration Endpoints =====
-
-def _check_mulerun_cli_status() -> bool:
-    """Check if MuleRun CLI is installed and logged in."""
-    try:
-        import shutil, subprocess
-        if shutil.which("mulerun") is None:
-            return False
-        result = subprocess.run(
-            ["mulerun", "login", "status"],
-            capture_output=True, text=True, timeout=5
-        )
-        return result.returncode == 0
-    except Exception:
-        return False
-
-
-@app.post("/config/mulerun-login")
-def trigger_mulerun_login():
-    """Trigger mulerun login — opens browser for OAuth."""
-    import shutil, subprocess
-    if shutil.which("mulerun") is None:
-        raise HTTPException(status_code=400, detail="MuleRun CLI 未安装。请先运行: npm i -g @mulerunai/cli")
-    try:
-        subprocess.Popen(
-            ["mulerun", "login"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        return {"status": "ok", "message": "浏览器已打开，请完成登录"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"启动登录失败: {e}")
-
-
 # Credential-like env fields that must never be returned in plaintext.
 SECRET_FIELDS = {
-    "DASHSCOPE_API_KEY",
+    *MODEL_API_KEY_FIELDS,
     "ALIBABA_CLOUD_ACCESS_KEY_ID",
     "ALIBABA_CLOUD_ACCESS_KEY_SECRET",
-    "KLING_ACCESS_KEY",
-    "KLING_SECRET_KEY",
-    "VIDU_API_KEY",
-    "MULEROUTER_API_KEY",
 }
 
 # Bullet sentinel: never appears in a real key, so the save path can detect an
@@ -3885,17 +3516,9 @@ def get_env_config():
     Secrets are masked (bullets + last 4 chars) and never returned in
     plaintext. `secrets_configured` reports which credential fields are set so
     the frontend can drive required-field / validation logic without the raw
-    value. Non-secret config (OSS bucket/endpoint/base path, provider modes,
-    endpoint overrides) is returned as-is."""
+    value."""
     try:
-        from ...utils.endpoints import PROVIDER_DEFAULTS
         from ...utils.oss_utils import is_oss_enabled
-        endpoint_overrides = {}
-        for provider in PROVIDER_DEFAULTS:
-            env_key = f"{provider}_BASE_URL"
-            value = os.getenv(env_key)
-            if value:
-                endpoint_overrides[env_key] = value
 
         secrets_configured = {
             field: bool((os.getenv(field, "") or "").strip())
@@ -3904,23 +3527,19 @@ def get_env_config():
 
         return {
             # Masked secrets — never plaintext.
-            "DASHSCOPE_API_KEY": _mask_secret(os.getenv("DASHSCOPE_API_KEY")),
+            **{field: _mask_secret(os.getenv(field)) for field in MODEL_API_KEY_FIELDS},
             "ALIBABA_CLOUD_ACCESS_KEY_ID": _mask_secret(os.getenv("ALIBABA_CLOUD_ACCESS_KEY_ID")),
             "ALIBABA_CLOUD_ACCESS_KEY_SECRET": _mask_secret(os.getenv("ALIBABA_CLOUD_ACCESS_KEY_SECRET")),
-            "KLING_ACCESS_KEY": _mask_secret(os.getenv("KLING_ACCESS_KEY")),
-            "KLING_SECRET_KEY": _mask_secret(os.getenv("KLING_SECRET_KEY")),
-            "VIDU_API_KEY": _mask_secret(os.getenv("VIDU_API_KEY")),
-            "MULEROUTER_API_KEY": _mask_secret(os.getenv("MULEROUTER_API_KEY")),
             # Non-secret config.
+            "NEWAPI_BASE_URL": os.getenv("NEWAPI_BASE_URL", ""),
+            "NEWAPI_CHAT_MODEL": get_selected_model(CHAT, migrate_stale=True),
+            "NEWAPI_IMAGE_MODEL": get_selected_model(IMAGE, migrate_stale=True),
+            "NEWAPI_VIDEO_MODEL": get_selected_model(VIDEO, migrate_stale=True),
+            "NEWAPI_MODELS": public_model_status(),
             "OSS_BUCKET_NAME": os.getenv("OSS_BUCKET_NAME", ""),
             "OSS_ENDPOINT": os.getenv("OSS_ENDPOINT", ""),
             "OSS_BASE_PATH": os.getenv("OSS_BASE_PATH", ""),
             "OSS_ENABLE": is_oss_enabled(),
-            "MULERUN_CLI_LOGGED_IN": _check_mulerun_cli_status(),
-            "KLING_PROVIDER_MODE": _normalize_provider_mode(os.getenv("KLING_PROVIDER_MODE")),
-            "VIDU_PROVIDER_MODE": _normalize_provider_mode(os.getenv("VIDU_PROVIDER_MODE")),
-            "PIXVERSE_PROVIDER_MODE": _normalize_provider_mode(os.getenv("PIXVERSE_PROVIDER_MODE")),
-            "endpoint_overrides": endpoint_overrides,
             "secrets_configured": secrets_configured,
         }
     except Exception as e:

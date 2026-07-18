@@ -47,8 +47,7 @@ export interface VideoTask {
     duration?: number;
     created_at: number;
     model?: string;
-    generation_mode?: string;  // 'i2v' or 'r2v'
-    reference_video_urls?: string[];  // Reference videos for R2V
+    generation_mode?: "t2v" | "i2v";
 }
 
 export interface Character {
@@ -79,8 +78,6 @@ export interface Character {
     video_assets?: VideoTask[];
     video_prompt?: string;
 
-    voice_id?: string;
-    voice_name?: string;
     locked?: boolean;
     starred?: boolean;
     status?: string;
@@ -197,23 +194,10 @@ export interface VideoParams {
     duration: number;
     seed: number | undefined;
     generateAudio: boolean;
-    audioUrl: string;
-    promptExtend: boolean;
-    negativePrompt: string;
     batchSize: number;
-    cameraMovement: string;
-    subjectMotion: string;
     model: string;
-    shotType: string;
-    generationMode: string;
-    referenceVideoUrls: string[];
-    // Kling
-    mode: string;
-    sound: boolean;
-    cfgScale: number;
-    // Vidu
-    viduAudio: boolean;
-    movementAmplitude: string;
+    ratio: string;
+    watermark: boolean;
 }
 
 /** 将动态列数映射为完整的 Tailwind class（避免 JIT 扫描不到动态拼接） */
@@ -227,7 +211,6 @@ export const GRID_COLS_CLASS: Record<number, string> = {
 export interface PromptConfig {
     storyboard_polish: string;
     video_polish: string;
-    r2v_polish: string;
     storyboard_extraction?: string;
 }
 
@@ -242,9 +225,7 @@ export interface Series {
     prompt_config?: PromptConfig;
     model_settings?: ModelSettings;
     workflow_mode?: "r2v" | "i2v_legacy";
-    /** PR-3e — Visual control preference. 'r2v' = 节奏优先 (new shots default
-     *  direct_r2v); 'i2v' = 画面优先 (new shots default t2i_i2v). */
-    default_generation_mode?: "r2v" | "i2v";
+    default_generation_mode?: "i2v";
     episode_ids: string[];
     created_at: number;
     updated_at: number;
@@ -268,9 +249,7 @@ export interface Project {
     model_settings?: ModelSettings;
     prompt_config?: PromptConfig;
     workflow_mode?: "i2v_legacy" | "r2v";
-    /** PR-3e — Inherited from series; used by StoryboardR2V addShot to
-     *  pick default tabMode for new shots. */
-    default_generation_mode?: "r2v" | "i2v";
+    default_generation_mode?: "i2v";
     merged_video_url?: string;
     /** PR-3k · Assembly Mix phase fields */
     bgm_url?: string | null;
@@ -365,7 +344,6 @@ async function injectDefaultsIntoProject(projectId: string): Promise<Project | n
     const pc = readLS<{
         storyboard_polish?: string;
         video_polish?: string;
-        r2v_polish?: string;
         entity_extraction?: string;
         style_analysis?: string;
         storyboard_extraction?: string;
@@ -374,18 +352,18 @@ async function injectDefaultsIntoProject(projectId: string): Promise<Project | n
     let applied = false;
 
     if (ms) {
-        await api.updateModelSettings(
-            projectId,
-            ms.t2i_model,
-            ms.i2i_model,
-            ms.i2v_model,
-            ms.character_aspect_ratio,
-            ms.scene_aspect_ratio,
-            ms.prop_aspect_ratio,
-            ms.storyboard_aspect_ratio,
-            ms.image_model,
-            ms.r2v_model,
-        );
+        await api.updateModelSettings(projectId, {
+            chat_model: ms.chat_model,
+            t2i_model: ms.image_model ?? ms.t2i_model,
+            i2i_model: ms.image_model ?? ms.i2i_model,
+            image_model: ms.image_model,
+            i2v_model: ms.video_model ?? ms.i2v_model,
+            video_model: ms.video_model ?? ms.i2v_model,
+            character_aspect_ratio: ms.character_aspect_ratio,
+            scene_aspect_ratio: ms.scene_aspect_ratio,
+            prop_aspect_ratio: ms.prop_aspect_ratio,
+            storyboard_aspect_ratio: ms.storyboard_aspect_ratio,
+        });
         applied = true;
     }
 
@@ -441,7 +419,7 @@ export const useProjectStore = create<ProjectStore>()(
             // Sync projects from backend
             setProjects: (projects: Project[]) => set({ projects }),
 
-            createProject: async (title: string, text: string, skipAnalysis: boolean = false, workflowMode: string = "r2v", seriesId?: string) => {
+            createProject: async (title: string, text: string, skipAnalysis: boolean = false, workflowMode: string = "i2v_legacy", seriesId?: string) => {
                 set({ isLoading: true });
                 try {
                     let project = await api.createProject(title, text, skipAnalysis, workflowMode, seriesId);
@@ -692,9 +670,9 @@ export const useProjectStore = create<ProjectStore>()(
                 }
             },
 
-            createSeries: async (title: string, description?: string, workflowMode?: string) => {
+            createSeries: async (title: string, description?: string, _workflowMode?: string) => {
                 try {
-                    const series = await api.createSeries(title, description, workflowMode);
+                    const series = await api.createSeries(title, description, "i2v_legacy");
                     set((state) => ({
                         seriesList: [...state.seriesList, series],
                     }));

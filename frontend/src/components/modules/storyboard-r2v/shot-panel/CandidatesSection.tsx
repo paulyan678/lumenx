@@ -30,8 +30,7 @@ import CandidateThumb from "./CandidateThumb";
 interface CandidatesSectionProps {
     shotId: string;
     tasks: VideoTask[];
-    /** Tasks pre-filtered to a specific tab (t2i_i2v / direct_r2v) so
-     *  candidates from the other tab don't leak in. */
+    /** Tasks pre-filtered to the active generation workflow. */
     activeModel?: string;
     compareSelectedIds: Set<string>;
     /** Dub info: if a task was dubbed, show dubbed version in its thumb. */
@@ -80,8 +79,7 @@ function groupIntoBatches(tasks: VideoTask[]): BatchSummary[] {
         const sameCluster =
             (next.created_at - prev.created_at) * 1000 < BATCH_GAP_MS &&
             next.model === prev.model &&
-            next.prompt === prev.prompt &&
-            (next.negative_prompt ?? "") === (prev.negative_prompt ?? "");
+            next.prompt === prev.prompt;
         if (sameCluster) {
             current.push(next);
         } else {
@@ -93,7 +91,6 @@ function groupIntoBatches(tasks: VideoTask[]): BatchSummary[] {
     return batches.map((bt) => {
         const first = bt[0];
         const parts: string[] = [];
-        if (first.negative_prompt) parts.push(`neg="${first.negative_prompt.slice(0, 24)}"`);
         if (first.resolution) parts.push(first.resolution);
         if (first.ratio) parts.push(first.ratio);
         const summary = parts.length ? parts.join(" · ") : "default params";
