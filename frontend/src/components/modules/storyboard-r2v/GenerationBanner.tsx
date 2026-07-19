@@ -22,19 +22,6 @@ export function GenerationBanner({
     refineProgress,
     summary,
 }: GenerationBannerProps) {
-    const [captionIndex, setCaptionIndex] = useState(0);
-
-    useEffect(() => {
-        if (state !== "phase1") {
-            setCaptionIndex(0);
-            return;
-        }
-        const timer = setInterval(() => {
-            setCaptionIndex((i) => (i + 1) % phase1Captions.length);
-        }, CAPTION_INTERVAL);
-        return () => clearInterval(timer);
-    }, [state, phase1Captions.length]);
-
     const t = useTranslations("storyboardR2V");
 
     if (state === "idle") return null;
@@ -43,21 +30,7 @@ export function GenerationBanner({
     return (
         <AnimatePresence mode="wait">
             {state === "phase1" && (
-                <BannerShell key="phase1">
-                    <Loader2 size={14} className="animate-spin text-status-completed-fg shrink-0" strokeWidth={1.8} />
-                    <AnimatePresence mode="wait">
-                        <motion.span
-                            key={captionIndex}
-                            initial={{ opacity: 0, y: 4 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -4 }}
-                            transition={{ duration: 0.25 }}
-                            className="text-[0.8125rem] text-text-secondary"
-                        >
-                            {phase1Captions[captionIndex]}
-                        </motion.span>
-                    </AnimatePresence>
-                </BannerShell>
+                <Phase1Banner key="phase1" captions={phase1Captions} />
             )}
 
             {state === "phase2" && (
@@ -79,6 +52,36 @@ export function GenerationBanner({
                 />
             )}
         </AnimatePresence>
+    );
+}
+
+function Phase1Banner({ captions }: { captions: string[] }) {
+    const [captionIndex, setCaptionIndex] = useState(0);
+    const captionCount = Math.max(captions.length, 1);
+
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setCaptionIndex((index) => (index + 1) % captionCount);
+        }, CAPTION_INTERVAL);
+        return () => clearInterval(timer);
+    }, [captionCount]);
+
+    return (
+        <BannerShell>
+            <Loader2 size={14} className="animate-spin text-status-completed-fg shrink-0" strokeWidth={1.8} />
+            <AnimatePresence mode="wait">
+                <motion.span
+                    key={captionIndex}
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.25 }}
+                    className="text-[0.8125rem] text-text-secondary"
+                >
+                    {captions[captionIndex] ?? ""}
+                </motion.span>
+            </AnimatePresence>
+        </BannerShell>
     );
 }
 

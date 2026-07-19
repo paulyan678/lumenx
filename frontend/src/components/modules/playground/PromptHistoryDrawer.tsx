@@ -55,6 +55,7 @@ interface HistoryEntry {
 
 export default function PromptHistoryDrawer() {
   const t = useTranslations('playground');
+  const tc = useTranslations('common');
   const showHistoryDrawer = usePlaygroundStore((s) => s.showHistoryDrawer);
   const setShowHistoryDrawer = usePlaygroundStore((s) => s.setShowHistoryDrawer);
   const history = usePlaygroundStore((s) => s.history);
@@ -136,8 +137,9 @@ export default function PromptHistoryDrawer() {
     >
       {/* Drawer */}
       <div
+        data-testid="playground-history-drawer"
         ref={drawerRef}
-        className="fixed right-0 top-0 h-full w-[420px] bg-elevated border-l border-glass-border shadow-2xl flex flex-col transition-transform duration-250 ease-out"
+        className="fixed right-0 top-0 flex h-full w-full max-w-[420px] flex-col border-l border-glass-border bg-elevated shadow-2xl transition-transform duration-250 ease-out"
         style={{ transform: visible ? 'translateX(0)' : 'translateX(100%)' }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -147,6 +149,7 @@ export default function PromptHistoryDrawer() {
           <button
             type="button"
             onClick={handleClose}
+            aria-label={tc('close')}
             className="w-8 h-8 rounded-lg flex items-center justify-center text-text-muted hover:text-foreground hover:bg-hover-bg transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />

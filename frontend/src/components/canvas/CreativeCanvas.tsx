@@ -3,7 +3,7 @@
 import { Canvas } from "@react-three/fiber";
 import { Stars, Grid } from "@react-three/drei";
 import { motion } from "framer-motion";
-import { Suspense, useState, useEffect, Component, type ReactNode } from "react";
+import { Suspense, useSyncExternalStore, Component, type ReactNode } from "react";
 import { useSettingsStore } from "@/store/settingsStore";
 
 function Background({ isDark }: { isDark: boolean }) {
@@ -45,6 +45,14 @@ function detectWebGL(): boolean {
     }
 }
 
+let cachedWebGLSupport: boolean | undefined;
+const subscribeToWebGLSupport = () => () => {};
+const getServerWebGLSupport = () => false;
+function getWebGLSupport(): boolean {
+    cachedWebGLSupport ??= detectWebGL();
+    return cachedWebGLSupport;
+}
+
 // 兜底：即使 WebGL 初始可用，运行时 context lost 也不让整页崩溃。
 // fallback 返回 null，外层 bg-background 仍保留静态主题底色。
 class CanvasErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
@@ -64,10 +72,11 @@ export default function CreativeCanvas() {
     const isAtelier = theme.startsWith("atelier");
     // 仅在客户端挂载后检测 WebGL：SSR 与首次渲染保持一致（都不挂 Canvas），
     // 避免 hydration mismatch；useEffect 跑完才按需挂载 3D 背景。
-    const [canRender3D, setCanRender3D] = useState(false);
-    useEffect(() => {
-        setCanRender3D(detectWebGL());
-    }, []);
+    const canRender3D = useSyncExternalStore(
+        subscribeToWebGLSupport,
+        getWebGLSupport,
+        getServerWebGLSupport,
+    );
 
     // Atelier 主题不需要 3D 透视网格 —— 背景由 --bg-base 纯色 + 页面级 bloom/grain 承担氛围。
     if (isAtelier) {

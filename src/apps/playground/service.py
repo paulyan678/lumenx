@@ -6,6 +6,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
+from ...utils import get_logger
+from ...utils.newapi_models import IMAGE, VIDEO, resolve_model_api_key
 from .models import (
     GenerateRequest,
     PlaygroundGeneration,
@@ -13,8 +15,6 @@ from .models import (
     PlaygroundOutput,
 )
 from .storage import PlaygroundStorage
-from ...utils import get_logger
-from ...utils.newapi_models import IMAGE, VIDEO, resolve_model_api_key
 
 logger = get_logger(__name__)
 
@@ -89,7 +89,9 @@ class PlaygroundService:
 
         self.storage.update_generation(gen)
 
-    def save_to_library(self, generation_id: str, output_id: str, category: str = "general") -> bool:
+    def save_to_library(
+        self, generation_id: str, output_id: str, category: str = "general"
+    ) -> bool:
         """Copy a generated output to ``output/assets/{category}/`` and flag
         :pyattr:`PlaygroundOutput.saved_to_library` = True."""
         gen = self.storage.get_generation(generation_id)
@@ -103,7 +105,9 @@ class PlaygroundService:
                 target_output = out
                 break
         if target_output is None:
-            logger.warning("save_to_library: output %s not found in generation %s", output_id, generation_id)
+            logger.warning(
+                "save_to_library: output %s not found in generation %s", output_id, generation_id
+            )
             return False
 
         # media_path is stored as e.g. "output/playground/images/t2i_xxx_0.png"
@@ -117,10 +121,17 @@ class PlaygroundService:
             logger.error("save_to_library: source file not found: %s", target_output.media_path)
             return False
 
-        dest_dir = os.path.join("output", "assets", category)
+        # Canonicalizing before constructing a path prevents arbitrary category
+        # strings from escaping the asset directory.
+        asset_type = self._category_to_asset_type(category)
+        dest_dir = os.path.join("output", "assets", asset_type)
         os.makedirs(dest_dir, exist_ok=True)
 
-        dest_path = os.path.join(dest_dir, os.path.basename(src_path))
+        # Always create a distinct library file. This avoids overwriting an
+        # existing asset with a coincidentally identical provider filename and
+        # lets a failed downstream registration clean up only its own copy.
+        dest_filename = f"{uuid.uuid4().hex}_{os.path.basename(src_path)}"
+        dest_path = os.path.join(dest_dir, dest_filename)
         shutil.copy2(src_path, dest_path)
         logger.info("Saved output %s to library: %s", output_id, dest_path)
 
@@ -128,9 +139,12 @@ class PlaygroundService:
         # global library asset record so the output is curatable through the
         # /library/assets CRUD. category -> asset_type mapping; anything
         # unknown (incl. the "general" default) falls back to "prop".
-        asset_type = self._category_to_asset_type(category)
         prompt_text = (gen.prompt or "").strip()
         asset_name = prompt_text[:40] or os.path.splitext(os.path.basename(dest_path))[0]
+        # New library records use the frontend's canonical
+        # /files/<path-relative-to-output> contract. The resolver still accepts
+        # older "output/..." records for backward compatibility.
+        relative_image_url = os.path.relpath(dest_path, "output").replace(os.sep, "/")
         try:
             # Deferred import: comic_gen.api owns the live ComicGenPipeline
             # singleton -- the same instance that backs the /library/assets
@@ -146,7 +160,7 @@ class PlaygroundService:
                     "name": asset_name,
                     "description": prompt_text,
                     # Point the library record at the freshly-copied file.
-                    "image_url": dest_path,
+                    "image_url": relative_image_url,
                 },
             )
             logger.info(
@@ -160,7 +174,11 @@ class PlaygroundService:
                 "save_to_library: failed to register global library asset for output %s",
                 output_id,
             )
-            return False
+            try:
+                os.unlink(dest_path)
+            except FileNotFoundError:
+                pass
+            raise
 
         target_output.saved_to_library = True
         self.storage.update_generation(gen)
@@ -182,6 +200,7 @@ class PlaygroundService:
 
             try:
                 self._generate_image_newapi(gen, out_path, idx)
+                self._assert_generated_media(out_path, "image")
 
                 output_entry = PlaygroundOutput(
                     id=str(uuid.uuid4()),
@@ -236,6 +255,7 @@ class PlaygroundService:
 
             try:
                 self._generate_video_newapi(gen, out_path)
+                self._assert_generated_media(out_path, "video")
 
                 output_entry = PlaygroundOutput(
                     id=str(uuid.uuid4()),
@@ -284,6 +304,17 @@ class PlaygroundService:
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _assert_generated_media(path: str, media_type: str) -> None:
+        if not os.path.isfile(path) or os.path.getsize(path) == 0:
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+            raise RuntimeError(
+                f"The {media_type} provider returned without creating a usable output file"
+            )
 
     @staticmethod
     def _category_to_asset_type(category: Optional[str]) -> str:

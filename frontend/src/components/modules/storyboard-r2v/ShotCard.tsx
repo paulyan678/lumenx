@@ -152,6 +152,51 @@ interface ShotCardProps {
     onUnpinVideo?: () => void;
 }
 
+function ShotStatusBadge({ shot, t }: { shot: ShotNode; t: (key: string, values?: Record<string, number | string>) => string }) {
+    const isProcessing = shot.videoStatus === "processing" || shot.t2iStatus === "processing";
+    const isPending = !isProcessing && (shot.videoStatus === "pending" || shot.t2iStatus === "pending");
+    const isFailed = !isProcessing && !isPending && (shot.videoStatus === "failed" || shot.t2iStatus === "failed");
+    const isStarred = shot.isVideoPinned || shot.finalTakeId;
+    if (isStarred) {
+        return (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-status-starred-border bg-status-starred-bg px-2.5 py-1 font-mono text-[0.625rem] font-semibold uppercase tracking-[0.1em] text-status-starred-fg">
+                <span className="h-[5px] w-[5px] rounded-full bg-status-starred-solid" />
+                {t("statusStarred")}
+            </span>
+        );
+    }
+    if (isProcessing) {
+        return (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-status-processing-border bg-status-processing-bg px-2.5 py-1 font-mono text-[0.625rem] font-semibold uppercase tracking-[0.1em] text-status-processing-fg">
+                <span className="h-[5px] w-[5px] rounded-full bg-status-processing-fg animate-pulse" />
+                {t("statusProcessing")}
+            </span>
+        );
+    }
+    if (isPending) {
+        return (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-status-pending-border bg-status-pending-bg px-2.5 py-1 font-mono text-[0.625rem] font-semibold uppercase tracking-[0.1em] text-status-pending-fg">
+                <span className="h-[5px] w-[5px] rounded-full bg-status-pending-fg" />
+                {t("statusPending")}
+            </span>
+        );
+    }
+    if (isFailed) {
+        return (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-status-failed-border bg-status-failed-bg px-2.5 py-1 font-mono text-[0.625rem] font-semibold uppercase tracking-[0.1em] text-status-failed-fg">
+                <span className="h-[5px] w-[5px] rounded-full bg-status-failed-fg" />
+                {t("statusFailed")}
+            </span>
+        );
+    }
+    return (
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-glass-border bg-black/20 px-2.5 py-1 font-mono text-[0.625rem] font-semibold uppercase tracking-[0.1em] text-text-secondary">
+            <span className="h-[5px] w-[5px] rounded-full bg-text-muted" />
+            {t("statusReady")}
+        </span>
+    );
+}
+
 export default function ShotCard({
     shot,
     index,
@@ -331,51 +376,6 @@ export default function ShotCard({
     // the "two Generate buttons" bug report.
     // onGenerateVideo / onGenerateT2I are still wired for the inline
     // retry buttons inside renderPreview when a take fails.
-
-    function ShotStatusBadge({ shot, t }: { shot: ShotNode; t: (key: string, values?: Record<string, number | string>) => string }) {
-        const isProcessing = shot.videoStatus === "processing" || shot.t2iStatus === "processing";
-        const isPending = !isProcessing && (shot.videoStatus === "pending" || shot.t2iStatus === "pending");
-        const isFailed = !isProcessing && !isPending && (shot.videoStatus === "failed" || shot.t2iStatus === "failed");
-        const isStarred = shot.isVideoPinned || shot.finalTakeId;
-        if (isStarred) {
-            return (
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-status-starred-border bg-status-starred-bg px-2.5 py-1 font-mono text-[0.625rem] font-semibold uppercase tracking-[0.1em] text-status-starred-fg">
-                    <span className="h-[5px] w-[5px] rounded-full bg-status-starred-solid" />
-                    {t("statusStarred")}
-                </span>
-            );
-        }
-        if (isProcessing) {
-            return (
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-status-processing-border bg-status-processing-bg px-2.5 py-1 font-mono text-[0.625rem] font-semibold uppercase tracking-[0.1em] text-status-processing-fg">
-                    <span className="h-[5px] w-[5px] rounded-full bg-status-processing-fg animate-pulse" />
-                    {t("statusProcessing")}
-                </span>
-            );
-        }
-        if (isPending) {
-            return (
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-status-pending-border bg-status-pending-bg px-2.5 py-1 font-mono text-[0.625rem] font-semibold uppercase tracking-[0.1em] text-status-pending-fg">
-                    <span className="h-[5px] w-[5px] rounded-full bg-status-pending-fg" />
-                    {t("statusPending")}
-                </span>
-            );
-        }
-        if (isFailed) {
-            return (
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-status-failed-border bg-status-failed-bg px-2.5 py-1 font-mono text-[0.625rem] font-semibold uppercase tracking-[0.1em] text-status-failed-fg">
-                    <span className="h-[5px] w-[5px] rounded-full bg-status-failed-fg" />
-                    {t("statusFailed")}
-                </span>
-            );
-        }
-        return (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-glass-border bg-black/20 px-2.5 py-1 font-mono text-[0.625rem] font-semibold uppercase tracking-[0.1em] text-text-secondary">
-                <span className="h-[5px] w-[5px] rounded-full bg-text-muted" />
-                {t("statusReady")}
-            </span>
-        );
-    }
 
     const handleInsertAssetFromChip = (_type: string, name: string) => {
         const currentPrompt = shot.prompt;

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { useSettingsStore, type ThemePreset } from "@/store/settingsStore";
+import { useHydrated } from "@/lib/useHydrated";
 
 interface LumenXBrandingProps {
   size?: "sm" | "md";
@@ -11,11 +11,11 @@ interface LumenXBrandingProps {
 // Logo 变体按主题映射（Tasty Sam 同形电路枫叶，透明底）。
 // atelier-dark 复用蓝色 logo-dark.png，再用 CSS filter 着色为 teal。
 const LOGO_SRC: Record<ThemePreset, string> = {
-  "atelier-dark": "/logo-dark.png",
-  "bridge-dark": "/logo-dark.png",
-  "brand-dark": "/logo-dark.png",
-  "atelier-light": "/logo-light-teal.png",
-  "brand-light": "/logo-light.png",
+  "atelier-dark": "logo-dark.png",
+  "bridge-dark": "logo-dark.png",
+  "brand-dark": "logo-dark.png",
+  "atelier-light": "logo-light-teal.png",
+  "brand-light": "logo-light.png",
 };
 // 仅 atelier-dark：把品牌蓝 PNG 着色为 teal，与主色一致。
 const ATELIER_DARK_FILTER = "hue-rotate(-64deg) saturate(1.35) brightness(1.08)";
@@ -27,10 +27,9 @@ export default function LumenXBranding({ size = "md", showSlogan = true }: Lumen
   const theme = useSettingsStore((s) => s.theme);
   // SSR 与客户端首次渲染统一用默认主题，避免 logo src/filter 的 hydration
   // mismatch；挂载后切到实际主题。
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const mounted = useHydrated();
   const activeTheme: ThemePreset = mounted ? theme : "atelier-dark";
-  const logoSrc = LOGO_SRC[activeTheme] ?? "/logo-dark.png";
+  const logoSrc = LOGO_SRC[activeTheme] ?? "logo-dark.png";
   const logoFilter = activeTheme === "atelier-dark" ? ATELIER_DARK_FILTER : undefined;
 
   return (

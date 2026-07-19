@@ -1,4 +1,5 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { renderWithIntl } from '@/test/renderWithIntl';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
 // Mock framer-motion
@@ -33,6 +34,7 @@ vi.mock('lucide-react', () => ({
     FileText: (props: any) => <span data-testid="icon-file-text" {...props} />,
     Download: (props: any) => <span data-testid="icon-download" {...props} />,
     MessageSquareCode: (props: any) => <span data-testid="icon-message-square-code" {...props} />,
+    Palette: (props: any) => <span data-testid="icon-palette" {...props} />,
     ChevronLeft: (props: any) => <span data-testid="icon-chevron-left" {...props} />,
     ChevronRight: (props: any) => <span data-testid="icon-chevron-right" {...props} />,
     Play: (props: any) => <span data-testid="icon-play" {...props} />,
@@ -93,7 +95,7 @@ const mockEpisodes = [
 // ── Helpers ──
 
 function renderPage(seriesId = 'series-1') {
-    return render(<SeriesDetailPage seriesId={seriesId} />);
+    return renderWithIntl(<SeriesDetailPage seriesId={seriesId} />);
 }
 
 // ── Tests ──
@@ -383,7 +385,12 @@ describe('SeriesDetailPage', () => {
             fireEvent.click(screen.getByText('确定'));
 
             await waitFor(() => {
-                expect(mockCreateEpisodeForSeries).toHaveBeenCalledWith('series-1', '新集数', 3);
+                expect(mockCreateEpisodeForSeries).toHaveBeenCalledWith(
+                    'series-1',
+                    '新集数',
+                    3,
+                    'i2v_legacy',
+                );
             });
         });
 

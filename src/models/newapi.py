@@ -70,9 +70,7 @@ def normalize_newapi_image_size(value: Optional[str]) -> str:
     try:
         return IMAGE_SIZE_ALIASES[normalized]
     except KeyError as exc:
-        raise ValueError(
-            "GPT Image 2 size must be 1024x1024, 1024x1536, or 1536x1024"
-        ) from exc
+        raise ValueError("GPT Image 2 size must be 1024x1024, 1024x1536, or 1536x1024") from exc
 
 
 def newapi_image_configured(model_id: Optional[str] = None) -> bool:
@@ -157,6 +155,35 @@ def _ensure_parent(path: str) -> None:
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
 
 
+def _remove_partial(path: str) -> None:
+    try:
+        os.unlink(path)
+    except OSError:
+        pass
+
+
+def _save_streaming_result(
+    response: requests.Response,
+    output_path: str,
+    media_label: str,
+) -> None:
+    """Persist a streamed provider result and reject empty 2xx bodies."""
+    _ensure_parent(output_path)
+    bytes_written = 0
+    try:
+        with open(output_path, "wb") as handle:
+            for chunk in response.iter_content(chunk_size=65536):
+                if chunk:
+                    handle.write(chunk)
+                    bytes_written += len(chunk)
+    except Exception:
+        _remove_partial(output_path)
+        raise
+    if bytes_written == 0:
+        _remove_partial(output_path)
+        raise RuntimeError(f"New API returned an empty {media_label} download")
+
+
 def _save_image_result(result: Dict[str, Any], output_path: str) -> None:
     data = result.get("data") if isinstance(result, dict) else None
     first = data[0] if isinstance(data, list) and data else None
@@ -167,9 +194,13 @@ def _save_image_result(result: Dict[str, Any], output_path: str) -> None:
     encoded = first.get("b64_json")
     if encoded:
         try:
+            payload = base64.b64decode(encoded, validate=True)
+            if not payload:
+                raise ValueError("empty image payload")
             with open(output_path, "wb") as handle:
-                handle.write(base64.b64decode(encoded, validate=True))
+                handle.write(payload)
         except (ValueError, TypeError) as exc:
+            _remove_partial(output_path)
             raise RuntimeError("New API returned invalid base64 image data") from exc
         return
 
@@ -177,10 +208,7 @@ def _save_image_result(result: Dict[str, Any], output_path: str) -> None:
     if not url:
         raise RuntimeError("New API image response contained neither url nor b64_json")
     response = _request("GET", str(url), timeout=120, stream=True)
-    with open(output_path, "wb") as handle:
-        for chunk in response.iter_content(chunk_size=65536):
-            if chunk:
-                handle.write(chunk)
+    _save_streaming_result(response, output_path, "image")
 
 
 def _open_image_ref(reference: str, stack: ExitStack) -> Tuple[str, Any, str]:
@@ -351,9 +379,7 @@ class NewAPIVideoModel(VideoGenModel):
         seed = kwargs.get("seed")
         ref_images = list(kwargs.get("ref_image_urls") or [])
         primary_reference = img_path or img_url or (ref_images[0] if ref_images else None)
-        generation_mode = kwargs.get("generation_mode") or (
-            "i2v" if primary_reference else "t2v"
-        )
+        generation_mode = kwargs.get("generation_mode") or ("i2v" if primary_reference else "t2v")
         validate_model_for_mode(model, generation_mode)
         if len(ref_images) > 1:
             raise ValueError("New API multi-reference video generation is not supported")
@@ -406,7 +432,9 @@ class NewAPIVideoModel(VideoGenModel):
             "on_provider_ids"
         )
         if callback:
-            request_id = response.headers.get("x-request-id") or response.headers.get("X-Request-Id")
+            request_id = response.headers.get("x-request-id") or response.headers.get(
+                "X-Request-Id"
+            )
             try:
                 callback("newapi", str(task_id), request_id)
             except Exception as exc:
@@ -441,9 +469,5 @@ class NewAPIVideoModel(VideoGenModel):
         if not video_url:
             raise RuntimeError("New API completed the video task without a download URL")
         download = _request("GET", video_url, timeout=180, stream=True)
-        _ensure_parent(output_path)
-        with open(output_path, "wb") as handle:
-            for chunk in download.iter_content(chunk_size=65536):
-                if chunk:
-                    handle.write(chunk)
+        _save_streaming_result(download, output_path, "video")
         return output_path, time.time() - start

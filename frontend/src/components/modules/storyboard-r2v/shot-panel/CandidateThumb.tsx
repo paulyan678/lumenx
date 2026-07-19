@@ -63,7 +63,14 @@ export default function CandidateThumb({
 
     const [editingLabel, setEditingLabel] = useState(false);
     const [labelDraft, setLabelDraft] = useState(task.label ?? "");
+    const [syncedLabel, setSyncedLabel] = useState(task.label ?? "");
     const labelInputRef = useRef<HTMLInputElement>(null);
+
+    const externalLabel = task.label ?? "";
+    if (externalLabel !== syncedLabel) {
+        setSyncedLabel(externalLabel);
+        setLabelDraft(externalLabel);
+    }
 
     useEffect(() => {
         if (editingLabel && labelInputRef.current) {
@@ -71,12 +78,6 @@ export default function CandidateThumb({
             labelInputRef.current.select();
         }
     }, [editingLabel]);
-
-    useEffect(() => {
-        // Sync draft when task.label changes from outside (e.g. annotate
-        // round-trip refresh).
-        setLabelDraft(task.label ?? "");
-    }, [task.label]);
 
     const commitLabel = async () => {
         setEditingLabel(false);

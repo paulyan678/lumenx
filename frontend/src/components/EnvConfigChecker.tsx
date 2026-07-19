@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import EnvConfigDialog from "@/components/project/EnvConfigDialog";
 import { api } from "@/lib/api";
 import {
@@ -12,17 +12,9 @@ import {
 export default function EnvConfigChecker() {
   const [isEnvDialogOpen, setIsEnvDialogOpen] = useState(false);
   const [envRequired, setEnvRequired] = useState(false);
-  const [hasChecked, setHasChecked] = useState(false);
+  const hasCheckedRef = useRef(false);
 
-  useEffect(() => {
-    // 只在客户端执行，且只检查一次
-    if (typeof window === 'undefined' || hasChecked) return;
-    
-    checkEnvConfig();
-    setHasChecked(true);
-  }, [hasChecked]);
-
-  const checkEnvConfig = async () => {
+  const checkEnvConfig = useCallback(async () => {
     try {
       const config = await api.getEnvConfig();
       const errors = getNewApiValidationErrors(
@@ -46,7 +38,15 @@ export default function EnvConfigChecker() {
       setEnvRequired(true);
       setIsEnvDialogOpen(true);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    // 只在客户端执行，且只检查一次
+    if (typeof window === "undefined" || hasCheckedRef.current) return;
+
+    hasCheckedRef.current = true;
+    void checkEnvConfig();
+  }, [checkEnvConfig]);
 
   return (
     <EnvConfigDialog

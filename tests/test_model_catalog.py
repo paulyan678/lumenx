@@ -334,6 +334,26 @@ def test_validation_report_detects_generated_artifact_drift():
     assert any("does not match" in error for error in report.errors)
 
 
+def test_default_validation_rebuilds_source_before_checking_artifacts(monkeypatch):
+    source = build_catalog_dict(MODEL_CATALOG_ROOT)
+    stale_backend = deepcopy(source)
+    stale_backend["models"].pop("deepseek-v4-pro")
+
+    monkeypatch.setattr(
+        "src.utils.model_catalog.load_generated_model_catalog",
+        lambda: stale_backend,
+    )
+    monkeypatch.setattr(
+        "src.utils.model_catalog.load_frontend_generated_model_catalog",
+        lambda: source,
+    )
+
+    report = build_catalog_validation_report()
+
+    assert report.ok is False
+    assert any("source YAML" in error for error in report.errors)
+
+
 def test_validation_report_detects_default_visibility_regression():
     catalog = build_catalog_dict(MODEL_CATALOG_ROOT)
     broken = deepcopy(catalog)
@@ -350,6 +370,15 @@ def test_unsupported_provider_is_rejected(tmp_path):
     _write_minimal_catalog(tmp_path, provider="legacy-provider")
 
     with pytest.raises(ValueError, match="Unsupported provider"):
+        build_catalog_dict(tmp_path)
+
+
+def test_noncanonical_family_filename_is_rejected(tmp_path):
+    _write_minimal_catalog(tmp_path)
+    family_path = tmp_path / "families" / "test.yaml"
+    family_path.rename(tmp_path / "families" / "test 2.yaml")
+
+    with pytest.raises(ValueError, match="lowercase kebab-case"):
         build_catalog_dict(tmp_path)
 
 

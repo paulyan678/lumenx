@@ -35,13 +35,17 @@ interface SummaryState {
     ai_summary_stale: boolean;
 }
 
-export default function PreviousEpisodeSummary({ scriptId }: PreviousEpisodeSummaryProps) {
+export default function PreviousEpisodeSummary(props: PreviousEpisodeSummaryProps) {
+    return <PreviousEpisodeSummaryForScript key={props.scriptId ?? "none"} {...props} />;
+}
+
+function PreviousEpisodeSummaryForScript({ scriptId }: PreviousEpisodeSummaryProps) {
     const t = useTranslations("previousEpisode");
     const setRunningOp = useProjectStore((s) => s.setRunningOp);
     const hookGenerating = useProjectStore((s) => !!s.runningOps[`hookGen:${scriptId}`]);
     const generating = useProjectStore((s) => !!s.runningOps[`summaryGen:${scriptId}`]);
     const [data, setData] = useState<SummaryState | null>(null);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(Boolean(scriptId));
     const [error, setError] = useState<string | null>(null);
     // R2V v2 P1-b — manual edit mode
     const [editing, setEditing] = useState(false);
@@ -79,8 +83,6 @@ export default function PreviousEpisodeSummary({ scriptId }: PreviousEpisodeSumm
     useEffect(() => {
         if (!scriptId) return;
         let cancelled = false;
-        setLoading(true);
-        setError(null);
         api.getPreviousEpisodeSummary(scriptId)
             .then(d => { if (!cancelled) setData(d); })
             .catch(err => {

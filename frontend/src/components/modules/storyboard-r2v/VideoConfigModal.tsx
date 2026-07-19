@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Check, Settings2, X } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useTranslations } from "next-intl";
@@ -47,10 +47,15 @@ export default function VideoConfigModal({
 }: VideoConfigModalProps) {
     const t = useTranslations("storyboardR2V");
     const [draft, setDraft] = useState<VideoConfig>(config);
+    const [syncedConfig, setSyncedConfig] = useState(config);
+    const [wasOpen, setWasOpen] = useState(isOpen);
 
-    useEffect(() => {
-        if (isOpen) setDraft(config);
-    }, [config, isOpen]);
+    const reopened = isOpen && !wasOpen;
+    if (isOpen !== wasOpen) setWasOpen(isOpen);
+    if (isOpen && (config !== syncedConfig || reopened)) {
+        setSyncedConfig(config);
+        setDraft(config);
+    }
 
     const activeModel = useMemo(
         () => VIDEO_I2V_MODELS.find((model) => model.id === draft.model)

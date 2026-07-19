@@ -20,6 +20,7 @@ import type { VideoTask } from "@/lib/api";
 import PreviewImage from "@/components/shared/preview/PreviewImage";
 import PreviewVideo from "@/components/shared/preview/PreviewVideo";
 import SidePanelHeader from "@/components/shared/SidePanelHeader";
+import { useNow } from "@/lib/useNow";
 
 type TabKey = "active" | "done" | "failed";
 
@@ -201,6 +202,7 @@ function TaskRow({
     onRetry?: (task: VideoTask) => Promise<void> | void;
 }) {
     const t = useTranslations("storyboardR2V");
+    const now = useNow();
     const [copiedField, setCopiedField] = useState<"providerId" | "providerRequest" | "diagnose" | null>(null);
     const [retrying, setRetrying] = useState(false);
     const isFailed = task.status === "failed";
@@ -219,7 +221,7 @@ function TaskRow({
                     ? "bg-status-processing-fg animate-pulse"
                     : "bg-status-pending-fg";
 
-    const elapsedS = Math.max(0, Math.floor(Date.now() / 1000 - task.created_at));
+    const elapsedS = Math.max(0, Math.floor(now / 1000 - task.created_at));
     const elapsedLabel = elapsedS < 60
         ? `${elapsedS}s`
         : elapsedS < 3600

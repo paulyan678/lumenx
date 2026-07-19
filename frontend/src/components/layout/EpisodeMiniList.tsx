@@ -43,10 +43,14 @@ interface EpisodeMiniListProps {
 function navigateToSeriesAddEpisode(seriesId: string): void {
     // Send the user to the SeriesDetailPage where they can add a
     // new episode. The page handles import / create flows.
-    window.location.hash = `/series/${seriesId}`;
+    window.location.assign(`#/series/${seriesId}`);
 }
 
-export default function EpisodeMiniList({
+export default function EpisodeMiniList(props: EpisodeMiniListProps) {
+    return <EpisodeMiniListForSeries key={props.seriesId} {...props} />;
+}
+
+function EpisodeMiniListForSeries({
     seriesId,
     currentProjectId,
     activeStep,
@@ -57,7 +61,6 @@ export default function EpisodeMiniList({
 
     useEffect(() => {
         let cancelled = false;
-        setLoading(true);
         api.getSeriesEpisodes(seriesId)
             .then((eps: any[]) => {
                 if (cancelled) return;
@@ -98,7 +101,7 @@ export default function EpisodeMiniList({
         // Preserve the activeStep via URL hash. ProjectClient reads
         // hash on mount to restore the step.
         const stepFragment = activeStep ? `#${activeStep}` : "";
-        window.location.hash = `/project/${epId}${stepFragment}`;
+        window.location.assign(`#/project/${epId}${stepFragment}`);
     };
 
     return (

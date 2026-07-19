@@ -1,6 +1,31 @@
 import { spawn } from "node:child_process";
+import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+
+function readProjectEnvSource() {
+  try {
+    return fs.readFileSync(path.resolve("..", ".env"), "utf8");
+  } catch (error) {
+    if (error?.code === "ENOENT") return "";
+    throw error;
+  }
+}
+
+/**
+ * @param {Record<string, string | undefined>} [baseEnv]
+ * @param {string} [envSource]
+ */
+export function resolveBackendPort(baseEnv = process.env, envSource = readProjectEnvSource()) {
+  const match = envSource.match(/^\s*(?:export\s+)?API_PORT\s*=\s*(.*?)\s*$/m);
+  const fileValue = match?.[1]?.replace(/^(?:"(.*)"|'(.*)')$/, "$1$2");
+  const rawPort = baseEnv.NEXT_PUBLIC_BACKEND_PORT || baseEnv.API_PORT || fileValue || "17177";
+  const port = Number(rawPort);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(`Invalid backend port: ${rawPort}`);
+  }
+  return String(port);
+}
 
 /**
  * @param {Record<string, string | undefined>} [baseEnv]
@@ -11,6 +36,7 @@ export function buildNextDevEnv(
   platform = process.platform,
 ) {
   const env = { ...baseEnv };
+  env.NEXT_PUBLIC_BACKEND_PORT = resolveBackendPort(baseEnv);
 
   // Watchpack's native watcher can hit EMFILE on large macOS workspaces.
   // Polling trades a little CPU for a much more stable dev server.

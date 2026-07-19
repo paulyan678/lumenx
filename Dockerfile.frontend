@@ -8,10 +8,20 @@ RUN npm ci
 
 COPY frontend/ .
 
-# Build for Docker (override desktop app paths)
-ENV NODE_ENV=production
+# Validate in React's non-production test environment, then build with the
+# Docker-specific static-export paths.
 ENV DOCKER_BUILD=true
+# Run deterministic checks before Next's static export. Invoke tsc directly:
+# the local `typecheck` helper bootstraps missing Next types by building first,
+# which would let an unchecked build run before this gate inside a clean image.
+RUN npm run lint \
+    && npm run test:all \
+    && npm run check:colors \
+    && ./node_modules/.bin/tsc --noEmit
+
+ENV NODE_ENV=production
 RUN npm run build
+RUN npm run check:export
 
 # Stage 2: Serve with nginx
 FROM nginx:alpine

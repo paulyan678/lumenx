@@ -527,6 +527,7 @@ export default function ConsistencyVault() {
 
 function CharacterDetailModal({ asset, type, onClose, onUpdateDescription, onGenerate, isGenerating, stylePrompt = "", styleNegativePrompt = "", onGenerateVideo, onDeleteVideo, isGeneratingVideo }: any) {
     const [description, setDescription] = useState(asset.description);
+    const [syncedAsset, setSyncedAsset] = useState(asset);
     const [isEditing, setIsEditing] = useState(false);
     const currentProject = useProjectStore((state) => state.currentProject);
     const updateProject = useProjectStore((state) => state.updateProject);
@@ -534,27 +535,28 @@ function CharacterDetailModal({ asset, type, onClose, onUpdateDescription, onGen
     // Style Controls
     const [applyStyle, setApplyStyle] = useState(true);
     const [negativePrompt, setNegativePrompt] = useState(styleNegativePrompt || "low quality, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry");
+    const [syncedStyleNegativePrompt, setSyncedStyleNegativePrompt] = useState(styleNegativePrompt);
     const [showAdvanced, setShowAdvanced] = useState(false);
 
     // Video Controls
     const [activeTab, setActiveTab] = useState<"image" | "video">("image");
-    const [videoPrompt, setVideoPrompt] = useState(asset.video_prompt || "");
+    const [videoPrompt, setVideoPrompt] = useState(asset.video_prompt || `Cinematic shot of ${asset.name}, ${asset.description}, looking around, breathing, slight movement, high quality, 4k`);
 
-    // Sync local state if asset changes
-    useEffect(() => {
+    if (asset !== syncedAsset) {
+        setSyncedAsset(asset);
         setDescription(asset.description);
         if (asset.video_prompt) setVideoPrompt(asset.video_prompt);
         else if (!videoPrompt) {
             setVideoPrompt(`Cinematic shot of ${asset.name}, ${asset.description}, looking around, breathing, slight movement, high quality, 4k`);
         }
-    }, [asset]);
+    }
 
-    // Sync negative prompt if style changes
-    useEffect(() => {
+    if (styleNegativePrompt !== syncedStyleNegativePrompt) {
+        setSyncedStyleNegativePrompt(styleNegativePrompt);
         if (styleNegativePrompt && (!negativePrompt || negativePrompt.includes("low quality"))) {
             setNegativePrompt(styleNegativePrompt);
         }
-    }, [styleNegativePrompt]);
+    }
 
     const handleSave = () => {
         onUpdateDescription(description);
@@ -785,17 +787,16 @@ function TabButton({ active, onClick, icon, label, count }: any) {
     );
 }
 
-function ImageWithRetry({ src, alt, className }: { src: string, alt: string, className?: string }) {
+type ImageWithRetryProps = { src: string; alt: string; className?: string };
+
+function ImageWithRetry(props: ImageWithRetryProps) {
+    return <ImageWithRetryForSource key={props.src} {...props} />;
+}
+
+function ImageWithRetryForSource({ src, alt, className }: ImageWithRetryProps) {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(false);
     const [retryCount, setRetryCount] = useState(0);
-
-    // Reset state when src changes
-    useEffect(() => {
-        setIsLoading(true);
-        setError(false);
-        setRetryCount(0);
-    }, [src]);
 
     useEffect(() => {
         if (error && retryCount < 10) {

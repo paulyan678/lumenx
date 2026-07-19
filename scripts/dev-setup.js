@@ -1,4 +1,5 @@
-const { execSync } = require('child_process');
+const { execFileSync, spawnSync } = require('child_process');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -6,42 +7,126 @@ const os = require('os');
 const root = path.join(__dirname, '..');
 const venv = path.join(root, '.venv');
 
-console.log('[setup] Checking environment...');
+const frontend = path.join(root, 'frontend');
+const frontendModules = path.join(frontend, 'node_modules');
+const npmCommand = os.platform() === 'win32' ? 'npm.cmd' : 'npm';
 
-// 1. Setup Python venv if missing
-if (!fs.existsSync(venv)) {
-  console.log('[setup] Creating Python virtual environment...');
-  try {
-    execSync('python3 -m venv .venv || python -m venv .venv', { stdio: 'inherit', cwd: root });
+const MINIMUM_PYTHON = [3, 11];
 
-    const pip = os.platform() === 'win32'
-      ? path.join(venv, 'Scripts', 'pip')
-      : path.join(venv, 'bin', 'pip');
-
-    console.log('[setup] Installing Python dependencies...');
-    execSync(`${pip} install -e .`, { stdio: 'inherit', cwd: root });
-  } catch (e) {
-    console.error('[setup] Failed to setup venv:', e.message);
+function assertNodeVersion() {
+  const [major, minor] = process.versions.node.split('.').map(Number);
+  if (major !== 20 || minor < 9) {
+    throw new Error(
+      `Node.js 20.9 or newer (but below 21) is required (found ${process.versions.node}). `
+      + 'Install a supported Node.js 20 release before running the development setup.',
+    );
   }
 }
 
-// 2. Setup Frontend dependencies if missing
-const frontendModules = path.join(root, 'frontend', 'node_modules');
-if (!fs.existsSync(frontendModules)) {
-  console.log('[setup] Installing frontend dependencies...');
-  execSync('npm install', { stdio: 'inherit', cwd: path.join(root, 'frontend') });
+function run(command, args, options = {}) {
+  execFileSync(command, args, {
+    stdio: 'inherit',
+    cwd: options.cwd || root,
+    timeout: options.timeout,
+  });
 }
 
-// 3. Pre-download Demucs model (required for dub workflow)
-console.log('[setup] Checking Demucs model...');
-try {
-  execSync(
-    'python -c "from demucs.pretrained import get_model; get_model(\'htdemucs\'); print(\'[setup] Demucs htdemucs model ready.\')"',
-    { stdio: 'inherit', cwd: root, timeout: 180000 }
+function findPython() {
+  const candidates = process.env.PYTHON ? [process.env.PYTHON] : ['python3', 'python'];
+  for (const candidate of candidates) {
+    const result = spawnSync(
+      candidate,
+      ['-c', 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")'],
+      { encoding: 'utf8' },
+    );
+    if (result.status !== 0) continue;
+    const [major, minor] = result.stdout.trim().split('.').map(Number);
+    if (
+      major > MINIMUM_PYTHON[0]
+      || (major === MINIMUM_PYTHON[0] && minor >= MINIMUM_PYTHON[1])
+    ) {
+      return candidate;
+    }
+  }
+  throw new Error('Python 3.11 or newer is required but was not found on PATH.');
+}
+
+function assertPythonVersion(pythonPath) {
+  const result = spawnSync(
+    pythonPath,
+    [
+      '-c',
+      'import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)',
+    ],
+    { stdio: 'ignore' },
   );
-} catch (e) {
-  console.warn('[setup] ⚠️  Demucs model download failed. Dubbing feature will attempt download on first use.');
-  console.warn('[setup]    If you are behind a firewall, manually run: python -c "from demucs.pretrained import get_model; get_model(\'htdemucs\')"');
+  if (result.status !== 0) {
+    throw new Error(
+      `The virtual environment at ${venv} must use Python 3.11 or newer. `
+      + 'Recreate .venv with a supported Python interpreter.',
+    );
+  }
 }
 
-console.log('[setup] Done.');
+function fingerprint(paths) {
+  const hash = crypto.createHash('sha256');
+  for (const filePath of paths) hash.update(fs.readFileSync(filePath));
+  return hash.digest('hex');
+}
+
+function sentinelMatches(sentinelPath, expected) {
+  return fs.existsSync(sentinelPath)
+    && fs.readFileSync(sentinelPath, 'utf8').trim() === expected;
+}
+
+function main() {
+  console.log('[setup] Checking environment...');
+  assertNodeVersion();
+
+  if (!fs.existsSync(venv)) {
+    console.log('[setup] Creating Python virtual environment...');
+    run(findPython(), ['-m', 'venv', venv]);
+  }
+
+  const venvPython = os.platform() === 'win32'
+    ? path.join(venv, 'Scripts', 'python.exe')
+    : path.join(venv, 'bin', 'python');
+  assertPythonVersion(venvPython);
+  const requirementsPath = path.join(root, 'requirements.txt');
+  const pythonFingerprint = fingerprint([requirementsPath]);
+  const pythonSentinel = path.join(venv, '.lumenx-requirements-sha256');
+  if (!sentinelMatches(pythonSentinel, pythonFingerprint)) {
+    console.log('[setup] Installing Python dependencies...');
+    run(venvPython, ['-m', 'pip', 'install', '-r', requirementsPath]);
+    fs.writeFileSync(pythonSentinel, `${pythonFingerprint}\n`, 'utf8');
+  }
+
+  const frontendFingerprint = fingerprint([
+    path.join(frontend, 'package.json'),
+    path.join(frontend, 'package-lock.json'),
+  ]);
+  const frontendSentinel = path.join(frontendModules, '.lumenx-deps-sha256');
+  if (!fs.existsSync(frontendModules) || !sentinelMatches(frontendSentinel, frontendFingerprint)) {
+    console.log('[setup] Installing frontend dependencies from package-lock.json...');
+    run(npmCommand, ['ci'], { cwd: frontend });
+    fs.writeFileSync(frontendSentinel, `${frontendFingerprint}\n`, 'utf8');
+  }
+
+  if (process.env.LUMENX_PRELOAD_DEMUCS === '1') {
+    console.log('[setup] Preloading the Demucs htdemucs model...');
+    run(
+      venvPython,
+      ['-c', "from demucs.pretrained import get_model; get_model('htdemucs')"],
+      { timeout: 180000 },
+    );
+  }
+
+  console.log('[setup] Done.');
+}
+
+try {
+  main();
+} catch (error) {
+  console.error(`[setup] Failed: ${error.message}`);
+  process.exitCode = 1;
+}

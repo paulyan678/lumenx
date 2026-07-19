@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   backend:
     build:
@@ -9,11 +7,14 @@ services:
     env_file:
       - .env
     environment:
-      - NO_PROXY=*.aliyuncs.com,localhost,127.0.0.1
+      - NO_PROXY=.aliyuncs.com,aliyuncs.com,localhost,127.0.0.1
+      - LUMENX_CONTAINER_LOCAL_DIAGNOSTICS=true
+      - LUMENX_DOCKER_BIND_HOST=${LUMENX_DOCKER_BIND_HOST:-127.0.0.1}
     volumes:
       - ./output:/app/output
+      - lumenx-config:/data
     ports:
-      - "17177:17177"
+      - "${LUMENX_DOCKER_BIND_HOST:-127.0.0.1}:17177:17177"
     restart: unless-stopped
 
   frontend:
@@ -22,7 +23,11 @@ services:
       dockerfile: Dockerfile.frontend
     container_name: lumenx-frontend
     ports:
-      - "3000:80"
+      - "${LUMENX_DOCKER_BIND_HOST:-127.0.0.1}:3000:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
+
+volumes:
+  lumenx-config:

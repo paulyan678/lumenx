@@ -8,11 +8,18 @@ export function cn(...inputs: ClassValue[]) {
 
 export function getAssetUrl(path: string | null | undefined): string {
     if (!path) return "";
-    if (path.startsWith("http") || path.startsWith("https") || path.startsWith("blob:")) return path;
+    const value = path.trim();
+    if (!value) return "";
+    if (/^(?:https?:|blob:|data:|\/\/)/i.test(value)) return value;
 
-    // Remove leading slash if present to avoid double slashes with API_URL/files/
-    const cleanPath = path.startsWith("/") ? path.slice(1) : path;
-    return `${API_URL}/files/${cleanPath}`;
+    // Persisted data exists in several historical forms. Canonicalize all of
+    // them to the backend's /files/<path-relative-to-output> contract instead
+    // of producing broken /files/output/... or /files/files/... URLs.
+    const cleanPath = value
+        .replace(/^\/+/, "")
+        .replace(/^files\/+/, "")
+        .replace(/^outputs?\/+/, "");
+    return `${API_URL.replace(/\/+$/, "")}/files/${cleanPath}`;
 }
 
 export function getAssetUrlWithTimestamp(path: string | null | undefined, timestamp?: number): string {

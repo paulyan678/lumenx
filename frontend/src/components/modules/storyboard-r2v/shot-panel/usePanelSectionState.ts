@@ -31,14 +31,16 @@ export function usePanelSectionState(
     section: string,
     defaultOpen: boolean,
 ): [boolean, (next: boolean) => void] {
+    const stateKey = key(shotId, section);
+    const [syncedKey, setSyncedKey] = useState(stateKey);
     const [open, setOpen] = useState<boolean>(() => readState(shotId, section, defaultOpen));
 
-    // Re-hydrate when shotId changes (e.g. user duplicates a shot —
-    // new shot inherits its own default until they interact).
-    useEffect(() => {
+    // Re-hydrate before children render when switching shots/sections. This
+    // prevents one paint with the previous shot's persisted collapse state.
+    if (stateKey !== syncedKey) {
+        setSyncedKey(stateKey);
         setOpen(readState(shotId, section, defaultOpen));
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [shotId, section]);
+    }
 
     // Listen for global override events (e.g. "expand all" toolbar button)
     // so externally-flipped localStorage values reflect immediately without

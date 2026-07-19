@@ -32,17 +32,20 @@ interface FrameLite {
     video_url: string | null;
 }
 
-export default function PreviousEpisodeFramesRail({ scriptId, seriesId }: PreviousEpisodeFramesRailProps) {
+export default function PreviousEpisodeFramesRail(props: PreviousEpisodeFramesRailProps) {
+    return <PreviousEpisodeFramesRailForScript key={`${props.seriesId}:${props.scriptId}`} {...props} />;
+}
+
+function PreviousEpisodeFramesRailForScript({ scriptId, seriesId }: PreviousEpisodeFramesRailProps) {
     const t = useTranslations("previousFramesRail");
     const [frames, setFrames] = useState<FrameLite[]>([]);
     const [prevTitle, setPrevTitle] = useState<string | null>(null);
     const [open, setOpen] = useState(false);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(Boolean(scriptId && seriesId));
 
     useEffect(() => {
         if (!scriptId || !seriesId) return;
         let cancelled = false;
-        setLoading(true);
         api.getPreviousEpisodeSummary(scriptId)
             .then(d => {
                 if (cancelled) return;

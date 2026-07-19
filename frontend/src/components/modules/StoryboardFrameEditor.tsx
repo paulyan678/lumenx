@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, RefreshCw, Check, AlertTriangle, Image as ImageIcon, Lock, Unlock, ChevronRight, Maximize2 } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -19,18 +19,19 @@ export default function StoryboardFrameEditor({ frame: initialFrame, onClose }: 
     const updateProject = useProjectStore(state => state.updateProject);
 
     // Get the latest frame data from the store (instead of using stale prop)
-    const frame = useMemo(() => {
-        if (!currentProject?.frames) return initialFrame;
-        return currentProject.frames.find((f: any) => f.id === initialFrame.id) || initialFrame;
-    }, [currentProject?.frames, initialFrame.id, initialFrame]);
+    const frame = currentProject?.frames?.find((f: any) => f.id === initialFrame.id) || initialFrame;
 
-    const [prompt, setPrompt] = useState(frame.image_prompt || frame.action_description || "");
+    const externalPrompt = frame.image_prompt || frame.action_description || "";
+    const [prompt, setPrompt] = useState(externalPrompt);
+    const [syncedPrompt, setSyncedPrompt] = useState(externalPrompt);
     const [isGenerating, setIsGenerating] = useState(false);
 
-    // Sync prompt when frame changes
-    useEffect(() => {
-        setPrompt(frame.image_prompt || frame.action_description || "");
-    }, [frame.id, frame.image_prompt, frame.action_description]);
+    // Adjust before rendering children when the store replaces this frame's
+    // prompt. Local edits remain intact while the external value is stable.
+    if (externalPrompt !== syncedPrompt) {
+        setSyncedPrompt(externalPrompt);
+        setPrompt(externalPrompt);
+    }
 
     const handleGenerate = async (batchSize: number) => {
         if (!currentProject) return;
@@ -132,7 +133,7 @@ export default function StoryboardFrameEditor({ frame: initialFrame, onClose }: 
                             </p>
                             {frame.dialogue && (
                                 <p className="text-xs text-text-secondary italic">
-                                    <span className="font-bold text-text-muted not-italic">{ts("dialogue")}:</span> "{frame.dialogue}"
+                                    <span className="font-bold text-text-muted not-italic">{ts("dialogue")}:</span> &quot;{frame.dialogue}&quot;
                                 </p>
                             )}
                         </div>

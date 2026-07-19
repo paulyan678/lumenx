@@ -70,7 +70,7 @@ The AI Comic Generator is a complete AI-powered comic video production platform 
 ## Architecture
 
 ### Frontend
-- Framework: Next.js 14 + React 18 + TypeScript + Tailwind CSS
+- Framework: Next.js 16 + React 19 + TypeScript + Tailwind CSS
 - State management: Zustand
 - HTTP client: Axios
 - 3D rendering: Three.js + @react-three/fiber
@@ -128,7 +128,8 @@ cp .env.example .env
 ### Backend Development
 ```bash
 # Install dependencies
-pip install -r requirements.txt
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
 
 # Create output directories
 mkdir -p output/uploads
@@ -136,7 +137,7 @@ mkdir -p output/uploads
 # Start backend server
 ./start_backend.sh
 # or
-python -m uvicorn src.apps.comic_gen.api:app --reload --host 0.0.0.0 --port 17177
+.venv/bin/python -m uvicorn src.apps.comic_gen.api:app --reload --host 127.0.0.1 --port 17177
 
 # API docs available at: http://localhost:17177/docs
 ```
@@ -144,7 +145,7 @@ python -m uvicorn src.apps.comic_gen.api:app --reload --host 0.0.0.0 --port 1717
 ### Frontend Development
 ```bash
 cd frontend
-npm install
+npm ci
 npm run dev
 # Frontend available at: http://localhost:3008
 ```
@@ -182,7 +183,7 @@ output/
 ```
 
 ### Project Data
-User project data is stored in `~/.tron/comic/`:
+User project data is stored in `~/.lumen-x/`:
 - `projects.json` - Main project database
 - `app.log` - Application logs
 
@@ -243,7 +244,7 @@ User project data is stored in `~/.tron/comic/`:
 
 ### Logs
 - Backend logs appear in terminal when running start_backend.sh
-- Desktop app logs saved to: `~/.tron/comic/app.log`
+- Desktop app logs saved to: `~/.lumen-x/logs/app.log`
 
 ## Deployment
 - Frontend: Built with Next.js, can be deployed as static files

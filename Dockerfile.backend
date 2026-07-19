@@ -3,26 +3,36 @@ FROM python:3.11-slim
 # Install FFmpeg and system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
+    fontconfig \
+    fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 # Copy and install Python dependencies (excluding pywebview)
 COPY requirements-docker.txt requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+RUN python -m pip install --no-cache-dir --upgrade "pip>=26.1.2" \
+    && python -m pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY src/ src/
+COPY config/model_catalog/generated/model_catalog.json config/model_catalog/generated/model_catalog.json
 
 # Create output directories
 RUN mkdir -p output/uploads output/video output/assets output/storyboard \
-    output/audio output/export output/video_inputs output/outputs/videos
+    output/audio output/export output/video_inputs output/outputs/videos /data/logs
 
 # Environment
-ENV NO_PROXY="*.aliyuncs.com,localhost,127.0.0.1"
-ENV no_proxy="*.aliyuncs.com,localhost,127.0.0.1"
+ENV NO_PROXY=".aliyuncs.com,aliyuncs.com,localhost,127.0.0.1"
+ENV no_proxy=".aliyuncs.com,aliyuncs.com,localhost,127.0.0.1"
 ENV PYTHONUNBUFFERED=1
+ENV LUMEN_X_PACKAGED=true
+ENV LUMENX_DATA_DIR=/data
+ENV LUMENX_LOG_DIR=/data/logs
 
 EXPOSE 17177
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:17177/health', timeout=2).read()"
 
 CMD ["python", "-m", "uvicorn", "src.apps.comic_gen.api:app", "--host", "0.0.0.0", "--port", "17177"]

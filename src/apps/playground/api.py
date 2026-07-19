@@ -5,8 +5,11 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, UploadFile, File
+from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
 
+from ...utils import get_logger
+from ...utils.newapi_models import MissingNewAPIKeyError, validate_model_for_mode
+from ...utils.uploads import IMAGE_UPLOAD_POLICY, save_upload_file_async
 from .models import (
     CreateTemplateRequest,
     GenerateRequest,
@@ -16,8 +19,6 @@ from .models import (
 )
 from .service import PlaygroundService
 from .storage import PlaygroundStorage
-from ...utils import get_logger
-from ...utils.newapi_models import MissingNewAPIKeyError, validate_model_for_mode
 
 logger = get_logger(__name__)
 
@@ -96,12 +97,8 @@ def save_to_library(
 
 router.add_api_route("/history", list_history, methods=["GET"])
 router.add_api_route("/history/{generation_id}", get_generation, methods=["GET"])
-router.add_api_route(
-    "/history/{generation_id}/status", get_generation_status, methods=["GET"]
-)
-router.add_api_route(
-    "/history/{generation_id}", delete_generation, methods=["DELETE"]
-)
+router.add_api_route("/history/{generation_id}/status", get_generation_status, methods=["GET"])
+router.add_api_route("/history/{generation_id}", delete_generation, methods=["DELETE"])
 router.add_api_route(
     "/history/{generation_id}/outputs/{output_id}/save-to-library",
     save_to_library,
@@ -176,14 +173,8 @@ UPLOAD_DIR = os.path.join("output", "playground", "uploads")
 
 async def upload_media(file: UploadFile = File(...)):
     """Upload a media file for use as playground input (reference image, first frame, etc.)."""
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-    ext = os.path.splitext(file.filename or "file")[1] or ".bin"
-    filename = f"{uuid.uuid4()}{ext}"
-    dest = os.path.join(UPLOAD_DIR, filename)
-    contents = await file.read()
-    with open(dest, "wb") as f:
-        f.write(contents)
-    return {"path": dest}
+    saved = await save_upload_file_async(file, UPLOAD_DIR, IMAGE_UPLOAD_POLICY)
+    return {"path": saved.path}
 
 
 router.add_api_route("/upload", upload_media, methods=["POST"])

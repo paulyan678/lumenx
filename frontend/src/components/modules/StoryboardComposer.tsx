@@ -486,7 +486,7 @@ export default function StoryboardComposer() {
                                         {frame.dialogue && (
                                             <div className="mt-auto pt-3 border-t border-border-subtle">
                                                 <span className="font-mono text-[0.625rem] font-semibold text-text-secondary uppercase tracking-[0.18em] block mb-1">{t("dialogueLabel")}</span>
-                                                <p className="text-sm text-text-secondary italic">"{frame.dialogue}"</p>
+                                                <p className="text-sm text-text-secondary italic">&quot;{frame.dialogue}&quot;</p>
                                             </div>
                                         )}
 
@@ -745,18 +745,22 @@ function CreateFrameDialog({ onClose, onCreate, scenes }: { onClose: () => void;
     );
 }
 
-function ImageWithRetry({ src, alt, className, onClick }: { src: string, alt: string, className?: string, onClick?: (e: React.MouseEvent) => void }) {
+type ImageWithRetryProps = {
+    src: string;
+    alt: string;
+    className?: string;
+    onClick?: (e: React.MouseEvent) => void;
+};
+
+function ImageWithRetry(props: ImageWithRetryProps) {
+    return <ImageWithRetryForSource key={props.src} {...props} />;
+}
+
+function ImageWithRetryForSource({ src, alt, className, onClick }: ImageWithRetryProps) {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(false);
     const [retryCount, setRetryCount] = useState(0);
     const imgRef = useRef<HTMLImageElement>(null);
-
-    // Reset state when src changes
-    useEffect(() => {
-        setIsLoading(true);
-        setError(false);
-        setRetryCount(0);
-    }, [src]);
 
     useEffect(() => {
         if (imgRef.current && imgRef.current.complete) {

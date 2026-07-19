@@ -1,6 +1,6 @@
 import os
 from typing import Dict, Any
-from .models import StoryboardFrame, GenerationStatus
+from .models import GenerationStatus, Script, StoryboardFrame
 from ...models.newapi import NewAPIVideoModel
 from ...utils.newapi_models import VIDEO, get_model_spec, get_selected_model
 from ...utils import get_logger
@@ -165,3 +165,19 @@ class VideoGenerator:
             frame.status = GenerationStatus.FAILED
             
         return frame
+
+    def generate_video(self, script: Script) -> Script:
+        """Generate video clips for every storyboard frame in a script."""
+        total_frames = len(script.frames)
+        model_id = script.model_settings.video_model
+
+        logger.info(f"Generating video clips for script: {script.title}")
+        for index, frame in enumerate(script.frames):
+            if frame.status == GenerationStatus.COMPLETED and frame.video_url:
+                logger.info(f"Skipping completed video frame {frame.id}")
+                continue
+
+            logger.info(f"Generating video frame {index + 1}/{total_frames}: {frame.id}")
+            script.frames[index] = self.generate_clip(frame, model_id=model_id)
+
+        return script

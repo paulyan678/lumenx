@@ -254,9 +254,15 @@ export default function PlaygroundPage() {
       </header>
 
       {/* ═══ SPLIT LAYOUT ═══ */}
-      <div className="flex flex-1 overflow-hidden min-h-0">
+      <div
+        data-testid="playground-split-layout"
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto md:flex-row md:overflow-hidden"
+      >
         {/* ─── LEFT: INPUT PANEL ─── */}
-        <aside className="flex w-[420px] shrink-0 flex-col gap-3 overflow-y-auto border-r border-glass-border px-4 py-4 scrollbar-thin">
+        <aside
+          data-testid="playground-input-panel"
+          className="flex w-full shrink-0 flex-col gap-3 overflow-visible border-b border-glass-border px-4 py-4 scrollbar-thin md:w-[420px] md:overflow-y-auto md:border-b-0 md:border-r"
+        >
           {/* Mode */}
           <section className="glass-panel atelier-card rounded-[20px] px-5 py-5">
             <div className="mb-3 font-mono text-[0.625rem] font-semibold uppercase tracking-[0.16em] text-text-secondary">
@@ -325,7 +331,10 @@ export default function PlaygroundPage() {
         </aside>
 
         {/* ─── RIGHT: RESULT GALLERY ─── */}
-        <main className="flex flex-1 flex-col overflow-hidden min-w-0">
+        <main
+          data-testid="playground-results-panel"
+          className="flex min-h-[360px] w-full min-w-0 flex-1 flex-col overflow-hidden md:min-h-0"
+        >
           <ResultGallery />
         </main>
       </div>

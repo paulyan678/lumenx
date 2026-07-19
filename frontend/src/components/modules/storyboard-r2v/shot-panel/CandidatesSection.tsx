@@ -26,6 +26,7 @@ import type { VideoTask } from "@/lib/api";
 import SectionShell from "./SectionShell";
 import { usePanelSectionState } from "./usePanelSectionState";
 import CandidateThumb from "./CandidateThumb";
+import { useNow } from "@/lib/useNow";
 
 interface CandidatesSectionProps {
     shotId: string;
@@ -321,13 +322,14 @@ function BatchBlock({
     onReuseBatchParams?: CandidatesSectionProps["onReuseBatchParams"];
 }) {
     const t = useTranslations("storyboardR2V");
+    const now = useNow();
     const [open, setOpen] = useState(defaultOpen);
     const failedCount = batch.tasks.filter((t) => t.status === "failed").length;
     const runningCount = batch.tasks.filter((t) => t.status === "pending" || t.status === "processing").length;
     const completedCount = batch.tasks.filter((t) => t.status === "completed").length;
 
     const formatBatchAge = (ts: number): string => {
-        const ageS = Math.max(0, Math.floor(Date.now() / 1000 - ts));
+        const ageS = Math.max(0, Math.floor(now / 1000 - ts));
         if (ageS < 60) return t("batchAgeSeconds", { s: ageS });
         if (ageS < 3600) return t("batchAgeMinutes", { m: Math.floor(ageS / 60) });
         if (ageS < 86_400) return t("batchAgeHours", { h: Math.floor(ageS / 3600) });

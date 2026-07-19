@@ -41,6 +41,7 @@ const EMPTY_FORM: FormState = { name: "", category: "general", prompt: "" };
  */
 export default function PromptTemplateModal() {
   const t = useTranslations("playground");
+  const tc = useTranslations("common");
   const {
     templates,
     showTemplateModal,
@@ -199,7 +200,8 @@ export default function PromptTemplateModal() {
     // Transparent click-catcher — no dark scrim, workspace stays visible (side panel).
     <div className="fixed inset-0 z-50" onClick={dismiss}>
       <div
-        className="fixed right-0 top-0 h-full w-[420px] bg-elevated border-l border-glass-border shadow-2xl flex flex-col transition-transform duration-250 ease-out"
+        data-testid="playground-template-drawer"
+        className="fixed right-0 top-0 flex h-full w-full max-w-[420px] flex-col border-l border-glass-border bg-elevated shadow-2xl transition-transform duration-250 ease-out"
         style={{ transform: visible ? "translateX(0)" : "translateX(100%)" }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -209,6 +211,7 @@ export default function PromptTemplateModal() {
             <button
               type="button"
               onClick={() => setView("browse")}
+              aria-label={tc("back")}
               className="w-8 h-8 -ml-1.5 rounded-lg flex items-center justify-center text-text-muted hover:text-foreground hover:bg-hover-bg transition-colors cursor-pointer"
             >
               <ChevronLeft className="w-4 h-4" />
@@ -220,6 +223,7 @@ export default function PromptTemplateModal() {
           <button
             type="button"
             onClick={dismiss}
+            aria-label={tc("close")}
             className="ml-auto w-8 h-8 rounded-lg flex items-center justify-center text-text-muted hover:text-foreground hover:bg-hover-bg transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
@@ -297,6 +301,7 @@ export default function PromptTemplateModal() {
                           <button
                             type="button"
                             onClick={() => toggleTemplateFavorite(tpl.id)}
+                            aria-label={isTemplateFavorited(tpl.id) ? t("template.unfavorite") : t("template.favorite")}
                             className={`h-7 w-7 rounded-md flex items-center justify-center transition-colors ${
                               isTemplateFavorited(tpl.id)
                                 ? "text-status-starred-solid"
@@ -318,6 +323,7 @@ export default function PromptTemplateModal() {
                             type="button"
                             onClick={() => handleDelete(tpl.id)}
                             disabled={deletingId === tpl.id}
+                            aria-label={tc("delete")}
                             className="h-7 w-7 rounded-md flex items-center justify-center text-text-muted hover:text-status-failed-fg hover:bg-status-failed-bg transition-colors disabled:opacity-30"
                           >
                             <Trash2 size={12} />

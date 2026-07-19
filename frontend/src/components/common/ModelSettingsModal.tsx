@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Settings, X, Image, Video, MessageSquare, Check, Layout, User, Building, Box } from 'lucide-react';
 import { useProjectStore, IMAGE_MODELS, I2V_MODELS, ASPECT_RATIOS } from '@/store/projectStore';
@@ -29,9 +29,16 @@ export default function ModelSettingsModal({ isOpen, onClose }: ModelSettingsMod
     const [propAspectRatio, setPropAspectRatio] = useState(resolvedSettings.prop_aspect_ratio);
     const [storyboardAspectRatio, setStoryboardAspectRatio] = useState(resolvedSettings.storyboard_aspect_ratio);
     const [isSaving, setIsSaving] = useState(false);
+    const [syncedSettings, setSyncedSettings] = useState(currentProject?.model_settings);
+    const [wasOpen, setWasOpen] = useState(isOpen);
 
-    // Sync state when project changes
-    useEffect(() => {
+    // Reset the draft before rendering when the backing settings object is
+    // replaced or the modal is reopened after a cancelled edit. Stable open
+    // settings leave in-progress user edits alone.
+    const reopened = isOpen && !wasOpen;
+    if (isOpen !== wasOpen) setWasOpen(isOpen);
+    if (currentProject?.model_settings !== syncedSettings || reopened) {
+        setSyncedSettings(currentProject?.model_settings);
         const normalizedSettings = resolveModelSettings(currentProject?.model_settings, 'project_settings');
         setChatModel(normalizedSettings.chat_model);
         setImageModel(normalizedSettings.image_model);
@@ -40,7 +47,7 @@ export default function ModelSettingsModal({ isOpen, onClose }: ModelSettingsMod
         setSceneAspectRatio(normalizedSettings.scene_aspect_ratio);
         setPropAspectRatio(normalizedSettings.prop_aspect_ratio);
         setStoryboardAspectRatio(normalizedSettings.storyboard_aspect_ratio);
-    }, [currentProject?.model_settings]);
+    }
 
     const handleSave = async () => {
         if (!currentProject) return;

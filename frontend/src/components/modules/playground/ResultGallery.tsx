@@ -40,7 +40,12 @@ function formatSessionLabel(
 }
 
 export default function ResultGallery() {
-  const { history, startGeneration, updateGeneration, useResultAsReference } = usePlaygroundStore();
+  const {
+    history,
+    startGeneration,
+    updateGeneration,
+    useResultAsReference: setResultAsReference,
+  } = usePlaygroundStore();
   const t = useTranslations('playground');
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'gallery'>('grid');
@@ -110,8 +115,8 @@ export default function ResultGallery() {
 
   // Image result → "Generate video": set the image as i2v reference and switch mode.
   const handleGenerateVideo = useCallback(
-    (mediaPath: string) => useResultAsReference(mediaPath, 'image', 'i2v'),
-    [useResultAsReference],
+    (mediaPath: string) => setResultAsReference(mediaPath, 'image', 'i2v'),
+    [setResultAsReference],
   );
 
   const filtered = useMemo(() => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useId } from "react";
+import { useState, useEffect, useRef, useId, useSyncExternalStore } from "react";
 import { motion } from "framer-motion";
 import {
   Plus, RefreshCw, Library, FileUp, X, ChevronDown, FileText,
@@ -42,7 +42,10 @@ function CreateSeriesDialog({ isOpen, onClose }: { isOpen: boolean; onClose: () 
   const dialogRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -238,6 +241,44 @@ function NewProjectTile({ onClick, episode = false }: { onClick: () => void; epi
 
 // localStorage key for the workspace gallery/list view preference.
 const WS_VIEW_KEY = "lumenx_workspace_view";
+const WS_VIEW_EVENT = "lumenx:workspace-view-change";
+type WorkspaceViewMode = "gallery" | "list";
+let workspaceViewFallback: WorkspaceViewMode = "gallery";
+
+function getWorkspaceViewMode(): WorkspaceViewMode {
+  if (typeof window === "undefined") return workspaceViewFallback;
+  try {
+    const stored = window.localStorage.getItem(WS_VIEW_KEY);
+    workspaceViewFallback = stored === "list" ? "list" : "gallery";
+  } catch {
+    /* use the in-memory fallback */
+  }
+  return workspaceViewFallback;
+}
+
+function subscribeWorkspaceViewMode(onStoreChange: () => void): () => void {
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === WS_VIEW_KEY) onStoreChange();
+  };
+  window.addEventListener("storage", onStorage);
+  window.addEventListener(WS_VIEW_EVENT, onStoreChange);
+  return () => {
+    window.removeEventListener("storage", onStorage);
+    window.removeEventListener(WS_VIEW_EVENT, onStoreChange);
+  };
+}
+
+function storeWorkspaceViewMode(mode: WorkspaceViewMode): void {
+  workspaceViewFallback = mode;
+  try {
+    window.localStorage.setItem(WS_VIEW_KEY, mode);
+  } catch {
+    /* localStorage unavailable — the in-memory choice still works */
+  }
+  window.dispatchEvent(new Event(WS_VIEW_EVENT));
+}
+
+const getServerWorkspaceViewMode = (): WorkspaceViewMode => "gallery";
 
 // deriveCover is imported from ProjectCard (single source of truth).
 
@@ -374,12 +415,15 @@ export default function Home() {
   const [wsSearch, setWsSearch] = useState("");
   const online = useOnline();
   const [wsStatus, setWsStatus] = useState<DerivedStatus | "all">("all");
-  const [viewMode, setViewMode] = useState<"gallery" | "list">("gallery");
+  const viewMode = useSyncExternalStore(
+    subscribeWorkspaceViewMode,
+    getWorkspaceViewMode,
+    getServerWorkspaceViewMode,
+  );
   const [projectId, setProjectId] = useState<string | null>(null);
   const [seriesId, setSeriesId] = useState<string | null>(null);
   const [episodeId, setEpisodeId] = useState<string | null>(null);
   const [seriesEpisodes, setSeriesEpisodes] = useState<Record<string, Project[]>>({});
-  const [, setEpisodesLoading] = useState(false);
   const projects = useProjectStore((state) => state.projects);
   const seriesList = useProjectStore((state) => state.seriesList);
   const deleteProject = useProjectStore((state) => state.deleteProject);
@@ -387,55 +431,6 @@ export default function Home() {
   const fetchSeriesList = useProjectStore((state) => state.fetchSeriesList);
   const t = useTranslations("workspace");
   const tc = useTranslations("common");
-
-  // Sync projects and series from backend on mount
-  useEffect(() => {
-    syncProjects();
-    fetchSeriesList();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Hydrate the persisted gallery/list view preference (client-only to avoid
-  // an SSR/CSR mismatch — default stays "gallery" on first paint).
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(WS_VIEW_KEY);
-      if (saved === "gallery" || saved === "list") setViewMode(saved);
-    } catch {
-      /* localStorage unavailable — keep default */
-    }
-  }, []);
-
-  // Load episodes for all series when seriesList changes
-  useEffect(() => {
-    if (seriesList.length === 0) return;
-    loadAllSeriesEpisodes();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [seriesList]);
-
-  const loadAllSeriesEpisodes = async () => {
-    setEpisodesLoading(true);
-    try {
-      const results = await Promise.all(
-        seriesList.map(async (s) => {
-          const eps = await api.getSeriesEpisodes(s.id);
-          return [s.id, eps] as const;
-        })
-      );
-      const map: Record<string, Project[]> = {};
-      for (const [id, eps] of results) {
-        map[id] = eps;
-      }
-      setSeriesEpisodes(map);
-    } catch (error) {
-      console.error("Failed to load series episodes:", error);
-      toast.error(t("toastEpisodesLoadFailed"), {
-        body: error instanceof Error ? error.message : String(error),
-      });
-    } finally {
-      setEpisodesLoading(false);
-    }
-  };
 
   const syncProjects = async () => {
     setIsSyncing(true);
@@ -453,6 +448,52 @@ export default function Home() {
       setIsSyncing(false);
     }
   };
+
+  // Sync projects and series from backend on mount
+  useEffect(() => {
+    let cancelled = false;
+    api.getProjects()
+      .then((backendProjects) => {
+        if (!cancelled && backendProjects?.length) setProjects(backendProjects);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        console.error("Failed to sync projects from backend:", error);
+        toast.error(t("toastProjectsSyncFailed"), {
+          body: error instanceof Error ? error.message : String(error),
+        });
+      });
+    void fetchSeriesList();
+    return () => { cancelled = true; };
+    // Initial loading has no user-visible sync spinner; manual refresh uses
+    // syncProjects/syncAll and owns isSyncing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Load episodes for all series when seriesList changes
+  useEffect(() => {
+    if (seriesList.length === 0) return;
+    let cancelled = false;
+    Promise.all(
+      seriesList.map(async (series) => {
+        const episodes = await api.getSeriesEpisodes(series.id);
+        return [series.id, episodes] as const;
+      }),
+    )
+      .then((results) => {
+        if (cancelled) return;
+        setSeriesEpisodes(Object.fromEntries(results));
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        console.error("Failed to load series episodes:", error);
+        toast.error(t("toastEpisodesLoadFailed"), {
+          body: error instanceof Error ? error.message : String(error),
+        });
+      });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seriesList]);
 
   const syncAll = async () => {
     await Promise.all([syncProjects(), fetchSeriesList()]);
@@ -558,10 +599,7 @@ export default function Home() {
   };
 
   // Persisted gallery/list switch for the workspace.
-  const changeViewMode = (mode: "gallery" | "list") => {
-    setViewMode(mode);
-    try { localStorage.setItem(WS_VIEW_KEY, mode); } catch { /* localStorage unavailable */ }
-  };
+  const changeViewMode = (mode: WorkspaceViewMode) => storeWorkspaceViewMode(mode);
 
   // Determine content based on activeTab
   const renderContent = () => {

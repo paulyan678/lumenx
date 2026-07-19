@@ -3,6 +3,8 @@
 # 这是一个高级配置模板，供需要自定义打包的用户使用
 
 import os
+import shutil
+import subprocess
 import sys
 from PyInstaller.utils.hooks import collect_all
 
@@ -10,6 +12,28 @@ block_cipher = None
 
 # 项目根目录
 ROOT_DIR = os.path.abspath('.')
+
+FFMPEG_NAME = 'ffmpeg.exe' if sys.platform == 'win32' else 'ffmpeg'
+FFMPEG_PATH = os.environ.get('LUMENX_FFMPEG_BINARY') or shutil.which(FFMPEG_NAME)
+if not FFMPEG_PATH or not os.path.isfile(FFMPEG_PATH):
+    raise FileNotFoundError(
+        'A runnable FFmpeg was not found. Install FFmpeg or set '
+        'LUMENX_FFMPEG_BINARY before packaging.'
+    )
+FFMPEG_PATH = os.path.abspath(FFMPEG_PATH)
+try:
+    subprocess.run(
+        [FFMPEG_PATH, '-version'],
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+except (OSError, subprocess.CalledProcessError) as exc:
+    raise RuntimeError(f'FFmpeg cannot run: {FFMPEG_PATH}') from exc
+
+ICON_PATH = 'icon.icns' if sys.platform == 'darwin' else 'icon.ico'
+if not os.path.isfile(ICON_PATH):
+    ICON_PATH = None
 
 # 收集所有数据文件
 datas = [
@@ -57,17 +81,19 @@ hiddenimports = [
     'requests',
     'multipart',
 ]
+binaries = [(FFMPEG_PATH, '.')]
 
 # 自动收集包的所有内容
 for package in ['uvicorn', 'fastapi', 'starlette', 'pydantic', 'demucs']:
     tmp_datas, tmp_binaries, tmp_hiddenimports = collect_all(package)
     datas += tmp_datas
+    binaries += tmp_binaries
     hiddenimports += tmp_hiddenimports
 
 a = Analysis(
     ['main.py'],
     pathex=[ROOT_DIR],
-    binaries=[],
+    binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=['.pyinstaller-hooks'],
@@ -94,7 +120,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='云创AI漫剧',
+    name='LumenX Studio',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -108,16 +134,16 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     # macOS 使用 .icns，Windows 使用 .ico
-    icon='icon.icns' if sys.platform == 'darwin' else 'icon.ico',
+    icon=ICON_PATH,
 )
 
 # macOS 应用包配置
 if sys.platform == 'darwin':
     app = BUNDLE(
         exe,
-        name='云创AI漫剧.app',
-        icon='icon.icns',
-        bundle_identifier='com.tron.comic',
+        name='LumenX Studio.app',
+        icon=ICON_PATH,
+        bundle_identifier='studio.lumenx.desktop',
         info_plist={
             'NSPrincipalClass': 'NSApplication',
             'NSHighResolutionCapable': 'True',

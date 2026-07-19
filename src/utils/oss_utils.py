@@ -92,12 +92,15 @@ class OSSImageUploader:
         self.bucket_name = os.getenv("OSS_BUCKET_NAME")
         self.base_path = get_oss_base_path()
         
-        # Debug prints for terminal
-        print(f"DEBUG: OSS init - ID={'***' if self.access_key_id else 'None'}, Secret={'***' if self.access_key_secret else 'None'}, Endpoint={self.endpoint}, Bucket={self.bucket_name}, Base={self.base_path}")
+        logger.debug(
+            "Initializing OSS client (credentials_set=%s, endpoint_set=%s, bucket_set=%s)",
+            bool(self.access_key_id and self.access_key_secret),
+            bool(self.endpoint),
+            bool(self.bucket_name),
+        )
         
         if not all([self.access_key_id, self.access_key_secret, self.endpoint, self.bucket_name]):
             logger.warning("OSS credentials not fully configured. OSS upload will be disabled.")
-            print("DEBUG: OSS init - FAILED: missing credentials")
             self.bucket = None
         else:
             try:
@@ -110,10 +113,8 @@ class OSSImageUploader:
                     connect_timeout=5  # 5 seconds connection timeout
                 )
                 logger.info(f"OSS initialized: bucket={self.bucket_name}, base_path={self.base_path}")
-                print(f"DEBUG: OSS init - SUCCESS: bucket={self.bucket_name}")
             except Exception as e:
                 logger.error(f"Failed to initialize OSS bucket: {e}")
-                print(f"DEBUG: OSS init - ERROR: {e}")
                 self.bucket = None
         
         self._initialized = True

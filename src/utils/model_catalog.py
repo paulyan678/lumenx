@@ -1,9 +1,13 @@
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 import yaml
+
+if TYPE_CHECKING:
+    from .provider_registry import ProviderFamilyConfig
 
 
 SUPPORTED_PROVIDER_BACKENDS = ("newapi",)
@@ -122,7 +126,18 @@ def _family_source_paths(catalog_root: Path) -> List[Path]:
         family_dir = MODEL_CATALOG_FAMILIES_DIR
     else:
         family_dir = catalog_root / "families"
-    return sorted(path for path in family_dir.glob("*.yaml") if path.is_file())
+    paths = sorted(path for path in family_dir.glob("*.yaml") if path.is_file())
+    invalid_names = [
+        path.name
+        for path in paths
+        if re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*\.yaml", path.name) is None
+    ]
+    if invalid_names:
+        raise ValueError(
+            "Model catalog family filenames must use lowercase kebab-case; "
+            f"invalid: {', '.join(invalid_names)}"
+        )
+    return paths
 
 
 def _build_schema_stub() -> Dict[str, Any]:
@@ -1023,7 +1038,7 @@ def write_catalog_schema(output_path: Path = MODEL_CATALOG_SCHEMA_PATH) -> Path:
 def load_generated_model_catalog(path: Path = GENERATED_MODEL_CATALOG_PATH) -> Dict[str, Any]:
     if path.exists():
         with path.open("r", encoding="utf-8") as f:
-            return json.load(f)
+            return _require_mapping(json.load(f), label=f"generated catalog {path}")
     return build_catalog_dict(MODEL_CATALOG_ROOT)
 
 
@@ -1033,7 +1048,7 @@ def load_frontend_generated_model_catalog(
     if not path.exists():
         raise FileNotFoundError(f"Frontend generated catalog is missing: {path}")
     with path.open("r", encoding="utf-8") as f:
-        return json.load(f)
+        return _require_mapping(json.load(f), label=f"frontend catalog {path}")
 
 
 # ---------------------------------------------------------------------------
@@ -1111,7 +1126,8 @@ class CatalogAccessor:
         backend_meta = runtime.get(backend)
         if backend_meta is None:
             return None
-        return backend_meta.get("gateway")
+        gateway = backend_meta.get("gateway")
+        return gateway if isinstance(gateway, str) else None
 
     # --- Enumeration helpers ---
 
@@ -1194,14 +1210,24 @@ def build_catalog_validation_report(
     catalog: Optional[Mapping[str, Any]] = None,
     frontend_catalog: Optional[Mapping[str, Any]] = None,
 ) -> CatalogValidationReport:
-    active_catalog = dict(catalog or load_generated_model_catalog())
-    active_frontend_catalog = dict(frontend_catalog or load_frontend_generated_model_catalog())
     errors: List[str] = []
     warnings: List[str] = []
 
+    if catalog is None:
+        active_catalog = build_catalog_dict(MODEL_CATALOG_ROOT)
+        generated_catalog = load_generated_model_catalog()
+        if active_catalog != generated_catalog:
+            errors.append(
+                "Backend generated catalog does not match the model catalog source YAML."
+            )
+    else:
+        active_catalog = dict(catalog)
+
+    active_frontend_catalog = dict(frontend_catalog or load_frontend_generated_model_catalog())
+
     if active_catalog != active_frontend_catalog:
         errors.append(
-            "Frontend generated catalog does not match config/model_catalog/generated/model_catalog.json."
+            "Frontend generated catalog does not match the model catalog source YAML."
         )
 
     models = active_catalog.get("models", {})

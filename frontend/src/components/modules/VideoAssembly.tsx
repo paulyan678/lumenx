@@ -25,11 +25,12 @@ export default function VideoAssembly() {
     const [isDownloading, setIsDownloading] = useState(false);
 
     // Group videos by frame
+    const videoTasks = currentProject?.video_tasks;
     const videosByFrame = useMemo(() => {
-        if (!currentProject?.video_tasks) return {};
+        if (!videoTasks) return {};
 
         const grouped: Record<string, any[]> = {};
-        currentProject.video_tasks.forEach((task: any) => {
+        videoTasks.forEach((task: any) => {
             if (task.status === "completed" && task.video_url) {
                 if (task.frame_id) {
                     if (!grouped[task.frame_id]) grouped[task.frame_id] = [];
@@ -38,7 +39,7 @@ export default function VideoAssembly() {
             }
         });
         return grouped;
-    }, [currentProject?.video_tasks]);
+    }, [videoTasks]);
 
     const handleSelectVideo = async (frameId: string, videoId: string) => {
         if (!currentProject) return;
@@ -230,7 +231,7 @@ export default function VideoAssembly() {
                                             </div>
                                             {frame.dialogue && (
                                                 <div className="flex items-start gap-2 pl-6 border-l-2 border-glass-border ml-1">
-                                                    <p className="text-xs text-text-secondary italic">"{frame.dialogue}"</p>
+                                                    <p className="text-xs text-text-secondary italic">&quot;{frame.dialogue}&quot;</p>
                                                 </div>
                                             )}
                                         </div>
@@ -386,13 +387,12 @@ function MixPhase({
 }) {
     const ta = useTranslations("assembly");
     const [presets, setPresets] = useState<BgmPreset[]>([]);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const mix = mixSettings ?? { dialogue: 100, bgm: 35, sfx: 60 };
 
     useEffect(() => {
         let cancelled = false;
-        setLoading(true);
         api.listBgmPresets()
             .then((p) => { if (!cancelled) setPresets(p); })
             .catch(() => { if (!cancelled) setPresets([]); })

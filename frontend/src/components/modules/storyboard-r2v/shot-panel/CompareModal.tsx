@@ -105,24 +105,6 @@ export default function CompareModal({ tasks, onClose, resolveUrl }: CompareModa
         }
     };
 
-    // Esc to close, Space to play/pause, S to cycle solo.
-    useEffect(() => {
-        const onKey = (e: KeyboardEvent) => {
-            if (e.key === "Escape") {
-                onClose();
-            } else if (e.key === " ") {
-                e.preventDefault();
-                togglePlay();
-            } else if (e.key.toLowerCase() === "s") {
-                e.preventDefault();
-                cycleSolo();
-            }
-        };
-        window.addEventListener("keydown", onKey);
-        return () => window.removeEventListener("keydown", onKey);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [slots.length, soloIndex]);
-
     const togglePlay = () => {
         const next = !isPlaying;
         setIsPlaying(next);
@@ -144,6 +126,24 @@ export default function CompareModal({ tasks, onClose, resolveUrl }: CompareModa
             return cur + 1;
         });
     };
+
+    // Esc to close, Space to play/pause, S to cycle solo.
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+                onClose();
+            } else if (e.key === " ") {
+                e.preventDefault();
+                togglePlay();
+            } else if (e.key.toLowerCase() === "s") {
+                e.preventDefault();
+                cycleSolo();
+            }
+        };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [slots.length, soloIndex]);
 
     const seekTo = (frac: number) => {
         for (const v of videoRefs.current) {

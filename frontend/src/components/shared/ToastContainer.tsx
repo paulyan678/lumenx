@@ -7,9 +7,10 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle2, AlertCircle, AlertTriangle, Info, Loader2, X } from "lucide-react";
 import { useTranslations } from "next-intl";
+import type { ReactNode } from "react";
 import { useToastStore, type Toast, type ToastKind } from "@/store/toastStore";
 
-const KIND_STYLES: Record<ToastKind, { ring: string; bg: string; icon: JSX.Element; iconClass: string }> = {
+const KIND_STYLES: Record<ToastKind, { ring: string; bg: string; icon: ReactNode; iconClass: string }> = {
     info: {
         ring: "border-primary/40",
         bg: "bg-primary/10",

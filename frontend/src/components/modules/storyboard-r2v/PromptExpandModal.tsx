@@ -47,12 +47,6 @@ export default function PromptExpandModal({
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
     const previouslyFocused = useRef<HTMLElement | null>(null);
 
-    // Sync draft when initialValue changes (e.g. parent updates while
-    // modal is open). Rare but safe.
-    useEffect(() => {
-        setDraft(initialValue);
-    }, [initialValue]);
-
     // Focus the textarea on mount; restore previous focus on unmount
     // (matches the CompareModal pattern).
     useEffect(() => {

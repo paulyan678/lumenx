@@ -59,17 +59,30 @@ export default function ProjectClient({ id, breadcrumbSegments }: { id: string; 
 
     // R2V v2 Phase 6 — content_mode lives on the parent series; fetch on
     // mount when project has series_id, default to "scripted" otherwise.
-    const [seriesContentMode, setSeriesContentMode] = useState<"scripted" | "freeform">("scripted");
+    const [loadedSeriesContentMode, setLoadedSeriesContentMode] = useState<{
+        seriesId: string;
+        mode: "scripted" | "freeform";
+    } | null>(null);
+    const activeSeriesId = currentProject?.series_id;
+    const seriesContentMode = activeSeriesId && loadedSeriesContentMode?.seriesId === activeSeriesId
+        ? loadedSeriesContentMode.mode
+        : "scripted";
     useEffect(() => {
         const sid = currentProject?.series_id;
-        if (!sid) {
-            setSeriesContentMode("scripted");
-            return;
-        }
+        if (!sid) return;
         let cancelled = false;
         import("@/lib/api").then(({ api }) => api.getSeries(sid))
-            .then((s: any) => { if (!cancelled) setSeriesContentMode(s?.content_mode === "freeform" ? "freeform" : "scripted"); })
-            .catch(() => { if (!cancelled) setSeriesContentMode("scripted"); });
+            .then((s: any) => {
+                if (!cancelled) {
+                    setLoadedSeriesContentMode({
+                        seriesId: sid,
+                        mode: s?.content_mode === "freeform" ? "freeform" : "scripted",
+                    });
+                }
+            })
+            .catch(() => {
+                if (!cancelled) setLoadedSeriesContentMode({ seriesId: sid, mode: "scripted" });
+            });
         return () => { cancelled = true; };
     }, [currentProject?.series_id]);
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { VideoTask } from '@/store/projectStore';
 import { Trash2, Check, Layers, X, Maximize2, Play, Pause, RefreshCw } from 'lucide-react';
 import { API_URL } from '@/lib/api';
@@ -33,24 +33,16 @@ export const VideoVariantSelector: React.FC<VideoVariantSelectorProps> = ({
     const [selectedVideoId, setSelectedVideoId] = useState<string | null>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
 
-    // Auto-select latest completed video if none selected
-    useEffect(() => {
-        if (!selectedVideoId && videos.length > 0) {
-            // Prefer completed videos
-            const completed = videos.filter(v => v.status === 'completed');
-            if (completed.length > 0) {
-                // Sort by created_at desc
-                completed.sort((a, b) => b.created_at - a.created_at);
-                setSelectedVideoId(completed[0].id);
-            } else {
-                // Or just the latest one
-                const sorted = [...videos].sort((a, b) => b.created_at - a.created_at);
-                setSelectedVideoId(sorted[0].id);
-            }
-        }
-    }, [videos, selectedVideoId]);
-
-    const selectedVideo = videos.find(v => v.id === selectedVideoId);
+    // Keep explicit user selection while it exists. If it was deleted (or the
+    // list first arrives), derive the newest usable fallback during render so
+    // the viewer never spends a frame pointing at a missing video.
+    const selectedVideo = videos.find(v => v.id === selectedVideoId)
+        ?? [...videos]
+            .sort((a, b) => {
+                const completedRank = Number(b.status === 'completed') - Number(a.status === 'completed');
+                return completedRank || b.created_at - a.created_at;
+            })[0];
+    const effectiveSelectedVideoId = selectedVideo?.id ?? null;
     const apiBase = getApiBaseUrl();
 
     const getFullUrl = (url: string) => {
@@ -148,7 +140,7 @@ export const VideoVariantSelector: React.FC<VideoVariantSelectorProps> = ({
                     <div className="relative">
                         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent snap-x">
                             {videos.map((video) => {
-                                const isSelected = video.id === selectedVideoId;
+                                const isSelected = video.id === effectiveSelectedVideoId;
                                 // Use image_url (snapshot) as thumbnail
                                 const thumbUrl = getFullUrl(video.image_url);
 
@@ -159,7 +151,10 @@ export const VideoVariantSelector: React.FC<VideoVariantSelectorProps> = ({
                                             relative flex-shrink-0 w-24 h-16 rounded-md overflow-hidden border-2 transition-all snap-start group/variant cursor-pointer
                                             ${isSelected ? 'border-blue-500 ring-2 ring-blue-500/30' : 'border-transparent hover:border-gray-500'}
                                         `}
-                                        onClick={() => setSelectedVideoId(video.id)}
+                                        onClick={() => {
+                                            setSelectedVideoId(video.id);
+                                            onSelect?.(video.id);
+                                        }}
                                     >
                                         {/* Thumbnail */}
                                         <img

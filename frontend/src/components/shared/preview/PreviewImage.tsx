@@ -61,7 +61,11 @@ export interface PreviewImageProps {
     placeholder?: React.ReactNode;
 }
 
-export default function PreviewImage({
+export default function PreviewImage(props: PreviewImageProps) {
+    return <PreviewImageForSource key={props.src ?? ""} {...props} />;
+}
+
+function PreviewImageForSource({
     src, alt, className, noLightbox = false,
     groupId, groupIndex, alwaysShowMagnify = false,
     clickToLightbox = false, placeholder,
@@ -75,12 +79,6 @@ export default function PreviewImage({
     const wrapperRef = useRef<HTMLDivElement | null>(null);
     /** Sized-adaptive bucket; recomputed on resize via ResizeObserver. */
     const [sizeBucket, setSizeBucket] = useState<"micro" | "mid" | "large">("large");
-
-    useEffect(() => {
-        setErrored(false);
-        setHasRetriedOnce(false);
-        setRetryNonce(0);
-    }, [src]);
 
     useEffect(() => {
         const el = wrapperRef.current;

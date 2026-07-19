@@ -7,6 +7,7 @@ import uuid
 import subprocess
 import threading
 import platform
+import tempfile
 from urllib.parse import quote
 from .models import Script, GenerationStatus, VideoTask, Character, Scene, StoryboardFrame, Series, PromptConfig, ArtDirection, GlobalAssetLibrary
 from .llm import ScriptProcessor
@@ -52,6 +53,40 @@ def _safe_resolve_path(base_dir: str, untrusted_rel: str) -> str:
     if not resolved.startswith(base + os.sep) and resolved != base:
         raise ValueError(f"Path escapes base directory: {untrusted_rel}")
     return resolved
+
+
+def _atomic_json_dump(path: str, payload: Any) -> None:
+    """Persist JSON without exposing readers to a truncated target file.
+
+    The temporary file lives beside the destination so ``os.replace`` stays
+    atomic on the same filesystem.  Any write/replace failure is propagated to
+    the caller; mutation endpoints must not report success for data that was
+    never durably stored.
+    """
+    directory = os.path.dirname(path) or "."
+    os.makedirs(directory, exist_ok=True)
+    temp_path: Optional[str] = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=directory,
+            prefix=f".{os.path.basename(path)}.",
+            suffix=".tmp",
+            delete=False,
+        ) as temp_file:
+            temp_path = temp_file.name
+            json.dump(payload, temp_file, indent=2)
+            temp_file.flush()
+            os.fsync(temp_file.fileno())
+        os.replace(temp_path, path)
+    except Exception:
+        if temp_path:
+            try:
+                os.unlink(temp_path)
+            except FileNotFoundError:
+                pass
+        raise
 
 
 class LibraryAssetInUseError(Exception):
@@ -106,10 +141,15 @@ class ComicGenPipeline:
         # Cached model instances (lazily initialized)
         self._newapi_video_model = None
 
-        # Pre-download Demucs model in background so first dub request is fast
+        # Demucs is large and may download model weights. Keep startup offline by
+        # default; operators can opt into preloading, while the first dub request
+        # still initializes it lazily when preload is disabled.
         self._demucs_ready = threading.Event()
         self._demucs_error: Optional[str] = None
-        threading.Thread(target=self._warmup_demucs_model, daemon=True).start()
+        self._demucs_warmup_lock = threading.Lock()
+        self._demucs_warmup_started = False
+        if os.getenv("LUMENX_PRELOAD_DEMUCS", "").strip() == "1":
+            self._start_demucs_warmup()
 
         # Recover orphan async tasks. FastAPI BackgroundTasks live in
         # process memory — any restart between submit + execute leaves
@@ -206,10 +246,7 @@ class ComicGenPipeline:
             elif label is not None:
                 trimmed = label.strip()[: self._MAX_LABEL_LEN]
                 task.label = trimmed or None
-            try:
-                self._save_data()
-            except Exception:
-                logger.warning("annotate_video_task: save failed")
+            self._save_data()
             return task
 
     _T2I_HISTORY_LIMIT = 10
@@ -278,10 +315,7 @@ class ComicGenPipeline:
                     1, min(int(workbench_generate_count), self._MAX_GENERATE_COUNT)
                 )
             frame.updated_at = time.time()
-            try:
-                self._save_data()
-            except Exception:
-                logger.warning("update_frame_workbench: save failed")
+            self._save_data()
             return frame
 
     def upload_t2i_frame(
@@ -318,10 +352,7 @@ class ComicGenPipeline:
             # requires the upload immediately unlocks Step 2.
             frame.t2i_selected_index = len(current) - 1
             frame.updated_at = time.time()
-            try:
-                self._save_data()
-            except Exception:
-                logger.warning("upload_t2i_frame: save failed")
+            self._save_data()
             return frame
 
     def mark_video_task_failed(
@@ -350,22 +381,25 @@ class ComicGenPipeline:
                     task.error = error_message
             except Exception:
                 pass
-            try:
-                self._save_data()
-            except Exception:
-                logger.warning("mark_video_task_failed: save failed")
+            # Background wrappers already catch persistence failures.  Let
+            # user-facing callers (notably Cancel) see a real error instead of
+            # returning success for a state change that was never stored.
+            self._save_data()
             return True
 
     # ... (existing methods)
 
     def export_project(self, script_id: str, options: Dict[str, Any]) -> str:
         """Step 7: Export project to final video."""
+        _validate_safe_id(script_id, "script_id")
         script = self.scripts.get(script_id)
         if not script:
             raise ValueError("Script not found")
 
-        export_url = self.export_manager.render_project(script, options)
-        return export_url
+        if not script.merged_video_url:
+            script = self.merge_videos(script_id)
+
+        return self.export_manager.render_project(script, options)
 
     def get_script(self, script_id: str) -> Optional[Script]:
         return self.scripts.get(script_id)
@@ -374,7 +408,7 @@ class ComicGenPipeline:
         if not os.path.exists(self.data_file):
             return {}
         try:
-            with open(self.data_file, 'r') as f:
+            with open(self.data_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 scripts = {k: Script(**v) for k, v in data.items()}
             migrated = any(
@@ -383,22 +417,26 @@ class ComicGenPipeline:
                 for raw in [data.get(key) or {}]
             )
             if migrated:
-                with open(self.data_file, "w") as f:
-                    json.dump({k: v.model_dump() for k, v in scripts.items()}, f, indent=2)
+                _atomic_json_dump(
+                    self.data_file,
+                    {k: v.model_dump() for k, v in scripts.items()},
+                )
             return scripts
         except Exception as e:
             logger.error(f"Failed to load data: {e}")
-            return {}
+            raise RuntimeError(f"Failed to load project data from {self.data_file}") from e
 
     def _save_data(self):
         """Save data with thread lock to prevent concurrent write issues."""
         with self._save_lock:
             try:
-                os.makedirs(os.path.dirname(self.data_file), exist_ok=True)
-                with open(self.data_file, 'w') as f:
-                    json.dump({k: v.model_dump() for k, v in self.scripts.items()}, f, indent=2)
+                _atomic_json_dump(
+                    self.data_file,
+                    {k: v.model_dump() for k, v in self.scripts.items()},
+                )
             except Exception as e:
                 logger.error(f"Failed to save data: {e}")
+                raise
 
     def _repair_series_bindings(self):
         """Repair episodes listed in series.episode_ids that have series_id=None."""
@@ -1437,7 +1475,7 @@ class ComicGenPipeline:
         self._save_data()
         return script
 
-    def refine_frame(self, script_id: str, frame_id: str) -> Optional[StoryboardFrame]:
+    def refine_frame(self, script_id: str, frame_id: str) -> StoryboardFrame:
         """Phase 2: Refine a single coarse frame into a rich frame."""
         from .prompt_assembly import assemble_prompt, sync_dialogue_metadata
         from .models import DialogueStructured, CameraMovementData, Blocking, AudioNote, LightingData, StageSubject
@@ -1491,8 +1529,8 @@ class ComicGenPipeline:
         result = self.script_processor.refine_frame_to_rich(
             coarse, char_assets, scene_assets, prev_ctx, next_ctx
         )
-        if not result:
-            return frame
+        if not isinstance(result, dict) or not result:
+            raise RuntimeError("Rich-frame refinement returned no usable result")
 
         # Map result onto frame fields
         if result.get("visual_description"):
@@ -1606,11 +1644,14 @@ class ComicGenPipeline:
             except Exception as exc:
                 failed += 1
                 logger.error(f"[refine_batch] frame={frame.id} error={exc}")
-                yield ("frame_refine_error", {
+                error_event = {
                     "frame_id": frame.id,
                     "frame_index": idx,
-                    "error": str(exc),
-                })
+                    "error": getattr(exc, "message", str(exc)),
+                }
+                if getattr(exc, "reason", None):
+                    error_event["reason"] = exc.reason
+                yield ("frame_refine_error", error_event)
 
         yield ("batch_complete", {"total": total, "success": success, "failed": failed})
 
@@ -1622,6 +1663,10 @@ class ComicGenPipeline:
         script = self.scripts.get(script_id)
         if not script:
             raise ValueError("Script not found")
+
+        frame = next((item for item in script.frames if item.id == frame_id), None)
+        if not frame:
+            raise ValueError(f"Frame {frame_id} not found")
 
         logger.debug(f"Refining prompt for frame {frame_id}")
 
@@ -1636,24 +1681,16 @@ class ComicGenPipeline:
         # Call LLM to refine prompt
         result = self.script_processor.polish_storyboard_prompt(raw_prompt, assets, feedback, custom_prompt)
         
-        # Find and update the frame
-        frame_found = False
-        for frame in script.frames:
-            if frame.id == frame_id:
-                frame.image_prompt_cn = result.get("prompt_cn")
-                frame.image_prompt_en = result.get("prompt_en")
-                frame.image_prompt = result.get("prompt_en")  # Also update legacy field
-                frame.updated_at = time.time()
-                frame_found = True
-                break
-        
-        if frame_found:
-            self._save_data()
+        frame.image_prompt_cn = result.get("prompt_cn")
+        frame.image_prompt_en = result.get("prompt_en")
+        frame.image_prompt = result.get("prompt_en")  # Also update legacy field
+        frame.updated_at = time.time()
+        self._save_data()
         
         return {
             "prompt_cn": result.get("prompt_cn"),
             "prompt_en": result.get("prompt_en"),
-            "frame_updated": frame_found
+            "frame_updated": True
         }
 
     def generate_storyboard(self, script_id: str) -> Script:
@@ -2039,7 +2076,7 @@ class ComicGenPipeline:
                 logger.debug(f"Original reference URLs from frontend: {ref_image_urls}")
 
             # Call generator
-            self.storyboard_generator.generate_frame(
+            generated_frame = self.storyboard_generator.generate_frame(
                 frame,
                 resolved["characters"],
                 scene,
@@ -2050,32 +2087,18 @@ class ComicGenPipeline:
                 size=effective_size,
                 model_name=i2i_model
             )
+            if (
+                generated_frame.status != GenerationStatus.COMPLETED
+                or not (generated_frame.rendered_image_url or generated_frame.image_url)
+            ):
+                raise RuntimeError("Storyboard frame generation failed without an output image")
             
             self._save_data()
             return script
         except Exception as e:
             frame.status = GenerationStatus.FAILED
             self._save_data()
-            raise e
-            # 1. Take the composition_data (positions of assets)
-            # 2. Construct a composite image (ControlNet input)
-            # 3. Call Img2Img with the composite + prompt
-            
-            logger.debug(f"Rendering frame {frame_id} with prompt: {prompt}")
-            time.sleep(1.5) # Simulate processing
-            
-            # Mock Result
-            mock_url = f"https://placehold.co/1280x720/2a2a2a/FFF?text=Rendered+Frame+{frame_id}"
-            frame.rendered_image_url = mock_url
-            frame.image_url = mock_url # Update main image too
-            frame.status = GenerationStatus.COMPLETED
-            
-        except Exception as e:
-            logger.error(f"Frame rendering failed: {e}")
-            frame.status = GenerationStatus.FAILED
-            
-        self._save_data()
-        return script
+            raise
 
     def generate_video(self, script_id: str) -> Script:
         """Step 4: Generate video clips."""
@@ -2483,8 +2506,20 @@ class ComicGenPipeline:
                 os.remove(cached)
             return None
 
+    def _start_demucs_warmup(self) -> None:
+        """Start one background model initialization, if it has not started."""
+        with self._demucs_warmup_lock:
+            if self._demucs_warmup_started:
+                return
+            self._demucs_warmup_started = True
+            threading.Thread(
+                target=self._warmup_demucs_model,
+                name="lumenx-demucs-warmup",
+                daemon=True,
+            ).start()
+
     def _warmup_demucs_model(self):
-        """Pre-download htdemucs model at startup so first dub request is fast."""
+        """Load/download htdemucs after explicit preload or first dub use."""
         try:
             from demucs.pretrained import get_model
             get_model("htdemucs")
@@ -2494,6 +2529,16 @@ class ComicGenPipeline:
             self._demucs_error = str(e)
             self._demucs_ready.set()
             logger.warning(f"[DUB] Demucs model warmup failed: {e}")
+
+    def _ensure_demucs_model_ready(self, timeout: float = 120) -> bool:
+        """Lazily initialize Demucs and report whether it is ready for use."""
+        self._start_demucs_warmup()
+        if not self._demucs_ready.wait(timeout=timeout):
+            raise RuntimeError("Demucs 模型正在下载中（首次约需30秒），请稍后重试。")
+        if self._demucs_error:
+            logger.warning("[DUB] Demucs unavailable; using simple audio replacement")
+            return False
+        return True
 
     def _separate_background_audio(self, video_path: str, work_dir: str) -> Optional[str]:
         """Extract audio from video and separate background (no_vocals) using Demucs.
@@ -2525,10 +2570,11 @@ class ComicGenPipeline:
             logger.info("[DUB] Source video has negligible audio, skipping separation")
             return None
 
-        # Step 2: Run Demucs separation (two-stems: vocals + no_vocals)
-        # Wait for background model warmup to finish (avoids duplicate download)
-        if not self._demucs_ready.wait(timeout=120):
-            raise RuntimeError("Demucs 模型正在下载中（首次约需30秒），请稍后重试。")
+        # Step 2: Run Demucs separation (two-stems: vocals + no_vocals).
+        # Startup does not touch the network unless explicitly opted in; the
+        # first request initializes the model here and waits for that one load.
+        if not self._ensure_demucs_model_ready():
+            return None
 
         try:
             import demucs.separate
@@ -2869,6 +2915,10 @@ class ComicGenPipeline:
                         
         if not abs_video_paths:
             logger.error("[MERGE] No valid video files found on disk!")
+            try:
+                os.remove(list_path)
+            except OSError:
+                pass
             raise ValueError("No valid video files found. The video files may have been deleted or moved.")
         
         logger.info(f"[MERGE] Merge list created with {len(abs_video_paths)} videos")
@@ -2945,15 +2995,19 @@ class ComicGenPipeline:
 
             self._save_data()
 
-            # Cleanup list file
-            if os.path.exists(list_path):
-                os.remove(list_path)
-
             return script
         except subprocess.TimeoutExpired:
             logger.error("[MERGE] FFmpeg timed out after 600 seconds")
+            try:
+                os.remove(output_path)
+            except OSError:
+                pass
             raise RuntimeError("FFmpeg timed out. The videos may be too large.")
         except subprocess.CalledProcessError as e:
+            try:
+                os.remove(output_path)
+            except OSError:
+                pass
             stderr_msg = e.stderr.decode() if e.stderr else "No error output"
             stdout_msg = e.stdout.decode() if e.stdout else "No output"
             
@@ -2967,6 +3021,11 @@ class ComicGenPipeline:
             # Extract user-friendly error message
             user_msg = self._extract_ffmpeg_error_message(stderr_msg, abs_video_paths)
             raise RuntimeError(user_msg)
+        finally:
+            try:
+                os.remove(list_path)
+            except OSError:
+                pass
     
     def _maybe_apply_bgm_mux(
         self,
@@ -2994,14 +3053,22 @@ class ComicGenPipeline:
         dial = max(0, min(100, int(mix.get("dialogue", 100)))) / 100.0
         bgm_lvl = max(0, min(100, int(mix.get("bgm", 35)))) / 100.0
 
-        mixed_path = video_path.replace(".mp4", "_mixed.mp4")
+        stem, extension = os.path.splitext(video_path)
+        mixed_path = f"{stem}_mixed{extension or '.mp4'}"
+        has_dialogue_audio = self._video_has_audio_stream(video_path, ffmpeg_path)
         # -stream_loop -1 loops BGM until shortest (the video) ends.
-        # apad on the dialogue side avoids amix cutting early on silence.
-        filter_complex = (
-            f"[0:a]volume={dial:.3f},apad[a0];"
-            f"[1:a]volume={bgm_lvl:.3f},aloop=loop=-1:size=2e9[a1];"
-            f"[a0][a1]amix=inputs=2:duration=first:dropout_transition=0[aout]"
-        )
+        if has_dialogue_audio:
+            # apad on the dialogue side avoids amix cutting early on silence.
+            filter_complex = (
+                f"[0:a:0]volume={dial:.3f},apad[a0];"
+                f"[1:a:0]volume={bgm_lvl:.3f}[a1];"
+                f"[a0][a1]amix=inputs=2:duration=first:dropout_transition=0[aout]"
+            )
+        else:
+            # Generated clips are allowed to be silent. In that case there is
+            # no dialogue stream to mix, so use the looped BGM as the final
+            # audio track instead of referencing a nonexistent ``0:a``.
+            filter_complex = f"[1:a:0]volume={bgm_lvl:.3f}[aout]"
         cmd = [
             ffmpeg_path, "-y",
             "-i", video_path,
@@ -3020,11 +3087,49 @@ class ComicGenPipeline:
         except subprocess.CalledProcessError as e:
             stderr_msg = e.stderr.decode() if e.stderr else ""
             logger.warning(f"[MERGE/BGM] ffmpeg failed: {stderr_msg[:400]}")
+            try:
+                os.remove(mixed_path)
+            except OSError:
+                pass
+            return None
+        except subprocess.TimeoutExpired:
+            logger.warning("[MERGE/BGM] ffmpeg timed out after 300 seconds")
+            try:
+                os.remove(mixed_path)
+            except OSError:
+                pass
             return None
         if not os.path.exists(mixed_path):
             logger.warning(f"[MERGE/BGM] mixed output not found: {mixed_path}")
             return None
         return mixed_path
+
+    @staticmethod
+    def _video_has_audio_stream(video_path: str, ffmpeg_path: str) -> bool:
+        """Return whether ``video_path`` exposes a decodable first audio stream."""
+        try:
+            result = subprocess.run(
+                [
+                    ffmpeg_path,
+                    "-hide_banner",
+                    "-loglevel",
+                    "error",
+                    "-i",
+                    video_path,
+                    "-map",
+                    "0:a:0",
+                    "-t",
+                    "0.01",
+                    "-f",
+                    "null",
+                    "-",
+                ],
+                capture_output=True,
+                timeout=15,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return False
+        return result.returncode == 0
 
     def _extract_ffmpeg_error_message(self, stderr: str, video_paths: List[str]) -> str:
         """
@@ -3341,13 +3446,6 @@ class ComicGenPipeline:
         
         self._save_data()
         return script
-
-
-
-
-    def get_script(self, script_id: str) -> Optional[Script]:
-        return self.scripts.get(script_id)
-
     def _select_variant_in_asset(self, image_asset: Any, variant_id: str) -> Any:
         """Helper to select a variant in an ImageAsset. Returns the selected variant if found."""
         if not image_asset or not image_asset.variants:
@@ -3663,7 +3761,7 @@ class ComicGenPipeline:
         if not os.path.exists(self.series_data_file):
             return {}
         try:
-            with open(self.series_data_file, 'r') as f:
+            with open(self.series_data_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 series_store = {k: Series(**v) for k, v in data.items()}
             migrated = any(
@@ -3672,21 +3770,27 @@ class ComicGenPipeline:
                 for raw in [data.get(key) or {}]
             )
             if migrated:
-                with open(self.series_data_file, "w") as f:
-                    json.dump({k: v.model_dump() for k, v in series_store.items()}, f, indent=2)
+                _atomic_json_dump(
+                    self.series_data_file,
+                    {k: v.model_dump() for k, v in series_store.items()},
+                )
             return series_store
         except Exception as e:
             logger.error(f"Failed to load series data: {e}")
-            return {}
+            raise RuntimeError(
+                f"Failed to load series data from {self.series_data_file}"
+            ) from e
 
     def _save_series_data_unlocked(self):
         """Save series data without acquiring the lock (caller must hold self._save_lock)."""
         try:
-            os.makedirs(os.path.dirname(self.series_data_file) or ".", exist_ok=True)
-            with open(self.series_data_file, 'w') as f:
-                json.dump({k: v.model_dump() for k, v in self.series_store.items()}, f, indent=2)
+            _atomic_json_dump(
+                self.series_data_file,
+                {k: v.model_dump() for k, v in self.series_store.items()},
+            )
         except Exception as e:
             logger.error(f"Failed to save series data: {e}")
+            raise
 
     def _save_series_data(self):
         """Save series data with thread lock."""
@@ -3701,21 +3805,25 @@ class ComicGenPipeline:
         if not os.path.exists(self.library_data_file):
             return GlobalAssetLibrary()
         try:
-            with open(self.library_data_file, 'r') as f:
+            with open(self.library_data_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 return GlobalAssetLibrary(**data)
         except Exception as e:
             logger.error(f"Failed to load library data: {e}")
-            return GlobalAssetLibrary()
+            raise RuntimeError(
+                f"Failed to load library data from {self.library_data_file}"
+            ) from e
 
     def _save_library_data_unlocked(self):
         """Save global library data without acquiring the lock (caller must hold self._save_lock)."""
         try:
-            os.makedirs(os.path.dirname(self.library_data_file) or ".", exist_ok=True)
-            with open(self.library_data_file, 'w') as f:
-                json.dump(self.library_store.model_dump(), f, indent=2)
+            _atomic_json_dump(
+                self.library_data_file,
+                self.library_store.model_dump(),
+            )
         except Exception as e:
             logger.error(f"Failed to save library data: {e}")
+            raise
 
     def _save_library_data(self):
         """Save global library data with thread lock."""
@@ -3802,8 +3910,13 @@ class ComicGenPipeline:
                 )
             else:
                 raise ValueError(f"Invalid asset type: {asset_type}")
-            self._library_list_for_type(asset_type).append(asset)
-            self._save_library_data_unlocked()
+            target_list = self._library_list_for_type(asset_type)
+            target_list.append(asset)
+            try:
+                self._save_library_data_unlocked()
+            except Exception:
+                target_list.remove(asset)
+                raise
             return asset
 
     def update_library_asset(self, asset_type: str, asset_id: str, patch: Dict[str, Any]):
@@ -3813,10 +3926,16 @@ class ComicGenPipeline:
         those)."""
         with self._save_lock:
             asset = self._find_library_asset(asset_type, asset_id)
+            original = asset.model_copy(deep=True)
             for key, value in (patch or {}).items():
                 if hasattr(asset, key) and key not in ("id", "status"):
                     setattr(asset, key, value)
-            self._save_library_data_unlocked()
+            try:
+                self._save_library_data_unlocked()
+            except Exception:
+                target_list = self._library_list_for_type(asset_type)
+                target_list[target_list.index(asset)] = original
+                raise
             return asset
 
     def _scan_library_asset_references(self, asset_type: str, asset_id: str) -> List[Dict[str, Any]]:
@@ -3885,7 +4004,16 @@ class ComicGenPipeline:
                 self.library_store.scenes = kept
             else:  # prop
                 self.library_store.props = kept
-            self._save_library_data_unlocked()
+            try:
+                self._save_library_data_unlocked()
+            except Exception:
+                if asset_type == "character":
+                    self.library_store.characters = target_list
+                elif asset_type == "scene":
+                    self.library_store.scenes = target_list
+                else:
+                    self.library_store.props = target_list
+                raise
 
     def promote_asset_to_library(self, source_kind: str, source_id: str, asset_type: str, asset_id: str):
         """Deep-copy an asset from a Project (episode) or Series into the
@@ -3924,8 +4052,13 @@ class ComicGenPipeline:
 
             new_asset = copy.deepcopy(source_asset)
             new_asset.id = str(uuid.uuid4())
-            self._library_list_for_type(asset_type).append(new_asset)
-            self._save_library_data_unlocked()
+            target_list = self._library_list_for_type(asset_type)
+            target_list.append(new_asset)
+            try:
+                self._save_library_data_unlocked()
+            except Exception:
+                target_list.remove(new_asset)
+                raise
             return new_asset
 
     def fork_library_asset_to_project(self, script_id: str, asset_type: str, library_asset_id: str):

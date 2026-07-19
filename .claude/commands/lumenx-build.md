@@ -10,7 +10,7 @@ description: LumenX Studio 桌面应用构建流程 - macOS DMG 和 Windows EXE 
 
 **通用:**
 - Python 3.11+
-- Node.js 18+ (npm)
+- Node.js 20.9+ (20.x, npm)
 - FFmpeg
 
 **macOS 额外:**
@@ -89,14 +89,14 @@ dist_windows\LumenX Studio.exe   # Windows 可执行文件
 
 | 问题 | 解决方案 |
 |------|---------|
-| FFmpeg 未找到 | 下载 FFmpeg 放入 `bin\` 目录或添加到 PATH |
+| FFmpeg 未找到 | 将 FFmpeg 添加到 `PATH`，或把 `LUMENX_FFMPEG_BINARY` 指向可运行的 `ffmpeg.exe` |
 | PowerShell 执行策略 | 管理员 PowerShell: `Set-ExecutionPolicy RemoteSigned` |
 | WebView2 错误 | 安装 Edge WebView2 Runtime |
 
 ## 构建产物清理
 
 ```bash
-rm -rf dist/ dist_mac/ dist_windows/ build/ *.spec
+rm -rf dist/ dist_mac/ dist_windows/ build/
 rm -rf frontend/.next frontend/out static/
 ```
 

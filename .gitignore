@@ -57,6 +57,8 @@ htmlcov/
 # Build outputs
 dist_mac/
 dist_windows/
+bin/ffmpeg
+bin/ffmpeg.exe
 *.app
 *.exe
 *.dmg
@@ -67,7 +69,6 @@ Thumbs.db
 
 # Node.js
 node_modules/
-package-lock.json
 
 # Frontend (Next.js)
 frontend/node_modules/

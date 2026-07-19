@@ -50,7 +50,6 @@ export function useLightbox(): LightboxContextValue {
         // Soft fallback so components don't crash if provider isn't mounted yet
         // (e.g. SSR or test). Open becomes a no-op + warns once.
         if (typeof window !== "undefined") {
-            // eslint-disable-next-line no-console
             console.warn("[Lightbox] useLightbox called outside <LightboxProvider>; open is a no-op.");
         }
         return {

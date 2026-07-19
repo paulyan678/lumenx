@@ -4,13 +4,13 @@ import shutil
 import platform
 import os
 import sys
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-def get_ffmpeg_path() -> str:
+def get_ffmpeg_path() -> Optional[str]:
     """
     Get path to ffmpeg binary, preferring bundled version.
 
@@ -118,7 +118,7 @@ def get_system_info() -> Dict[str, str]:
     }
 
 
-def run_system_checks() -> Dict[str, any]:
+def run_system_checks() -> Dict[str, Any]:
     """
     Run all system checks and return results.
     

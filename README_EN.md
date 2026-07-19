@@ -12,7 +12,7 @@
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
-[![Node](https://img.shields.io/badge/node-18%2B-green)](https://nodejs.org/)
+[![Node](https://img.shields.io/badge/node-20.9%2B-green)](https://nodejs.org/)
 [![GitHub Stars](https://img.shields.io/github/stars/alibaba/lumenx?style=social)](https://github.com/alibaba/lumenx)
 
 [English](README_EN.md) · [中文](README.md) · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md)
@@ -105,7 +105,7 @@ Reference-to-video is not advertised because the implemented New API contract do
 ### Prerequisites
 
 - Python 3.11+
-- Node.js 18+
+- Node.js 20.9+ (20.x)
 - FFmpeg (for video processing)
 
 ### One-command Launch
@@ -120,6 +120,9 @@ cp .env.example .env
 chmod 600 .env
 # Edit .env, set NEWAPI_BASE_URL and the key for each model you plan to use
 
+# Install the root launcher dependencies once
+npm ci
+
 # Start (backend on 17177 + frontend on 3008, auto-opens browser)
 npm run dev
 ```
@@ -128,11 +131,12 @@ Or start separately:
 
 ```bash
 # Backend
-pip install -r requirements.txt
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
 ./start_backend.sh  # http://localhost:17177
 
 # Frontend
-cd frontend && npm install && npm run dev  # http://localhost:3008
+cd frontend && npm ci && npm run dev  # http://localhost:3008
 ```
 
 ### Access
@@ -159,9 +163,7 @@ LumenX uses a **local-first** architecture and New API is its only AI provider. 
 <details>
 <summary>Detailed Configuration</summary>
 
-All settings can be configured via:
-- **Development**: `.env` file in project root
-- **In-app Settings**: Settings page (saves to `~/.lumen-x/config.json`)
+All settings can be configured in the app. Development updates the project-root `.env`; packaged desktop and container builds persist settings not overridden by deployment environment variables in `config.json` under the durable user-data directory.
 
 Saved keys stay masked in the application. LumenX never sends one model's key with another model ID and never falls back to another provider or model.
 

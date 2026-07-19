@@ -1,20 +1,20 @@
-#!/bin/bash
+#!/bin/sh
 
-# 阿里云服务不走代理（避免PAC配置被Python忽略）
-# macOS系统代理会被requests库读取，但PAC规则不会被解析
-# 显式设置NO_PROXY确保阿里云域名直连
-export NO_PROXY="*.aliyuncs.com,localhost,127.0.0.1"
-export no_proxy="*.aliyuncs.com,localhost,127.0.0.1"
+set -eu
 
 echo "========================================"
 echo "Starting Backend (FastAPI)..."
-echo "Port: 17177"
-echo "Proxy Bypass: *.aliyuncs.com"
 echo "========================================"
 
 # 确保在项目根目录
-cd "$(dirname "$0")"
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+cd "$SCRIPT_DIR"
 
-# 启动 uvicorn
-python -m uvicorn src.apps.comic_gen.api:app --reload --port 17177 --host 0.0.0.0
+if ! command -v node >/dev/null 2>&1; then
+    echo "Error: Node.js 20 is required to launch the configured backend." >&2
+    exit 1
+fi
 
+# The shared launcher safely reads .env, validates API_PORT, preserves the
+# caller's proxy exclusions, and starts the repository virtual environment.
+exec node "$SCRIPT_DIR/scripts/start-backend.js"

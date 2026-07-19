@@ -10,17 +10,19 @@ import json
 from unittest.mock import MagicMock
 
 import pytest
+from fastapi.testclient import TestClient
 
+from src.apps.comic_gen import api as comic_api
 from src.apps.comic_gen.llm import (
     PolishError,
     ScriptProcessor,
     _is_echo,
 )
 
-
 # ---------------------------------------------------------------------------
 # _is_echo unit tests
 # ---------------------------------------------------------------------------
+
 
 class TestIsEcho:
     def test_exact_match_after_normalize(self):
@@ -44,6 +46,7 @@ class TestIsEcho:
 # ---------------------------------------------------------------------------
 # polish_video_prompt error paths
 # ---------------------------------------------------------------------------
+
 
 class TestPolishVideoPromptErrors:
     def test_is_configured_false_raises(self):
@@ -86,10 +89,12 @@ class TestPolishVideoPromptErrors:
         sp = ScriptProcessor.__new__(ScriptProcessor)
         sp.llm = MagicMock()
         sp.llm.is_configured = True
-        sp.llm.chat.return_value = json.dumps({
-            "prompt_cn": "镜头：一个英雄站在悬崖上",
-            "prompt_en": "draft prompt",  # 模型偷懒回 echo
-        })
+        sp.llm.chat.return_value = json.dumps(
+            {
+                "prompt_cn": "镜头：一个英雄站在悬崖上",
+                "prompt_en": "draft prompt",  # 模型偷懒回 echo
+            }
+        )
         with pytest.raises(PolishError) as exc_info:
             sp.polish_video_prompt("draft prompt")
         assert exc_info.value.reason == "model_echo"
@@ -100,19 +105,101 @@ class TestPolishVideoPromptErrors:
         sp = ScriptProcessor.__new__(ScriptProcessor)
         sp.llm = MagicMock()
         sp.llm.is_configured = True
-        sp.llm.chat.return_value = json.dumps({
-            "prompt_cn": "电影感广角：英雄静立悬崖之上，眺望远方海雾",
-            "prompt_en": "Cinematic wide shot: a heroic figure standing on a cliff, gazing into distant sea mist",
-        })
+        sp.llm.chat.return_value = json.dumps(
+            {
+                "prompt_cn": "电影感广角：英雄静立悬崖之上，眺望远方海雾",
+                "prompt_en": "Cinematic wide shot: a heroic figure standing on a cliff, gazing into distant sea mist",
+            }
+        )
         result = sp.polish_video_prompt("hero on cliff")
         assert "prompt_cn" in result
         assert "prompt_en" in result
         assert "Cinematic" in result["prompt_en"]
 
 
+class TestPolishStoryboardPromptErrors:
+    def _processor(self, response=None, error=None):
+        processor = ScriptProcessor.__new__(ScriptProcessor)
+        processor.llm = MagicMock()
+        processor.llm.is_configured = True
+        if error is not None:
+            processor.llm.chat.side_effect = error
+        else:
+            processor.llm.chat.return_value = response
+        return processor
+
+    def test_missing_configuration_is_explicit(self):
+        processor = self._processor()
+        processor.llm.require_configured.side_effect = RuntimeError("missing key")
+
+        with pytest.raises(PolishError) as exc_info:
+            processor.polish_storyboard_prompt("draft", [])
+
+        assert exc_info.value.reason == "is_configured_false"
+
+    def test_provider_error_is_not_returned_as_mock_success(self):
+        processor = self._processor(error=TimeoutError("provider timeout"))
+
+        with pytest.raises(PolishError) as exc_info:
+            processor.polish_storyboard_prompt("draft", [])
+
+        assert exc_info.value.reason == "api_error"
+
+    @pytest.mark.parametrize(
+        ("response", "reason"),
+        [
+            ("not-json", "json_parse_error"),
+            (json.dumps({"prompt_cn": "only one language"}), "missing_keys"),
+            (json.dumps({"prompt_cn": "", "prompt_en": "English"}), "missing_keys"),
+        ],
+    )
+    def test_malformed_result_is_not_returned_as_original_prompt(self, response, reason):
+        processor = self._processor(response=response)
+
+        with pytest.raises(PolishError) as exc_info:
+            processor.polish_storyboard_prompt("draft", [])
+
+        assert exc_info.value.reason == reason
+
+    def test_success_returns_validated_bilingual_prompts(self):
+        processor = self._processor(
+            response=json.dumps(
+                {
+                    "prompt_cn": "电影感广角镜头",
+                    "prompt_en": "A cinematic wide shot with deliberate lighting",
+                }
+            )
+        )
+
+        result = processor.polish_storyboard_prompt("draft", [])
+
+        assert result == {
+            "prompt_cn": "电影感广角镜头",
+            "prompt_en": "A cinematic wide shot with deliberate lighting",
+        }
+
+    def test_api_maps_typed_failure_to_bad_gateway(self, monkeypatch):
+        def fail_refine(*args, **kwargs):
+            raise PolishError(
+                reason="api_error",
+                message_zh="上游失败",
+                message_en="Upstream failed",
+            )
+
+        monkeypatch.setattr(comic_api.pipeline, "refine_frame_prompt", fail_refine)
+        response = TestClient(comic_api.app).post(
+            "/projects/project-1/storyboard/refine_prompt",
+            json={"frame_id": "frame-1", "raw_prompt": "draft", "assets": []},
+        )
+
+        assert response.status_code == 502
+        assert response.json()["detail"]["reason"] == "api_error"
+
+
 # ---------------------------------------------------------------------------
 # 双语锚点迭代 (#119)
 # ---------------------------------------------------------------------------
+
 
 class TestBilingualAnchoredIteration:
     def test_first_polish_no_prev_cn(self):
@@ -120,9 +207,12 @@ class TestBilingualAnchoredIteration:
         sp = ScriptProcessor.__new__(ScriptProcessor)
         sp.llm = MagicMock()
         sp.llm.is_configured = True
-        sp.llm.chat.return_value = json.dumps({
-            "prompt_cn": "改写版", "prompt_en": "Polished version",
-        })
+        sp.llm.chat.return_value = json.dumps(
+            {
+                "prompt_cn": "改写版",
+                "prompt_en": "Polished version",
+            }
+        )
         sp.polish_video_prompt("hero on cliff")
         # 第一参数 messages，最后一条 user 消息就是 draft
         call = sp.llm.chat.call_args
@@ -134,9 +224,12 @@ class TestBilingualAnchoredIteration:
         sp = ScriptProcessor.__new__(ScriptProcessor)
         sp.llm = MagicMock()
         sp.llm.is_configured = True
-        sp.llm.chat.return_value = json.dumps({
-            "prompt_cn": "迭代版", "prompt_en": "Iterated version unique",
-        })
+        sp.llm.chat.return_value = json.dumps(
+            {
+                "prompt_cn": "迭代版",
+                "prompt_en": "Iterated version unique",
+            }
+        )
         sp.polish_video_prompt(
             draft_prompt="Polished EN previous",
             feedback="把第二句改成俯视角",
@@ -155,9 +248,12 @@ class TestBilingualAnchoredIteration:
         sp = ScriptProcessor.__new__(ScriptProcessor)
         sp.llm = MagicMock()
         sp.llm.is_configured = True
-        sp.llm.chat.return_value = json.dumps({
-            "prompt_cn": "改", "prompt_en": "Changed text X",
-        })
+        sp.llm.chat.return_value = json.dumps(
+            {
+                "prompt_cn": "改",
+                "prompt_en": "Changed text X",
+            }
+        )
         sp.polish_video_prompt(
             draft_prompt="Polished EN previous",
             feedback="make it darker",

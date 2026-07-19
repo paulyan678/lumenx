@@ -252,7 +252,7 @@ export default function StoryboardR2V() {
                 });
         }, 1000);
         map.set(shotId, { timer, patch: merged });
-    }, [currentProject?.id, updateProject]);
+    }, [currentProject, updateProject]);
 
     // Prompt edits hit a different endpoint (POST /frames/update with
     // action_description) — debounced separately from workbench so a
@@ -279,7 +279,7 @@ export default function StoryboardR2V() {
                 .catch((err) => debugLog.warn("Studio", "persistPrompt failed", err));
         }, 800);
         map.set(shotId, { timer, prompt });
-    }, [currentProject?.id, updateProject]);
+    }, [currentProject, updateProject]);
 
     // Flush all pending writes on unmount (e.g. user switches step tab)
     // so the last keystroke / param change isn't stranded in the debounce
@@ -404,7 +404,7 @@ export default function StoryboardR2V() {
         const frames = currentProject.frames as any[];
         const frameCount = frames.length;
         return { frameCount };
-    }, [currentProject?.frames]);
+    }, [currentProject]);
 
     const handleSmartGenerate = useCallback(async () => {
         if (!currentProject?.id) return;
@@ -632,7 +632,7 @@ export default function StoryboardR2V() {
                 .catch((err) => debugLog.warn("Studio", "persistField failed", err));
         }, 3000);
         map.set(shotId, { timer, fields: merged });
-    }, [shots, currentProject?.id, updateProject]);
+    }, [shots, currentProject, updateProject]);
 
     // Duration editor config follows the active approved Seedance model.
     const durationEditorCfg = useMemo(() => {
@@ -993,6 +993,7 @@ export default function StoryboardR2V() {
         for (const t of allVideoTasks) map.set(t.id, t);
         return map;
     }, [allVideoTasks]);
+    const autoSelectRequestsRef = useRef<Set<string>>(new Set());
 
     // Map shot.id → human label for the queue panel's frame column.
     const shotLabelByFrameId = useMemo(() => {
@@ -1011,32 +1012,51 @@ export default function StoryboardR2V() {
     // project-level poll refreshes. Video task status is only visible
     // via project refresh (GET /tasks/ only covers asset tasks).
     useEffect(() => {
-        if (!allVideoTasks.length) return;
-        const autoSelectFrameIds: string[] = [];
+        if (!tasksById.size) return;
+        const transitions: Array<{
+            frameId: string;
+            task: VideoTask;
+            status: "completed" | "failed";
+        }> = [];
+        for (const shot of shots) {
+            if (!shot.videoTaskId) continue;
+            const task = tasksById.get(shot.videoTaskId);
+            if (!task) continue;
+            if (task.status === "completed" && shot.videoStatus !== "completed") {
+                transitions.push({ frameId: shot.id, task, status: "completed" });
+            } else if (task.status === "failed" && shot.videoStatus !== "failed") {
+                transitions.push({ frameId: shot.id, task, status: "failed" });
+            }
+        }
+        if (!transitions.length) return;
+
+        const transitionByFrame = new Map(transitions.map((transition) => [transition.frameId, transition]));
         setShots(prev => {
-            let changed = false;
-            const next = prev.map(s => {
-                if (!s.videoTaskId) return s;
-                const task = allVideoTasks.find(t => t.id === s.videoTaskId);
-                if (!task) return s;
-                if (task.status === "completed" && s.videoStatus !== "completed") {
-                    changed = true;
-                    autoSelectFrameIds.push(s.id);
-                    return { ...s, videoStatus: "completed" as const, videoUrl: (task as any).video_url };
-                }
-                if (task.status === "failed" && s.videoStatus !== "failed") {
-                    changed = true;
-                    return { ...s, videoStatus: "failed" as const };
-                }
-                return s;
+            return prev.map(shot => {
+                const transition = transitionByFrame.get(shot.id);
+                if (!transition || shot.videoTaskId !== transition.task.id) return shot;
+                return transition.status === "completed"
+                    ? { ...shot, videoStatus: "completed" as const, videoUrl: transition.task.video_url }
+                    : { ...shot, videoStatus: "failed" as const };
             });
-            return changed ? next : prev;
         });
+
         // Persist newly-completed videos as the frame's active take so the
         // hero survives reload / refine / cross-device opens. Backend skips
         // pinned frames; failures here are non-fatal (UI already updated).
         const projectId = currentProject?.id;
+        const autoSelectFrameIds = transitions
+            .filter((transition) => transition.status === "completed")
+            .filter((transition) => {
+                if (!projectId) return false;
+                const requestKey = `${projectId}:${transition.frameId}:${transition.task.id}`;
+                if (autoSelectRequestsRef.current.has(requestKey)) return false;
+                autoSelectRequestsRef.current.add(requestKey);
+                return true;
+            })
+            .map((transition) => transition.frameId);
         if (projectId && autoSelectFrameIds.length > 0) {
+            const autoSelectFrameIdSet = new Set(autoSelectFrameIds);
             Promise.all(
                 autoSelectFrameIds.map(frameId =>
                     api.autoSelectLatestVideo(projectId, frameId).catch(err => {
@@ -1054,7 +1074,7 @@ export default function StoryboardR2V() {
                     // have picked a sibling take in the same batch, so the
                     // optimistic videoUrl set above could be stale by a hop.
                     setShots(prev => prev.map(s => {
-                        if (!autoSelectFrameIds.includes(s.id)) return s;
+                        if (!autoSelectFrameIdSet.has(s.id)) return s;
                         const refreshed = last.frames.find((f: any) => f.id === s.id);
                         if (!refreshed?.video_url) return s;
                         return { ...s, videoUrl: refreshed.video_url, isVideoPinned: Boolean(refreshed.is_video_pinned) };
@@ -1062,7 +1082,7 @@ export default function StoryboardR2V() {
                 }
             });
         }
-    }, [allVideoTasks, currentProject?.id, updateProject]);
+    }, [tasksById, shots, currentProject?.id, updateProject]);
 
     // Compare modal needs the actual VideoTask objects for the
     // currently-selected ids (in whatever order they were selected).
@@ -1162,7 +1182,7 @@ export default function StoryboardR2V() {
             const fresh = await api.getProject(currentProject.id);
             updateProject(currentProject.id, fresh);
         } catch { /* swallow */ }
-    }, [currentProject?.id, updateProject]);
+    }, [currentProject, updateProject]);
 
     const handleToggleStar = useCallback(async (task: VideoTask, next: boolean) => {
         if (!currentProject?.id) return;
@@ -1172,7 +1192,7 @@ export default function StoryboardR2V() {
         } catch (err) {
             debugLog.error("Studio", "Failed to toggle star:", err);
         }
-    }, [currentProject?.id, refreshProject]);
+    }, [currentProject, refreshProject]);
 
     // Manual pin: user explicitly chose this take as the frame's active
     // video. Backend sets is_video_pinned=true so subsequent auto-selects
@@ -1193,7 +1213,7 @@ export default function StoryboardR2V() {
         } catch (err) {
             debugLog.error("Studio", "Failed to set active take:", err);
         }
-    }, [currentProject?.id, updateProject]);
+    }, [currentProject, updateProject]);
 
     // Unpin: clear the manual pin so auto-select resumes on next
     // completion. Selected_video_id / video_url stay put — user keeps
@@ -1209,7 +1229,7 @@ export default function StoryboardR2V() {
         } catch (err) {
             debugLog.error("Studio", "Failed to unpin video:", err);
         }
-    }, [currentProject?.id, updateProject]);
+    }, [currentProject, updateProject]);
 
     const handleSetLabel = useCallback(async (task: VideoTask, next: string | null) => {
         if (!currentProject?.id) return;
@@ -1223,7 +1243,7 @@ export default function StoryboardR2V() {
         } catch (err) {
             debugLog.error("Studio", "Failed to set label:", err);
         }
-    }, [currentProject?.id, refreshProject]);
+    }, [currentProject, refreshProject]);
 
     const handleCancelTask = useCallback(async (task: VideoTask) => {
         if (!currentProject?.id) return;
@@ -1233,7 +1253,7 @@ export default function StoryboardR2V() {
         } catch (err) {
             debugLog.error("Studio", "Failed to cancel task:", err);
         }
-    }, [currentProject?.id, refreshProject]);
+    }, [currentProject, refreshProject]);
 
     // Retry = fire a fresh batch of 1 for the shot owning this task,
     // reusing the task's params as best-effort. After Phase 2 the

@@ -37,7 +37,11 @@ export interface PreviewVideoProps {
     placeholder?: React.ReactNode;
 }
 
-export default function PreviewVideo({
+export default function PreviewVideo(props: PreviewVideoProps) {
+    return <PreviewVideoForSource key={props.src ?? ""} {...props} />;
+}
+
+function PreviewVideoForSource({
     src, poster, alt, className, noLightbox = false,
     groupId, groupIndex, alwaysShowMagnify = false,
     clickToLightbox = false,
@@ -52,12 +56,6 @@ export default function PreviewVideo({
     const wrapperRef = useRef<HTMLDivElement | null>(null);
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const [sizeBucket, setSizeBucket] = useState<"micro" | "mid" | "large">("large");
-
-    useEffect(() => {
-        setErrored(false);
-        setHasRetriedOnce(false);
-        setRetryNonce(0);
-    }, [src]);
 
     useEffect(() => {
         const el = wrapperRef.current;

@@ -161,16 +161,20 @@ export function DiagnoseModal({ taskId, elapsedLabel, onClose }: DiagnoseModalPr
         | { kind: "ok"; data: Awaited<ReturnType<typeof api.diagnoseLogTail>> }
         | { kind: "error"; message: string };
     const [health, setHealth] = useState<HealthState>({ kind: "loading" });
-    const [log, setLog] = useState<LogState>({ kind: "idle" });
+    const [log, setLog] = useState<LogState>({ kind: "loading" });
     const [copied, setCopied] = useState<"task" | "log_path" | "log_text" | null>(null);
 
-    const loadLog = () => {
-        setLog({ kind: "loading" });
+    const requestLog = () => {
         api.diagnoseLogTail(200)
             .then((data) => setLog({ kind: "ok", data }))
             .catch((err) =>
                 setLog({ kind: "error", message: err instanceof Error ? err.message : String(err) }),
             );
+    };
+
+    const loadLog = () => {
+        setLog({ kind: "loading" });
+        requestLog();
     };
 
     // Auto-fetch health on mount; auto-fetch log too so the user
@@ -184,11 +188,10 @@ export function DiagnoseModal({ taskId, elapsedLabel, onClose }: DiagnoseModalPr
             .catch((err) => {
                 if (!cancelled) setHealth({ kind: "error", message: err instanceof Error ? err.message : String(err) });
             });
-        loadLog();
+        requestLog();
         return () => {
             cancelled = true;
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const copy = async (text: string, kind: "task" | "log_path" | "log_text") => {

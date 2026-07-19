@@ -127,10 +127,6 @@ export default function ArtDirection() {
         }
     };
 
-    useEffect(() => {
-        loadPresets();
-    }, []);
-
     const resolvePositivePrompt = (style: StyleConfig | null): string => {
         if (!style) return "";
         if (style.positive_prompt) return style.positive_prompt;
@@ -160,23 +156,22 @@ export default function ArtDirection() {
             setEditingNegative(seriesBaseline.negative_prompt || "");
             setCustomStyles(projectAD?.custom_styles || []);
         }
+        // Always replace the list, including with an empty array, so removed
+        // recommendations do not linger after a project refresh.
+        setAiRecommendations(projectAD?.ai_recommendations ?? []);
     }, [currentProject?.id, currentProject?.art_direction, seriesBaseline, presets]);
 
     useEffect(() => {
-        if (currentProject?.art_direction?.ai_recommendations) {
-            setAiRecommendations(currentProject.art_direction.ai_recommendations);
-        }
-    }, [currentProject?.art_direction?.ai_recommendations]);
-
-    const loadPresets = async () => {
-        try {
-            const data = await api.getStylePresets();
-            setPresets(data.presets || []);
-            setCategories(data.categories || []);
-        } catch (error) {
-            console.error("Failed to load presets:", error);
-        }
-    };
+        let cancelled = false;
+        api.getStylePresets()
+            .then((data) => {
+                if (cancelled) return;
+                setPresets(data.presets || []);
+                setCategories(data.categories || []);
+            })
+            .catch((error) => console.error("Failed to load presets:", error));
+        return () => { cancelled = true; };
+    }, []);
 
     const handleAnalyze = async () => {
         if (!currentProject) return;

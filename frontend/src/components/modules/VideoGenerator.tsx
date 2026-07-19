@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { Video } from "lucide-react";
 import { useProjectStore } from "@/store/projectStore";
@@ -14,7 +14,7 @@ export default function VideoGenerator() {
     const tStep = useTranslations("stepHeader");
     const currentProject = useProjectStore((state) => state.currentProject);
     const updateProject = useProjectStore((state) => state.updateProject);
-    const [tasks, setTasks] = useState<VideoTask[]>([]);
+    const tasks = currentProject?.video_tasks ?? [];
 
     // Shared state for Remix functionality
     const [remixData, setRemixData] = useState<Partial<VideoTask> | null>(null);
@@ -22,7 +22,7 @@ export default function VideoGenerator() {
     // Get default model from project settings
     const defaultI2vModel = resolveModelId(
         'i2v',
-        currentProject?.model_settings?.i2v_model,
+        currentProject?.model_settings?.video_model ?? currentProject?.model_settings?.i2v_model,
         'video_sidebar',
     );
 
@@ -37,25 +37,19 @@ export default function VideoGenerator() {
         ratio: "16:9",
         watermark: false,
     });
+    const [syncedDefaultModel, setSyncedDefaultModel] = useState(defaultI2vModel);
 
-    // Sync model from project settings when project changes
-    useEffect(() => {
+    // Update the lifted form state before rendering when project defaults
+    // change; user selection remains untouched while the default is stable.
+    if (defaultI2vModel !== syncedDefaultModel) {
+        setSyncedDefaultModel(defaultI2vModel);
         setParams((p) => ({
             ...p,
-            model: resolveModelId(
-                'i2v',
-                currentProject?.model_settings?.video_model ?? currentProject?.model_settings?.i2v_model,
-                'video_sidebar',
-            ),
+            model: defaultI2vModel,
         }));
-    }, [currentProject?.model_settings?.video_model, currentProject?.model_settings?.i2v_model]);
+    }
 
-    // Sync tasks from project
-    useEffect(() => {
-        if (currentProject?.video_tasks) {
-            setTasks(currentProject.video_tasks);
-        }
-    }, [currentProject?.video_tasks]);
+    const handleRemixClear = useCallback(() => setRemixData(null), []);
 
     // Poll for updates
     useEffect(() => {
@@ -66,7 +60,6 @@ export default function VideoGenerator() {
             try {
                 const project = await api.getProject(currentProject.id);
                 if (project.video_tasks) {
-                    setTasks(project.video_tasks);
                     updateProject(currentProject.id, { video_tasks: project.video_tasks });
                 }
             } catch (error) {
@@ -79,7 +72,6 @@ export default function VideoGenerator() {
 
     const handleTaskCreated = (updatedProject: any) => {
         if (updatedProject.video_tasks) {
-            setTasks(updatedProject.video_tasks);
             updateProject(currentProject!.id, { video_tasks: updatedProject.video_tasks });
         }
     };
@@ -141,7 +133,7 @@ export default function VideoGenerator() {
                     <VideoCreator
                         onTaskCreated={handleTaskCreated}
                         remixData={remixData}
-                        onRemixClear={() => setRemixData(null)}
+                        onRemixClear={handleRemixClear}
                         params={params}
                         onParamsChange={(newParams) => setParams(p => ({ ...p, ...newParams }))}
                     />

@@ -8,6 +8,7 @@ import { characterImageAsset } from "@/lib/characterImage";
 import { api } from "@/lib/api";
 import { toast } from "@/store/toastStore";
 import { coverGradient, GRAIN_URL } from "@/lib/atelierCover";
+import { useNow } from "@/lib/useNow";
 
 type AssetTab = "characters" | "scenes" | "props";
 
@@ -82,7 +83,15 @@ function downloadExt(url: string, contentType?: string): string {
  * id/url/created_at/prompt_used），故读为 undefined → 不渲染；后端补字段后 UI 零改自动出现。
  * 动作区：「下载」实做；「生成更多变体」对 project 资产实做（series 置灰，无生成端点）。
  */
-export default function AssetInspector({
+export default function AssetInspector(props: AssetInspectorProps) {
+  const imageAsset = primaryImageAsset(props.asset, props.type);
+  const defaultId = imageAsset?.selected_id ?? imageAsset?.variants?.[0]?.id ?? "none";
+  const inspectorKey = `${props.sourceKind}:${props.sourceId}:${props.type}:${props.asset.id}:${defaultId}`;
+
+  return <AssetInspectorForAsset key={inspectorKey} {...props} />;
+}
+
+function AssetInspectorForAsset({
   asset,
   type,
   sourceName,
@@ -94,6 +103,7 @@ export default function AssetInspector({
   onPromoted,
 }: AssetInspectorProps) {
   const t = useTranslations("library");
+  const now = useNow();
   const TYPE_LABEL: Record<AssetTab, string> = {
     characters: t("characterLabel"),
     scenes: t("sceneLabel"),
@@ -103,7 +113,7 @@ export default function AssetInspector({
   const timeAgo = (ts?: number): string => {
     if (!ts) return "—";
     const tsMs = ts > 1e12 ? ts : ts * 1000;
-    const days = Math.floor((Date.now() - tsMs) / 86_400_000);
+    const days = Math.floor((now - tsMs) / 86_400_000);
     if (days <= 0) return t("timeToday");
     if (days === 1) return t("timeYesterday");
     if (days < 30) return t("timeDaysAgo", { days });
@@ -122,18 +132,9 @@ export default function AssetInspector({
   const [generating, setGenerating] = useState(false);
   const [promoting, setPromoting] = useState(false);
 
-  // 切换选中资产时重置本地高亮的变体 + 丢弃上一个资产本地追加的变体。
-  useEffect(() => {
-    setActiveVariantId(defaultId);
-    setExtraVariants([]);
-  }, [asset.id, defaultId]);
-
   // 卸载/切换资产后避免异步轮询回写已失效的状态。
   const aliveRef = useRef(true);
   const currentAssetIdRef = useRef(asset.id);
-  useEffect(() => {
-    currentAssetIdRef.current = asset.id;
-  }, [asset.id]);
   useEffect(() => {
     aliveRef.current = true;
     return () => {

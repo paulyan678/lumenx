@@ -44,49 +44,41 @@ export default function GalleryView({
 }: GalleryViewProps) {
   const t = useTranslations('playground');
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const activeIndex = Math.min(selectedIndex, Math.max(0, generations.length - 1));
   const thumbnailStripRef = useRef<HTMLDivElement>(null);
-
-  // Clamp selectedIndex when generations change
-  useEffect(() => {
-    if (selectedIndex >= generations.length) {
-      setSelectedIndex(Math.max(0, generations.length - 1));
-    }
-  }, [generations.length, selectedIndex]);
 
   // Keyboard navigation
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'ArrowLeft') {
-        setSelectedIndex((prev) => Math.max(0, prev - 1));
+        setSelectedIndex(Math.max(0, activeIndex - 1));
       } else if (e.key === 'ArrowRight') {
-        setSelectedIndex((prev) =>
-          Math.min(generations.length - 1, prev + 1)
-        );
+        setSelectedIndex(Math.min(generations.length - 1, activeIndex + 1));
       } else if (e.key === 'Enter') {
-        if (generations[selectedIndex]) {
-          onOpenDetail(generations[selectedIndex]);
+        if (generations[activeIndex]) {
+          onOpenDetail(generations[activeIndex]);
         }
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [generations, selectedIndex, onOpenDetail]);
+  }, [generations, activeIndex, onOpenDetail]);
 
   // Scroll selected thumbnail into view
   useEffect(() => {
     const strip = thumbnailStripRef.current;
     if (!strip) return;
-    const thumb = strip.children[selectedIndex] as HTMLElement | undefined;
+    const thumb = strip.children[activeIndex] as HTMLElement | undefined;
     if (thumb) {
       thumb.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
     }
-  }, [selectedIndex]);
+  }, [activeIndex]);
 
   const handleClick = useCallback(() => {
-    if (generations[selectedIndex]) {
-      onOpenDetail(generations[selectedIndex]);
+    if (generations[activeIndex]) {
+      onOpenDetail(generations[activeIndex]);
     }
-  }, [generations, selectedIndex, onOpenDetail]);
+  }, [generations, activeIndex, onOpenDetail]);
 
   if (generations.length === 0) {
     return (
@@ -96,7 +88,7 @@ export default function GalleryView({
     );
   }
 
-  const current = generations[selectedIndex];
+  const current = generations[activeIndex];
   if (!current) return null;
 
   const output = current.outputs[0];
@@ -193,7 +185,7 @@ export default function GalleryView({
             const genMediaUrl = genOutput?.media_path
               ? getMediaUrl(genOutput.media_path)
               : null;
-            const isSelected = idx === selectedIndex;
+            const isSelected = idx === activeIndex;
             const isFailed = gen.status === 'failed';
 
             return (

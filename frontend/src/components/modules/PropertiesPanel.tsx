@@ -266,6 +266,12 @@ function StoryboardInspector() {
     const updateProject = useProjectStore((state) => state.updateProject);
     const selectedFrameId = useProjectStore((state) => state.selectedFrameId);
 
+    // State for bilingual polish results. Keep hooks above the project guard so
+    // loading or clearing a project never changes this component's hook order.
+    const [polishedPrompts, setPolishedPrompts] = useState<Record<string, { cn: string; en: string }>>({});
+    const [isPolishing, setIsPolishing] = useState(false);
+    const [feedbackText, setFeedbackText] = useState("");
+
     if (!currentProject) return null;
 
     const selectedFrame = currentProject?.frames?.find((f: any) => f.id === selectedFrameId);
@@ -350,11 +356,6 @@ function StoryboardInspector() {
             : [...currentIds, charId];
         updateFrame({ character_ids: newIds });
     };
-
-    // State for bilingual polish results
-    const [polishedPrompts, setPolishedPrompts] = useState<Record<string, { cn: string; en: string }>>({});
-    const [isPolishing, setIsPolishing] = useState(false);
-    const [feedbackText, setFeedbackText] = useState("");
 
     const polishedPrompt = selectedFrame ? polishedPrompts[selectedFrame.id] : null;
 

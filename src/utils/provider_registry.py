@@ -116,4 +116,5 @@ def get_gateway_for_model(
 
     accessor = get_catalog_accessor()
     canonical_id = accessor.resolve_legacy_to_canonical(model_id) or model_id
-    return accessor.get_gateway(canonical_id, "newapi")
+    gateway = accessor.get_gateway(canonical_id, "newapi")
+    return gateway if isinstance(gateway, str) else None

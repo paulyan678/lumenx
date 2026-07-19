@@ -24,17 +24,14 @@ function tag(scope: string): string {
 export const debugLog = {
     warn: (scope: string, ...args: unknown[]): void => {
         if (!isDev) return;
-        // eslint-disable-next-line no-console
         console.warn(tag(scope), ...args);
     },
     error: (scope: string, ...args: unknown[]): void => {
         if (!isDev) return;
-        // eslint-disable-next-line no-console
         console.error(tag(scope), ...args);
     },
     info: (scope: string, ...args: unknown[]): void => {
         if (!isDev) return;
-        // eslint-disable-next-line no-console
         console.info(tag(scope), ...args);
     },
 };

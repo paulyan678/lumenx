@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Palette, Info } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -28,15 +28,15 @@ export default function ProjectSettings({ project, isOpen, onClose, onUpdate }: 
     const [stylePreset, setStylePreset] = useState(project?.style_preset || "realistic");
     const [stylePrompt, setStylePrompt] = useState(project?.style_prompt || "");
     const [isSaving, setIsSaving] = useState(false);
+    const [syncedProject, setSyncedProject] = useState(project);
     const t = useTranslations("project");
     const tc = useTranslations("common");
 
-    useEffect(() => {
-        if (project) {
-            setStylePreset(project.style_preset || "realistic");
-            setStylePrompt(project.style_prompt || "");
-        }
-    }, [project]);
+    if (project !== syncedProject) {
+        setSyncedProject(project);
+        setStylePreset(project?.style_preset || "realistic");
+        setStylePrompt(project?.style_prompt || "");
+    }
 
     const handleSave = async () => {
         if (!project) return;

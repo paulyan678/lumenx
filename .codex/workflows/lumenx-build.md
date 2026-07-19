@@ -12,7 +12,7 @@ Use this workflow when the user asks to build, package, or prepare a desktop rel
 Common requirements:
 
 - Python 3.11+
-- Node.js 18+
+- Node.js 20.9+ (20.x)
 - FFmpeg
 
 macOS-specific:
@@ -91,14 +91,14 @@ dist_windows\LumenX Studio.exe
 
 Common Windows issues:
 
-- FFmpeg missing: add FFmpeg to `bin\` or to `PATH`
+- FFmpeg missing: add FFmpeg to `PATH`, or set `LUMENX_FFMPEG_BINARY` to a runnable `ffmpeg.exe`
 - PowerShell execution policy: `Set-ExecutionPolicy RemoteSigned`
 - WebView2 issue: install Edge WebView2 Runtime
 
 ## Clean Build Artifacts
 
 ```bash
-rm -rf dist/ dist_mac/ dist_windows/ build/ *.spec
+rm -rf dist/ dist_mac/ dist_windows/ build/
 rm -rf frontend/.next frontend/out static/
 ```
 

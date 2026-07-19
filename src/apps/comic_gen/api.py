@@ -31,7 +31,8 @@ from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 import json
 import os
-import shutil
+import tempfile
+import threading
 import uuid
 import logging
 import traceback
@@ -44,8 +45,29 @@ from .models import (
     StoryboardFrame,
     VideoTask,
 )
-from .llm import ScriptProcessor, DEFAULT_STORYBOARD_POLISH_PROMPT, DEFAULT_VIDEO_POLISH_PROMPT, DEFAULT_ENTITY_EXTRACTION_PROMPT, DEFAULT_STYLE_ANALYSIS_PROMPT, DEFAULT_STORYBOARD_EXTRACTION_PROMPT
+from .llm import (
+    DEFAULT_ENTITY_EXTRACTION_PROMPT,
+    DEFAULT_STORYBOARD_EXTRACTION_PROMPT,
+    DEFAULT_STORYBOARD_POLISH_PROMPT,
+    DEFAULT_STYLE_ANALYSIS_PROMPT,
+    DEFAULT_VIDEO_POLISH_PROMPT,
+    FrameRefineError,
+    ScriptProcessor,
+    StyleAnalysisError,
+)
 from ...utils.oss_utils import OSSImageUploader, sign_oss_urls_in_data
+from ...utils.uploads import (
+    GENERIC_MEDIA_UPLOAD_POLICY,
+    IMAGE_UPLOAD_POLICY,
+    TEXT_IMPORT_UPLOAD_POLICY,
+    read_upload_bytes,
+    save_upload_file,
+)
+from ...utils.deployment_security import (
+    cors_middleware_options,
+    diagnostic_access_allowed,
+    is_diagnostic_path,
+)
 from ...utils import setup_logging
 from ...utils.newapi_models import (
     CHAT,
@@ -68,28 +90,47 @@ logger = logging.getLogger(__name__)
 setup_logging()
 
 # Use absolute path for .env file (api.py is in src/apps/comic_gen/)
-_project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+_project_root = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
 env_path = os.path.join(_project_root, ".env")
-if os.path.exists(env_path):
-    load_dotenv(env_path, override=True)
+
+
+def _load_project_environment(path: str = env_path) -> None:
+    """Load development defaults without overriding explicit process config."""
+    if os.path.exists(path):
+        load_dotenv(path, override=False)
+
+
+_load_project_environment()
 
 # Mount playground router AFTER .env is loaded (adapters read API keys from env)
 from ..playground.api import router as playground_router
+
 app.include_router(playground_router, prefix="/playground")
 
 # Debug: Print OSS configuration at startup
-logger.info(f"STARTUP: OSS_ENDPOINT={os.getenv('OSS_ENDPOINT')}, OSS_BUCKET_NAME={os.getenv('OSS_BUCKET_NAME')}, OSS_BASE_PATH={os.getenv('OSS_BASE_PATH')}")
-
+logger.info(
+    f"STARTUP: OSS_ENDPOINT={os.getenv('OSS_ENDPOINT')}, OSS_BUCKET_NAME={os.getenv('OSS_BUCKET_NAME')}, OSS_BASE_PATH={os.getenv('OSS_BASE_PATH')}"
+)
 
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify the frontend origin
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["Content-Disposition"],  # Allow browsers to access Content-Disposition for downloads
+    **cors_middleware_options(),
 )
+
+
+@app.middleware("http")
+async def restrict_diagnostic_access(request: Request, call_next):
+    """Keep diagnostics local unless the operator explicitly enables them."""
+
+    client_host = request.client.host if request.client else None
+    if is_diagnostic_path(request.url.path) and not diagnostic_access_allowed(client_host):
+        # A generic 404 avoids advertising deployment internals to remote callers.
+        return JSONResponse(status_code=404, content={"detail": "Not found"})
+    return await call_next(request)
+
 
 # Middleware to add cache headers to static files
 @app.middleware("http")
@@ -99,25 +140,27 @@ async def add_cache_control_header(request: Request, call_next):
         response.headers["Cache-Control"] = "public, max-age=86400"
     return response
 
-# Create output directory if it doesn't exist
+# Serve only media roots. The output directory also contains projects.json,
+# series.json, library_assets.json, task history, and temporary merge manifests;
+# mounting it wholesale would expose private project data without authentication.
+_MEDIA_FILE_MOUNTS = (
+    ("/files/outputs/videos", "output/video", "files_outputs_videos"),
+    ("/files/outputs/assets", "output/assets", "files_outputs_assets"),
+    ("/files/videos", "output/video", "files_videos"),
+    ("/files/video", "output/video", "files_video"),
+    ("/files/assets", "output/assets", "files_assets"),
+    ("/files/uploads", "output/uploads", "files_uploads"),
+    ("/files/storyboard", "output/storyboard", "files_storyboard"),
+    ("/files/playground", "output/playground", "files_playground"),
+    ("/files/audio", "output/audio", "files_audio"),
+    ("/files/export", "output/export", "files_export"),
+    ("/files/video_inputs", "output/video_inputs", "files_video_inputs"),
+    ("/files/presets", "output/presets", "files_presets"),
+)
 os.makedirs("output", exist_ok=True)
-os.makedirs("output/uploads", exist_ok=True)
-os.makedirs("output/video", exist_ok=True)
-os.makedirs("output/assets", exist_ok=True)
-
-# Mount static files with multiple aliases to handle plural/singular inconsistencies
-# Legacy paths in projects.json often use 'outputs/videos' or 'outputs/assets'
-app.mount("/files/outputs/videos", StaticFiles(directory="output/video"), name="files_outputs_videos")
-app.mount("/files/outputs/assets", StaticFiles(directory="output/assets"), name="files_outputs_assets")
-app.mount("/files/outputs", StaticFiles(directory="output"), name="files_outputs")
-app.mount("/files/videos", StaticFiles(directory="output/video"), name="files_videos")
-app.mount("/files/assets", StaticFiles(directory="output/assets"), name="files_assets")
-app.mount("/files", StaticFiles(directory="output"), name="files")
-
-# Ensure playground output directories exist
-os.makedirs("output/playground/images", exist_ok=True)
-os.makedirs("output/playground/videos", exist_ok=True)
-app.mount("/files/playground", StaticFiles(directory="output/playground"), name="files_playground")
+for _url_prefix, _media_dir, _mount_name in _MEDIA_FILE_MOUNTS:
+    os.makedirs(_media_dir, exist_ok=True)
+    app.mount(_url_prefix, StaticFiles(directory=_media_dir), name=_mount_name)
 
 
 # Initialize pipeline
@@ -182,7 +225,7 @@ class GenerateAssetRequest(BaseModel):
     prompt: Optional[str] = None
     apply_style: bool = True
     negative_prompt: Optional[str] = None
-    batch_size: int = 1
+    batch_size: int = Field(1, ge=1, le=4)
     model_name: Optional[str] = None
     aspect_ratio: Optional[str] = None
 
@@ -191,6 +234,16 @@ class GenerateAssetRequest(BaseModel):
     def validate_image_model(cls, value):
         if value is not None:
             get_model_spec(value, IMAGE)
+        return value
+
+    @field_validator("generation_type")
+    @classmethod
+    def validate_generation_type(cls, value):
+        supported = {"all", "full_body", "three_view", "headshot", "reference_sheet"}
+        if value not in supported:
+            raise ValueError(
+                f"Unsupported asset generation type {value!r}; choose one of {sorted(supported)}"
+            )
         return value
 
 class ToggleLockRequest(BaseModel):
@@ -209,21 +262,28 @@ class UpdateAssetAttributesRequest(BaseModel):
 
 
 @app.get("/health")
-def health_check():
+def health_check(request: Request):
     """Lightweight liveness probe used by the Diagnose UI on stuck
-    tasks and by external uptime checks. Intentionally cheap: no DB
-    hit, no provider call, just a 200 + a few facts the frontend can
-    show next to the spinner ("backend reachable, log file at X")."""
-    from ...utils import get_log_dir
-    log_dir = get_log_dir()
-    log_file = os.path.join(log_dir, "app.log")
-    return {
+    tasks and by external uptime checks. Intentionally cheap: no DB hit and no
+    provider call. Filesystem paths and project counts are included only for
+    loopback clients or when remote diagnostics are explicitly enabled."""
+    response = {
         "ok": True,
         "time": time.time(),
-        "log_file": log_file,
-        "log_dir": log_dir,
-        "studio_projects": len(getattr(pipeline, "scripts", {})),
     }
+    client_host = request.client.host if request.client else None
+    if diagnostic_access_allowed(client_host):
+        from ...utils import get_log_dir
+
+        log_dir = get_log_dir()
+        response.update(
+            {
+                "log_file": os.path.join(log_dir, "app.log"),
+                "log_dir": log_dir,
+                "studio_projects": len(getattr(pipeline, "scripts", {})),
+            }
+        )
+    return response
 
 
 @app.get("/diagnose/log_tail")
@@ -268,27 +328,25 @@ def check_system():
     return run_system_checks()
 
 
-
-
-
 @app.post("/upload")
 def upload_file(file: UploadFile = File(...)):
     """Uploads a file and returns its URL (OSS if configured, else local)."""
     try:
-        file_ext = os.path.splitext(file.filename)[1]
-        filename = f"{uuid.uuid4()}{file_ext}"
-        file_path = os.path.join("output/uploads", filename)
-
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        saved = save_upload_file(
+            file,
+            "output/uploads",
+            GENERIC_MEDIA_UPLOAD_POLICY,
+        )
 
         # Try uploading to OSS
-        oss_url = OSSImageUploader().upload_image(file_path)
+        oss_url = OSSImageUploader().upload_image(saved.path)
         if oss_url:
             return signed_response({"url": oss_url})
 
         # Fallback to local URL (relative path for frontend getAssetUrl)
-        return {"url": f"uploads/{filename}"}
+        return {"url": f"uploads/{saved.filename}"}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -317,18 +375,13 @@ def upload_asset(
     """
     try:
         # 1. Save file locally first
-        file_ext = os.path.splitext(file.filename)[1]
-        filename = f"{uuid.uuid4()}{file_ext}"
-        file_path = os.path.join("output/uploads", filename)
-        
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        saved = save_upload_file(file, "output/uploads", IMAGE_UPLOAD_POLICY)
         
         # 2. Upload to OSS
         uploader = OSSImageUploader()
-        oss_url = uploader.upload_image(file_path)
+        oss_url = uploader.upload_image(saved.path)
         if not oss_url:
-            oss_url = f"uploads/{filename}"  # Fallback to local path
+            oss_url = f"uploads/{saved.filename}"  # Fallback to local path
         
         # 3. Update asset with new variant
         updated_script = pipeline.add_uploaded_asset_variant(
@@ -345,6 +398,8 @@ def upload_asset(
         
         return signed_response(updated_script)
         
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -380,7 +435,6 @@ async def create_project(request: CreateProjectRequest, skip_analysis: bool = Fa
     except (ValueError, MissingNewAPIKeyError) as e:
         raise HTTPException(status_code=400, detail=str(e))
     return signed_response(result)
-
 
 
 class ReparseProjectRequest(BaseModel):
@@ -423,7 +477,6 @@ async def reparse_project(script_id: str, request: ReparseProjectRequest):
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 
 @app.post("/projects/{script_id}/extract_preview")
@@ -978,22 +1031,21 @@ def upload_library_asset_image(file: UploadFile = File(...)):
     returns the {image_url} contract the library UI expects.
     """
     try:
-        file_ext = os.path.splitext(file.filename or "")[1]
-        filename = f"{uuid.uuid4()}{file_ext}"
-        file_path = os.path.join("output/uploads", filename)
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        saved = save_upload_file(file, "output/uploads", IMAGE_UPLOAD_POLICY)
         # Prefer OSS when configured (signed), else fall back to local path.
-        oss_url = OSSImageUploader().upload_image(file_path)
+        oss_url = OSSImageUploader().upload_image(saved.path)
         if oss_url:
             return signed_response({"image_url": oss_url})
-        return {"image_url": f"uploads/{filename}"}
+        return {"image_url": f"uploads/{saved.filename}"}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("upload_library_asset_image failed")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.api_route("/library/assets/{asset_type}/{asset_id}", methods=["PUT", "PATCH"])
+@app.put("/library/assets/{asset_type}/{asset_id}")
+@app.patch("/library/assets/{asset_type}/{asset_id}")
 def update_library_asset(asset_type: str, asset_id: str, request: UpdateLibraryAssetRequest):
     """Patch a global library asset (only the provided fields are applied)."""
     try:
@@ -1085,7 +1137,7 @@ async def import_file_preview(
     if suggested_episodes < 1 or suggested_episodes > 50:
         raise HTTPException(status_code=400, detail="建议集数应在 1-50 之间")
     try:
-        content_bytes = await file.read()
+        content_bytes = await read_upload_bytes(file, TEXT_IMPORT_UPLOAD_POLICY)
         text = content_bytes.decode("utf-8")
         if not text.strip():
             raise HTTPException(status_code=400, detail="文件内容为空")
@@ -1105,6 +1157,8 @@ async def import_file_preview(
             "episodes": episodes,
             "import_id": import_id,
         }
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -1215,10 +1269,12 @@ def get_user_config_path() -> str:
     - Packaged app mode: Uses ~/.lumen-x/config.json
     """
     from ...utils import get_user_data_dir
-    
+
     # Check if running in packaged mode (e.g., via environment variable or frozen check)
-    is_packaged = os.getenv("LUMEN_X_PACKAGED", "false").lower() == "true" or getattr(sys, 'frozen', False)
-    
+    is_packaged = os.getenv("LUMEN_X_PACKAGED", "false").lower() == "true" or getattr(
+        sys, "frozen", False
+    )
+
     if is_packaged:
         # Use user home directory for packaged app
         config_dir = get_user_data_dir()
@@ -1227,27 +1283,91 @@ def get_user_config_path() -> str:
     else:
         # Use .env in project root for development
         # Get absolute path to project root (api.py is in src/apps/comic_gen/)
-        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        project_root = os.path.dirname(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        )
         return os.path.join(project_root, ".env")
 
+
+_USER_CONFIG_LOCK = threading.RLock()
+
+
+def _normalize_user_config(config: Any, config_path: str) -> Dict[str, str]:
+    """Validate persisted environment data before applying any of it."""
+    if not isinstance(config, dict):
+        raise ValueError(f"User config at {config_path} must be a JSON object")
+
+    normalized: Dict[str, str] = {}
+    for key, value in config.items():
+        if not isinstance(key, str):
+            raise ValueError(f"User config at {config_path} contains a non-string key")
+        if isinstance(value, str):
+            normalized[key] = value
+        elif isinstance(value, bool):
+            # Older releases could persist booleans directly. Normalize that
+            # one known legacy shape rather than making the config unusable.
+            normalized[key] = "true" if value else "false"
+        elif isinstance(value, (int, float)):
+            normalized[key] = str(value)
+        elif value is None:
+            normalized[key] = ""
+        else:
+            raise ValueError(f"User config at {config_path} contains a non-scalar value for {key}")
+    return normalized
+
+
+def _read_user_config_json(config_path: str) -> Dict[str, str]:
+    """Read a packaged config strictly; malformed files are never reset."""
+    if not os.path.exists(config_path):
+        return {}
+    try:
+        with open(config_path, "r", encoding="utf-8") as config_file:
+            return _normalize_user_config(json.load(config_file), config_path)
+    except Exception as exc:
+        raise RuntimeError(f"Failed to load user configuration from {config_path}: {exc}") from exc
+
+
+def _atomic_write_private_json(config_path: str, config: Dict[str, str]) -> None:
+    """Atomically persist credential-bearing JSON with owner-only access."""
+    directory = os.path.dirname(config_path) or "."
+    os.makedirs(directory, exist_ok=True)
+    temp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=directory,
+            prefix=f".{os.path.basename(config_path)}.",
+            suffix=".tmp",
+            delete=False,
+        ) as temp_file:
+            temp_path = temp_file.name
+            os.chmod(temp_path, 0o600)
+            json.dump(config, temp_file, indent=2, ensure_ascii=False)
+            temp_file.flush()
+            os.fsync(temp_file.fileno())
+        os.replace(temp_path, config_path)
+    except Exception:
+        if temp_path:
+            try:
+                os.unlink(temp_path)
+            except FileNotFoundError:
+                pass
+        raise
 
 
 def load_user_config():
     """Loads user config from file and applies to environment."""
     config_path = get_user_config_path()
-    
+
     if config_path.endswith(".json"):
         # JSON config for packaged app
-        if os.path.exists(config_path):
-            try:
-                import json
-                with open(config_path, "r") as f:
-                    config = json.load(f)
-                for key, value in config.items():
-                    if value:
-                        os.environ[key] = value
-            except Exception as e:
-                logger.warning(f"Failed to load config from {config_path}: {e}")
+        with _USER_CONFIG_LOCK:
+            config = _read_user_config_json(config_path)
+            # Validate the complete file before changing process state.
+            for key, value in config.items():
+                if value and key not in os.environ:
+                    os.environ[key] = value
     # .env is already loaded at startup via dotenv
 
 
@@ -1255,28 +1375,23 @@ def save_user_config(config_dict: dict):
     """Saves user config to file."""
     config_path = get_user_config_path()
 
-    if config_path.endswith(".json"):
-        # JSON config for packaged app
-        import json
-        existing_config = {}
+    with _USER_CONFIG_LOCK:
+        if config_path.endswith(".json"):
+            # JSON config for packaged app
+            existing_config = _read_user_config_json(config_path)
+            updates = _normalize_user_config(config_dict, config_path)
+            candidate = {**existing_config, **updates}
+            _atomic_write_private_json(config_path, candidate)
+        else:
+            # .env for development
+            updates = _normalize_user_config(config_dict, config_path)
+            for key, value in updates.items():
+                if config_dict[key] is not None:
+                    set_key(config_path, key, value)
+        # Configuration contains credentials. Keep it private regardless of the
+        # process umask or whether python-dotenv created the file.
         if os.path.exists(config_path):
-            try:
-                with open(config_path, "r") as f:
-                    existing_config = json.load(f)
-            except:
-                pass
-        existing_config.update(config_dict)
-        with open(config_path, "w") as f:
-            json.dump(existing_config, f, indent=2)
-    else:
-        # .env for development
-        for key, value in config_dict.items():
-            if value is not None:
-                set_key(config_path, key, value)
-    # Configuration contains credentials. Keep it private regardless of the
-    # process umask or whether python-dotenv created the file.
-    if os.path.exists(config_path):
-        os.chmod(config_path, 0o600)
+            os.chmod(config_path, 0o600)
 
 
 def remove_user_config_keys(keys: list):
@@ -1285,46 +1400,42 @@ def remove_user_config_keys(keys: list):
         return
     config_path = get_user_config_path()
 
-    if config_path.endswith(".json"):
-        import json
-        if os.path.exists(config_path):
-            try:
-                with open(config_path, "r") as f:
-                    existing_config = json.load(f)
+    with _USER_CONFIG_LOCK:
+        if config_path.endswith(".json"):
+            if os.path.exists(config_path):
+                candidate = _read_user_config_json(config_path)
                 for key in keys:
-                    existing_config.pop(key, None)
-                with open(config_path, "w") as f:
-                    json.dump(existing_config, f, indent=2)
-                os.chmod(config_path, 0o600)
-            except Exception as e:
-                logger.warning(f"Failed to remove keys from config: {e}")
-    else:
-        from dotenv import unset_key
-        for key in keys:
-            try:
+                    candidate.pop(key, None)
+                _atomic_write_private_json(config_path, candidate)
+        else:
+            from dotenv import unset_key
+
+            for key in keys:
                 unset_key(config_path, key)
-            except Exception as e:
-                logger.warning(f"Failed to unset key {key} from .env: {e}")
+            if os.path.exists(config_path):
+                os.chmod(config_path, 0o600)
 
 
 # Load user config on startup
 import sys
+
 load_user_config()
 _newapi_migration_updates = migrate_legacy_newapi_environment()
 if _newapi_migration_updates:
     save_user_config(_newapi_migration_updates)
 
 
-
 @app.get("/config/info")
 def get_config_info():
     """Returns information about the current config storage mode."""
     config_path = get_user_config_path()
-    is_packaged = os.getenv("LUMEN_X_PACKAGED", "false").lower() == "true" or getattr(sys, 'frozen', False)
+    is_packaged = os.getenv("LUMEN_X_PACKAGED", "false").lower() == "true" or getattr(
+        sys, "frozen", False
+    )
     return {
         "mode": "packaged" if is_packaged else "development",
         "config_path": config_path,
-        "config_exists": os.path.exists(config_path)
+        "config_exists": os.path.exists(config_path),
     }
 
 
@@ -1354,12 +1465,11 @@ def update_env_config(config: EnvConfig):
             if field in SECRET_FIELDS and _MASK_CHAR in str(config_dict[field]):
                 config_dict.pop(field, None)
 
-        # Update current process env
-        for key, value in config_dict.items():
-            os.environ[key] = value
-
-        # Save to file
-        save_user_config(config_dict)
+        # Persist before changing process state so failed writes cannot leave
+        # the running app claiming an unsaved configuration is active.
+        with _USER_CONFIG_LOCK:
+            save_user_config(config_dict)
+            os.environ.update(config_dict)
 
         # Reset OSS singleton to pick up new config (non-blocking)
         try:
@@ -1374,7 +1484,6 @@ def update_env_config(config: EnvConfig):
     except Exception as e:
         logger.exception("Failed to save environment configuration")
         raise HTTPException(status_code=500, detail=str(e))
-
 
 
 @app.get("/projects/{script_id}")
@@ -1457,7 +1566,6 @@ def get_project(script_id: str):
                 d["source"] = "global"
                 payload["props"].append(d)
     return signed_response(payload)
-
 
 
 @app.delete("/projects/{script_id}")
@@ -2048,7 +2156,6 @@ def generate_assets(script_id: str, background_tasks: BackgroundTasks):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-
 class GenerateMotionRefRequest(BaseModel):
     """Request model for generating Motion Reference videos."""
     model_config = ConfigDict(extra="forbid")
@@ -2058,7 +2165,7 @@ class GenerateMotionRefRequest(BaseModel):
     prompt: Optional[str] = None
     model: Optional[str] = None
     duration: int = 5
-    batch_size: int = 1
+    batch_size: int = Field(1, ge=1, le=4)
 
     @field_validator("model")
     @classmethod
@@ -2137,6 +2244,8 @@ def refine_storyboard_prompt(script_id: str, request: RefinePromptRequest):
     Declared `def` (not `async def`) so FastAPI runs it on the threadpool
     and the event loop stays free for concurrent GETs.
     """
+    from .llm import PolishError
+
     try:
         result = pipeline.refine_frame_prompt(
             script_id,
@@ -2146,6 +2255,9 @@ def refine_storyboard_prompt(script_id: str, request: RefinePromptRequest):
             request.feedback,
         )
         return result
+    except PolishError as e:
+        logger.warning("refine_storyboard_prompt failed: %s", e)
+        raise HTTPException(status_code=502, detail=_polish_error_response(e))
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -2161,6 +2273,21 @@ def refine_single_frame(script_id: str, frame_id: str):
         if not frame:
             raise HTTPException(status_code=500, detail="Refine returned no result")
         return frame.model_dump() if hasattr(frame, 'model_dump') else frame.dict()
+    except FrameRefineError as e:
+        status_code = {
+            "missing_config": 503,
+            "provider_timeout": 504,
+            "provider_error": 502,
+            "malformed_response": 502,
+        }.get(e.reason, 502)
+        raise HTTPException(
+            status_code=status_code,
+            detail={
+                "error": "frame_refine_failed",
+                "reason": e.reason,
+                "message": e.message,
+            },
+        ) from None
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -2194,7 +2321,6 @@ def generate_storyboard(script_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-
 @app.post("/projects/{script_id}/generate_video", response_model=Script)
 def generate_video(script_id: str):
     """Triggers video generation."""
@@ -2203,7 +2329,6 @@ def generate_video(script_id: str):
         return signed_response(updated_script)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 
 class CreateVideoTaskRequest(BaseModel):
@@ -2216,7 +2341,7 @@ class CreateVideoTaskRequest(BaseModel):
     seed: Optional[int] = None
     resolution: str = "720p"
     generate_audio: bool = False
-    batch_size: int = 1
+    batch_size: int = Field(1, ge=1, le=4)
     model: Optional[str] = None
     generation_mode: str = "i2v"
     ratio: Optional[str] = None
@@ -2501,7 +2626,6 @@ def delete_asset_video(script_id: str, asset_type: str, asset_id: str, video_id:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-
 @app.post("/projects/{script_id}/assets/toggle_lock", response_model=Script)
 def toggle_asset_lock(script_id: str, request: ToggleLockRequest):
     """Toggles the locked status of an asset."""
@@ -2534,7 +2658,6 @@ def toggle_asset_starred(script_id: str, request: ToggleLockRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-
 @app.post("/projects/{script_id}/assets/update_image", response_model=Script)
 def update_asset_image(script_id: str, request: UpdateAssetImageRequest):
     """Updates an asset's image URL manually."""
@@ -2552,7 +2675,6 @@ def update_asset_image(script_id: str, request: UpdateAssetImageRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-
 @app.post("/projects/{script_id}/assets/update_attributes", response_model=Script)
 def update_asset_attributes(script_id: str, request: UpdateAssetAttributesRequest):
     """Updates arbitrary attributes of an asset."""
@@ -2568,7 +2690,6 @@ def update_asset_attributes(script_id: str, request: UpdateAssetAttributesReques
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 
 class UpdateAssetDescriptionRequest(BaseModel):
@@ -2592,7 +2713,6 @@ def update_asset_description(script_id: str, request: UpdateAssetDescriptionRequ
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 
 class SelectVariantRequest(BaseModel):
@@ -2975,7 +3095,7 @@ class RenderFrameRequest(BaseModel):
     frame_id: str
     composition_data: Optional[Dict[str, Any]] = None
     prompt: str
-    batch_size: int = 1
+    batch_size: int = Field(1, ge=1, le=4)
 
 
 @app.post("/projects/{script_id}/storyboard/render", response_model=Script)
@@ -3074,15 +3194,12 @@ def upload_frame_image(script_id: str, frame_id: str, file: UploadFile = File(..
     """Upload an image as a variant for a frame's rendered_image_asset."""
     try:
         # Save file locally first
-        file_ext = os.path.splitext(file.filename)[1]
-        filename = f"{uuid.uuid4()}{file_ext}"
-        file_path = os.path.join("output/uploads", filename)
+        saved = save_upload_file(file, "output/uploads", IMAGE_UPLOAD_POLICY)
 
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
-        updated_script = pipeline.upload_frame_image(script_id, frame_id, file_path)
+        updated_script = pipeline.upload_frame_image(script_id, frame_id, saved.path)
         return signed_response(updated_script)
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -3208,28 +3325,15 @@ class ExportRequest(BaseModel):
 
 @app.post("/projects/{script_id}/export")
 def export_project(script_id: str, request: ExportRequest):
-    """Export project video by merging all selected frame videos.
-
-    Currently delegates to the existing merge_videos pipeline.
-    resolution/format/subtitles parameters are accepted but not yet applied
-    (requires FFmpeg pipeline iteration).
-    """
+    """Export a project video using the requested media options."""
     try:
-        script = pipeline.get_script(script_id)
-        if not script:
-            raise HTTPException(status_code=404, detail="Project not found")
-
-        # If already merged, return existing URL directly
-        if script.merged_video_url:
-            return signed_response({"url": script.merged_video_url})
-
-        # Otherwise, run merge pipeline
-        merged_script = pipeline.merge_videos(script_id)
-        return signed_response({"url": merged_script.merged_video_url})
+        export_url = pipeline.export_project(script_id, request.model_dump())
+        return signed_response({"url": export_url})
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        status_code = 404 if str(e) == "Script not found" else 400
+        raise HTTPException(status_code=status_code, detail=str(e))
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
@@ -3269,6 +3373,21 @@ async def analyze_script_for_styles(script_id: str, request: AnalyzeStyleRequest
         )
 
         return {"recommendations": recommendations}
+    except StyleAnalysisError as e:
+        status_code = {
+            "missing_config": 503,
+            "provider_timeout": 504,
+            "provider_error": 502,
+            "malformed_response": 502,
+        }.get(e.reason, 502)
+        raise HTTPException(
+            status_code=status_code,
+            detail={
+                "error": "style_analysis_failed",
+                "reason": e.reason,
+                "message": e.message,
+            },
+        ) from None
     except HTTPException:
         raise
     except Exception as e:
@@ -3457,7 +3576,7 @@ def polish_video_prompt(request: PolishVideoPromptRequest):
     成功：200 + {prompt_cn, prompt_en}
     失败：502 + {reason, message_zh, message_en, prompt_cn?, prompt_en?}
       其中 reason ∈ {is_configured_false, api_error, json_parse_error,
-                     missing_keys, model_echo}。
+                     missing_keys, model_echo, image_unavailable}。
       model_echo 是 warning 性质（带原文双语），其余是 hard error。
     """
     from .llm import PolishError
@@ -3544,9 +3663,6 @@ def get_env_config():
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
-
 
 
 # ============================================

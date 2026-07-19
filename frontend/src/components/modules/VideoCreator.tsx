@@ -33,11 +33,18 @@ export default function VideoCreator({
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isPolishing, setIsPolishing] = useState(false);
     const [submitSuccess, setSubmitSuccess] = useState(false);
+    const [handledRemixData, setHandledRemixData] = useState<Partial<VideoTask> | null>(null);
+
+    // Consume a newly supplied remix before rendering the form. Keeping the
+    // last object identity lets local edits survive the parent's clear signal.
+    if (remixData && remixData !== handledRemixData) {
+        setHandledRemixData(remixData);
+        if (remixData.image_url) setSelectedImages([remixData.image_url]);
+        if (remixData.prompt) setPrompt(remixData.prompt);
+    }
 
     useEffect(() => {
         if (!remixData) return;
-        if (remixData.image_url) setSelectedImages([remixData.image_url]);
-        if (remixData.prompt) setPrompt(remixData.prompt);
         onRemixClear();
     }, [remixData, onRemixClear]);
 

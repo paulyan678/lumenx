@@ -142,6 +142,28 @@ def test_create_library_character_tolerates_partial_payload(tmp_path):
     assert ch.name == "未命名"
 
 
+def test_library_mutations_roll_back_in_memory_when_persistence_fails(tmp_path):
+    lib = GlobalAssetLibrary(characters=[_char("c1", "before")])
+    p = _bare_pipeline(tmp_path, library=lib)
+
+    def fail_save():
+        raise OSError("disk full")
+
+    p._save_library_data_unlocked = fail_save
+
+    with pytest.raises(OSError, match="disk full"):
+        p.create_library_asset("scene", {"name": "new"})
+    assert p.library_store.scenes == []
+
+    with pytest.raises(OSError, match="disk full"):
+        p.update_library_asset("character", "c1", {"name": "after"})
+    assert p.library_store.characters[0].name == "before"
+
+    with pytest.raises(OSError, match="disk full"):
+        p.delete_library_asset("character", "c1")
+    assert [asset.id for asset in p.library_store.characters] == ["c1"]
+
+
 def test_update_and_delete_library_asset(tmp_path):
     lib = GlobalAssetLibrary(characters=[_char("c1", "old")])
     p = _bare_pipeline(tmp_path, library=lib)

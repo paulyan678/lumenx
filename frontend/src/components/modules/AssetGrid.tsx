@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { RefreshCw, Download, Plus } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -28,10 +28,10 @@ export default function AssetGrid({ projectId }: AssetGridProps) {
 
     const [isGenerating, setIsGenerating] = useState(false);
 
-    // Initialize assets from current project
-    const [assets, setAssets] = useState<Asset[]>(() => {
-        if (!currentProject) return [];
-        return [
+    // Assets are a projection of the project store; keeping a second state
+    // copy made project switches briefly show the previous project's assets.
+    const assets: Asset[] = currentProject
+        ? [
             ...currentProject.characters.map((c: any) => ({
                 id: c.id,
                 type: "char" as const,
@@ -44,29 +44,8 @@ export default function AssetGrid({ projectId }: AssetGridProps) {
                 url: getAssetUrl(s.image_url),
                 title: s.name
             }))
-        ];
-    });
-
-    // Update assets when project changes
-    useEffect(() => {
-        if (currentProject) {
-            const newAssets: Asset[] = [
-                ...currentProject.characters.map((c: any) => ({
-                    id: c.id,
-                    type: "char" as const,
-                    url: getAssetUrl(c.image_url),
-                    title: c.name
-                })),
-                ...currentProject.scenes.map((s: any) => ({
-                    id: s.id,
-                    type: "bg" as const,
-                    url: getAssetUrl(s.image_url),
-                    title: s.name
-                }))
-            ];
-            setAssets(newAssets);
-        }
-    }, [currentProject?.id, currentProject?.characters, currentProject?.scenes]);
+        ]
+        : [];
 
     const handleGenerate = async () => {
         if (!projectId) {
@@ -77,23 +56,6 @@ export default function AssetGrid({ projectId }: AssetGridProps) {
         setIsGenerating(true);
         try {
             const project = await api.generateAssets(projectId);
-            // Transform backend data
-            const newAssets: Asset[] = [
-                ...project.characters.map((c: any) => ({
-                    id: c.id,
-                    type: "char" as const,
-                    url: getAssetUrl(c.image_url),
-                    title: c.name
-                })),
-                ...project.scenes.map((s: any) => ({
-                    id: s.id,
-                    type: "bg" as const,
-                    url: getAssetUrl(s.image_url),
-                    title: s.name
-                }))
-            ];
-            setAssets(newAssets);
-
             // Update project in store
             if (currentProject) {
                 updateProject(currentProject.id, {
