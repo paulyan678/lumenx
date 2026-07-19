@@ -1,5 +1,6 @@
 # Packaging toolchain security baseline
 pip==26.1.2
+setuptools==83.0.0
 
 # Web Framework
 fastapi==0.139.2
