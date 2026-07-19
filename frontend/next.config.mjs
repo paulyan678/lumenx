@@ -13,6 +13,9 @@ const nextConfig = {
     distDir: isProd ? 'out' : undefined,
     basePath: isProd && !isDocker ? '/static' : undefined,
     assetPrefix: isProd && !isDocker ? '/static' : undefined,
+    // The repo launcher intentionally opens the loopback IP. Trust that host
+    // so Next's development client can hydrate instead of serving inert HTML.
+    allowedDevOrigins: ['127.0.0.1'],
     // Dev-only: proxy /api-proxy/* to backend to avoid CORS issues (e.g. file downloads).
     // Static exports cannot contain rewrites, so omit the option entirely in production.
     ...(!isProd ? {

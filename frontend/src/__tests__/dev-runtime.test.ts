@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import nextConfig from '../../next.config.mjs';
 import packageJson from '../../package.json';
 import { buildNextDevEnv, resolveBackendPort } from '../../scripts/run-next-dev.mjs';
 import {
@@ -14,6 +15,10 @@ import {
 describe('frontend dev runtime', () => {
     it('routes npm run dev through the repo-controlled wrapper script', () => {
         expect(packageJson.scripts.dev).toBe('node ./scripts/run-next-dev.mjs');
+    });
+
+    it('hydrates when the root launcher opens the loopback IP', () => {
+        expect(nextConfig.allowedDevOrigins).toContain('127.0.0.1');
     });
 
     it('enables Watchpack polling by default on macOS', () => {
