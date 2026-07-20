@@ -170,9 +170,7 @@ def test_packaged_config_atomic_failure_preserves_file_and_process_state(tmp_pat
 
     monkeypatch.setattr(api.os, "replace", fail_replace)
     with pytest.raises(HTTPException) as exc_info:
-        api.update_env_config(
-            api.EnvConfig(NEWAPI_BASE_URL="https://after.example/v1")
-        )
+        api.update_env_config(api.EnvConfig(NEWAPI_BASE_URL="https://after.example/v1"))
 
     assert exc_info.value.status_code == 500
     assert "disk unavailable" in exc_info.value.detail
