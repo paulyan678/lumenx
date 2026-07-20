@@ -4,8 +4,8 @@ from typing import Dict, Any, List
 from .models import StoryboardFrame, Character, Scene, Prop, GenerationStatus, ImageAsset, ImageVariant
 from ...models.newapi import NewAPIImageModel
 from ...utils import get_logger
+from ...utils.media_refs import resolve_local_media_path
 from ...utils.newapi_models import IMAGE, get_model_spec, get_selected_model
-from ...utils.oss_utils import is_object_key
 
 logger = get_logger(__name__)
 
@@ -104,14 +104,9 @@ class StoryboardGenerator:
                     logger.info(f"[Storyboard] Character '{char.name}' reference: source={source}, url={target_url}")
                     
                     if target_url:
-                        if is_object_key(target_url):
-                            asset_ref_paths.append(target_url)
-                        else:
-                            potential_path = os.path.join("output", target_url)
-                            if os.path.exists(potential_path):
-                                asset_ref_paths.append(os.path.abspath(potential_path))
-                            elif os.path.exists(target_url):
-                                asset_ref_paths.append(os.path.abspath(target_url))
+                        resolved_path = resolve_local_media_path(target_url)
+                        if resolved_path and os.path.exists(resolved_path):
+                            asset_ref_paths.append(resolved_path)
             
             # Add scene reference image
             scene_url = None
@@ -124,14 +119,9 @@ class StoryboardGenerator:
                     scene_url = scene.image_url
                 
                 if scene_url:
-                    if is_object_key(scene_url):
-                        asset_ref_paths.append(scene_url)
-                    else:
-                        potential_path = os.path.join("output", scene_url)
-                        if os.path.exists(potential_path):
-                            asset_ref_paths.append(os.path.abspath(potential_path))
-                        elif os.path.exists(scene_url):
-                            asset_ref_paths.append(os.path.abspath(scene_url))
+                    resolved_path = resolve_local_media_path(scene_url)
+                    if resolved_path and os.path.exists(resolved_path):
+                        asset_ref_paths.append(resolved_path)
         
         # Collect character descriptions for prompt building
         for char_id in frame.character_ids:
@@ -208,31 +198,6 @@ class StoryboardGenerator:
             frame.updated_at = time.time()
             frame.status = GenerationStatus.COMPLETED
             
-            # Try uploading to OSS if configured - store Object Key (not full URL)
-            try:
-                from ...utils.oss_utils import OSSImageUploader
-                uploader = OSSImageUploader()
-                if uploader.is_configured:
-                    # Upload the selected variant
-                    if selected_variant:
-                        # Construct local path from relative path
-                        local_path = os.path.join("output", selected_variant.url)
-                        if os.path.exists(local_path):
-                            # Upload and get Object Key (not full URL)
-                            object_key = uploader.upload_file(
-                                local_path, 
-                                sub_path=f"storyboard"
-                            )
-                            if object_key:
-                                logger.info(f"Uploaded frame {frame.id} to OSS: {object_key}")
-                                # Store Object Key (will be converted to signed URL on API response)
-                                selected_variant.url = object_key
-                                frame.rendered_image_url = object_key
-                                frame.image_url = object_key
-            except Exception as e:
-                logger.error(f"Failed to upload frame {frame.id} to OSS: {e}")
-                # Continue even if OSS upload fails
-                
         except Exception as e:
             logger.error(f"Failed to generate frame {frame.id}: {e}")
             frame.status = GenerationStatus.FAILED

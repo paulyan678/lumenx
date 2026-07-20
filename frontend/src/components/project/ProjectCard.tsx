@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
-import { Play, Trash2, Film, Clock, MoreVertical, ExternalLink, Star } from "lucide-react";
+import { Play, Trash2, Film, Clock, MoreVertical, ExternalLink, Star, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Project } from "@/store/projectStore";
 import { useSettingsStore } from "@/store/settingsStore";
@@ -12,7 +12,7 @@ import { api } from "@/lib/api";
 
 interface ProjectCardProps {
     project: Project;
-    onDelete: (id: string) => void;
+    onDelete: (id: string) => void | Promise<void>;
 }
 
 export type DerivedStatus = "completed" | "processing" | "pending";
@@ -58,6 +58,7 @@ export default function ProjectCard({ project, onDelete }: ProjectCardProps) {
     const locale = useSettingsStore((s) => s.locale);
 
     const [menuOpen, setMenuOpen] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
     const menuWrapRef = useRef<HTMLDivElement>(null);
     const firstItemRef = useRef<HTMLButtonElement>(null);
 
@@ -114,10 +115,14 @@ export default function ProjectCard({ project, onDelete }: ProjectCardProps) {
             : `#/project/${project.id}`;
     };
 
-    const handleDelete = (e: React.MouseEvent) => {
+    const handleDelete = async (e: React.MouseEvent) => {
         e.stopPropagation();
-        if (confirm(t("confirmDelete", { title: project.title }))) {
-            onDelete(project.id);
+        if (isDeleting || !confirm(t("confirmDelete", { title: project.title }))) return;
+        setIsDeleting(true);
+        try {
+            await onDelete(project.id);
+        } finally {
+            setIsDeleting(false);
         }
     };
 
@@ -252,16 +257,17 @@ export default function ProjectCard({ project, onDelete }: ProjectCardProps) {
                 <div className="relative" ref={menuWrapRef} onClick={(e) => e.stopPropagation()}>
                     <button
                         type="button"
+                        disabled={isDeleting}
                         onClick={(e) => {
                             e.stopPropagation();
                             setMenuOpen((v) => !v);
                         }}
-                        className={`w-8 h-8 rounded-lg grid place-items-center transition-colors ${menuOpen ? "text-foreground bg-hover-bg" : "text-text-muted hover:text-foreground hover:bg-hover-bg"}`}
+                        className={`w-8 h-8 rounded-lg grid place-items-center transition-colors disabled:cursor-wait disabled:opacity-60 ${menuOpen ? "text-foreground bg-hover-bg" : "text-text-muted hover:text-foreground hover:bg-hover-bg"}`}
                         aria-label={t("moreActions")}
                         aria-haspopup="menu"
                         aria-expanded={menuOpen}
                     >
-                        <MoreVertical size={15} />
+                        {isDeleting ? <Loader2 size={15} className="animate-spin" /> : <MoreVertical size={15} />}
                     </button>
                     {menuOpen ? (
                         <div
@@ -286,12 +292,13 @@ export default function ProjectCard({ project, onDelete }: ProjectCardProps) {
                             <button
                                 type="button"
                                 role="menuitem"
+                                disabled={isDeleting}
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     setMenuOpen(false);
-                                    handleDelete(e);
+                                    void handleDelete(e);
                                 }}
-                                className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left font-sans text-body-sm text-foreground transition-colors hover:bg-red-500/10 hover:text-red-400 focus-visible:outline-none focus-visible:bg-red-500/10 focus-visible:text-red-400"
+                                className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left font-sans text-body-sm text-foreground transition-colors hover:bg-red-500/10 hover:text-red-400 focus-visible:outline-none focus-visible:bg-red-500/10 focus-visible:text-red-400 disabled:cursor-wait disabled:opacity-60"
                             >
                                 <Trash2 size={14} aria-hidden="true" />
                                 {tCommon("delete")}

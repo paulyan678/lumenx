@@ -65,9 +65,8 @@ hiddenimports = [
     'starlette.staticfiles',
     'fastapi',
     'pydantic',
-    # New API (OpenAI-compatible chat) and optional OSS storage
+    # New API (OpenAI-compatible)
     'openai',
-    'oss2',
     # Local audio separation
     'demucs',
     'demucs.pretrained',

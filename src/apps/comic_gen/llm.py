@@ -88,7 +88,7 @@ def _resolve_image_for_vision(url: str) -> Optional[str]:
       - 已是 http(s):// 或 data:image/ → 原样返回（New API 能 fetch / 已内联）
       - 看起来是相对路径（output/* 或 /files/* 或裸文件名）→ 读本地文件做 base64 data URI
       - 找不到本地文件 → 返回 None，调用方应跳过这一张
-    Remote gateways cannot access localhost or private OSS paths, so local paths must be inline."""
+    Remote gateways cannot access localhost paths, so local files must be inline."""
     import base64
 
     if not url or not isinstance(url, str):

@@ -34,9 +34,7 @@ function appendNoProxy(current) {
   const entries = new Set(
     String(current || '').split(',').map((entry) => entry.trim()).filter(Boolean),
   );
-  // Requests/urllib3 do not interpret a leading wildcard in NO_PROXY. A
-  // leading dot is the portable suffix form for every aliyuncs.com host.
-  for (const entry of ['.aliyuncs.com', 'aliyuncs.com', 'localhost', '127.0.0.1']) {
+  for (const entry of ['localhost', '127.0.0.1']) {
     entries.add(entry);
   }
   return [...entries].join(',');

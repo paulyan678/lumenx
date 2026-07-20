@@ -4,13 +4,15 @@ import { useState, useEffect, useRef, useId, useSyncExternalStore } from "react"
 import { motion } from "framer-motion";
 import {
   Plus, RefreshCw, Library, FileUp, X, ChevronDown, FileText,
-  Film, Sparkles, Search, Clock, MoreVertical,
+  Sparkles, Search,
 } from "lucide-react";
 import { useProjectStore, Project } from "@/store/projectStore";
 import { toast } from "@/store/toastStore";
 import { useOnline } from "@/lib/useOnline";
 import { rovingKeyDown } from "@/lib/a11y";
-import ProjectCard, { deriveStatus, deriveCover, type DerivedStatus } from "@/components/project/ProjectCard";
+import ProjectCard, { deriveStatus, type DerivedStatus } from "@/components/project/ProjectCard";
+import ProjectRow from "@/components/project/ProjectRow";
+import SeriesGroupHeader from "@/components/series/SeriesGroupHeader";
 import CreateProjectDialog from "@/components/project/CreateProjectDialog";
 import EnvConfigDialog from "@/components/project/EnvConfigDialog";
 import CreativeCanvas from "@/components/canvas/CreativeCanvas";
@@ -280,91 +282,11 @@ function storeWorkspaceViewMode(mode: WorkspaceViewMode): void {
 
 const getServerWorkspaceViewMode = (): WorkspaceViewMode => "gallery";
 
-// deriveCover is imported from ProjectCard (single source of truth).
-
-// ── Project Row (Line B list-view item) ──
-function ProjectRow({ project, crumb }: { project: Project; crumb: string }) {
-  const t = useTranslations("project");
-  const cover = deriveCover(project);
-  const status = deriveStatus(project);
-  const frameCount = project.frames?.length || 0;
-  const sceneCount = project.scenes?.length || 0;
-
-  const open = () => { window.location.hash = `#/project/${project.id}`; };
-
-  const badge = {
-    completed: { label: t("statusCompleted"), cls: "text-status-completed-fg bg-status-completed-bg border-status-completed-border" },
-    processing: { label: t("statusProcessing"), cls: "text-status-processing-fg bg-status-processing-bg border-status-processing-border" },
-    pending: { label: t("statusDraft"), cls: "text-status-pending-fg bg-status-pending-bg border-status-pending-border" },
-  }[status];
-
-  return (
-    <div
-      onClick={open}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        // Only activate from the row itself — nested controls (⋯) handle their own keys.
-        if (e.target !== e.currentTarget) return;
-        if (e.key === "Enter" || e.key === " ") {
-          if (e.key === " ") e.preventDefault();
-          open();
-        }
-      }}
-      className="group glass-panel flex items-center gap-4 rounded-xl border border-glass-border px-3 py-2.5 cursor-pointer hover:bg-hover-bg transition-colors"
-    >
-      {/* Thumbnail */}
-      <div className="relative w-[68px] aspect-[16/10] flex-shrink-0 rounded-lg overflow-hidden bg-surface-inset">
-        {cover ? (
-          <img src={cover} alt="" className="w-full h-full object-cover" />
-        ) : (
-          <div className="w-full h-full grid place-items-center text-text-muted">
-            <FileText size={16} />
-          </div>
-        )}
-      </div>
-
-      {/* Name + series/episode crumb */}
-      <div className="flex-1 min-w-0">
-        <h3 className="font-display atelier-display text-[1rem] font-semibold leading-tight tracking-tight text-foreground truncate">
-          {project.title}
-        </h3>
-        {crumb && (
-          <div className="font-mono text-[0.59375rem] uppercase tracking-wider text-text-muted mt-0.5 truncate">
-            {crumb}
-          </div>
-        )}
-      </div>
-
-      {/* Status badge */}
-      <span className={`atelier-badge hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[0.59375rem] font-mono font-semibold uppercase tracking-wider flex-shrink-0 ${badge.cls}`}>
-        <span className="w-[5px] h-[5px] rounded-full bg-current" />
-        {badge.label}
-      </span>
-
-      {/* Shot count / duration */}
-      <div className="hidden md:flex items-center gap-3 font-mono text-[0.625rem] text-text-secondary flex-shrink-0">
-        <span className="inline-flex items-center gap-1">
-          <Film size={11} className="text-text-muted" />
-          {t("shotCount", { count: frameCount })}
-        </span>
-        <span className="inline-flex items-center gap-1">
-          <Clock size={11} className="text-text-muted" />
-          {sceneCount}
-        </span>
-      </div>
-
-      {/* More */}
-      <button
-        onClick={(e) => e.stopPropagation()}
-        className="w-8 h-8 rounded-lg grid place-items-center text-text-muted hover:text-foreground hover:bg-hover-bg transition-colors flex-shrink-0"
-        aria-label={t("moreActions")}
-      >
-        <MoreVertical size={15} />
-      </button>
-    </div>
-  );
+function isUsableRouteId(id: string): boolean {
+  return id.trim().length > 0 && id !== "undefined" && id !== "null";
 }
+
+// deriveCover is imported from ProjectCard (single source of truth).
 
 // ── Episode Breadcrumb Wrapper ──
 function EpisodeBreadcrumbWrapper({ seriesId, episodeId }: { seriesId: string; episodeId: string }) {
@@ -424,9 +346,11 @@ export default function Home() {
   const [seriesId, setSeriesId] = useState<string | null>(null);
   const [episodeId, setEpisodeId] = useState<string | null>(null);
   const [seriesEpisodes, setSeriesEpisodes] = useState<Record<string, Project[]>>({});
+  const [deletingSeriesIds, setDeletingSeriesIds] = useState<Set<string>>(() => new Set());
   const projects = useProjectStore((state) => state.projects);
   const seriesList = useProjectStore((state) => state.seriesList);
   const deleteProject = useProjectStore((state) => state.deleteProject);
+  const deleteSeries = useProjectStore((state) => state.deleteSeries);
   const setProjects = useProjectStore((state) => state.setProjects);
   const fetchSeriesList = useProjectStore((state) => state.fetchSeriesList);
   const t = useTranslations("workspace");
@@ -499,6 +423,61 @@ export default function Home() {
     await Promise.all([syncProjects(), fetchSeriesList()]);
   };
 
+  const handleDeleteProject = async (id: string) => {
+    try {
+      await deleteProject(id);
+
+      // Series episodes render from this page-local cache. Remove the deleted
+      // item immediately so it cannot issue a second DELETE from a stale card.
+      setSeriesEpisodes((current) => {
+        let changed = false;
+        const next = Object.fromEntries(
+          Object.entries(current).map(([sid, episodes]) => {
+            const remaining = episodes.filter((episode) => episode.id !== id);
+            if (remaining.length !== episodes.length) changed = true;
+            return [sid, remaining];
+          }),
+        );
+        return changed ? next : current;
+      });
+
+      // Refresh series episode_ids/count metadata after deleting an episode.
+      await fetchSeriesList();
+    } catch (error) {
+      console.error("Failed to delete project:", error);
+      toast.error(t("toastProjectDeleteFailed"), {
+        body: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
+  const handleDeleteSeries = async (series: { id: string; title: string }) => {
+    if (deletingSeriesIds.has(series.id)) return;
+    if (!window.confirm(t("confirmDeleteSeries", { title: series.title }))) return;
+
+    setDeletingSeriesIds((current) => new Set(current).add(series.id));
+    try {
+      await deleteSeries(series.id);
+      setSeriesEpisodes((current) => {
+        if (!(series.id in current)) return current;
+        const next = { ...current };
+        delete next[series.id];
+        return next;
+      });
+    } catch (error) {
+      console.error("Failed to delete series:", error);
+      toast.error(t("toastSeriesDeleteFailed"), {
+        body: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setDeletingSeriesIds((current) => {
+        const next = new Set(current);
+        next.delete(series.id);
+        return next;
+      });
+    }
+  };
+
   // Close dropdown when clicking outside
   useEffect(() => {
     if (!showCreateDropdown) return;
@@ -513,7 +492,7 @@ export default function Home() {
       const hash = window.location.hash;
       // Match #/series/{id}/episode/{eid} first (more specific)
       const seriesEpisodeMatch = hash.match(/^#\/series\/([^/]+)\/episode\/([^/]+)$/);
-      if (seriesEpisodeMatch) {
+      if (seriesEpisodeMatch && isUsableRouteId(seriesEpisodeMatch[1]) && isUsableRouteId(seriesEpisodeMatch[2])) {
         setSeriesId(seriesEpisodeMatch[1]);
         setEpisodeId(seriesEpisodeMatch[2]);
         setProjectId(null);
@@ -522,7 +501,7 @@ export default function Home() {
       }
       // Match #/series/{id}
       const seriesMatch = hash.match(/^#\/series\/([^/]+)$/);
-      if (seriesMatch) {
+      if (seriesMatch && isUsableRouteId(seriesMatch[1])) {
         setSeriesId(seriesMatch[1]);
         setEpisodeId(null);
         setProjectId(null);
@@ -531,11 +510,13 @@ export default function Home() {
       }
       if (hash.startsWith('#/project/')) {
         const id = hash.replace('#/project/', '');
-        setProjectId(id);
-        setSeriesId(null);
-        setEpisodeId(null);
-        setCurrentView('project');
-        return;
+        if (isUsableRouteId(id)) {
+          setProjectId(id);
+          setSeriesId(null);
+          setEpisodeId(null);
+          setCurrentView('project');
+          return;
+        }
       }
       if (hash === '#/library') {
         setCurrentView('library');
@@ -850,18 +831,13 @@ export default function Home() {
                 if (eps.length === 0 && wsFiltering) return null;
                 return (
                   <section key={`grp-${s.id}`} aria-label={s.title}>
-                    <div className="flex items-baseline gap-3 mt-4 mb-4 mx-0.5">
-                      <button
-                        onClick={() => { window.location.hash = `#/series/${s.id}`; }}
-                        className="font-display atelier-display text-[1.5rem] font-semibold tracking-tight text-foreground hover:text-primary transition-colors"
-                      >
-                        {s.title}
-                      </button>
-                      <span className="font-mono text-[0.625rem] uppercase tracking-wider text-text-muted">
-                        {t("series")} · {t("frames", { count: eps.length })}
-                      </span>
-                      <span className="atelier-group-line h-px flex-1 bg-glass-border" />
-                    </div>
+                    <SeriesGroupHeader
+                      title={s.title}
+                      episodeCount={eps.length}
+                      deleting={deletingSeriesIds.has(s.id)}
+                      onOpen={() => { window.location.hash = `#/series/${s.id}`; }}
+                      onDelete={() => { void handleDeleteSeries(s); }}
+                    />
                     {viewMode === "list" ? (
                       <div className="flex flex-col gap-1.5">
                         {eps.map((ep, i) => (
@@ -873,6 +849,7 @@ export default function Home() {
                             <ProjectRow
                               project={ep}
                               crumb={`${s.title}${ep.episode_number ? ` · EP.${String(ep.episode_number).padStart(2, "0")}` : ""}`}
+                              onDelete={handleDeleteProject}
                             />
                           </div>
                         ))}
@@ -896,7 +873,7 @@ export default function Home() {
                             className="atelier-reveal"
                             style={{ animationDelay: `${Math.min(i * 60, 300)}ms` }}
                           >
-                            <ProjectCard project={ep} onDelete={deleteProject} />
+                            <ProjectCard project={ep} onDelete={handleDeleteProject} />
                           </div>
                         ))}
                         {!wsFiltering && <NewProjectTile episode onClick={() => { setDialogSeries({ id: s.id, title: s.title }); setIsDialogOpen(true); }} />}
@@ -930,7 +907,7 @@ export default function Home() {
                           className="atelier-reveal"
                           style={{ animationDelay: `${Math.min(i * 60, 300)}ms` }}
                         >
-                          <ProjectRow project={p} crumb="" />
+                          <ProjectRow project={p} crumb="" onDelete={handleDeleteProject} />
                         </div>
                       ))}
                       {!wsFiltering && (
@@ -953,7 +930,7 @@ export default function Home() {
                           className="atelier-reveal"
                           style={{ animationDelay: `${Math.min(i * 60, 300)}ms` }}
                         >
-                          <ProjectCard project={p} onDelete={deleteProject} />
+                          <ProjectCard project={p} onDelete={handleDeleteProject} />
                         </div>
                       ))}
                       {!wsFiltering && <NewProjectTile onClick={() => setIsDialogOpen(true)} />}

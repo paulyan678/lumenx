@@ -87,15 +87,13 @@ def test_nginx_limits_uploads_and_sets_baseline_security_headers():
     assert 'add_header Referrer-Policy "same-origin" always;' in config
 
 
-def test_backend_image_contains_runtime_catalog_and_portable_proxy_exclusions():
+def test_backend_image_contains_runtime_catalog_and_local_proxy_exclusions():
     dockerfile = DOCKERFILE_BACKEND.read_text(encoding="utf-8")
     compose = (REPO_ROOT / "docker-compose.yml").read_text(encoding="utf-8")
 
     assert "COPY config/model_catalog/generated/model_catalog.json" in dockerfile
-    assert "*.aliyuncs.com" not in dockerfile
-    assert "*.aliyuncs.com" not in compose
-    assert ".aliyuncs.com,aliyuncs.com,localhost,127.0.0.1" in dockerfile
-    assert ".aliyuncs.com,aliyuncs.com,localhost,127.0.0.1" in compose
+    assert 'ENV NO_PROXY="localhost,127.0.0.1"' in dockerfile
+    assert "NO_PROXY=localhost,127.0.0.1" in compose
     assert "fonts-noto-cjk" in dockerfile
     assert "LUMEN_X_PACKAGED=true" in dockerfile
     assert "LUMENX_DATA_DIR=/data" in dockerfile

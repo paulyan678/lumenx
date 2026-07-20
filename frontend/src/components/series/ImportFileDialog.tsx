@@ -141,7 +141,7 @@ export default function ImportFileDialog({ isOpen, onClose, onSuccess }: ImportF
                 episodes: previewResult.episodes,
             });
             setCreatedResult({
-                series_id: result.series_id,
+                series_id: result.series.id,
                 episode_count: result.episodes?.length ?? previewResult.episodes.length,
             });
             setStep(3);

@@ -43,6 +43,11 @@ describe('i18n configuration', () => {
         expect(zhKeys).toEqual(enKeys);
     });
 
+    it('includes the series context label used by the project dialog', () => {
+        expect(getMessages('zh').project.series).toBe('系列');
+        expect(getMessages('en').project.series).toBe('Series');
+    });
+
     it('getMessages falls back to zh for unknown locale', () => {
         // @ts-expect-error testing invalid input
         const messages = getMessages('fr');

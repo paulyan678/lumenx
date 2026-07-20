@@ -63,7 +63,7 @@ def test_generate_video_processes_every_unfinished_frame_with_project_model(monk
     ]
 
 
-def test_generate_video_marks_missing_image_failed_and_continues(monkeypatch, tmp_path):
+def test_generate_video_marks_missing_image_failed_and_continues(tmp_path):
     missing_image = _frame("frame-missing", image_url=None)
     valid = _frame("frame-valid")
     script = _script(missing_image, valid)
@@ -74,11 +74,7 @@ def test_generate_video_marks_missing_image_failed_and_continues(monkeypatch, tm
         def generate(self, **kwargs):
             return kwargs["output_path"], None
 
-    class DisabledUploader:
-        is_configured = False
-
     generator.model = SuccessfulModel()
-    monkeypatch.setattr("src.utils.oss_utils.OSSImageUploader", DisabledUploader)
 
     result = generator.generate_video(script)
 

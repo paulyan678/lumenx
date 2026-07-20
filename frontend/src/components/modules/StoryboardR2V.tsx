@@ -1645,8 +1645,8 @@ export default function StoryboardR2V() {
                                                 debugLog.error("Studio", "T2I upload failed", err);
                                                 const status = err?.response?.status;
                                                 // Always surface the backend detail string so the
-                                                // user can self-diagnose ("frame not found", "OSS
-                                                // write denied", etc.) instead of "请重试".
+                                                // user can self-diagnose ("frame not found",
+                                                // "write denied", etc.) instead of "请重试".
                                                 const detail = err?.response?.data?.detail
                                                     || err?.message
                                                     || `HTTP ${status ?? "?"}`;

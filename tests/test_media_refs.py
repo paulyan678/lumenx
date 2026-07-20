@@ -21,12 +21,8 @@ def test_classify_local_absolute_path_under_output():
     assert classify_media_ref(abs_path) == "local_path"
 
 
-def test_classify_oss_object_key(monkeypatch):
-    monkeypatch.setenv("OSS_BASE_PATH", "stable-test-base")
-    assert (
-        classify_media_ref("stable-test-base/project_1/assets/foo.png")
-        == "object_key"
-    )
+def test_classify_unmanaged_relative_path_as_unknown():
+    assert classify_media_ref("external/project_1/assets/foo.png") == "unknown"
 
 
 def test_classify_remote_url():

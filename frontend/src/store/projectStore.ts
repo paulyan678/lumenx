@@ -539,19 +539,22 @@ export const useProjectStore = create<ProjectStore>()(
                 try {
                     // Delete from backend first
                     await api.deleteProject(id);
-                    // Then remove from local state
-                    set((state) => ({
-                        projects: state.projects.filter((p) => p.id !== id),
-                        currentProject: state.currentProject?.id === id ? null : state.currentProject
-                    }));
                 } catch (error) {
-                    console.error('Failed to delete project from backend:', error);
-                    // Still remove from local state for UX, but warn user
-                    set((state) => ({
-                        projects: state.projects.filter((p) => p.id !== id),
-                        currentProject: state.currentProject?.id === id ? null : state.currentProject
-                    }));
+                    // Older backends returned 404 when a retry raced with a
+                    // successful first delete. That still means local state
+                    // should converge; other failures must remain visible.
+                    const status = (error as { response?: { status?: number } } | null)?.response?.status;
+                    if (status === 404) {
+                        // Continue to the shared local-state cleanup below.
+                    } else {
+                        console.error('Failed to delete project from backend:', error);
+                        throw error;
+                    }
                 }
+                set((state) => ({
+                    projects: state.projects.filter((p) => p.id !== id),
+                    currentProject: state.currentProject?.id === id ? null : state.currentProject
+                }));
             },
 
             isAnalyzingArtStyle: false,

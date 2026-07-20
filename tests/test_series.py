@@ -11,8 +11,9 @@ from unittest.mock import patch, MagicMock
 
 from src.apps.comic_gen.models import (
     Series, Script, Character, Scene, Prop, PromptConfig, ModelSettings,
+    StoryboardFrame,
 )
-from src.apps.comic_gen.pipeline import ComicGenPipeline
+from src.apps.comic_gen.pipeline import ComicGenPipeline, SeriesAssetInUseError
 
 
 # ---------------------------------------------------------------------------
@@ -152,6 +153,61 @@ class TestSeriesCRUD:
     def test_delete_series_not_found(self, pipeline):
         with pytest.raises(ValueError, match="Series not found"):
             pipeline.delete_series("missing")
+
+    def test_delete_unreferenced_series_asset(self, pipeline):
+        series = pipeline.create_series("Asset cleanup")
+        prop = _make_prop(name="Dog", id="prop-dog")
+        series.props = [prop]
+
+        updated = pipeline.delete_series_asset(series.id, prop.id, "prop")
+
+        assert updated.props == []
+        assert pipeline.get_series(series.id).props == []
+
+    def test_delete_referenced_series_asset_requires_force(self, pipeline):
+        series = pipeline.create_series("Referenced asset")
+        prop = _make_prop(name="Dog", id="prop-dog")
+        series.props = [prop]
+        episode = _make_script(
+            series_id=series.id,
+            frames=[
+                StoryboardFrame(
+                    id="frame-1",
+                    scene_id="scene-1",
+                    prop_ids=[prop.id],
+                )
+            ],
+        )
+        pipeline.scripts[episode.id] = episode
+        series.episode_ids = [episode.id]
+
+        with pytest.raises(SeriesAssetInUseError) as exc_info:
+            pipeline.delete_series_asset(series.id, prop.id, "prop")
+
+        assert exc_info.value.references[0]["frame_id"] == "frame-1"
+        assert [item.id for item in series.props] == [prop.id]
+
+        updated = pipeline.delete_series_asset(series.id, prop.id, "prop", force=True)
+        assert updated.props == []
+
+    def test_series_asset_delete_ignores_unrelated_projects(self, pipeline):
+        series = pipeline.create_series("Scoped references")
+        character = _make_character(id="shared-id")
+        series.characters = [character]
+        unrelated = _make_script(
+            frames=[
+                StoryboardFrame(
+                    id="unrelated-frame",
+                    scene_id="scene-1",
+                    character_ids=[character.id],
+                )
+            ],
+        )
+        pipeline.scripts[unrelated.id] = unrelated
+
+        updated = pipeline.delete_series_asset(series.id, character.id, "character")
+
+        assert updated.characters == []
 
 
 # ===================================================================
@@ -329,6 +385,51 @@ class TestSplitTextByMarkers:
         combined = "".join(chunks)
         assert combined == text
 
+    def test_missing_markers_split_markdown_at_headings(self, pipeline):
+        text = (
+            "# Skills\n\nIntroductory overview.\n\n"
+            "## Common principles\n\nShared rules and safeguards.\n\n"
+            "## Usage\n\nInstallation and deployment advice."
+        )
+        episodes_data = [
+            {"title": "Overview"},
+            {"title": "Principles"},
+            {"title": "Usage"},
+        ]
+
+        chunks = pipeline._split_text_by_markers(text, episodes_data)
+
+        assert len(chunks) == 3
+        assert chunks[0].startswith("# Skills")
+        assert chunks[1].startswith("## Common principles")
+        assert chunks[2].startswith("## Usage")
+        assert all(chunk.strip() for chunk in chunks)
+        assert "".join(chunks) == text
+
+    def test_next_start_marker_wins_over_misleading_previous_end(self, pipeline):
+        text = "# Overview\nIntro\n\n## Principles\nRules\n\n## Usage\nSteps"
+        episodes_data = [
+            {
+                "start_marker": "# Overview",
+                "end_marker": "Steps",
+            },
+            {
+                "start_marker": "## Principles",
+                "end_marker": "Rules",
+            },
+            {
+                "start_marker": "## Usage",
+                "end_marker": "Steps",
+            },
+        ]
+
+        chunks = pipeline._split_text_by_markers(text, episodes_data)
+
+        assert chunks[1].startswith("## Principles")
+        assert chunks[2].startswith("## Usage")
+        assert all(chunk.strip() for chunk in chunks)
+        assert "".join(chunks) == text
+
     def test_sequential_search_no_overlap(self, pipeline):
         text = "AAABBBCCC"
         episodes_data = [
@@ -347,6 +448,7 @@ class TestSplitTextByMarkers:
 # ===================================================================
 # 7. Cross-series import tests
 # ===================================================================
+
 
 class TestImportAssetsFromSeries:
     def test_deep_copy_with_new_id(self, pipeline):

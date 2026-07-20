@@ -157,22 +157,29 @@ def test_packaged_config_atomic_failure_preserves_file_and_process_state(tmp_pat
     from src.apps.comic_gen import api
 
     config_path = tmp_path / "config.json"
-    config_path.write_text('{"OSS_BUCKET_NAME": "before"}', encoding="utf-8")
+    config_path.write_text(
+        '{"NEWAPI_BASE_URL": "https://before.example/v1"}',
+        encoding="utf-8",
+    )
     os.chmod(config_path, 0o600)
     monkeypatch.setattr(api, "get_user_config_path", lambda: str(config_path))
-    monkeypatch.setenv("OSS_BUCKET_NAME", "before")
+    monkeypatch.setenv("NEWAPI_BASE_URL", "https://before.example/v1")
 
     def fail_replace(*_args):
         raise OSError("disk unavailable")
 
     monkeypatch.setattr(api.os, "replace", fail_replace)
     with pytest.raises(HTTPException) as exc_info:
-        api.update_env_config(api.EnvConfig(OSS_BUCKET_NAME="after"))
+        api.update_env_config(
+            api.EnvConfig(NEWAPI_BASE_URL="https://after.example/v1")
+        )
 
     assert exc_info.value.status_code == 500
     assert "disk unavailable" in exc_info.value.detail
-    assert os.environ["OSS_BUCKET_NAME"] == "before"
-    assert json.loads(config_path.read_text(encoding="utf-8")) == {"OSS_BUCKET_NAME": "before"}
+    assert os.environ["NEWAPI_BASE_URL"] == "https://before.example/v1"
+    assert json.loads(config_path.read_text(encoding="utf-8")) == {
+        "NEWAPI_BASE_URL": "https://before.example/v1"
+    }
     assert list(tmp_path.glob(".config.json.*.tmp")) == []
 
 

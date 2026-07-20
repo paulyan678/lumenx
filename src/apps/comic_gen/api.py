@@ -36,7 +36,7 @@ import threading
 import uuid
 import logging
 import traceback
-from .pipeline import ComicGenPipeline, LibraryAssetInUseError
+from .pipeline import ComicGenPipeline, LibraryAssetInUseError, SeriesAssetInUseError
 from .models import (
     ArtDirection,
     PromptConfig,
@@ -55,7 +55,6 @@ from .llm import (
     ScriptProcessor,
     StyleAnalysisError,
 )
-from ...utils.oss_utils import OSSImageUploader, sign_oss_urls_in_data
 from ...utils.uploads import (
     GENERIC_MEDIA_UPLOAD_POLICY,
     IMAGE_UPLOAD_POLICY,
@@ -109,12 +108,6 @@ from ..playground.api import router as playground_router
 
 app.include_router(playground_router, prefix="/playground")
 
-# Debug: Print OSS configuration at startup
-logger.info(
-    f"STARTUP: OSS_ENDPOINT={os.getenv('OSS_ENDPOINT')}, OSS_BUCKET_NAME={os.getenv('OSS_BUCKET_NAME')}, OSS_BASE_PATH={os.getenv('OSS_BASE_PATH')}"
-)
-
-
 app.add_middleware(
     CORSMiddleware,
     **cors_middleware_options(),
@@ -166,33 +159,11 @@ for _url_prefix, _media_dir, _mount_name in _MEDIA_FILE_MOUNTS:
 # Initialize pipeline
 pipeline = ComicGenPipeline()
 
-@app.get("/debug/config")
-def debug_config():
-    """Diagnostic endpoint to check OSS and path configuration."""
-    uploader = OSSImageUploader()
-    return {
-        "oss_configured": uploader.is_configured,
-        "oss_bucket_initialized": uploader.bucket is not None,
-        "oss_base_path": os.getenv("OSS_BASE_PATH", "lumenx"),
-        "output_dir_exists": os.path.exists("output"),
-        "output_contents": os.listdir("output") if os.path.exists("output") else [],
-        "cwd": os.getcwd(),
-        "env_vars_present": {
-            "OSS_ENDPOINT": bool(os.getenv("OSS_ENDPOINT")),
-            "OSS_BUCKET_NAME": bool(os.getenv("OSS_BUCKET_NAME")),
-            "ALIBABA_CLOUD_ACCESS_KEY_ID": bool(os.getenv("ALIBABA_CLOUD_ACCESS_KEY_ID")),
-        }
-    }
-
-def signed_response(data):
-    """Helper to sign OSS URLs in data before returning to frontend.
-    
-    Handles Pydantic models, lists of models, and dicts.
-    Returns a JSONResponse with signed URLs.
-    """
+def json_response(data):
+    """Return project data without losing fields during Pydantic conversion."""
     if data is None:
         return JSONResponse(content=None)
-    
+
     # Convert Pydantic models to dict
     if hasattr(data, "model_dump"):
         processed_data = data.model_dump()
@@ -200,13 +171,7 @@ def signed_response(data):
         processed_data = [item.model_dump() if hasattr(item, "model_dump") else item for item in data]
     else:
         processed_data = data
-    
-    # Check if OSS is configured
-    uploader = OSSImageUploader()
-    if uploader.is_configured:
-        # OSS mode: sign URLs in the data
-        processed_data = sign_oss_urls_in_data(processed_data, uploader)
-    
+
     # Return JSONResponse directly to avoid Pydantic re-validation stripping fields
     return JSONResponse(content=processed_data)
 
@@ -330,20 +295,13 @@ def check_system():
 
 @app.post("/upload")
 def upload_file(file: UploadFile = File(...)):
-    """Uploads a file and returns its URL (OSS if configured, else local)."""
+    """Save an uploaded file locally and return its media path."""
     try:
         saved = save_upload_file(
             file,
             "output/uploads",
             GENERIC_MEDIA_UPLOAD_POLICY,
         )
-
-        # Try uploading to OSS
-        oss_url = OSSImageUploader().upload_image(saved.path)
-        if oss_url:
-            return signed_response({"url": oss_url})
-
-        # Fallback to local URL (relative path for frontend getAssetUrl)
         return {"url": f"uploads/{saved.filename}"}
     except HTTPException:
         raise
@@ -374,29 +332,23 @@ def upload_asset(
     - description: Optional modified description for the asset
     """
     try:
-        # 1. Save file locally first
+        # 1. Save the source file locally.
         saved = save_upload_file(file, "output/uploads", IMAGE_UPLOAD_POLICY)
-        
-        # 2. Upload to OSS
-        uploader = OSSImageUploader()
-        oss_url = uploader.upload_image(saved.path)
-        if not oss_url:
-            oss_url = f"uploads/{saved.filename}"  # Fallback to local path
-        
-        # 3. Update asset with new variant
+
+        # 2. Update the asset with its local media path.
         updated_script = pipeline.add_uploaded_asset_variant(
             script_id=script_id,
             asset_type=asset_type,
             asset_id=asset_id,
             upload_type=upload_type,
-            image_url=oss_url,
+            image_url=f"uploads/{saved.filename}",
             description=description
         )
         
         if not updated_script:
             raise HTTPException(status_code=404, detail="Script or asset not found")
         
-        return signed_response(updated_script)
+        return json_response(updated_script)
         
     except HTTPException:
         raise
@@ -434,7 +386,7 @@ async def create_project(request: CreateProjectRequest, skip_analysis: bool = Fa
         )
     except (ValueError, MissingNewAPIKeyError) as e:
         raise HTTPException(status_code=400, detail=str(e))
-    return signed_response(result)
+    return json_response(result)
 
 
 class ReparseProjectRequest(BaseModel):
@@ -459,7 +411,7 @@ def update_script_text(script_id: str, request: UpdateScriptTextRequest):
     script.original_text = request.text or ""
     script.updated_at = time.time()
     pipeline._save_data()
-    return signed_response(script)
+    return json_response(script)
 
 
 @app.put("/projects/{script_id}/reparse", response_model=Script)
@@ -472,7 +424,7 @@ async def reparse_project(script_id: str, request: ReparseProjectRequest):
             None,  # Use default executor
             partial(pipeline.reparse_project, script_id, request.text)
         )
-        return signed_response(result)
+        return json_response(result)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -503,7 +455,7 @@ async def extract_preview(script_id: str, request: ReparseProjectRequest):
 def list_projects():
     """Lists all projects from backend storage."""
     scripts = list(pipeline.scripts.values())
-    return signed_response(scripts)
+    return json_response(scripts)
 
 
 @app.post("/projects/{script_id}/toggle_starred")
@@ -511,7 +463,7 @@ def toggle_project_starred(script_id: str):
     """Toggle the user-starred (featured shortlist) flag on a project."""
     try:
         script = pipeline.toggle_project_starred(script_id)
-        return signed_response(script)
+        return json_response(script)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -555,14 +507,14 @@ def create_series(request: CreateSeriesRequest):
         request.content_mode,
         request.default_generation_mode,
     )
-    return signed_response(series)
+    return json_response(series)
 
 
 @app.get("/series")
 def list_series():
     """List all Series."""
     series_list = pipeline.list_series()
-    return signed_response(series_list)
+    return json_response(series_list)
 
 
 @app.get("/series/{series_id}")
@@ -584,7 +536,7 @@ def get_series(series_id: str):
         }
         for ep in episodes
     ]
-    return signed_response(result)
+    return json_response(result)
 
 
 @app.put("/series/{series_id}")
@@ -595,7 +547,7 @@ def update_series(series_id: str, request: UpdateSeriesRequest):
     try:
         updates = request.model_dump(exclude_unset=True)
         series = pipeline.update_series(series_id, updates)
-        return signed_response(series)
+        return json_response(series)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -620,7 +572,7 @@ def add_episode_to_series(series_id: str, request: AddEpisodeRequest):
     """Add an existing project as an episode to a Series."""
     try:
         series = pipeline.add_episode_to_series(series_id, request.script_id, request.episode_number)
-        return signed_response(series)
+        return json_response(series)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -630,7 +582,7 @@ def remove_episode_from_series(series_id: str, script_id: str):
     """Remove an episode from a Series (does not delete the project)."""
     try:
         series = pipeline.remove_episode_from_series(series_id, script_id)
-        return signed_response(series)
+        return json_response(series)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -640,7 +592,7 @@ def get_series_episodes(series_id: str):
     """Get all episodes in a Series."""
     try:
         episodes = pipeline.get_series_episodes(series_id)
-        return signed_response(episodes)
+        return json_response(episodes)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -666,7 +618,7 @@ def update_series_prompt_config(series_id: str, config: PromptConfig):
     """Update Series-level prompt config."""
     try:
         series = pipeline.update_series(series_id, {"prompt_config": config})
-        return signed_response(series)
+        return json_response(series)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -744,7 +696,7 @@ def update_series_model_settings(series_id: str, settings: UpdateModelSettingsRe
         series = pipeline.get_series(series_id)
         if not series:
             raise HTTPException(status_code=404, detail="Series not found")
-        return signed_response(series)
+        return json_response(series)
     try:
         current_series = pipeline.get_series(series_id)
         if not current_series:
@@ -753,7 +705,7 @@ def update_series_model_settings(series_id: str, settings: UpdateModelSettingsRe
             {**current_series.model_settings.model_dump(), **updates}
         )
         series = pipeline.update_series(series_id, {"model_settings": ms})
-        return signed_response(series)
+        return json_response(series)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -768,7 +720,7 @@ def get_series_assets(series_id: str):
     series = pipeline.get_series(series_id)
     if not series:
         raise HTTPException(status_code=404, detail="Series not found")
-    return signed_response({
+    return json_response({
         "characters": [c.model_dump() for c in series.characters],
         "scenes": [s.model_dump() for s in series.scenes],
         "props": [p.model_dump() for p in series.props],
@@ -796,7 +748,7 @@ def generate_series_asset(series_id: str, request: GenerateAssetRequest, backgro
         background_tasks.add_task(pipeline.process_asset_generation_task, task_id)
         response_data = series.dict()
         response_data["_task_id"] = task_id
-        return signed_response(response_data)
+        return json_response(response_data)
     except (ValueError, MissingNewAPIKeyError) as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -808,7 +760,7 @@ def toggle_series_asset_lock(series_id: str, request: ToggleLockRequest):
     """Toggle the locked status of a Series asset."""
     try:
         series = pipeline.toggle_series_asset_lock(series_id, request.asset_id, request.asset_type)
-        return signed_response(series)
+        return json_response(series)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -820,7 +772,7 @@ def toggle_series_asset_starred(series_id: str, request: ToggleLockRequest):
     """Toggle the starred (library shortlist) status of a Series asset."""
     try:
         series = pipeline.toggle_series_asset_starred(series_id, request.asset_id, request.asset_type)
-        return signed_response(series)
+        return json_response(series)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -832,7 +784,7 @@ def update_series_asset_image(series_id: str, request: UpdateAssetImageRequest):
     """Update a Series asset's image URL."""
     try:
         series = pipeline.update_series_asset_image(series_id, request.asset_id, request.asset_type, request.image_url)
-        return signed_response(series)
+        return json_response(series)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -846,7 +798,41 @@ def update_series_asset_attributes(series_id: str, request: UpdateAssetAttribute
         series = pipeline.update_series_asset_attributes(
             series_id, request.asset_id, request.asset_type, request.attributes
         )
-        return signed_response(series)
+        return json_response(series)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/series/{series_id}/assets/{asset_type}/{asset_id}")
+def delete_series_asset(
+    series_id: str,
+    asset_type: str,
+    asset_id: str,
+    force: bool = False,
+):
+    """Delete a series-owned asset, protecting live storyboard references."""
+    try:
+        series = pipeline.delete_series_asset(
+            series_id,
+            asset_id,
+            asset_type,
+            force=force,
+        )
+        return json_response(series)
+    except SeriesAssetInUseError as e:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "series_asset_in_use",
+                "message": str(e),
+                "asset_type": e.asset_type,
+                "asset_id": e.asset_id,
+                "references": e.references,
+                "hint": "Pass ?force=true to delete anyway.",
+            },
+        )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -898,7 +884,7 @@ def create_series_character(series_id: str, request: CreateSeriesAssetRequest):
     series.updated_at = time.time()
     pipeline.series_store[series_id] = series
     pipeline._save_series_data()
-    return signed_response(char.model_dump())
+    return json_response(char.model_dump())
 
 
 @app.post("/series/{series_id}/scenes")
@@ -918,7 +904,7 @@ def create_series_scene(series_id: str, request: CreateSeriesAssetRequest):
     series.updated_at = time.time()
     pipeline.series_store[series_id] = series
     pipeline._save_series_data()
-    return signed_response(scene.model_dump())
+    return json_response(scene.model_dump())
 
 
 @app.post("/series/{series_id}/props")
@@ -938,7 +924,7 @@ def create_series_prop(series_id: str, request: CreateSeriesAssetRequest):
     series.updated_at = time.time()
     pipeline.series_store[series_id] = series
     pipeline._save_series_data()
-    return signed_response(prop.model_dump())
+    return json_response(prop.model_dump())
 
 
 @app.post("/series/{series_id}/assets/import")
@@ -946,7 +932,7 @@ def import_series_assets(series_id: str, request: ImportAssetsRequest):
     """Deep-copy assets from another Series into this one."""
     try:
         series, imported_ids, skipped_ids = pipeline.import_assets_from_series(series_id, request.source_series_id, request.asset_ids)
-        return signed_response(series)
+        return json_response(series)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -997,7 +983,7 @@ class ForkFromLibraryRequest(BaseModel):
 def get_library_assets():
     """List all assets in the global shared pool."""
     lib = pipeline.list_library_assets()
-    return signed_response({
+    return json_response({
         "characters": [c.model_dump() for c in lib.characters],
         "scenes": [s.model_dump() for s in lib.scenes],
         "props": [p.model_dump() for p in lib.props],
@@ -1010,7 +996,7 @@ def create_library_asset(request: CreateLibraryAssetRequest):
     try:
         payload = request.model_dump(exclude={"asset_type"})
         asset = pipeline.create_library_asset(request.asset_type, payload)
-        return signed_response(asset.model_dump())
+        return json_response(asset.model_dump())
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -1022,9 +1008,7 @@ def upload_library_asset_image(file: UploadFile = File(...)):
     """Upload an image to use as a global library asset's master image.
 
     Saves the file under output/uploads/ (served via the /files static mount)
-    and returns {"image_url": <path-or-URL the frontend can load>}. When OSS
-    is configured the returned URL is the (signed) OSS URL; otherwise a local
-    relative path "uploads/<name>" resolvable through the frontend's
+    and returns a local relative path resolvable through the frontend's
     getAssetUrl helper. The caller then passes this image_url to
     POST /library/assets (image_url=...) or PATCH /library/assets/{type}/{id}
     to attach it to a library asset. Mirrors the generic /upload endpoint but
@@ -1032,10 +1016,6 @@ def upload_library_asset_image(file: UploadFile = File(...)):
     """
     try:
         saved = save_upload_file(file, "output/uploads", IMAGE_UPLOAD_POLICY)
-        # Prefer OSS when configured (signed), else fall back to local path.
-        oss_url = OSSImageUploader().upload_image(saved.path)
-        if oss_url:
-            return signed_response({"image_url": oss_url})
         return {"image_url": f"uploads/{saved.filename}"}
     except HTTPException:
         raise
@@ -1051,7 +1031,7 @@ def update_library_asset(asset_type: str, asset_id: str, request: UpdateLibraryA
     try:
         patch = request.model_dump(exclude_unset=True)
         asset = pipeline.update_library_asset(asset_type, asset_id, patch)
-        return signed_response(asset.model_dump())
+        return json_response(asset.model_dump())
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -1096,7 +1076,7 @@ def promote_asset_to_library(request: PromoteAssetRequest):
         asset = pipeline.promote_asset_to_library(
             request.source_kind, request.source_id, request.asset_type, request.asset_id
         )
-        return signed_response(asset.model_dump())
+        return json_response(asset.model_dump())
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -1117,7 +1097,7 @@ def fork_asset_from_library(script_id: str, request: ForkFromLibraryRequest):
         asset = pipeline.fork_library_asset_to_project(
             script_id, request.asset_type, request.library_asset_id
         )
-        return signed_response(asset.model_dump())
+        return json_response(asset.model_dump())
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -1197,7 +1177,7 @@ async def import_file_confirm(request: ConfirmImportRequest):
                 request.description,
             )
         )
-        return signed_response(result)
+        return json_response(result)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -1206,7 +1186,7 @@ async def import_file_confirm(request: ConfirmImportRequest):
 
 
 class EnvConfig(BaseModel):
-    """Writable New API and object-storage configuration.
+    """Writable New API configuration.
 
     ``extra='forbid'`` intentionally rejects stale provider controls instead
     of accepting and silently ignoring them.
@@ -1225,13 +1205,6 @@ class EnvConfig(BaseModel):
     NEWAPI_DEEPSEEK_V4_FLASH_API_KEY: Optional[str] = None
     NEWAPI_QWEN_37_MAX_API_KEY: Optional[str] = None
     NEWAPI_DEEPSEEK_V4_PRO_API_KEY: Optional[str] = None
-    ALIBABA_CLOUD_ACCESS_KEY_ID: Optional[str] = None
-    ALIBABA_CLOUD_ACCESS_KEY_SECRET: Optional[str] = None
-    OSS_BUCKET_NAME: Optional[str] = None
-    OSS_ENDPOINT: Optional[str] = None
-    OSS_BASE_PATH: Optional[str] = None
-    OSS_ENABLE: bool = True
-
     @field_validator("NEWAPI_BASE_URL")
     @classmethod
     def validate_newapi_base_url(cls, value):
@@ -1451,8 +1424,8 @@ def update_env_config(config: EnvConfig):
             if value is None:
                 continue
             if isinstance(value, bool):
-                # Booleans (e.g. OSS_ENABLE) persist as "true"/"false" strings so
-                # they round-trip through os.environ and the .env/config.json store.
+                # Keep boolean serialization explicit if a future configuration
+                # field needs to round-trip through an environment-backed store.
                 config_dict[key] = "true" if value else "false"
             else:
                 config_dict[key] = value
@@ -1470,14 +1443,6 @@ def update_env_config(config: EnvConfig):
         with _USER_CONFIG_LOCK:
             save_user_config(config_dict)
             os.environ.update(config_dict)
-
-        # Reset OSS singleton to pick up new config (non-blocking)
-        try:
-            OSSImageUploader.reset_instance()
-            logger.info("OSS instance reset successfully")
-        except Exception as oss_e:
-            # OSS reset failure should not block config saving
-            logger.warning(f"OSS reset failed (non-critical): {oss_e}")
 
         config_path = get_user_config_path()
         return {"status": "success", "message": f"Configuration saved to {config_path}"}
@@ -1565,15 +1530,19 @@ def get_project(script_id: str):
                 d = pr.model_dump()
                 d["source"] = "global"
                 payload["props"].append(d)
-    return signed_response(payload)
+    return json_response(payload)
 
 
 @app.delete("/projects/{script_id}")
 def delete_project(script_id: str):
-    """Deletes a project by ID. WARNING: This permanently removes the project from backend storage."""
+    """Delete a project by ID.
+
+    Repeated requests are successful so retries and stale cards converge
+    without surfacing a misleading 404 after the first delete completed.
+    """
     script = pipeline.get_script(script_id)
     if not script:
-        raise HTTPException(status_code=404, detail="Project not found")
+        return {"status": "already_deleted", "id": script_id}
     
     try:
         # If project belongs to a Series, remove from episode_ids
@@ -1734,7 +1703,7 @@ def reconcile_apply(script_id: str, request: ApplyReconcileRequest):
     pipeline.series_store[series.id] = series
     pipeline._save_data()
     pipeline._save_series_data()
-    return signed_response(script)
+    return json_response(script)
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -2056,7 +2025,7 @@ def sync_descriptions(script_id: str):
     """
     try:
         updated_script = pipeline.sync_descriptions_from_script_entities(script_id)
-        return signed_response(updated_script)
+        return json_response(updated_script)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -2072,7 +2041,7 @@ def add_character(script_id: str, request: AddCharacterRequest):
     """Adds a new character."""
     try:
         updated_script = pipeline.add_character(script_id, request.name, request.description)
-        return signed_response(updated_script)
+        return json_response(updated_script)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -2083,7 +2052,7 @@ def delete_character(script_id: str, char_id: str):
     """Deletes a character."""
     try:
         updated_script = pipeline.delete_character(script_id, char_id)
-        return signed_response(updated_script)
+        return json_response(updated_script)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -2098,7 +2067,7 @@ def add_scene(script_id: str, request: AddSceneRequest):
     """Adds a new scene."""
     try:
         updated_script = pipeline.add_scene(script_id, request.name, request.description)
-        return signed_response(updated_script)
+        return json_response(updated_script)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -2109,7 +2078,7 @@ def delete_scene(script_id: str, scene_id: str):
     """Deletes a scene."""
     try:
         updated_script = pipeline.delete_scene(script_id, scene_id)
-        return signed_response(updated_script)
+        return json_response(updated_script)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -2129,7 +2098,7 @@ def update_project_style(script_id: str, request: UpdateStyleRequest):
             request.style_preset,
             request.style_prompt
         )
-        return signed_response(updated_script)
+        return json_response(updated_script)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -2151,7 +2120,7 @@ def generate_assets(script_id: str, background_tasks: BackgroundTasks):
 
     try:
         updated_script = pipeline.generate_assets(script_id)
-        return signed_response(updated_script)
+        return json_response(updated_script)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -2195,7 +2164,7 @@ def generate_motion_ref(script_id: str, request: GenerateMotionRefRequest, backg
         # Return script with task_id for frontend polling
         response_data = script.model_dump() if hasattr(script, 'model_dump') else script.dict()
         response_data["_task_id"] = task_id
-        return signed_response(response_data)
+        return json_response(response_data)
 
     except (ValueError, MissingNewAPIKeyError) as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -2218,7 +2187,7 @@ def analyze_to_storyboard(script_id: str, request: AnalyzeToStoryboardRequest):
     """
     try:
         updated_script = pipeline.analyze_text_to_frames(script_id, request.text)
-        return signed_response(updated_script)
+        return json_response(updated_script)
     except (ValueError, MissingNewAPIKeyError) as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -2316,7 +2285,7 @@ def generate_storyboard(script_id: str):
     """Triggers storyboard generation."""
     try:
         updated_script = pipeline.generate_storyboard(script_id)
-        return signed_response(updated_script)
+        return json_response(updated_script)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -2326,7 +2295,7 @@ def generate_video(script_id: str):
     """Triggers video generation."""
     try:
         updated_script = pipeline.generate_video(script_id)
-        return signed_response(updated_script)
+        return json_response(updated_script)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -2414,7 +2383,7 @@ def annotate_video_task(script_id: str, task_id: str, request: AnnotateVideoTask
     )
     if task is None:
         raise HTTPException(status_code=404, detail="Video task not found")
-    return signed_response(task)
+    return json_response(task)
 
 
 class UpdateFrameWorkbenchRequest(BaseModel):
@@ -2447,7 +2416,7 @@ def update_frame_workbench(
         raise HTTPException(status_code=400, detail=str(e))
     if frame is None:
         raise HTTPException(status_code=404, detail="Script or frame not found")
-    return signed_response(frame)
+    return json_response(frame)
 
 
 @app.post("/projects/{script_id}/video_tasks/{task_id}/cancel", response_model=VideoTask)
@@ -2470,7 +2439,7 @@ def cancel_video_task(script_id: str, task_id: str):
     )
     if not task:
         raise HTTPException(status_code=404, detail="Video task not found")
-    return signed_response(task)
+    return json_response(task)
 
 
 @app.post("/projects/{script_id}/video_tasks", response_model=List[VideoTask])
@@ -2503,7 +2472,7 @@ def create_video_task(script_id: str, request: CreateVideoTaskRequest, backgroun
             # Add background processing
             background_tasks.add_task(pipeline.process_video_task, script_id, task_id)
 
-        return signed_response(tasks)
+        return json_response(tasks)
 
     except (ValueError, MissingNewAPIKeyError) as e:
         # Validation failures from pipeline.create_video_task (model⇄
@@ -2544,7 +2513,7 @@ def generate_single_asset(script_id: str, request: GenerateAssetRequest, backgro
         # Return script with task_id for frontend polling
         response_data = script.model_dump() if hasattr(script, 'model_dump') else script.dict()
         response_data["_task_id"] = task_id
-        return signed_response(response_data)
+        return json_response(response_data)
 
     except (ValueError, MissingNewAPIKeyError) as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -2563,7 +2532,7 @@ def get_task_status(task_id: str):
     if status["status"] == "completed":
         script = pipeline.get_script(status["script_id"])
         if script:
-            status["script"] = signed_response(script).body.decode('utf-8')
+            status["script"] = json_response(script).body.decode('utf-8')
     
     return status
 
@@ -2601,7 +2570,7 @@ def generate_asset_video(script_id: str, asset_type: str, asset_id: str, request
         # Add background processing
         background_tasks.add_task(pipeline.process_video_task, script_id, task_id)
         
-        return signed_response(script)
+        return json_response(script)
 
     except (ValueError, MissingNewAPIKeyError) as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -2619,7 +2588,7 @@ def delete_asset_video(script_id: str, asset_type: str, asset_id: str, video_id:
             asset_type,
             video_id
         )
-        return signed_response(updated_script)
+        return json_response(updated_script)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -2635,7 +2604,7 @@ def toggle_asset_lock(script_id: str, request: ToggleLockRequest):
             request.asset_id,
             request.asset_type
         )
-        return signed_response(updated_script)
+        return json_response(updated_script)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -2651,7 +2620,7 @@ def toggle_asset_starred(script_id: str, request: ToggleLockRequest):
             request.asset_id,
             request.asset_type
         )
-        return signed_response(updated_script)
+        return json_response(updated_script)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -2668,7 +2637,7 @@ def update_asset_image(script_id: str, request: UpdateAssetImageRequest):
             request.asset_type,
             request.image_url
         )
-        return signed_response(updated_script)
+        return json_response(updated_script)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -2685,7 +2654,7 @@ def update_asset_attributes(script_id: str, request: UpdateAssetAttributesReques
             request.asset_type,
             request.attributes
         )
-        return signed_response(updated_script)
+        return json_response(updated_script)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -2708,7 +2677,7 @@ def update_asset_description(script_id: str, request: UpdateAssetDescriptionRequ
             request.asset_type,
             request.description
         )
-        return signed_response(updated_script)
+        return json_response(updated_script)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -2732,7 +2701,7 @@ def select_asset_variant(script_id: str, request: SelectVariantRequest):
             request.variant_id,
             request.generation_type
         )
-        return signed_response(updated_script)
+        return json_response(updated_script)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -2753,7 +2722,7 @@ def delete_asset_variant(script_id: str, request: DeleteVariantRequest):
             request.asset_type,
             request.variant_id
         )
-        return signed_response(updated_script)
+        return json_response(updated_script)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -2779,7 +2748,7 @@ def toggle_variant_favorite(script_id: str, request: FavoriteVariantRequest):
             request.is_favorited,
             request.generation_type
         )
-        return signed_response(updated_script)
+        return json_response(updated_script)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -2802,7 +2771,7 @@ def update_model_settings(script_id: str, request: UpdateModelSettingsRequest):
             chat_model=request.chat_model,
             video_model=request.video_model,
         )
-        return signed_response(updated_script)
+        return json_response(updated_script)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -2928,7 +2897,7 @@ def update_audio_mix(script_id: str, request: AudioMixRequest):
         mix["sfx"] = max(0, min(100, request.sfx_volume))
     script.mix_settings = mix
     pipeline._save_data()
-    return signed_response(script)
+    return json_response(script)
 
 
 class DubPreviewRequest(BaseModel):
@@ -2945,7 +2914,7 @@ def preview_dub(script_id: str, frame_id: str, request: DubPreviewRequest):
             video_task_id=request.video_task_id,
             offset_ms=request.offset_ms,
         )
-        return signed_response(updated_script)
+        return json_response(updated_script)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except RuntimeError as e:
@@ -2957,7 +2926,7 @@ def apply_dub(script_id: str, frame_id: str):
     """Promote current preview to official dubbed video."""
     try:
         updated_script = pipeline.apply_dub(script_id, frame_id)
-        return signed_response(updated_script)
+        return json_response(updated_script)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -2967,7 +2936,7 @@ def revert_frame_dub(script_id: str, frame_id: str):
     """Revert dubbing — remove dubbed+preview, keep bg cache."""
     try:
         updated_script = pipeline.revert_dub(script_id, frame_id)
-        return signed_response(updated_script)
+        return json_response(updated_script)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -2984,7 +2953,7 @@ def toggle_frame_lock(script_id: str, request: ToggleFrameLockRequest):
             script_id,
             request.frame_id
         )
-        return signed_response(updated_script)
+        return json_response(updated_script)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -3022,7 +2991,7 @@ def update_frame(script_id: str, request: UpdateFrameRequest):
             camera_movement_description=request.camera_movement_description,
             transition_hint=request.transition_hint,
         )
-        return signed_response(updated_script)
+        return json_response(updated_script)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -3045,7 +3014,7 @@ def add_frame(script_id: str, request: AddFrameRequest):
             request.camera_angle,
             request.insert_at
         )
-        return signed_response(updated_script)
+        return json_response(updated_script)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -3056,7 +3025,7 @@ def delete_frame(script_id: str, frame_id: str):
     """Deletes a storyboard frame."""
     try:
         updated_script = pipeline.delete_frame(script_id, frame_id)
-        return signed_response(updated_script)
+        return json_response(updated_script)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -3071,7 +3040,7 @@ def copy_frame(script_id: str, request: CopyFrameRequest):
     """Copies a storyboard frame."""
     try:
         updated_script = pipeline.copy_frame(script_id, request.frame_id, request.insert_at)
-        return signed_response(updated_script)
+        return json_response(updated_script)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -3085,7 +3054,7 @@ def reorder_frames(script_id: str, request: ReorderFramesRequest):
     """Reorders storyboard frames."""
     try:
         updated_script = pipeline.reorder_frames(script_id, request.frame_ids)
-        return signed_response(updated_script)
+        return json_response(updated_script)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -3111,7 +3080,7 @@ def render_frame(script_id: str, request: RenderFrameRequest):
             request.prompt,
             request.batch_size
         )
-        return signed_response(updated_script)
+        return json_response(updated_script)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -3128,7 +3097,7 @@ def select_video(script_id: str, frame_id: str, request: SelectVideoRequest):
     """Selects a video variant for a specific frame."""
     try:
         updated_script = pipeline.select_video_for_frame(script_id, frame_id, request.video_id)
-        return signed_response(updated_script)
+        return json_response(updated_script)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -3146,7 +3115,7 @@ def auto_select_latest_video(script_id: str, frame_id: str):
     """
     try:
         updated_script = pipeline.auto_select_latest_video(script_id, frame_id)
-        return signed_response(updated_script)
+        return json_response(updated_script)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -3163,7 +3132,7 @@ def unpin_video(script_id: str, frame_id: str):
     """
     try:
         updated_script = pipeline.unpin_video(script_id, frame_id)
-        return signed_response(updated_script)
+        return json_response(updated_script)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -3179,7 +3148,7 @@ def extract_last_frame(script_id: str, frame_id: str, request: ExtractLastFrameR
     """Extract the last frame from a completed video and add it as a variant to the frame's rendered_image_asset."""
     try:
         updated_script = pipeline.extract_last_frame(script_id, frame_id, request.video_task_id)
-        return signed_response(updated_script)
+        return json_response(updated_script)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except RuntimeError as e:
@@ -3197,7 +3166,7 @@ def upload_frame_image(script_id: str, frame_id: str, file: UploadFile = File(..
         saved = save_upload_file(file, "output/uploads", IMAGE_UPLOAD_POLICY)
 
         updated_script = pipeline.upload_frame_image(script_id, frame_id, saved.path)
-        return signed_response(updated_script)
+        return json_response(updated_script)
     except HTTPException:
         raise
     except ValueError as e:
@@ -3285,7 +3254,7 @@ async def upload_t2i_frame(script_id: str, frame_id: str, file: UploadFile = Fil
                 except OSError:
                     pass
             raise HTTPException(status_code=404, detail="Script or frame not found")
-        return signed_response(frame)
+        return json_response(frame)
     except HTTPException:
         raise
     except Exception as e:
@@ -3299,7 +3268,7 @@ def merge_videos(script_id: str):
     import traceback
     try:
         merged_script = pipeline.merge_videos(script_id)
-        return signed_response(merged_script)
+        return json_response(merged_script)
     except ValueError as e:
         # Known validation errors (no videos, etc.)
         logger.error(f"[MERGE ERROR] Validation failed: {e}")
@@ -3328,7 +3297,7 @@ def export_project(script_id: str, request: ExportRequest):
     """Export a project video using the requested media options."""
     try:
         export_url = pipeline.export_project(script_id, request.model_dump())
-        return signed_response({"url": export_url})
+        return json_response({"url": export_url})
     except HTTPException:
         raise
     except ValueError as e:
@@ -3408,7 +3377,7 @@ def clear_project_art_direction(script_id: str):
     script.updated_at = time.time()
     pipeline.scripts[script_id] = script
     pipeline._save_data()
-    return signed_response(script)
+    return json_response(script)
 
 
 @app.put("/projects/{script_id}/last_episode_summary")
@@ -3440,7 +3409,7 @@ def update_last_episode_summary(script_id: str, payload: dict):
     script.updated_at = time.time()
     pipeline.scripts[script_id] = script
     pipeline._save_data()
-    return signed_response(script)
+    return json_response(script)
 
 
 @app.post("/projects/{script_id}/art_direction/save", response_model=Script)
@@ -3454,7 +3423,7 @@ def save_art_direction(script_id: str, request: SaveArtDirectionRequest):
             request.custom_styles,
             request.ai_recommendations
         )
-        return signed_response(updated_script)
+        return json_response(updated_script)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -3608,8 +3577,6 @@ def polish_video_prompt(request: PolishVideoPromptRequest):
 # Credential-like env fields that must never be returned in plaintext.
 SECRET_FIELDS = {
     *MODEL_API_KEY_FIELDS,
-    "ALIBABA_CLOUD_ACCESS_KEY_ID",
-    "ALIBABA_CLOUD_ACCESS_KEY_SECRET",
 }
 
 # Bullet sentinel: never appears in a real key, so the save path can detect an
@@ -3637,8 +3604,6 @@ def get_env_config():
     the frontend can drive required-field / validation logic without the raw
     value."""
     try:
-        from ...utils.oss_utils import is_oss_enabled
-
         secrets_configured = {
             field: bool((os.getenv(field, "") or "").strip())
             for field in SECRET_FIELDS
@@ -3647,18 +3612,12 @@ def get_env_config():
         return {
             # Masked secrets — never plaintext.
             **{field: _mask_secret(os.getenv(field)) for field in MODEL_API_KEY_FIELDS},
-            "ALIBABA_CLOUD_ACCESS_KEY_ID": _mask_secret(os.getenv("ALIBABA_CLOUD_ACCESS_KEY_ID")),
-            "ALIBABA_CLOUD_ACCESS_KEY_SECRET": _mask_secret(os.getenv("ALIBABA_CLOUD_ACCESS_KEY_SECRET")),
             # Non-secret config.
             "NEWAPI_BASE_URL": os.getenv("NEWAPI_BASE_URL", ""),
             "NEWAPI_CHAT_MODEL": get_selected_model(CHAT, migrate_stale=True),
             "NEWAPI_IMAGE_MODEL": get_selected_model(IMAGE, migrate_stale=True),
             "NEWAPI_VIDEO_MODEL": get_selected_model(VIDEO, migrate_stale=True),
             "NEWAPI_MODELS": public_model_status(),
-            "OSS_BUCKET_NAME": os.getenv("OSS_BUCKET_NAME", ""),
-            "OSS_ENDPOINT": os.getenv("OSS_ENDPOINT", ""),
-            "OSS_BASE_PATH": os.getenv("OSS_BASE_PATH", ""),
-            "OSS_ENABLE": is_oss_enabled(),
             "secrets_configured": secrets_configured,
         }
     except Exception as e:
@@ -3694,7 +3653,7 @@ def create_prop(script_id: str, request: CreatePropRequest):
     script.updated_at = time.time()
     pipeline._save_data()
 
-    return signed_response(script)
+    return json_response(script)
 
 
 @app.delete("/projects/{script_id}/props/{prop_id}")
@@ -3718,4 +3677,4 @@ def delete_prop(script_id: str, prop_id: str):
     script.updated_at = time.time()
     pipeline._save_data()
 
-    return signed_response(script)
+    return json_response(script)

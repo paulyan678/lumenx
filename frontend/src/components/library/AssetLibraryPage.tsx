@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useTranslations } from "next-intl";
-import { Search, Star, ArrowDownUp, ChevronDown, Check, Plus } from "lucide-react";
-import { api } from "@/lib/api";
+import { Search, Star, ArrowDownUp, ChevronDown, Check, Plus, Trash2, Loader2 } from "lucide-react";
+import { api, crudApi } from "@/lib/api";
 import type { Series, Project, Character, Scene, Prop, ImageAsset } from "@/store/projectStore";
 import { toast } from "@/store/toastStore";
 import { characterImageUrl, characterVariants } from "@/lib/characterImage";
@@ -17,7 +17,13 @@ type TypeFilter = AssetTab | "all";
 type SortMode = "default" | "name" | "recent" | "usage";
 type ViewAxis = "type" | "source";
 
-const SINGULAR: Record<AssetTab, string> = { characters: "character", scenes: "scene", props: "prop" };
+type SingularAssetType = "character" | "scene" | "prop";
+
+const SINGULAR: Record<AssetTab, SingularAssetType> = {
+  characters: "character",
+  scenes: "scene",
+  props: "prop",
+};
 
 interface AssetSource {
   id: string; // `series-X` / `project-X`（列表 key）
@@ -42,6 +48,23 @@ interface RenderGroup {
   title: string;
   meta: string;
   items: RenderItem[];
+}
+
+function assetDeleteKey(sourceId: string, type: AssetTab, assetId: string): string {
+  return `${sourceId}:${type}:${assetId}`;
+}
+
+function apiResponseStatus(error: unknown): number | undefined {
+  return (error as { response?: { status?: number } } | null)?.response?.status;
+}
+
+function conflictReferenceCount(error: unknown): number | null {
+  const response = (error as {
+    response?: { status?: number; data?: { detail?: { references?: unknown[] } } };
+  } | null)?.response;
+  if (response?.status !== 409) return null;
+  const references = response.data?.detail?.references;
+  return Array.isArray(references) ? references.length : 0;
 }
 
 /** 取图：character 走 characterImageUrl（reference_sheet→full_body→legacy）；scene/prop 用 image_asset。 */
@@ -97,6 +120,7 @@ export default function AssetLibraryPage() {
   const [starredOnly, setStarredOnly] = useState(false);
   const [selected, setSelected] = useState<{ sourceId: string; assetId: string; type: AssetTab } | null>(null);
   const [newAssetOpen, setNewAssetOpen] = useState(false);
+  const [deletingAssetKey, setDeletingAssetKey] = useState<string | null>(null);
 
   const loadAssets = useCallback(async () => {
     setLoading(true);
@@ -290,6 +314,67 @@ export default function AssetLibraryPage() {
     } catch (e) {
       console.error("toggle star failed", e);
       setSources(setStarredTo(prevStarred)); // 失败:精确还原到原值（不靠再翻一次，避免并发下双翻 desync）
+    }
+  };
+
+  const deleteAsset = async (src: AssetSource, asset: Character | Scene | Prop, type: AssetTab) => {
+    if (deletingAssetKey) return;
+    if (!window.confirm(t("confirmDeleteAsset", { name: asset.name, source: src.name }))) return;
+
+    const key = assetDeleteKey(src.id, type, asset.id);
+    const assetType = SINGULAR[type];
+    const performDelete = async (force: boolean) => {
+      if (src.kind === "series") {
+        await api.deleteSeriesAsset(src.rawId, assetType, asset.id, force);
+      } else if (src.kind === "global") {
+        await api.deleteLibraryAsset(assetType, asset.id, force);
+      } else if (type === "characters") {
+        await crudApi.deleteCharacter(src.rawId, asset.id);
+      } else if (type === "scenes") {
+        await crudApi.deleteScene(src.rawId, asset.id);
+      } else {
+        await crudApi.deleteProp(src.rawId, asset.id);
+      }
+    };
+
+    setDeletingAssetKey(key);
+    try {
+      try {
+        await performDelete(false);
+      } catch (error) {
+        // A hot-reloaded/stale page may still show an asset the backend has
+        // already removed. Treat that 404 as converged and prune the card.
+        if (apiResponseStatus(error) !== 404) {
+          const referenceCount = conflictReferenceCount(error);
+          if (referenceCount === null) throw error;
+          if (!window.confirm(t("confirmForceDeleteAsset", { name: asset.name, count: referenceCount }))) return;
+          await performDelete(true);
+        }
+      }
+
+      setSources((current) =>
+        current
+          .map((source) =>
+            source.id === src.id
+              ? {
+                  ...source,
+                  [type]: (source[type] as (Character | Scene | Prop)[]).filter((item) => item.id !== asset.id),
+                }
+              : source,
+          )
+          .filter((source) => source.characters.length + source.scenes.length + source.props.length > 0),
+      );
+      setSelected((current) =>
+        current?.sourceId === src.id && current.assetId === asset.id && current.type === type ? null : current,
+      );
+      toast.success(t("assetDeleted"), { body: t("assetDeletedBody", { name: asset.name }) });
+    } catch (error) {
+      console.error("Failed to delete library asset:", error);
+      toast.error(t("deleteFailed"), {
+        body: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setDeletingAssetKey(null);
     }
   };
 
@@ -528,9 +613,11 @@ export default function AssetLibraryPage() {
                       const isSel = selected?.sourceId === src.id && selected?.assetId === asset.id && selected?.type === type;
                       const isStar = !!asset.starred;
                       const isChar = type === "characters";
+                      const deleteKey = assetDeleteKey(src.id, type, asset.id);
+                      const isDeleting = deletingAssetKey === deleteKey;
                       return (
                         <div
-                          key={`${type}-${asset.id}`}
+                          key={`${src.id}-${type}-${asset.id}`}
                           role="button"
                           tabIndex={0}
                           onClick={() => setSelected({ sourceId: src.id, assetId: asset.id, type })}
@@ -587,7 +674,7 @@ export default function AssetLibraryPage() {
                             {isStar && (
                               <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_44px_-8px_var(--color-status-starred-bg)]" aria-hidden="true" />
                             )}
-                            {/* top row: star chip + variant chip */}
+                            {/* top row: star chip + variant/delete actions */}
                             <div className="absolute top-2 left-2 right-2 flex items-center justify-between">
                               <button
                                 type="button"
@@ -604,11 +691,31 @@ export default function AssetLibraryPage() {
                               >
                                 <Star size={13} className={isStar ? "fill-current" : ""} />
                               </button>
-                              {vc > 0 && (
-                                <span className="px-2 py-[3px] rounded-full font-mono text-[0.5625rem] font-semibold text-white bg-black/55 backdrop-blur-md tracking-wide">
-                                  {t("variantCount", { count: vc })}
-                                </span>
-                              )}
+                              <div className="flex items-center gap-1.5">
+                                {vc > 0 && (
+                                  <span className="px-2 py-[3px] rounded-full font-mono text-[0.5625rem] font-semibold text-white bg-black/55 backdrop-blur-md tracking-wide">
+                                    {t("variantCount", { count: vc })}
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  aria-label={t("deleteAssetAria", { name: asset.name })}
+                                  title={t("deleteAssetAria", { name: asset.name })}
+                                  disabled={isDeleting || deletingAssetKey !== null}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    void deleteAsset(src, asset, type);
+                                  }}
+                                  onKeyDown={(e) => e.stopPropagation()}
+                                  className="w-7 h-7 rounded-full grid place-items-center text-red-200 bg-black/55 border border-red-400/30 backdrop-blur-md transition-colors hover:text-white hover:bg-red-500/40 hover:border-red-300/60 disabled:cursor-wait disabled:opacity-50"
+                                >
+                                  {isDeleting ? (
+                                    <Loader2 size={13} className="animate-spin" aria-hidden="true" />
+                                  ) : (
+                                    <Trash2 size={13} aria-hidden="true" />
+                                  )}
+                                </button>
+                              </div>
                             </div>
                             {/* kind chip（仅「按项目」视图 + 「全部」类型下显示，告知卡片类型） */}
                             {viewAxis === "source" && activeType === "all" && (

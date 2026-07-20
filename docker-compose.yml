@@ -7,7 +7,7 @@ services:
     env_file:
       - .env
     environment:
-      - NO_PROXY=.aliyuncs.com,aliyuncs.com,localhost,127.0.0.1
+      - NO_PROXY=localhost,127.0.0.1
       - LUMENX_CONTAINER_LOCAL_DIAGNOSTICS=true
       - LUMENX_DOCKER_BIND_HOST=${LUMENX_DOCKER_BIND_HOST:-127.0.0.1}
     volumes:

@@ -12,7 +12,7 @@
  *        - mid  (≤ 120px): ⚠ + small Retry link
  *        - large (> 120px): ⚠ + label + Retry + Copy URL buttons
  *      One automatic retry first (cache-bust ?retry=1) — most "broken"
- *      images are transient cache / OSS-signature blips that retry fixes.
+ *      images are transient browser-cache blips that retry fixes.
  *      Second failure stays on the panel, user does diagnose.
  *
  *   3. Click-to-lightbox — hover reveals a 🔍 button (top-right) that
@@ -97,7 +97,7 @@ function PreviewImageForSource({
     }, []);
 
     const resolved = getAssetUrl(src);
-    /** Append retry-bust to bypass browser/OSS cache on retry. */
+    /** Append retry-bust to bypass the browser cache on retry. */
     const displaySrc = resolved
         ? (retryNonce > 0 ? `${resolved}${resolved.includes("?") ? "&" : "?"}__r=${retryNonce}` : resolved)
         : "";

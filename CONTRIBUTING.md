@@ -50,7 +50,7 @@ git checkout -b feature/your-feature-name
 When contributing to media upload/generation flows, please keep these invariants:
 
 - **Local-first storage**: files under `output/` are always written first and remain the durable project source.
-- **OSS is optional**: OSS acts as an optional mirror and signed-URL service, not a mandatory storage backend.
+- **Local-only storage**: generated and uploaded media references resolve to files under `output/`.
 - **New API only**: every AI request routes through the shared `NEWAPI_BASE_URL`.
 - **One key per model**: the selected model ID must use only its matching `NEWAPI_*_API_KEY` field.
 - **Fail closed**: a missing key or unsupported model must produce a validation error. Do not add provider, model, or credential fallbacks.
@@ -58,9 +58,9 @@ When contributing to media upload/generation flows, please keep these invariants
 
 Use the following vocabulary consistently in PRs, code, and docs:
 
-- `storage_mode`: `local_only` or `local_plus_oss`
+- `storage_mode`: `local_only`
 - `provider_backend`: `newapi`
-- `media_ref`: stable project-side media reference (for example local relative path or OSS object key)
+- `media_ref`: stable project-side local relative path
 - `resolved_media_input`: request-side provider-ready payload derived from `media_ref`
 
 ## 🧠 Model Onboarding Workflow

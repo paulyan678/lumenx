@@ -35,7 +35,6 @@ type SettingsCategory = "general" | "models" | "prompts" | "apikeys" | "storage"
 import {
   FormRow,
   FieldLabel,
-  KeyField,
   Toggle,
   ModeSegment,
   settingsInputClass,
@@ -48,12 +47,6 @@ type EnvConfig = EnvConfigPayload & {
   NEWAPI_CHAT_MODEL: string;
   NEWAPI_IMAGE_MODEL: string;
   NEWAPI_VIDEO_MODEL: string;
-  ALIBABA_CLOUD_ACCESS_KEY_ID: string;
-  ALIBABA_CLOUD_ACCESS_KEY_SECRET: string;
-  OSS_ENABLE: boolean;
-  OSS_BUCKET_NAME: string;
-  OSS_ENDPOINT: string;
-  OSS_BASE_PATH: string;
 };
 
 const DEFAULT_CONFIG: EnvConfig = {
@@ -61,12 +54,6 @@ const DEFAULT_CONFIG: EnvConfig = {
   NEWAPI_CHAT_MODEL: DEFAULT_ACTIVE_MODELS.chat,
   NEWAPI_IMAGE_MODEL: DEFAULT_ACTIVE_MODELS.image,
   NEWAPI_VIDEO_MODEL: DEFAULT_ACTIVE_MODELS.video,
-  ALIBABA_CLOUD_ACCESS_KEY_ID: "",
-  ALIBABA_CLOUD_ACCESS_KEY_SECRET: "",
-  OSS_ENABLE: true,
-  OSS_BUCKET_NAME: "",
-  OSS_ENDPOINT: "",
-  OSS_BASE_PATH: "",
 };
 
 const normalizeEnvConfig = (existing: EnvConfig, data?: EnvConfigPayload): EnvConfig => ({
@@ -75,12 +62,6 @@ const normalizeEnvConfig = (existing: EnvConfig, data?: EnvConfigPayload): EnvCo
   NEWAPI_CHAT_MODEL: normalizeActiveModel("chat", data?.NEWAPI_CHAT_MODEL),
   NEWAPI_IMAGE_MODEL: normalizeActiveModel("image", data?.NEWAPI_IMAGE_MODEL),
   NEWAPI_VIDEO_MODEL: normalizeActiveModel("video", data?.NEWAPI_VIDEO_MODEL),
-  ALIBABA_CLOUD_ACCESS_KEY_ID: data?.ALIBABA_CLOUD_ACCESS_KEY_ID ?? existing.ALIBABA_CLOUD_ACCESS_KEY_ID,
-  ALIBABA_CLOUD_ACCESS_KEY_SECRET: data?.ALIBABA_CLOUD_ACCESS_KEY_SECRET ?? existing.ALIBABA_CLOUD_ACCESS_KEY_SECRET,
-  OSS_ENABLE: data?.OSS_ENABLE ?? existing.OSS_ENABLE,
-  OSS_BUCKET_NAME: data?.OSS_BUCKET_NAME ?? existing.OSS_BUCKET_NAME,
-  OSS_ENDPOINT: data?.OSS_ENDPOINT ?? existing.OSS_ENDPOINT,
-  OSS_BASE_PATH: data?.OSS_BASE_PATH ?? existing.OSS_BASE_PATH,
 });
 
 const LS_KEY_MODEL = "lumenx_default_model_settings";
@@ -342,19 +323,6 @@ export default function SettingsPage() {
         ...buildSecretReplacementPatch(secretReplacements),
       });
       await loadConfig();
-      toast.success(t("saveSuccess"));
-    } catch {
-      toast.error(t("saveConfigFailed"));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // Storage credentials are unrelated to New API model readiness.
-  const handleSaveStorage = async () => {
-    setSaving(true);
-    try {
-      await api.saveEnvConfig(config);
       toast.success(t("saveSuccess"));
     } catch {
       toast.error(t("saveConfigFailed"));
@@ -755,78 +723,6 @@ export default function SettingsPage() {
       title={t("secStorageTitle")}
       desc={t("secStorageDesc")}
     >
-      <FormRow label={t("cloudStorageLabel")}>
-        <Toggle
-          checked={config.OSS_ENABLE}
-          onChange={(v) => setConfig((c) => ({ ...c, OSS_ENABLE: v }))}
-          label={t("enableCloudStorage")}
-          sub={t("enableCloudStorageSub")}
-          ariaLabel={t("enableCloudStorageAria")}
-        />
-      </FormRow>
-
-      <FormRow label={t("ossAkSkLabel")} hint={t("ossAkSkHint")}>
-        <div className="space-y-3">
-          <div>
-            <FieldLabel>ALIBABA_CLOUD_ACCESS_KEY_ID</FieldLabel>
-            <KeyField
-              value={config.ALIBABA_CLOUD_ACCESS_KEY_ID}
-              onChange={(v) => handleChange("ALIBABA_CLOUD_ACCESS_KEY_ID", v)}
-              placeholder={t("ossOptionalMirror")}
-            />
-          </div>
-          <div>
-            <FieldLabel>ALIBABA_CLOUD_ACCESS_KEY_SECRET</FieldLabel>
-            <KeyField
-              value={config.ALIBABA_CLOUD_ACCESS_KEY_SECRET}
-              onChange={(v) => handleChange("ALIBABA_CLOUD_ACCESS_KEY_SECRET", v)}
-              placeholder={t("ossOptionalMirror")}
-            />
-          </div>
-          <a
-            href="https://help.aliyun.com/zh/ram/user-guide/create-an-accesskey-pair"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-[0.75rem] text-primary hover:underline"
-          >
-            {t("howToGetAccessKey")}
-          </a>
-        </div>
-      </FormRow>
-
-      <FormRow label={t("bucketLabel")} hint={t("bucketHint")}>
-        <FieldLabel>OSS_BUCKET</FieldLabel>
-        <input
-          type="text"
-          value={config.OSS_BUCKET_NAME}
-          onChange={(e) => handleChange("OSS_BUCKET_NAME", e.target.value)}
-          placeholder={t("bucketPlaceholder")}
-          className={settingsInputClass + " font-mono text-[0.71875rem]"}
-        />
-      </FormRow>
-
-      <FormRow label="Endpoint" hint={t("endpointHint")}>
-        <FieldLabel>OSS_ENDPOINT</FieldLabel>
-        <input
-          type="text"
-          value={config.OSS_ENDPOINT}
-          onChange={(e) => handleChange("OSS_ENDPOINT", e.target.value)}
-          placeholder={t("endpointPlaceholder")}
-          className={settingsInputClass + " font-mono text-[0.71875rem]"}
-        />
-      </FormRow>
-
-      <FormRow label="Base Path" hint={t("basePathHint")}>
-        <FieldLabel>OSS_BASE_PATH</FieldLabel>
-        <input
-          type="text"
-          value={config.OSS_BASE_PATH}
-          onChange={(e) => handleChange("OSS_BASE_PATH", e.target.value)}
-          placeholder="lumenx"
-          className={settingsInputClass + " font-mono text-[0.71875rem]"}
-        />
-      </FormRow>
-
       <FormRow label={t("dataDirLabel")} hint={t("dataDirHint")}>
         <PathField value={dataDir} label="DATA_DIR · MANAGED" />
       </FormRow>
@@ -834,18 +730,6 @@ export default function SettingsPage() {
       <FormRow label={t("logDirLabel")} hint={t("logDirHint")}>
         <PathField value={logDir} label="LOG_DIR · MANAGED" />
       </FormRow>
-
-      <div className="flex justify-end pt-4">
-        <button
-          type="button"
-          onClick={handleSaveStorage}
-          disabled={saving || loading || !online}
-          className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover text-on-accent text-sm font-medium rounded-lg transition-all disabled:opacity-50"
-        >
-          {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-          {saving ? t("saving") : t("saveConfig")}
-        </button>
-      </div>
     </Section>
   );
 
@@ -873,7 +757,7 @@ export default function SettingsPage() {
           </p>
         </div>
 
-        {/* Check for updates — compares APP_VERSION against latest GitHub release */}
+        {/* Check for updates — compares this build with the personal repo's latest commit */}
         <div className="mb-6">
           <UpdateChecker />
         </div>

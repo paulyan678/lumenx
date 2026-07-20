@@ -23,8 +23,8 @@ RUN mkdir -p output/uploads output/video output/assets output/storyboard \
     output/audio output/export output/video_inputs output/outputs/videos /data/logs
 
 # Environment
-ENV NO_PROXY=".aliyuncs.com,aliyuncs.com,localhost,127.0.0.1"
-ENV no_proxy=".aliyuncs.com,aliyuncs.com,localhost,127.0.0.1"
+ENV NO_PROXY="localhost,127.0.0.1"
+ENV no_proxy="localhost,127.0.0.1"
 ENV PYTHONUNBUFFERED=1
 ENV LUMEN_X_PACKAGED=true
 ENV LUMENX_DATA_DIR=/data

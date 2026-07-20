@@ -111,5 +111,5 @@ Packaged app data is stored in:
 
 Typical contents:
 
-- `config.json` for API keys and OSS configuration
+- `config.json` for API keys and application configuration
 - `logs/` for runtime logs

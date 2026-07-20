@@ -49,7 +49,7 @@ const mockPreviewResult = {
 };
 
 const mockCreatedResult = {
-    series_id: 'new-series-1',
+    series: { id: 'new-series-1' },
     episodes: [{ id: 'ep1' }, { id: 'ep2' }],
 };
 
@@ -74,6 +74,7 @@ function renderDialog(props = {}) {
 describe('ImportFileDialog', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        window.location.hash = '';
     });
 
     // ── Rendering ──
@@ -273,6 +274,31 @@ describe('ImportFileDialog', () => {
             await waitFor(() => {
                 expect(screen.getByText(/共 2 集/)).toBeInTheDocument();
             });
+        });
+
+        it('navigates to the created series id from the backend response', async () => {
+            const onSuccess = vi.fn();
+            mockImportFilePreview.mockResolvedValue(mockPreviewResult);
+            mockImportFileConfirm.mockResolvedValue(mockCreatedResult);
+            renderDialog({ onSuccess });
+            const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+            fireEvent.change(fileInput, { target: { files: [createMockFile('story.txt')] } });
+            fireEvent.click(screen.getByText('开始分析'));
+
+            await waitFor(() => {
+                expect(screen.getByText('确认创建')).toBeInTheDocument();
+            });
+            fireEvent.click(screen.getByText('确认创建'));
+            await waitFor(() => {
+                expect(screen.getByText('查看系列')).toBeInTheDocument();
+            });
+            fireEvent.click(screen.getByText('查看系列'));
+
+            expect(onSuccess).toHaveBeenCalledWith({
+                series_id: 'new-series-1',
+                episode_count: 2,
+            });
+            expect(window.location.hash).toBe('#/series/new-series-1');
         });
     });
 

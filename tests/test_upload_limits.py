@@ -101,13 +101,7 @@ def test_public_uploads_reject_disallowed_extensions_without_writing_files(
     assert not upload_dir.exists() or list(upload_dir.iterdir()) == []
 
 
-def test_generic_upload_preserves_audio_support(client, monkeypatch):
-    class LocalOnlyUploader:
-        def upload_image(self, path):
-            return None
-
-    monkeypatch.setattr(comic_api, "OSSImageUploader", LocalOnlyUploader)
-
+def test_generic_upload_preserves_audio_support(client):
     response = client.post(
         "/upload",
         files={"file": ("voice.mp3", b"ID3-audio", "audio/mpeg")},
@@ -175,7 +169,7 @@ def test_upload_t2i_success_contract_is_unchanged(client, monkeypatch):
         )
 
     monkeypatch.setattr(comic_api.pipeline, "upload_t2i_frame", fake_upload_t2i_frame)
-    monkeypatch.setattr(comic_api, "signed_response", lambda value: value)
+    monkeypatch.setattr(comic_api, "json_response", lambda value: value)
 
     response = client.post(
         "/projects/project-1/frames/frame-1/upload_t2i",

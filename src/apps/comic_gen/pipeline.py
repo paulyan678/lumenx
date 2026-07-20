@@ -24,7 +24,6 @@ from ...utils.newapi_models import (
     get_selected_model,
     resolve_model_api_key,
 )
-from ...utils.oss_utils import is_object_key
 from ...utils.system_check import get_ffmpeg_path, get_ffmpeg_install_instructions
 
 logger = get_logger(__name__)
@@ -107,6 +106,20 @@ class LibraryAssetInUseError(Exception):
             f"Library {asset_type} {asset_id} is referenced by "
             f"{len(references)} storyboard frame(s); refusing to delete "
             f"(pass force=True to delete anyway)."
+        )
+
+
+class SeriesAssetInUseError(Exception):
+    """Raised when a series asset is still referenced by episode frames."""
+
+    def __init__(self, asset_type: str, asset_id: str, references: List[Dict[str, Any]]):
+        self.asset_type = asset_type
+        self.asset_id = asset_id
+        self.references = references
+        super().__init__(
+            f"Series {asset_type} {asset_id} is referenced by "
+            f"{len(references)} storyboard frame(s); refusing to delete "
+            f"without force=True."
         )
 
 
@@ -1227,7 +1240,7 @@ class ComicGenPipeline:
             asset_type: "character", "scene", or "prop"
             asset_id: The asset ID
             upload_type: "full_body", "head_shot", "three_views", or "image"
-            image_url: URL of the uploaded image (OSS Object Key)
+            image_url: Local media path of the uploaded image
             description: Optional modified description for reverse generation
         """
         from .models import ImageVariant, AssetUnit
@@ -2030,7 +2043,7 @@ class ComicGenPipeline:
             for url in ref_image_urls:
                 if not url:
                     continue
-                if is_object_key(url) or url.startswith("http"):
+                if url.startswith("http"):
                     ref_image_paths.append(url)
                 else:
                     potential_path = _safe_resolve_path("output", url)
@@ -2039,7 +2052,7 @@ class ComicGenPipeline:
             
             # Also handle single path if provided (legacy support)
             if ref_image_url and ref_image_url not in ref_image_urls:
-                if is_object_key(ref_image_url) or ref_image_url.startswith("http"):
+                if ref_image_url.startswith("http"):
                     if ref_image_url not in ref_image_paths:
                         ref_image_paths.append(ref_image_url)
                 else:
@@ -2267,11 +2280,7 @@ class ComicGenPipeline:
         if not os.path.exists(output_path):
             raise RuntimeError("Failed to extract last frame from video")
 
-        # Upload to OSS if configured
-        from ...utils.oss_utils import OSSImageUploader
-        uploader = OSSImageUploader()
-        oss_url = uploader.upload_image(output_path)
-        image_url = oss_url if oss_url else os.path.relpath(output_path, "output")
+        image_url = os.path.relpath(output_path, "output")
 
         # Create new variant
         variant = ImageVariant(
@@ -2310,11 +2319,7 @@ class ComicGenPipeline:
         if not frame:
             raise ValueError("Frame not found")
 
-        # Upload to OSS if configured
-        from ...utils.oss_utils import OSSImageUploader
-        uploader = OSSImageUploader()
-        oss_url = uploader.upload_image(safe_path)
-        image_url = oss_url if oss_url else os.path.relpath(safe_path, "output")
+        image_url = os.path.relpath(safe_path, "output")
 
         # Create new variant
         variant = ImageVariant(
@@ -2458,10 +2463,9 @@ class ComicGenPipeline:
     def _resolve_media_path(self, url: str, suffix: str = "") -> Optional[str]:
         """Resolve a media URL to a local file path.
 
-        Handles three cases:
+        Handles two cases:
         1. Local relative path (e.g. 'video/xxx.mp4') → resolve under output/
-        2. OSS object key (e.g. 'lumenx/videos/xxx.mp4') → sign URL then download
-        3. Full HTTP URL → download directly
+        2. Full HTTP URL → download to the local cache
         """
         if not url:
             return None
@@ -2471,19 +2475,9 @@ class ComicGenPipeline:
             local_path = _safe_resolve_path("output", url)
             if os.path.exists(local_path):
                 return local_path
-            # Not found locally — might be an OSS object key
-            if is_object_key(url):
-                from ...utils.oss_utils import OSSImageUploader
-                uploader = OSSImageUploader()
-                if uploader.is_configured:
-                    url = uploader.sign_url_for_api(url)
-                else:
-                    logger.error(f"[DUB] File not local and OSS not configured: {url}")
-                    return None
-            else:
-                return None
+            return None
 
-        # Case 2 & 3: Download from HTTP URL
+        # Case 2: Download from HTTP URL
         import hashlib
         url_hash = hashlib.md5(url.split("?")[0].encode()).hexdigest()[:12]
         cache_dir = os.path.join("output", "cache")
@@ -4315,40 +4309,155 @@ class ComicGenPipeline:
 
     def _split_text_by_markers(self, text: str, episodes_data: List[Dict]) -> List[str]:
         """Split text into chunks using start/end markers from LLM.
-        Searches sequentially to avoid overlapping chunks."""
-        chunks = []
-        search_from = 0  # Track position to avoid overlap
+        Searches sequentially to avoid overlapping chunks and preserves every
+        source character exactly once.
 
-        for ep in episodes_data:
-            start_marker = ep.get("start_marker", "")
-            end_marker = ep.get("end_marker", "")
+        Start markers are the most reliable source of an internal boundary. An
+        episode's end marker is only used when the following start marker cannot
+        be found. If the LLM omitted or hallucinated a boundary, fall back to a
+        balanced split instead of allowing the first episode to consume the
+        entire document.
+        """
+        episode_count = len(episodes_data)
+        if episode_count == 0:
+            return []
+        if episode_count == 1:
+            return [text]
 
-            start_idx = search_from
-            end_idx = len(text)
+        boundaries = [0]
+        search_from = 0
 
-            if start_marker:
-                found = text.find(start_marker, search_from)
-                if found >= 0:
-                    start_idx = found
+        first_start = episodes_data[0].get("start_marker", "")
+        if isinstance(first_start, str) and first_start:
+            found = text.find(first_start)
+            if found >= 0:
+                search_from = found + len(first_start)
 
-            if end_marker:
-                found = text.find(end_marker, start_idx)
-                if found >= 0:
-                    end_idx = found + len(end_marker)
+        for index in range(1, episode_count):
+            boundary = -1
+            start_marker = episodes_data[index].get("start_marker", "")
 
-            chunks.append(text[start_idx:end_idx])
-            search_from = end_idx  # Next episode starts after this one
+            if isinstance(start_marker, str) and start_marker:
+                found = text.find(start_marker, max(search_from, boundaries[-1]))
+                if found > boundaries[-1]:
+                    boundary = found
+                    search_from = found + len(start_marker)
 
-        # Fallback: if markers produced empty/overlapping chunks, do equal split
-        if not chunks or all(len(c.strip()) == 0 for c in chunks):
-            chunk_size = max(1, len(text) // len(episodes_data))
-            chunks = []
-            for i in range(len(episodes_data)):
-                start = i * chunk_size
-                end = start + chunk_size if i < len(episodes_data) - 1 else len(text)
-                chunks.append(text[start:end])
+            if boundary < 0:
+                end_marker = episodes_data[index - 1].get("end_marker", "")
+                if isinstance(end_marker, str) and end_marker:
+                    found = text.find(end_marker, max(search_from, boundaries[-1]))
+                    if found >= boundaries[-1]:
+                        boundary = found + len(end_marker)
+                        search_from = boundary
 
+            if boundary <= boundaries[-1] or boundary >= len(text):
+                return self._split_text_at_natural_boundaries(text, episode_count)
+            boundaries.append(boundary)
+
+        boundaries.append(len(text))
+        chunks = [
+            text[boundaries[index] : boundaries[index + 1]]
+            for index in range(episode_count)
+        ]
+
+        if text.strip() and any(not chunk.strip() for chunk in chunks):
+            return self._split_text_at_natural_boundaries(text, episode_count)
         return chunks
+
+    def _split_text_at_natural_boundaries(
+        self, text: str, episode_count: int
+    ) -> List[str]:
+        """Return balanced, lossless chunks when LLM markers are unusable.
+
+        Markdown headings are preferred because imported ``.md`` files commonly
+        use them as section boundaries. Otherwise the nearest paragraph, line,
+        sentence, or word boundary around each proportional split is used.
+        """
+        if episode_count <= 0:
+            return []
+        if episode_count == 1:
+            return [text]
+        if not text:
+            return [""] * episode_count
+
+        text_length = len(text)
+
+        def chunks_from(boundaries: List[int]) -> List[str]:
+            all_boundaries = [0] + boundaries + [text_length]
+            return [
+                text[all_boundaries[index] : all_boundaries[index + 1]]
+                for index in range(episode_count)
+            ]
+
+        def choose_boundaries(candidates: List[int]) -> List[int]:
+            """Pick ordered candidates nearest the proportional target points."""
+            selected = []
+            remaining_candidates = sorted(set(candidates))
+            for index in range(1, episode_count):
+                remaining_boundaries = episode_count - index - 1
+                available = [
+                    position
+                    for position in remaining_candidates
+                    if position > (selected[-1] if selected else 0)
+                ]
+                if len(available) <= remaining_boundaries:
+                    return []
+                usable = available[: len(available) - remaining_boundaries]
+                target = round(text_length * index / episode_count)
+                chosen = min(usable, key=lambda position: abs(position - target))
+                selected.append(chosen)
+                remaining_candidates = [
+                    position for position in available if position > chosen
+                ]
+            return selected
+
+        markdown_headings = [
+            match.start()
+            for match in re.finditer(r"(?m)^[ \t]{0,3}#{1,6}[ \t]+\S", text)
+            if 0 < match.start() < text_length
+        ]
+        if len(markdown_headings) >= episode_count - 1:
+            heading_boundaries = choose_boundaries(markdown_headings)
+            if heading_boundaries:
+                heading_chunks = chunks_from(heading_boundaries)
+                if all(chunk.strip() for chunk in heading_chunks):
+                    return heading_chunks
+
+        proportional_boundaries = []
+        can_keep_nonempty = text_length >= episode_count
+        preferred_groups = [
+            [match.end() for match in re.finditer(r"\n[ \t]*\n+", text)],
+            [index + 1 for index, char in enumerate(text) if char == "\n"],
+            [index + 1 for index, char in enumerate(text) if char in "。！？.!?；;"],
+            [match.end() for match in re.finditer(r"[ \t]+", text)],
+        ]
+        ideal_chunk_length = max(1, text_length // episode_count)
+        search_radius = max(20, ideal_chunk_length // 2)
+
+        for index in range(1, episode_count):
+            previous = proportional_boundaries[-1] if proportional_boundaries else 0
+            min_position = previous + (1 if can_keep_nonempty else 0)
+            max_position = text_length - (
+                episode_count - index if can_keep_nonempty else 0
+            )
+            target = round(text_length * index / episode_count)
+            target = max(min_position, min(target, max_position))
+            chosen = target
+
+            for candidates in preferred_groups:
+                nearby = [
+                    position
+                    for position in candidates
+                    if min_position <= position <= max_position
+                    and abs(position - target) <= search_radius
+                ]
+                if nearby:
+                    chosen = min(nearby, key=lambda position: abs(position - target))
+                    break
+            proportional_boundaries.append(chosen)
+
+        return chunks_from(proportional_boundaries)
 
     # ============================================================
     # Series Asset Operations
@@ -4371,6 +4480,85 @@ class ComicGenPipeline:
         if not target_asset:
             raise ValueError(f"Asset {asset_id} of type {asset_type} not found in series")
         return series, target_asset
+
+    def _scan_series_asset_references(
+        self,
+        series_id: str,
+        asset_type: str,
+        asset_id: str,
+    ) -> List[Dict[str, Any]]:
+        """Find episode frames in one series that reference an owned asset."""
+        series = self.series_store.get(series_id)
+        if not series:
+            return []
+
+        episode_ids = set(series.episode_ids)
+        references: List[Dict[str, Any]] = []
+        for script_id, script in self.scripts.items():
+            if script_id not in episode_ids and script.series_id != series_id:
+                continue
+            for frame in script.frames or []:
+                if asset_type == "scene":
+                    referenced = frame.scene_id == asset_id
+                elif asset_type == "character":
+                    referenced = asset_id in (frame.character_ids or [])
+                else:
+                    referenced = asset_id in (frame.prop_ids or [])
+                if referenced:
+                    references.append({
+                        "owner_kind": "project",
+                        "owner_id": script_id,
+                        "owner_title": script.title,
+                        "frame_id": frame.id,
+                    })
+        return references
+
+    def delete_series_asset(
+        self,
+        series_id: str,
+        asset_id: str,
+        asset_type: str,
+        force: bool = False,
+    ) -> Series:
+        """Delete one series-owned asset, protecting live frame references."""
+        with self._save_lock:
+            series, _target_asset = self._find_series_asset(
+                series_id,
+                asset_id,
+                asset_type,
+            )
+            references = self._scan_series_asset_references(
+                series_id,
+                asset_type,
+                asset_id,
+            )
+            if references and not force:
+                raise SeriesAssetInUseError(asset_type, asset_id, references)
+
+            if asset_type == "character":
+                original_assets = series.characters
+                series.characters = [asset for asset in original_assets if asset.id != asset_id]
+            elif asset_type == "scene":
+                original_assets = series.scenes
+                series.scenes = [asset for asset in original_assets if asset.id != asset_id]
+            else:
+                original_assets = series.props
+                series.props = [asset for asset in original_assets if asset.id != asset_id]
+
+            original_updated_at = series.updated_at
+            series.updated_at = time.time()
+            try:
+                self._save_series_data_unlocked()
+            except Exception:
+                if asset_type == "character":
+                    series.characters = original_assets
+                elif asset_type == "scene":
+                    series.scenes = original_assets
+                else:
+                    series.props = original_assets
+                series.updated_at = original_updated_at
+                raise
+            return series
 
     def toggle_series_asset_lock(self, series_id: str, asset_id: str, asset_type: str) -> Series:
         """Toggle the locked status of a Series asset."""

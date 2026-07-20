@@ -52,7 +52,7 @@ const launcher = require({str(REPO_ROOT / 'scripts' / 'start-backend.js')!r});
 const parsed = launcher.readEnvFile({str(env_file)!r});
 if (parsed.API_HOST !== '127.0.0.2' || parsed.API_PORT !== '18181') process.exit(2);
 const merged = launcher.appendNoProxy('example.com,localhost');
-if (merged !== 'example.com,localhost,.aliyuncs.com,aliyuncs.com,127.0.0.1') process.exit(3);
+if (merged !== 'example.com,localhost,127.0.0.1') process.exit(3);
 """
 
     subprocess.run(["node", "-e", script], check=True)

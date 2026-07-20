@@ -209,20 +209,9 @@ def test_compose_binds_published_ports_to_loopback_by_default():
     assert "lumenx-config:/data" in compose
 
 
-def test_oss_initialization_does_not_print_configuration(monkeypatch, capsys):
-    from src.utils.oss_utils import OSSImageUploader
+def test_obsolete_config_diagnostic_endpoint_is_removed():
+    client = TestClient(comic_api.app, client=("127.0.0.1", 50000))
 
-    for name in (
-        "ALIBABA_CLOUD_ACCESS_KEY_ID",
-        "ALIBABA_CLOUD_ACCESS_KEY_SECRET",
-        "OSS_ENDPOINT",
-        "OSS_BUCKET_NAME",
-    ):
-        monkeypatch.delenv(name, raising=False)
+    response = client.get("/debug/config")
 
-    OSSImageUploader.reset_instance()
-    try:
-        OSSImageUploader()
-        assert capsys.readouterr().out == ""
-    finally:
-        OSSImageUploader.reset_instance()
+    assert response.status_code == 404

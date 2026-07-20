@@ -4,8 +4,8 @@
  * UpdateChecker — 关于页「检查更新」(Phase 2 设置规格 §B ⑥b)。
  *
  * 纯前端、自包含、无 props：SettingsPage 直接 <UpdateChecker /> 渲染即可。
- * 手动按钮 → 拉取 GitHub releases/latest(未授权,限流 ~60/hr)→ 与本地
- * 版本比对 → 有新版仅提示并打开发布页(绝不自更新)。
+ * 手动按钮 → 拉取个人仓库 main 分支最新提交(未授权,限流 ~60/hr)→
+ * 与构建提交比对 → 有变化仅提示并打开提交页(绝不自更新)。
  *
  * 主题:仅语义 token(primary=teal 动作/链接,accent=amber 提示),
  * 状态文案用 text-text-secondary / text-text-muted。无硬编码色 / 无 white-alpha。
@@ -15,79 +15,79 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { RefreshCw, Loader2, Check, Sparkles, ExternalLink, CircleAlert } from "lucide-react";
 
-// 本地版本常量,避免跨文件耦合(与 SettingsPage 的 APP_VERSION 同源)。
-const APP_VERSION = "v0.2.0";
-const REPO = "alibaba/lumenx";
-const LATEST_API = `https://api.github.com/repos/${REPO}/releases/latest`;
-const RELEASES_URL = `https://github.com/${REPO}/releases`;
+const DEFAULT_REPOSITORY = "paulyan678/lumenx";
+const REPOSITORY_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+const configuredRepository = process.env.NEXT_PUBLIC_UPDATE_REPOSITORY?.trim();
+
+export const UPDATE_REPOSITORY =
+  configuredRepository && REPOSITORY_PATTERN.test(configuredRepository)
+    ? configuredRepository
+    : DEFAULT_REPOSITORY;
+export const UPDATE_BRANCH = "main";
+export const LATEST_COMMIT_API = `https://api.github.com/repos/${UPDATE_REPOSITORY}/commits/${UPDATE_BRANCH}`;
+export const COMMITS_URL = `https://github.com/${UPDATE_REPOSITORY}/commits/${UPDATE_BRANCH}`;
+
+const BUILD_COMMIT = process.env.NEXT_PUBLIC_BUILD_COMMIT?.trim() || "";
 
 type Status = "idle" | "checking" | "latest" | "update" | "error";
 
-/** 解析为可比较的数字段:剥离前导 v,按 . + - 拆分,非数字视作 0。 */
-function parseSemver(v: string): number[] {
-  return v
-    .trim()
-    .replace(/^[vV]/, "")
-    .split(/[.+-]/)
-    .map((s) => {
-      const n = parseInt(s, 10);
-      return Number.isNaN(n) ? 0 : n;
-    });
+function normalizeCommit(value: string): string {
+  return value.trim().toLowerCase();
 }
 
-/** remote 是否比 current 更新(逐段数字比较,短的补 0;相等视为非更新)。 */
-function isNewer(remote: string, current: string): boolean {
-  const a = parseSemver(remote);
-  const b = parseSemver(current);
-  const len = Math.max(a.length, b.length);
-  for (let i = 0; i < len; i++) {
-    const x = a[i] ?? 0;
-    const y = b[i] ?? 0;
-    if (x > y) return true;
-    if (x < y) return false;
-  }
-  return false;
+/** Accept full or abbreviated SHAs when comparing the build with GitHub. */
+export function commitsMatch(remote: string, current: string): boolean {
+  const remoteCommit = normalizeCommit(remote);
+  const currentCommit = normalizeCommit(current);
+  return Boolean(
+    remoteCommit &&
+      currentCommit &&
+      (remoteCommit.startsWith(currentCommit) || currentCommit.startsWith(remoteCommit)),
+  );
 }
 
-export default function UpdateChecker() {
+type UpdateCheckerProps = {
+  currentCommit?: string;
+};
+
+export default function UpdateChecker({ currentCommit = BUILD_COMMIT }: UpdateCheckerProps) {
   const t = useTranslations("settings");
   const [status, setStatus] = useState<Status>("idle");
-  const [remoteTag, setRemoteTag] = useState("");
-  const [releaseUrl, setReleaseUrl] = useState("");
+  const [remoteCommit, setRemoteCommit] = useState("");
+  const [commitUrl, setCommitUrl] = useState("");
   const [errorMsg, setErrorMsg] = useState(() => t("updateError"));
 
   const checking = status === "checking";
 
-  const openReleases = (url?: string) =>
-    window.open(url || RELEASES_URL, "_blank", "noopener,noreferrer");
+  const openChanges = (url?: string) =>
+    window.open(url || COMMITS_URL, "_blank", "noopener,noreferrer");
 
   const handleCheck = async () => {
     setStatus("checking");
     setErrorMsg(t("updateError"));
+    if (!normalizeCommit(currentCommit)) {
+      setErrorMsg(t("updateBuildUnknown"));
+      setStatus("error");
+      return;
+    }
     try {
-      const res = await fetch(LATEST_API, {
+      const res = await fetch(LATEST_COMMIT_API, {
         headers: { Accept: "application/vnd.github+json" },
       });
-      // 404 = 仓库尚无任何 release;403 通常是未授权限流。
-      if (res.status === 404) {
-        setErrorMsg(t("updateNoRelease"));
-        setStatus("error");
-        return;
-      }
       if (!res.ok) {
         setStatus("error");
         return;
       }
       const data = await res.json();
-      const tag: string = typeof data?.tag_name === "string" ? data.tag_name : "";
+      const sha: string = typeof data?.sha === "string" ? data.sha.trim() : "";
       const url: string = typeof data?.html_url === "string" ? data.html_url : "";
-      if (!tag) {
+      if (!sha) {
         setStatus("error");
         return;
       }
-      setRemoteTag(tag);
-      setReleaseUrl(url);
-      setStatus(isNewer(tag, APP_VERSION) ? "update" : "latest");
+      setRemoteCommit(sha.slice(0, 7));
+      setCommitUrl(url);
+      setStatus(commitsMatch(sha, currentCommit) ? "latest" : "update");
     } catch {
       setStatus("error");
     }
@@ -117,13 +117,13 @@ export default function UpdateChecker() {
           {status === "latest" && (
             <>
               <Check size={13} />
-              {t("updateUpToDate", { version: APP_VERSION })}
+              {t("updateUpToDate", { commit: remoteCommit })}
             </>
           )}
           {status === "update" && (
             <>
               <Sparkles size={13} />
-              {t("updateNewVersion", { version: remoteTag })}
+              {t("updateNewVersion", { commit: remoteCommit })}
             </>
           )}
           {status === "error" && (
@@ -137,11 +137,11 @@ export default function UpdateChecker() {
         {showOpenButton && (
           <button
             type="button"
-            onClick={() => openReleases(status === "update" ? releaseUrl : undefined)}
+            onClick={() => openChanges(status === "update" ? commitUrl : undefined)}
             className="inline-flex items-center gap-1 text-primary hover:underline text-[0.75rem] font-medium"
-            aria-label={t("updateOpenReleaseAria")}
+            aria-label={t("updateOpenCommitAria")}
           >
-            {t("updateOpenRelease")}
+            {t("updateOpenCommit")}
             <ExternalLink size={12} />
           </button>
         )}

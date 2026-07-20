@@ -29,6 +29,7 @@ export default function ScriptProcessor() {
     const currentProject = useProjectStore((state) => state.currentProject);
     const updateProject = useProjectStore((state) => state.updateProject);
     const analyzeProject = useProjectStore((state) => state.analyzeProject);
+    const selectProject = useProjectStore((state) => state.selectProject);
     const isAnalyzing = useProjectStore((state) => state.isAnalyzing);
 
     // Initialize from project data. Fallback to snake_case original_text
@@ -288,6 +289,9 @@ export default function ScriptProcessor() {
                 isOpen={reconcileOpen}
                 scriptId={currentProject?.id ?? null}
                 onClose={() => setReconcileOpen(false)}
+                onApplied={async () => {
+                    if (currentProject?.id) await selectProject(currentProject.id);
+                }}
             />
 
         </div>

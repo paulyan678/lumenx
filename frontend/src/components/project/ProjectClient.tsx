@@ -22,6 +22,7 @@ import EnvConfigDialog from "@/components/project/EnvConfigDialog";
 import PromptConfigModal from "@/components/project/PromptConfigModal";
 import StoryboardR2V from "@/components/modules/StoryboardR2V";
 import EntityConfirmModal from "@/components/modules/EntityConfirmModal";
+import { usesUnifiedProjectFlow } from "@/lib/workflowRouting";
 import dynamic from "next/dynamic";
 
 const CreativeCanvas = dynamic(() => import("@/components/canvas/CreativeCanvas"), { ssr: false });
@@ -87,12 +88,13 @@ export default function ProjectClient({ id, breadcrumbSegments }: { id: string; 
     }, [currentProject?.series_id]);
 
     const steps = useMemo(() => {
-        // PR-3f routing: backend enum "r2v" → unified workbench (5 steps).
-        // Anything else (i2v_legacy, missing) → legacy 9-step path. Old
-        // projects without workflow_mode default to legacy for backward
-        // compat (spec §3.2).
+        // Series episodes always use the unified workbench because their
+        // reconciliation flow leads into Cast. New API episodes can retain
+        // the i2v_legacy generation flag, so workflow_mode alone is not a
+        // reliable UI-routing signal. Standalone legacy projects keep the
+        // original six-step path.
         let base;
-        if (currentProject?.workflow_mode !== "r2v") {
+        if (!usesUnifiedProjectFlow(currentProject)) {
             base = LEGACY_STEPS;
         } else if (seriesContentMode === "freeform") {
             // Phase 6 — freeform mode: skip Script step, episodes start at

@@ -204,6 +204,14 @@ def test_public_config_masks_secrets_and_returns_metadata_only(monkeypatch):
     assert {item["model_id"] for item in response["NEWAPI_MODELS"]} == set(MODEL_SPECS)
     assert all("api_key" not in item for item in response["NEWAPI_MODELS"])
     assert all(item["enabled"] is True for item in response["NEWAPI_MODELS"])
+    assert set(response) == set(MODEL_API_KEY_FIELDS) | {
+        "NEWAPI_BASE_URL",
+        "NEWAPI_CHAT_MODEL",
+        "NEWAPI_IMAGE_MODEL",
+        "NEWAPI_VIDEO_MODEL",
+        "NEWAPI_MODELS",
+        "secrets_configured",
+    }
 
 
 def test_masked_secret_round_trip_does_not_overwrite_saved_value(monkeypatch):
@@ -212,7 +220,6 @@ def test_masked_secret_round_trip_does_not_overwrite_saved_value(monkeypatch):
     monkeypatch.setenv("NEWAPI_GPT_IMAGE_2_API_KEY", "existing-credential")
     saved = []
     monkeypatch.setattr(api, "save_user_config", lambda values: saved.append(values))
-    monkeypatch.setattr(api.OSSImageUploader, "reset_instance", lambda: None)
 
     result = api.update_env_config(
         api.EnvConfig(NEWAPI_GPT_IMAGE_2_API_KEY="••••••••tial")

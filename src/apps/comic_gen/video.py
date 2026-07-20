@@ -65,19 +65,7 @@ class VideoGenerator:
                 generation_mode="i2v",
             )
             
-            # Upload to OSS if configured
             video_url = os.path.relpath(output_path, "output")
-            try:
-                from ...utils.oss_utils import OSSImageUploader
-                uploader = OSSImageUploader()
-                if uploader.is_configured:
-                    object_key = uploader.upload_file(output_path, sub_path="motion_ref")
-                    if object_key:
-                        logger.info(f"Uploaded motion ref video to OSS: {object_key}")
-                        video_url = object_key
-            except Exception as e:
-                logger.error(f"Failed to upload motion ref to OSS: {e}")
-            
             return {"video_url": video_url}
             
         except Exception as e:
@@ -98,15 +86,8 @@ class VideoGenerator:
         
         # Convert file:// URL to local path if necessary, or ensure the model can handle it.
         # New API accepts a public URL or encoded image input.
-        # For this local demo, we might need to assume the user has a way to serve files or upload them.
-        # OR we mock the upload.
-        # For now, let's assume the image_url is accessible to the API (e.g. if we used an OSS URL earlier).
-        # If it's a local file, we can't really call the API unless we upload it.
-        
-        # TODO: Implement file upload to OSS/S3 here if needed.
-        # For the purpose of this demo code, we'll assume the image_url is valid for the API.
-        # If it starts with file://, we strip it, but the API won't be able to read local files.
-        # We will log a warning.
+        # Local files are passed directly to the New API adapter, which packages
+        # the image input for the remote request.
         
         img_url = frame.image_url
         img_path = None
@@ -146,20 +127,6 @@ class VideoGenerator:
             rel_path = os.path.relpath(output_path, "output")
             frame.video_url = rel_path
             frame.status = GenerationStatus.COMPLETED
-            
-            # Try uploading to OSS if configured - store Object Key (not full URL)
-            try:
-                from ...utils.oss_utils import OSSImageUploader
-                uploader = OSSImageUploader()
-                if uploader.is_configured:
-                    object_key = uploader.upload_file(output_path, sub_path="video")
-                    if object_key:
-                        logger.info(f"Uploaded video for frame {frame.id} to OSS: {object_key}")
-                        # Store Object Key (will be converted to signed URL on API response)
-                        frame.video_url = object_key
-            except Exception as e:
-                logger.error(f"Failed to upload video for frame {frame.id} to OSS: {e}")
-                # Continue even if OSS upload fails
         except Exception as e:
             logger.error(f"Failed to generate video for frame {frame.id}: {e}")
             frame.status = GenerationStatus.FAILED

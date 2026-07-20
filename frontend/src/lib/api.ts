@@ -57,15 +57,9 @@ export interface EnvConfigPayload {
     NEWAPI_DEEPSEEK_V4_FLASH_API_KEY?: string;
     NEWAPI_QWEN_37_MAX_API_KEY?: string;
     NEWAPI_DEEPSEEK_V4_PRO_API_KEY?: string;
-    ALIBABA_CLOUD_ACCESS_KEY_ID?: string;
-    ALIBABA_CLOUD_ACCESS_KEY_SECRET?: string;
-    OSS_BUCKET_NAME?: string;
-    OSS_ENDPOINT?: string;
-    OSS_BASE_PATH?: string;
-    OSS_ENABLE?: boolean;
     // Secrets from GET are masked (bullets + last 4 chars). This map reports
     // which credential fields are actually configured on the backend.
-    secrets_configured?: Partial<Record<NewApiSecretField | "ALIBABA_CLOUD_ACCESS_KEY_ID" | "ALIBABA_CLOUD_ACCESS_KEY_SECRET", boolean>>;
+    secrets_configured?: Partial<Record<NewApiSecretField, boolean>>;
     NEWAPI_MODELS?: NewApiModelConfigPayload[];
     [key: string]: string | Record<string, string> | Record<string, boolean> | NewApiModelConfigPayload[] | boolean | undefined;
 }
@@ -103,6 +97,15 @@ export interface ReconcileAction {
     local_id: string;
     action: "merge_into_series" | "create_new_in_series" | "skip";
     target_series_id?: string;
+}
+
+export interface SeriesImportConfirmResponse {
+    series: {
+        id: string;
+    };
+    episodes: Array<{
+        id: string;
+    }>;
 }
 
 export interface VideoTask {
@@ -966,6 +969,17 @@ export const api = {
         const res = await axios.put(`${API_URL}/library/assets/${assetType}/${assetId}`, patch);
         return res.data;
     },
+    /** 永久删除全局/共享资产。被分镜引用时后端返回 409；force=true 可确认后强制删除。 */
+    deleteLibraryAsset: async (
+        assetType: "character" | "scene" | "prop",
+        assetId: string,
+        force: boolean = false,
+    ) => {
+        const res = await axios.delete(`${API_URL}/library/assets/${assetType}/${assetId}`, {
+            params: { force },
+        });
+        return res.data;
+    },
     /** 把项目/系列来源资产 deep-copy 提升进全局共享池。后端：POST /library/assets/promote。
      *  sourceKind: "project"|"series"；assetType 单数。 */
     promoteAssetToLibrary: async (
@@ -1131,6 +1145,18 @@ export const api = {
         const response = await axios.get(`${API_URL}/series/${seriesId}/assets`);
         return response.data;
     },
+    deleteSeriesAsset: async (
+        seriesId: string,
+        assetType: "character" | "scene" | "prop",
+        assetId: string,
+        force: boolean = false,
+    ) => {
+        const response = await axios.delete(
+            `${API_URL}/series/${seriesId}/assets/${assetType}/${assetId}`,
+            { params: { force } },
+        );
+        return response.data;
+    },
     importSeriesAssets: async (seriesId: string, sourceSeriesId: string, assetIds: string[]) => {
         const response = await axios.post(`${API_URL}/series/${seriesId}/assets/import`, { source_series_id: sourceSeriesId, asset_ids: assetIds });
         return response.data;
@@ -1172,7 +1198,7 @@ export const api = {
         return response.data;
     },
     importFileConfirm: async (data: { title: string; description?: string; import_id?: string; text?: string; episodes: any[] }) => {
-        const response = await axios.post(`${API_URL}/series/import/confirm`, data);
+        const response = await axios.post<SeriesImportConfirmResponse>(`${API_URL}/series/import/confirm`, data);
         return response.data;
     },
 };

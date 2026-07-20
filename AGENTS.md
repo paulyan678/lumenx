@@ -79,9 +79,8 @@ The AI Comic Generator is a complete AI-powered comic video production platform 
 ### Backend
 - Framework: FastAPI (Python 3.11+)
 - AI integration: New API only, using exact model IDs and model-specific API keys
-- Optional cloud storage: Alibaba Cloud OSS (independent from AI provider routing)
 - Data validation: Pydantic
-- File storage: Local + Alibaba Cloud OSS
+- File storage: Local `output/` directory
 
 ### Core Components
 
@@ -112,7 +111,7 @@ src/
 │   ├── audio.py         # Audio generation
 │   └── export.py        # Video export/synthesis
 ├── models/              # AI model wrappers
-├── utils/               # Utility functions (OSS integration)
+├── utils/               # Shared utility functions
 └── config.py            # Global configuration
 ```
 
@@ -231,7 +230,7 @@ User project data is stored in `~/.lumen-x/`:
 ### Configuration
 - New API model-specific keys can be configured via `.env` or the app settings dialog
 - AI requests must use the selected model's exact key; shared-key and cross-model fallback are not supported
-- OSS configuration is optional but recommended for cloud storage
+- Generated and uploaded media must remain under the local `output/` directory
 - Model settings can be changed per project via `update_model_settings`
 
 ## Debugging
@@ -239,7 +238,6 @@ User project data is stored in `~/.lumen-x/`:
 ### Common Issues
 - FFmpeg not found: Install FFmpeg and ensure it's in PATH
 - API keys missing: Configure the selected New API model's key via app settings or `.env`
-- OSS errors: Verify credentials and bucket permissions
 - Video merge failures: Check if video files exist and have proper paths
 
 ### Logs

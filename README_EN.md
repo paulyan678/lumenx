@@ -158,7 +158,6 @@ LumenX uses a **local-first** architecture and New API is its only AI provider. 
 | `NEWAPI_CHAT_MODEL` | Active chat model; default `deepseek-v4-flash` |
 | `NEWAPI_IMAGE_MODEL` | Active image model; default `gpt-image-2` |
 | `NEWAPI_VIDEO_MODEL` | Active video model; default `doubao-seedance-2-0-fast-260128` |
-| Optional OSS fields | Cloud media mirror + signed URLs; unrelated to AI routing |
 
 <details>
 <summary>Detailed Configuration</summary>
@@ -173,7 +172,7 @@ Saved keys stay masked in the application. LumenX never sends one model's key wi
 
 ## 🏗️ Architecture
 
-The Next.js frontend calls a FastAPI backend that uses New API as its sole AI provider. The backend resolves the selected exact model ID together with its model-specific key. Optional OSS storage handles media only and is not part of AI routing.
+The Next.js frontend calls a FastAPI backend that uses New API as its sole AI provider. The backend resolves the selected exact model ID together with its model-specific key, and generated media stays in the local `output/` directory.
 
 ### Directory Structure
 

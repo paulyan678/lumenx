@@ -200,7 +200,6 @@ pyinstaller --clean --noconfirm \
     --hidden-import=fastapi \
     --hidden-import=pydantic \
     --hidden-import=openai \
-    --hidden-import=oss2 \
     --hidden-import=demucs \
     --hidden-import=demucs.pretrained \
     --hidden-import=demucs.separate \
